@@ -6,6 +6,8 @@ import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import com.olympus.iptv.data.Category
 import com.olympus.iptv.databinding.ItemCategoryBinding
+import com.olympus.iptv.ui.FocusMotion
+import com.olympus.iptv.ui.Haptics
 
 class CategoryAdapter(
     private val onSelect: (Category, Boolean) -> Unit,
@@ -15,8 +17,10 @@ class CategoryAdapter(
     private val locked: (Category) -> Boolean = { false }
 ) : RecyclerView.Adapter<CategoryAdapter.Holder>() {
 
+    private val allItems = mutableListOf<Category>()
     private val items = mutableListOf<Category>()
     private var selectedId: String? = null
+    private var filterQuery = ""
     /** Phone list rows: taller taps, no TV focus-select while scrolling. */
     var phoneListMode = false
 
@@ -25,8 +29,8 @@ class CategoryAdapter(
     }
 
     fun submit(list: List<Category>, selectedId: String?) {
-        val sameItems = items.size == list.size && items.indices.all { index ->
-            val current = items[index]
+        val sameItems = allItems.size == list.size && allItems.indices.all { index ->
+            val current = allItems[index]
             val next = list[index]
             current.id == next.id && current.name == next.name
         }
@@ -34,23 +38,44 @@ class CategoryAdapter(
             if (this.selectedId != selectedId) setSelected(selectedId)
             return
         }
-        if (items.isNotEmpty() && items.size == list.size && items.indices.all { items[it].id == list[it].id }) {
+        if (allItems.isNotEmpty() && allItems.size == list.size && allItems.indices.all { allItems[it].id == list[it].id }) {
             for (index in list.indices) {
-                if (items[index].name != list[index].name) {
-                    items[index] = list[index]
-                    notifyItemChanged(index)
+                if (allItems[index].name != list[index].name) {
+                    allItems[index] = list[index]
                 }
             }
-            if (this.selectedId != selectedId) setSelected(selectedId)
+            this.selectedId = selectedId
+            applyFilter(filterQuery, force = true)
             return
         }
-        if (items.isNotEmpty() && preservesOrder(list)) {
+        if (allItems.isNotEmpty() && filterQuery.isBlank() && preservesOrder(list)) {
             insertArrivals(list, selectedId)
             return
         }
-        items.clear()
-        items.addAll(list)
+        allItems.clear()
+        allItems.addAll(list)
         this.selectedId = selectedId
+        applyFilter(filterQuery, force = true)
+    }
+
+    fun setFilter(query: String) {
+        applyFilter(query.trim(), force = false)
+    }
+
+    private fun applyFilter(query: String, force: Boolean) {
+        val normalized = query.trim()
+        if (!force && normalized.equals(filterQuery, ignoreCase = true) && items.isNotEmpty()) return
+        filterQuery = normalized
+        val next = if (normalized.isBlank()) {
+            allItems.toList()
+        } else {
+            allItems.filter {
+                it.name.contains(normalized, ignoreCase = true) ||
+                    it.id.contains(normalized, ignoreCase = true)
+            }
+        }
+        items.clear()
+        items.addAll(next)
         notifyDataSetChanged()
     }
 
@@ -59,23 +84,23 @@ class CategoryAdapter(
     private fun preservesOrder(list: List<Category>): Boolean {
         var index = 0
         for (item in list) {
-            if (index < items.size && items[index].id == item.id) index++
+            if (index < allItems.size && allItems[index].id == item.id) index++
         }
-        return index == items.size
+        return index == allItems.size
     }
 
     private fun insertArrivals(list: List<Category>, selectedId: String?) {
         var index = 0
         for (item in list) {
-            if (index < items.size && items[index].id == item.id) {
+            if (index < allItems.size && allItems[index].id == item.id) {
                 index++
             } else {
-                items.add(index, item)
-                notifyItemInserted(index)
+                allItems.add(index, item)
                 index++
             }
         }
         this.selectedId = selectedId
+        applyFilter(filterQuery, force = true)
     }
 
     fun categories(): List<Category> = items.toList()
@@ -87,9 +112,10 @@ class CategoryAdapter(
 
     fun setSelected(id: String?) {
         val old = items.indexOfFirst { it.id == selectedId }
-        val next = items.indexOfFirst { it.id == id }
         selectedId = id
-        if (old >= 0 && old != next) notifyItemChanged(old)
+        val next = items.indexOfFirst { it.id == id }
+        if (old >= 0) notifyItemChanged(old)
+        if (next >= 0 && next != old) notifyItemChanged(next)
     }
 
     fun refreshDetails() {
@@ -132,21 +158,42 @@ class CategoryAdapter(
                     binding.root.layoutParams = params
                 }
             }
-            binding.root.setOnClickListener { onSelect(item, true) }
+            binding.root.setOnClickListener {
+                if (phoneListMode) Haptics.tick(binding.root)
+                onSelect(item, true)
+            }
             binding.root.setOnLongClickListener {
+                if (phoneListMode) Haptics.tick(binding.root)
                 onHold(item)
                 true
             }
             if (phoneListMode) {
                 binding.root.onFocusChangeListener = null
+                binding.root.scaleX = 1f
+                binding.root.scaleY = 1f
+                binding.root.elevation = 0f
+                binding.label.alpha = 1f
+                binding.detail.alpha = 1f
+                binding.icon.alpha = 1f
             } else {
                 binding.root.setOnFocusChangeListener { _, hasFocus ->
+                    FocusMotion.animate(binding.root, hasFocus)
+                    paintFocusChrome(hasFocus || item.id == selectedId)
                     if (hasFocus) {
                         binding.root.isSelected = true
                         onSelect(item, false)
                     }
                 }
+                FocusMotion.animate(binding.root, binding.root.isFocused)
+                paintFocusChrome(binding.root.isFocused || item.id == selectedId)
             }
+        }
+
+        private fun paintFocusChrome(active: Boolean) {
+            val alpha = if (active) 1f else 0.55f
+            binding.label.alpha = alpha
+            binding.detail.alpha = if (active) 0.95f else 0.45f
+            binding.icon.alpha = if (active) 1f else 0.5f
         }
 
         fun showDetail(item: Category) {

@@ -9,6 +9,8 @@ import android.os.Handler
 import android.os.Looper
 import android.os.Process
 import android.os.SystemClock
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
@@ -61,12 +63,16 @@ import com.olympus.iptv.remind.ReminderStore
 import com.olympus.iptv.playlist.GroupLock
 import com.olympus.iptv.playlist.LineupClient
 import com.olympus.iptv.playlist.LoadedPlaylist
+import com.olympus.iptv.playlist.PinAlert
 import com.olympus.iptv.playlist.PlaylistLoader
 import com.olympus.iptv.playlist.XtreamClient
+import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.olympus.iptv.record.RecordActivity
 import com.olympus.iptv.remind.RemindersActivity
 import com.olympus.iptv.record.RecordPrompt
 import com.olympus.iptv.record.RecordingService
+import com.olympus.iptv.ui.FocusMotion
+import com.olympus.iptv.ui.Haptics
 import com.olympus.iptv.ui.epg.EpgEditsActivity
 import com.olympus.iptv.ui.login.LoginActivity
 import com.olympus.iptv.ui.player.PlayerActivity
@@ -201,8 +207,8 @@ class BrowseActivity : AppCompatActivity() {
     )
     private val channelAdapter = ChannelAdapter(
         onClick = { play(it) },
-        onLongClick = { _ ->
-            showRowOptions()
+        onLongClick = { channel ->
+            showRowOptions(channel)
             true
         },
         onFocused = { showChannelDetail(it) },
@@ -842,7 +848,12 @@ class BrowseActivity : AppCompatActivity() {
     private fun refreshPlaylist(quiet: Boolean = false) {
         val saved = playlist ?: return
         val app = application as OlympusIptvApp
-        if (app.catalogRefresh?.isActive == true) return
+        if (app.catalogRefresh?.isActive == true) {
+            if (touchPrimary && ::binding.isInitialized && quiet) {
+                binding.groupsRefresh.isRefreshing = true
+            }
+            return
+        }
         val db = app.catalogDb
         if (!quiet) {
             binding.refreshLine.visibility = View.VISIBLE
@@ -1053,11 +1064,13 @@ class BrowseActivity : AppCompatActivity() {
                         if (added == 0) getString(R.string.refresh_quiet_done)
                         else getString(R.string.refresh_quiet_added, added)
                     )
+                    binding.groupsRefresh.isRefreshing = false
                     return@withContext
                 }
                 moviesPending = false
                 showsPending = false
                 showLoading(false)
+                binding.groupsRefresh.isRefreshing = false
                 binding.refreshLine.visibility = View.VISIBLE
                 binding.refreshLine.text = if (added == 0) {
                     getString(R.string.refresh_current)
@@ -1974,6 +1987,7 @@ class BrowseActivity : AppCompatActivity() {
         binding.adminPane.visibility = View.VISIBLE
         hidePreviewChrome()
         updateGroupClock()
+        paintAdminParentalSummary()
         if (touchPrimary) {
             binding.mobileTopBar.visibility = View.VISIBLE
             binding.mobileBack.visibility = View.VISIBLE
@@ -1982,6 +1996,55 @@ class BrowseActivity : AppCompatActivity() {
             paintMobileSettingsChips()
         }
         focus.post { if (focus.isShown) focus.requestFocus() }
+    }
+
+    private fun paintAdminParentalSummary() {
+        if (!::binding.isInitialized) return
+        lifecycleScope.launch {
+            val prefs = withContext(Dispatchers.IO) {
+                (application as OlympusIptvApp).playlistStore.devicePrefs()
+            }
+            if (isDestroyed) return@launch
+            val locked = activeConfig.groupPins.orEmpty().size
+            val base = if (locked <= 0) {
+                getString(R.string.admin_parental_none, prefs.parentalTimeoutMinutes)
+            } else {
+                getString(R.string.admin_parental_summary, locked, prefs.parentalTimeoutMinutes)
+            }
+            val quiet = getString(if (prefs.quietHours) R.string.admin_quiet_on else R.string.admin_quiet_off)
+            binding.adminParentalSummary.text = base + quiet
+            maybeShowBackupTip()
+        }
+    }
+
+    private fun paintNowPlayingBar() {
+        if (!touchPrimary || !::binding.isInitialized) return
+        val app = application as OlympusIptvApp
+        val channel = app.lastPlayed
+        val match = channel != null && app.lastPlayedPlaylistId == playlist?.id
+        if (!match || channel == null) {
+            binding.nowPlayingBar.visibility = View.GONE
+            return
+        }
+        binding.nowPlayingTitle.text = channel.name
+        binding.nowPlayingBar.visibility =
+            if (binding.groupColumn.visibility == View.VISIBLE) View.VISIBLE else View.GONE
+    }
+
+    private fun resumeNowPlaying() {
+        val app = application as OlympusIptvApp
+        val channel = app.lastPlayed ?: return
+        if (app.lastPlayedPlaylistId != playlist?.id) return
+        Haptics.tick(binding.nowPlayingResume)
+        play(channel, queueOverride = listOf(channel), zapMode = PlayerActivity.ZAP_LIST, rememberReturn = true)
+    }
+
+    private fun maybeShowBackupTip() {
+        if (!touchPrimary) return
+        val prefs = getSharedPreferences("olympus_tips", MODE_PRIVATE)
+        if (prefs.getBoolean("backup_tip_shown", false)) return
+        prefs.edit().putBoolean("backup_tip_shown", true).apply()
+        Toast.makeText(this, R.string.backup_tip, Toast.LENGTH_LONG).show()
     }
 
     override fun onStop() {
@@ -2043,6 +2106,8 @@ class BrowseActivity : AppCompatActivity() {
 
     private var seenLibraryStamp = -1L
     private var holdChannelId: String? = null
+    private val groupScrollOffset = HashMap<String, Int>()
+    private var pinFailStreak = 0
 
     private val lineupWatch: (String) -> Unit = { id ->
         if (id == playlist?.id && !isDestroyed) {
@@ -2174,6 +2239,7 @@ class BrowseActivity : AppCompatActivity() {
         reloadRecent()
         flushGroupRefresh()
         GroupLock.purgeExpired()
+        paintNowPlayingBar()
         lifecycleScope.launch {
             val prefs = withContext(Dispatchers.IO) {
                 (application as OlympusIptvApp).playlistStore.devicePrefs()
@@ -2504,6 +2570,18 @@ class BrowseActivity : AppCompatActivity() {
     }
 
     private fun showWrongPinModal() {
+        pinFailStreak += 1
+        if (pinFailStreak >= 2) {
+            val email = playlist?.email?.trim().orEmpty()
+            if (email.isNotBlank() && PinAlert.configured()) {
+                val app = application as OlympusIptvApp
+                app.appScope.launch {
+                    val deviceId = runCatching { app.playlistStore.deviceId() }.getOrDefault("")
+                    PinAlert.notifyFailedUnlock(app, email, deviceId)
+                }
+            }
+            pinFailStreak = 0
+        }
         pinDigits = ""
         paintGroupPin()
         binding.groupPin.visibility = View.GONE
@@ -2563,11 +2641,14 @@ class BrowseActivity : AppCompatActivity() {
             saveGroupPin(category.id, pinDigits)
             hideGroupPin()
             categoryAdapter.refreshDetails()
+            Haptics.tick(binding.groupPin)
             Toast.makeText(this, R.string.pin_set_ok, Toast.LENGTH_SHORT).show()
             focusGroups()
             return
         }
         if (GroupLock.accepts(activeConfig, category.id, pinDigits)) {
+            pinFailStreak = 0
+            Haptics.tick(binding.groupPin)
             lifecycleScope.launch {
                 val minutes = withContext(Dispatchers.IO) {
                     (application as OlympusIptvApp).playlistStore.parentalTimeoutMinutes()
@@ -2580,6 +2661,7 @@ class BrowseActivity : AppCompatActivity() {
             }
             return
         }
+        Haptics.reject(binding.groupPin)
         showWrongPinModal()
     }
 
@@ -3088,6 +3170,27 @@ class BrowseActivity : AppCompatActivity() {
         binding.mobileTitle.setOnClickListener { /* section switching is the bottom tabs */ }
         binding.mobileAdmin.setOnClickListener { showAdminPane() }
         binding.mobileAbout.setOnClickListener { showAboutPane() }
+        binding.mobileSearch.setOnClickListener { openSearch() }
+        binding.groupsSearch.visibility = View.VISIBLE
+        binding.groupsSearch.setOnClickListener { openSearch() }
+        binding.groupsFilter.visibility = View.VISIBLE
+        binding.groupsFilter.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
+            override fun afterTextChanged(s: Editable?) {
+                categoryAdapter.setFilter(s?.toString().orEmpty())
+            }
+        })
+        binding.nowPlayingResume.setOnClickListener { resumeNowPlaying() }
+        binding.nowPlayingBar.setOnClickListener { resumeNowPlaying() }
+        binding.groupsRefresh.isEnabled = true
+        binding.groupsRefresh.setColorSchemeResources(R.color.accent)
+        binding.groupsRefresh.setProgressBackgroundColorSchemeResource(R.color.bg_elevated)
+        binding.groupsRefresh.setOnRefreshListener {
+            Haptics.tick(binding.groupsRefresh)
+            refreshPlaylist(quiet = true)
+        }
+        paintNowPlayingBar()
         val openLive = View.OnClickListener { openSection(GuideSection.TV) }
         val openMovies = View.OnClickListener { openSection(GuideSection.MOVIES) }
         val openShows = View.OnClickListener { openSection(GuideSection.SHOWS) }
@@ -3140,8 +3243,14 @@ class BrowseActivity : AppCompatActivity() {
     }
 
     private fun wireHomeContinue() {
-        binding.homeContinue.setOnClickListener { openHomeContinue() }
-        binding.homeContinuePlay.setOnClickListener { openHomeContinue() }
+        binding.homeContinue.setOnClickListener {
+            Haptics.tick(binding.homeContinue)
+            openHomeContinue()
+        }
+        binding.homeContinuePlay.setOnClickListener {
+            Haptics.tick(binding.homeContinuePlay)
+            openHomeContinue()
+        }
         binding.homeContinue.setOnLongClickListener {
             openContinueGroup()
             true
@@ -3149,6 +3258,11 @@ class BrowseActivity : AppCompatActivity() {
         binding.homeContinuePlay.setOnLongClickListener {
             openContinueGroup()
             true
+        }
+        if (!touchPrimary) {
+            binding.homeContinue.setOnFocusChangeListener { _, hasFocus ->
+                FocusMotion.animate(binding.homeContinue, hasFocus)
+            }
         }
         binding.homeContinue.setOnKeyListener { _, keyCode, event ->
             if (event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener false
@@ -3263,7 +3377,8 @@ class BrowseActivity : AppCompatActivity() {
             binding.btnFavoritesSetup, binding.btnQueue, binding.btnFresh,
             binding.btnRemind, binding.btnParental,
             binding.mobileTabLive, binding.mobileTabMovies, binding.mobileTabShows,
-            binding.mobileBack, binding.mobileAdmin, binding.mobileAbout,
+            binding.mobileBack, binding.mobileAdmin, binding.mobileAbout, binding.mobileSearch,
+            binding.groupsSearch,
             binding.bottomTabLive, binding.bottomTabMovies, binding.bottomTabShows
         ).forEach { chip ->
             chip.minHeight = min
@@ -3355,6 +3470,7 @@ class BrowseActivity : AppCompatActivity() {
             binding.groupPinWrong.visibility == View.VISIBLE -> dismissWrongPinToGroups()
             binding.groupPin.visibility == View.VISIBLE -> cancelGroupPinToGroups()
             guideMenu == GuideMenu.CHANNELS || guideMenu == GuideMenu.PROGRAMS -> {
+                rememberGroupScroll()
                 showMenu(GuideMenu.GROUPS)
                 armGroupFocus()
                 focusGroups()
@@ -3373,6 +3489,11 @@ class BrowseActivity : AppCompatActivity() {
     private fun showMenu(next: GuideMenu) {
         if (next == GuideMenu.PROGRAMS && section != GuideSection.TV) return
         if (next == guideMenu) return
+        if ((guideMenu == GuideMenu.CHANNELS || guideMenu == GuideMenu.PROGRAMS) &&
+            next == GuideMenu.GROUPS
+        ) {
+            rememberGroupScroll()
+        }
         previousMenu = guideMenu
         guideMenu = next
         val guideUp = binding.groupColumn.visibility == View.VISIBLE ||
@@ -3445,6 +3566,10 @@ class BrowseActivity : AppCompatActivity() {
             binding.mobileSectionRow.visibility = View.GONE
         }
         paintHomeContinue()
+        paintNowPlayingBar()
+        if (touchPrimary) {
+            binding.groupsFilter.visibility = if (showGroups) View.VISIBLE else View.GONE
+        }
         val content = binding.contentColumn.layoutParams as LinearLayout.LayoutParams
         val programs = binding.programPane.layoutParams as LinearLayout.LayoutParams
         val density = resources.displayMetrics.density
@@ -3974,11 +4099,12 @@ class BrowseActivity : AppCompatActivity() {
         return categoryAdapter.categories().getOrNull(pos)
     }
 
-    private fun showRowOptions() {
+    private fun showRowOptions(seed: Channel? = null) {
         val now = android.os.SystemClock.uptimeMillis()
         if (now - rowMenuAt < 400L) return
         rowMenuAt = now
-        val channel = (currentFocus?.tag as? ProgramGuideAdapter.Slot)?.let { visibleChannels.getOrNull(it.row) }
+        val channel = seed
+            ?: (currentFocus?.tag as? ProgramGuideAdapter.Slot)?.let { visibleChannels.getOrNull(it.row) }
             ?: focusedChannel
             ?: return
         val saved = playlist ?: return
@@ -3994,7 +4120,7 @@ class BrowseActivity : AppCompatActivity() {
             val actions = ArrayList<Int>()
             labels += getString(if (favorite) R.string.guide_remove_favorite else R.string.guide_add_favorite)
             actions += 0
-            if (section == GuideSection.TV) {
+            if (section == GuideSection.TV && !touchPrimary) {
                 labels += getString(R.string.guide_move_up)
                 actions += 1
                 labels += getString(R.string.guide_move_down)
@@ -4010,26 +4136,86 @@ class BrowseActivity : AppCompatActivity() {
                 labels += getString(if (queued) R.string.queue_remove else R.string.queue_add)
                 actions += 5
             }
-            androidx.appcompat.app.AlertDialog.Builder(this@BrowseActivity)
-                .setTitle(channel.name)
-                .setItems(labels.toTypedArray()) { _, which ->
-                    when (actions[which]) {
-                        0 -> toggleGuideFavorite(channel)
-                        1 -> moveFavorite(channel, -1)
-                        2 -> moveFavorite(channel, 1)
-                        3 -> offerRecording(channel)
-                        4 -> offerReminder(channel)
-                        5 -> if (queueItem != null) {
-                            app.appScope.launch {
-                                if (queued) app.playlistStore.removeQueue(saved.id, queueItem.bucket, queueItem.id)
-                                else app.playlistStore.addQueue(saved.id, queueItem)
-                            }
+            val runAction: (Int) -> Unit = { action ->
+                when (action) {
+                    0 -> toggleGuideFavorite(channel)
+                    1 -> moveFavorite(channel, -1)
+                    2 -> moveFavorite(channel, 1)
+                    3 -> offerRecording(channel)
+                    4 -> offerReminder(channel)
+                    5 -> if (queueItem != null) {
+                        app.appScope.launch {
+                            if (queued) app.playlistStore.removeQueue(saved.id, queueItem.bucket, queueItem.id)
+                            else app.playlistStore.addQueue(saved.id, queueItem)
                         }
                     }
                 }
-                .setNegativeButton(android.R.string.cancel, null)
-                .show()
+            }
+            if (touchPrimary) {
+                showPhoneRowSheet(channel.name, labels, actions, runAction)
+            } else {
+                androidx.appcompat.app.AlertDialog.Builder(this@BrowseActivity)
+                    .setTitle(channel.name)
+                    .setItems(labels.toTypedArray()) { _, which -> runAction(actions[which]) }
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show()
+            }
         }
+    }
+
+    private fun showPhoneRowSheet(
+        title: String,
+        labels: List<String>,
+        actions: List<Int>,
+        runAction: (Int) -> Unit
+    ) {
+        val sheet = BottomSheetDialog(this)
+        val column = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(
+                (20 * resources.displayMetrics.density).toInt(),
+                (16 * resources.displayMetrics.density).toInt(),
+                (20 * resources.displayMetrics.density).toInt(),
+                (24 * resources.displayMetrics.density).toInt()
+            )
+            setBackgroundColor(getColor(R.color.bg_elevated))
+        }
+        column.addView(TextView(this).apply {
+            text = title
+            setTextColor(getColor(R.color.text_primary))
+            textSize = 18f
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            setPadding(0, 0, 0, (12 * resources.displayMetrics.density).toInt())
+        })
+        labels.forEachIndexed { index, label ->
+            column.addView(TextView(this).apply {
+                text = label
+                setTextColor(getColor(R.color.text_primary))
+                textSize = 16f
+                minHeight = (52 * resources.displayMetrics.density).toInt()
+                gravity = Gravity.CENTER_VERTICAL
+                setBackgroundResource(R.drawable.bg_nav)
+                setPadding(
+                    (14 * resources.displayMetrics.density).toInt(),
+                    (10 * resources.displayMetrics.density).toInt(),
+                    (14 * resources.displayMetrics.density).toInt(),
+                    (10 * resources.displayMetrics.density).toInt()
+                )
+                val params = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+                params.topMargin = (6 * resources.displayMetrics.density).toInt()
+                layoutParams = params
+                setOnClickListener {
+                    Haptics.tick(this)
+                    sheet.dismiss()
+                    runAction(actions[index])
+                }
+            })
+        }
+        sheet.setContentView(column)
+        sheet.show()
     }
 
     private fun offerReminder(channel: Channel) {
@@ -4775,6 +4961,30 @@ class BrowseActivity : AppCompatActivity() {
         }
     }
 
+    private fun rememberGroupScroll() {
+        val categoryId = selectedCategoryId ?: return
+        val layout = binding.channelList.layoutManager as? LinearLayoutManager ?: return
+        val first = layout.findFirstVisibleItemPosition()
+        if (first >= 0) groupScrollOffset[categoryId] = first
+        // Drop huge in-memory pages when returning to the groups list.
+        if (visibleChannels.size > 400) {
+            visibleChannels = emptyList()
+            channelAdapter.submit(emptyList(), null)
+            pageCursor = null
+            pageExhausted = false
+        }
+        paintNowPlayingBar()
+    }
+
+    private fun showChannelSkeleton(show: Boolean) {
+        if (!::binding.isInitialized) return
+        binding.channelSkeleton.visibility = if (show) View.VISIBLE else View.GONE
+        if (show) {
+            binding.libraryStatus.visibility = View.GONE
+            binding.errorText.visibility = View.GONE
+        }
+    }
+
     private fun loadGroupPage(reset: Boolean) {
         if (reset) {
             pageCursor = null
@@ -4785,6 +4995,7 @@ class BrowseActivity : AppCompatActivity() {
             binding.errorText.visibility = View.GONE
             if (visibleChannels.isEmpty()) {
                 channelAdapter.submit(emptyList(), groupLabel(selectedCategoryId), sequentialNumbers = false)
+                showChannelSkeleton(true)
             }
         }
         if (pageExhausted || pageLoading) return
@@ -4825,6 +5036,7 @@ class BrowseActivity : AppCompatActivity() {
             pageLoading = false
             if (cursor == null) {
                 visibleChannels = named
+                showChannelSkeleton(false)
                 channelAdapter.submit(named, groupLabel(categoryId), sequentialNumbers = false)
                 val restoreId = returnChannelId ?: holdChannelId
                 val restoreRow = if (!restoreId.isNullOrBlank()) {
@@ -4832,10 +5044,11 @@ class BrowseActivity : AppCompatActivity() {
                 } else {
                     -1
                 }
-                if (restoreRow >= 0) {
-                    binding.channelList.scrollToPosition(restoreRow)
-                } else {
-                    binding.channelList.scrollToPosition(0)
+                val remembered = groupScrollOffset[categoryId] ?: 0
+                when {
+                    restoreRow >= 0 -> binding.channelList.scrollToPosition(restoreRow)
+                    remembered in named.indices -> binding.channelList.scrollToPosition(remembered)
+                    else -> binding.channelList.scrollToPosition(0)
                 }
                 finishChannelPane(named)
                 markChannelsReady()
@@ -4858,19 +5071,34 @@ class BrowseActivity : AppCompatActivity() {
 
     private fun finishChannelPane(channels: List<Channel>) {
         binding.libraryStatus.visibility = View.GONE
+        showChannelSkeleton(false)
         if (channels.isEmpty()) {
             binding.errorText.visibility = View.VISIBLE
+            val favoritesEmpty = selectedCategoryId == PlaylistLoader.FAVORITES_ID
+            val continueEmpty = selectedCategoryId == PlaylistLoader.CONTINUE_ID
             binding.errorText.text = when {
                 section == GuideSection.MOVIES && !movieError.isNullOrBlank() && source?.vodChannels.isNullOrEmpty() ->
                     getString(R.string.movies_failed, movieError)
                 section == GuideSection.SHOWS && !showError.isNullOrBlank() && source?.seriesChannels.isNullOrEmpty() ->
                     showError
-                selectedCategoryId == PlaylistLoader.FAVORITES_ID -> getString(R.string.no_favorites)
-                selectedCategoryId == PlaylistLoader.CONTINUE_ID -> getString(R.string.continue_empty)
+                favoritesEmpty -> getString(R.string.empty_favorites_cta)
+                continueEmpty -> getString(R.string.empty_continue_cta)
                 else -> getString(R.string.no_channels)
             }
+            binding.errorText.setOnClickListener {
+                when {
+                    favoritesEmpty -> openFavoritesSetup()
+                    continueEmpty -> openSection(
+                        if (section == GuideSection.SHOWS) GuideSection.SHOWS else GuideSection.MOVIES
+                    )
+                    else -> Unit
+                }
+            }
+            binding.errorText.isClickable = favoritesEmpty || continueEmpty
         } else {
             binding.errorText.visibility = View.GONE
+            binding.errorText.setOnClickListener(null)
+            binding.errorText.isClickable = false
             schedulePrefetch(channels)
             scheduleEpisodePrefetch()
             showChannelDetail(channels.first())
@@ -5128,7 +5356,7 @@ class BrowseActivity : AppCompatActivity() {
             prefetchEpg(snapshot)
         }
         epgPrefetchWait = run
-        focusHandler.postDelayed(run, FOCUS_SETTLE_MS)
+        focusHandler.postDelayed(run, if (touchPrimary) 220L else FOCUS_SETTLE_MS)
     }
 
     private fun prefetchEpg(channels: List<Channel>) {
@@ -5246,6 +5474,7 @@ class BrowseActivity : AppCompatActivity() {
         val channelReturn = PlayerActivity.takeChannelReturn()
         if (section == GuideSection.TV) {
             val menu = when {
+                touchPrimary -> GuideMenu.CHANNELS
                 channelReturn -> GuideMenu.CHANNELS
                 returnOnProgram -> GuideMenu.PROGRAMS
                 returnMenu == GuideMenu.CHANNELS || returnMenu == GuideMenu.PROGRAMS -> returnMenu
@@ -5253,17 +5482,32 @@ class BrowseActivity : AppCompatActivity() {
             }
             if (guideMenu != menu) showMenu(menu)
             val row = visibleChannels.indexOfFirst { it.id == returnChannelId }.let { if (it < 0) 0 else it }
-            if (menu == GuideMenu.PROGRAMS) focusCurrentProgram(row) else focusReturnChannel(row)
+            if (menu == GuideMenu.PROGRAMS && !touchPrimary) focusCurrentProgram(row) else focusReturnChannel(row)
             return
         }
-        if (guideMenu != returnMenu) showMenu(returnMenu)
+        if (guideMenu != GuideMenu.CHANNELS) showMenu(GuideMenu.CHANNELS)
         val row = visibleChannels.indexOfFirst { it.id == returnChannelId }
         focusReturnChannel(row)
     }
 
     private fun focusReturnChannel(row: Int) {
-        if (row >= 0) focusRowAt(binding.channelList, row, R.id.playTarget)
-        else focusChannelPane()
+        if (row < 0) {
+            focusChannelPane()
+            return
+        }
+        val layout = binding.channelList.layoutManager as? LinearLayoutManager
+        if (layout != null) {
+            layout.scrollToPositionWithOffset(row, (12 * resources.displayMetrics.density).toInt())
+        } else {
+            binding.channelList.scrollToPosition(row)
+        }
+        binding.channelList.post {
+            if (isDestroyed) return@post
+            focusRowAt(binding.channelList, row, R.id.playTarget)
+            binding.channelList.post {
+                if (!isDestroyed) focusRowAt(binding.channelList, row, R.id.playTarget)
+            }
+        }
     }
 
     private fun playContinue(channel: Channel) {
@@ -5347,6 +5591,10 @@ class BrowseActivity : AppCompatActivity() {
             returnChannelId = channel.id
             returnOnProgram = section == GuideSection.TV &&
                 (guideMenu == GuideMenu.PROGRAMS || focusIsIn(binding.programPane))
+            rememberGroupScroll()
+            selectedCategoryId?.let { groupScrollOffset[it] =
+                visibleChannels.indexOfFirst { row -> row.id == channel.id }.coerceAtLeast(0)
+            }
         }
         if (selectedCategoryId == PlaylistLoader.CONTINUE_ID && !channel.seriesId.isNullOrBlank()) {
             stopPreview()

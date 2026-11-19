@@ -1540,7 +1540,7 @@
           <div class="quick-head">
             <div>
               <h2>Auto-add to favorites</h2>
-              <p class="hint" id="catalogLoadingBanner" hidden>Catalog still loading on the device… auto-add unlocks when groups arrive.</p>
+              <p class="hint" id="catalogLoadingBanner" hidden aria-live="polite">Catalog still loading on the device… auto-add unlocks when groups arrive.</p>
               <p class="hint" id="quickStatus">Add a few channels you watch, then search below for anything else. Off keeps Countries on USA only.</p>
             </div>
             <button class="section-save" type="button">Save</button>
@@ -1600,7 +1600,7 @@
         </div>
         <div class="fav-head">
           <div>
-            <h2>Favorites</h2>
+            <h2>Favorites <span id="favoriteCount" class="hint" style="font-weight:normal"></span></h2>
             <p class="hint" id="favoriteOrderNote">Drag to reorder. Drag items up/down or click remove to manage.</p>
           </div>
           <div class="fav-search">
@@ -3255,11 +3255,17 @@
       const ids = (session.favorites && session.favorites.ids) || [];
       const labels = (session.favorites && session.favorites.labels) || {};
       const logos = (session.favorites && session.favorites.logos) || {};
-      document.querySelector("#favoriteOrderNote").textContent = "Drag to reorder. Drag items up/down or click remove to manage.";
+      const countEl = document.querySelector("#favoriteCount");
+      if (countEl) countEl.textContent = ids.length ? "(" + ids.length + ")" : "";
+      document.querySelector("#favoriteOrderNote").textContent = ids.length
+        ? "Drag to reorder. Use the arrows or Remove on a row. Changes sync to the device."
+        : "Add from the cards above or search below — favorites sync to the device as you go.";
       if (!ids.length) {
         const empty = document.createElement("p");
         empty.className = "fav-empty";
-        empty.textContent = "Favorites you add are listed here.";
+        empty.textContent = catalogIsReady()
+          ? "No favorites yet. Use an auto-add card above, or type two letters to search."
+          : "Waiting for the catalog… auto-add and search unlock when groups arrive.";
         box.append(empty);
         return;
       }
@@ -4618,14 +4624,33 @@
       const banner = document.querySelector("#catalogLoadingBanner");
       const status = document.querySelector("#quickStatus");
       const cards = document.querySelector(".quick-cards");
-      if (banner) banner.hidden = !!ready;
+      const search = document.querySelector("#favoriteSearch");
+      const note = document.querySelector("#favoriteNote");
+      if (banner) {
+        banner.hidden = !!ready;
+        banner.setAttribute("aria-busy", ready ? "false" : "true");
+      }
       if (status) {
         status.textContent = ready
           ? "Add a few channels you watch, then search below for anything else. Off keeps Countries on USA only."
           : "Catalog still loading on the device… auto-add unlocks when groups arrive.";
       }
-      if (cards) cards.style.opacity = ready ? "1" : "0.45";
-      if (cards) cards.style.pointerEvents = ready ? "" : "none";
+      if (cards) {
+        cards.style.opacity = ready ? "1" : "0.45";
+        cards.style.pointerEvents = ready ? "" : "none";
+        cards.setAttribute("aria-disabled", ready ? "false" : "true");
+      }
+      if (search) {
+        search.disabled = !ready;
+        search.placeholder = ready
+          ? "Find a channel, movie, or show"
+          : "Catalog loading… search unlocks soon";
+      }
+      if (note && !ready) note.textContent = "Search waits until the device catalog is ready.";
+      if (note && ready && (search.value || "").trim().length < 2) {
+        note.textContent = "Type at least two letters.";
+      }
+      if (session) renderFavoriteOrder();
     }
 
     async function refreshSessionCatalog() {

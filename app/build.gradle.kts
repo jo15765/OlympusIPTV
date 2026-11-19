@@ -16,6 +16,8 @@ fun localProperty(name: String): String = Properties().apply {
 
 val watchmodeKey = localProperty("watchmode.apiKey")
 val opensubtitlesKey = localProperty("opensubtitles.apiKey")
+val sendgridKey = localProperty("sendgrid.apiKey")
+val sendgridFrom = localProperty("sendgrid.fromEmail")
 
 android {
     namespace = "com.olympus.iptv"
@@ -25,10 +27,12 @@ android {
         applicationId = "com.olympus.iptv"
         minSdk = 24
         targetSdk = 35
-        versionCode = 48
-        versionName = "0.2.47"
+        versionCode = 51
+        versionName = "0.2.50"
         buildConfigField("String", "WATCHMODE_API_KEY", "\"$watchmodeKey\"")
         buildConfigField("String", "OPENSUBTITLES_API_KEY", "\"$opensubtitlesKey\"")
+        buildConfigField("String", "SENDGRID_API_KEY", "\"$sendgridKey\"")
+        buildConfigField("String", "SENDGRID_FROM_EMAIL", "\"$sendgridFrom\"")
     }
 
     buildTypes {
@@ -75,6 +79,7 @@ dependencies {
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.constraintlayout)
     implementation(libs.androidx.recyclerview)
+    implementation(libs.androidx.swiperefreshlayout)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
     implementation(libs.androidx.datastore.preferences)

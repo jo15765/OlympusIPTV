@@ -55,6 +55,9 @@ class OlympusIptvApp : Application() {
     var guideChannels: List<Channel> = emptyList()
     var playbackQueue: List<Channel> = emptyList()
     var guideSource: LoadedPlaylist? = null
+    /** Last channel handed to the player — drives the phone now-playing strip. */
+    @Volatile var lastPlayed: Channel? = null
+    @Volatile var lastPlayedPlaylistId: String? = null
     @Volatile var stagedLineup: Pair<String, LineupConfig>? = null
     private val lineupListeners = java.util.concurrent.CopyOnWriteArrayList<(String) -> Unit>()
 

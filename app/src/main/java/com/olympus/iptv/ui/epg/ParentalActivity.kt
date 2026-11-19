@@ -23,6 +23,7 @@ import com.olympus.iptv.playlist.CatalogDb
 import com.olympus.iptv.playlist.GroupLock
 import com.olympus.iptv.playlist.LineupApplier
 import com.olympus.iptv.playlist.LineupClient
+import com.olympus.iptv.ui.Haptics
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -168,23 +169,37 @@ class ParentalActivity : AppCompatActivity() {
         binding.groupPin.post { reclaimPinFocus() }
     }
 
+    private var clearingLocks = false
+
     private fun clearSelected() {
         if (selected.isEmpty()) {
             Toast.makeText(this, R.string.parental_select_first, Toast.LENGTH_SHORT).show()
             return
         }
         if (saving) return
-        val ids = selected.toList()
-        selected.clear()
-        applyPins(ids, null)
-        adapter.notifyDataSetChanged()
-        updateHint()
+        val locked = selected.filter { !config.groupPins.orEmpty()[it].isNullOrBlank() }
+        if (locked.isEmpty()) {
+            Toast.makeText(this, R.string.parental_select_first, Toast.LENGTH_SHORT).show()
+            return
+        }
+        clearingLocks = true
+        pinTargets = locked
+        pinDigits = ""
+        pinKeyIndex = 4
+        binding.groupPinTitle.setText(R.string.parental_clear_need_pin)
+        paintDigits()
+        setBackgroundFocusEnabled(false)
+        binding.pinScrim.visibility = View.VISIBLE
+        binding.groupPin.visibility = View.VISIBLE
+        attachPinFocusGuard()
+        binding.groupPin.post { reclaimPinFocus() }
     }
 
     private fun hidePin() {
         detachPinFocusGuard()
         pinTargets = emptyList()
         pinDigits = ""
+        clearingLocks = false
         binding.groupPin.visibility = View.GONE
         binding.pinScrim.visibility = View.GONE
         setBackgroundFocusEnabled(true)
@@ -286,7 +301,26 @@ class ParentalActivity : AppCompatActivity() {
         if (pinDigits.length == 4) {
             val targets = pinTargets
             val code = pinDigits
+            if (clearingLocks) {
+                val match = targets.all { GroupLock.accepts(config, it, code) }
+                if (!match) {
+                    Haptics.reject(binding.groupPin)
+                    pinDigits = ""
+                    paintDigits()
+                    Toast.makeText(this, R.string.parental_clear_bad_pin, Toast.LENGTH_SHORT).show()
+                    return
+                }
+                selected.clear()
+                clearingLocks = false
+                Haptics.tick(binding.groupPin)
+                applyPins(targets, null)
+                hidePin()
+                adapter.notifyDataSetChanged()
+                updateHint()
+                return
+            }
             selected.clear()
+            Haptics.tick(binding.groupPin)
             applyPins(targets, code)
             hidePin()
             Toast.makeText(this, R.string.pin_set_ok, Toast.LENGTH_SHORT).show()

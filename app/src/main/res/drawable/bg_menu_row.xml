@@ -4,14 +4,27 @@
         <shape>
             <solid android:color="@color/bg_elevated" />
             <corners android:radius="10dp" />
-            <stroke android:width="2dp" android:color="@color/focus" />
+            <stroke
+                android:width="3dp"
+                android:color="@color/focus" />
         </shape>
     </item>
     <item android:state_selected="true">
         <shape>
             <solid android:color="@color/bg_elevated" />
-            <stroke android:width="1dp" android:color="@color/accent" />
+            <stroke
+                android:width="2dp"
+                android:color="@color/accent" />
             <corners android:radius="10dp" />
+        </shape>
+    </item>
+    <item android:state_pressed="true">
+        <shape>
+            <solid android:color="@color/bg_elevated" />
+            <corners android:radius="10dp" />
+            <stroke
+                android:width="1dp"
+                android:color="@color/accent" />
         </shape>
     </item>
     <item>

@@ -6,8 +6,14 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
+import android.view.ViewOutlineProvider
+import coil.dispose
 import coil.load
+import coil.transform.RoundedCornersTransformation
 import com.olympus.iptv.R
+import com.olympus.iptv.ui.DeviceForm
+import com.olympus.iptv.ui.FocusMotion
+import com.olympus.iptv.ui.Haptics
 import com.olympus.iptv.ui.channelLogo
 import com.olympus.iptv.ui.prefetchLogos
 import com.olympus.iptv.data.Channel
@@ -191,15 +197,23 @@ class ChannelAdapter(
             bindLogo(item)
             binding.playTarget.isFocusable = true
             binding.playTarget.isFocusableInTouchMode = true
-            binding.playTarget.setOnClickListener { onClick(item) }
+            val touch = DeviceForm.isTouchPrimary(binding.root.context)
+            binding.playTarget.setOnClickListener {
+                if (touch) Haptics.tick(binding.playTarget)
+                onClick(item)
+            }
             binding.playTarget.setOnLongClickListener { onLongClick(item) }
             binding.playTarget.setOnFocusChangeListener { _, hasFocus ->
+                if (!touch) FocusMotion.animate(binding.playTarget, hasFocus)
                 if (hasFocus) onFocused(item)
             }
         }
 
         override fun bindLogo(item: Channel) {
-            loadLogo(binding.logo, item.logoUrl, 160)
+            val radius = 8f * binding.root.resources.displayMetrics.density
+            binding.logo.clipToOutline = true
+            binding.logo.outlineProvider = ViewOutlineProvider.BACKGROUND
+            loadLogo(binding.logo, item.logoUrl, 160, poster = true, cornerPx = radius)
         }
 
         override fun bindFavorite(item: Channel) = Unit
@@ -230,7 +244,6 @@ class ChannelAdapter(
                 binding.name.text = item.name
                 binding.group.visibility = View.GONE
                 binding.country.visibility = View.GONE
-                binding.epgNow.visibility = View.GONE
                 hideActions()
                 val density = binding.root.resources.displayMetrics.density
                 val padH = (6 * density).toInt()
@@ -239,10 +252,16 @@ class ChannelAdapter(
                 binding.logo.layoutParams.width = logo
                 binding.logo.layoutParams.height = logo
                 bindLogo(item)
+                bindEpg(item)
                 binding.playTarget.isFocusable = guideRowsFocusable
                 binding.playTarget.isFocusableInTouchMode = guideRowsFocusable
-                binding.playTarget.setOnClickListener { onClick(item) }
+                val touch = DeviceForm.isTouchPrimary(binding.root.context)
+                binding.playTarget.setOnClickListener {
+                    if (touch) Haptics.tick(binding.playTarget)
+                    onClick(item)
+                }
                 binding.playTarget.setOnFocusChangeListener { _, hasFocus ->
+                    if (!touch && guideRowsFocusable) FocusMotion.animate(binding.playTarget, hasFocus)
                     if (hasFocus) onFocused(item)
                 }
             }
@@ -276,11 +295,35 @@ class ChannelAdapter(
         }
 
         override fun bindEpg(item: Channel) {
-            binding.epgNow.visibility = View.GONE
+            val touch = DeviceForm.isTouchPrimary(binding.root.context)
+            if (!touch || item.kind != ContentKind.LIVE || !item.seriesId.isNullOrBlank()) {
+                binding.epgNow.visibility = View.GONE
+                return
+            }
+            val line = epgProvider(item)?.nowLine().orEmpty()
+            if (line.isBlank()) {
+                binding.epgNow.visibility = View.GONE
+            } else {
+                binding.epgNow.text = line
+                binding.epgNow.visibility = View.VISIBLE
+            }
         }
     }
 
-    private fun loadLogo(view: android.widget.ImageView, url: String?, sizeDp: Int) {
+    override fun onViewRecycled(holder: Holder) {
+        super.onViewRecycled(holder)
+        val logo = holder.itemView.findViewById<android.widget.ImageView>(R.id.logo) ?: return
+        logo.setTag(R.id.logo, null)
+        logo.dispose()
+    }
+
+    private fun loadLogo(
+        view: android.widget.ImageView,
+        url: String?,
+        sizeDp: Int,
+        poster: Boolean = false,
+        cornerPx: Float = 0f
+    ) {
         val key = url.orEmpty()
         if (key.isBlank()) {
             view.setTag(R.id.logo, null)
@@ -294,8 +337,11 @@ class ChannelAdapter(
             return
         }
         view.setTag(R.id.logo, key)
+        view.scaleType = if (poster) android.widget.ImageView.ScaleType.FIT_CENTER
+        else android.widget.ImageView.ScaleType.FIT_CENTER
         view.load(key) {
             channelLogo(logoPx(view, sizeDp))
+            if (poster && cornerPx > 0f) transformations(RoundedCornersTransformation(cornerPx))
             placeholder(R.drawable.ic_channel_placeholder)
             error(R.drawable.ic_channel_placeholder)
         }

@@ -304,7 +304,10 @@ class PlayerActivity : AppCompatActivity() {
         }
         WindowCompat.setDecorFitsSystemWindows(window, false)
         binding.btnPhoneBack.setOnClickListener { handlePlayerBack() }
-        binding.btnPhonePlay.setOnClickListener { togglePause() }
+        binding.btnPhonePlay.setOnClickListener {
+            com.olympus.iptv.ui.Haptics.tick(binding.btnPhonePlay)
+            togglePause()
+        }
         binding.btnPhoneMenu.setOnClickListener { showPlaybackMenu() }
         binding.phoneSeek.setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: android.widget.SeekBar?, progress: Int, fromUser: Boolean) {
@@ -468,9 +471,14 @@ class PlayerActivity : AppCompatActivity() {
             providerName = loaded.name
             val channel = loaded
             current = channel
+            val app = application as OlympusIptvApp
+            app.lastPlayed = channel
+            app.lastPlayedPlaylistId = playlistId
             hadPlaybackReady = false
             bufferStartedAt = 0L
             bufferWatchToken += 1
+            showConnectingBadge(true)
+            hidePlaybackError()
             PlaybackTrace.start(channel)
             if (zapMode == ZAP_LIST && index in queue.indices) {
                 val updated = queue.toMutableList()
@@ -695,6 +703,7 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun onBufferingStarted() {
         if (bufferStartedAt == 0L) bufferStartedAt = SystemClock.elapsedRealtime()
+        showConnectingBadge(true)
         val token = ++bufferWatchToken
         val started = bufferStartedAt
         hideHandler.postDelayed({
@@ -709,6 +718,7 @@ class PlayerActivity : AppCompatActivity() {
         val started = bufferStartedAt
         bufferStartedAt = 0L
         bufferWatchToken += 1
+        showConnectingBadge(false)
         if (started <= 0L) {
             hadPlaybackReady = true
             return
@@ -718,6 +728,11 @@ class PlayerActivity : AppCompatActivity() {
         hadPlaybackReady = true
         val minLog = if (initial) INITIAL_SPOOL_LOG_MS else REBUFFER_LOG_MS
         if (waited >= minLog) PlaybackTrace.spool(current, initial, waited)
+    }
+
+    private fun showConnectingBadge(show: Boolean) {
+        if (!::binding.isInitialized) return
+        binding.connectingBadge.visibility = if (show) View.VISIBLE else View.GONE
     }
 
     private val trackListener = object : Player.Listener {
@@ -769,7 +784,32 @@ class PlayerActivity : AppCompatActivity() {
         } else {
             getString(R.string.playback_issue_app)
         }
-        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+        showPlaybackError(message)
+    }
+
+    private fun showPlaybackError(message: String) {
+        if (!::binding.isInitialized) return
+        showConnectingBadge(false)
+        binding.playbackErrorBody.text = message
+        binding.playbackErrorCard.visibility = View.VISIBLE
+        binding.playbackErrorRetry.setOnClickListener {
+            hidePlaybackError()
+            playCurrent()
+        }
+        binding.playbackErrorNext.setOnClickListener {
+            hidePlaybackError()
+            nextChannel()
+        }
+        binding.playbackErrorClose.setOnClickListener {
+            hidePlaybackError()
+            finish()
+        }
+        binding.playbackErrorRetry.requestFocus()
+    }
+
+    private fun hidePlaybackError() {
+        if (!::binding.isInitialized) return
+        binding.playbackErrorCard.visibility = View.GONE
     }
 
     private fun refreshEpgQuietly() {
