@@ -17,6 +17,8 @@ class CategoryAdapter(
 
     private val items = mutableListOf<Category>()
     private var selectedId: String? = null
+    /** Phone list rows: taller taps, no TV focus-select while scrolling. */
+    var phoneListMode = false
 
     init {
         setHasStableIds(true)
@@ -116,15 +118,33 @@ class CategoryAdapter(
             binding.icon.setImageResource(icon(item))
             binding.root.isSelected = item.id == selectedId
             showDetail(item)
+            if (phoneListMode) {
+                binding.root.isFocusableInTouchMode = false
+                binding.root.minimumHeight =
+                    (56 * binding.root.resources.displayMetrics.density).toInt()
+                binding.label.textSize = 16f
+                binding.detail.textSize = 13f
+                val pad = (14 * binding.root.resources.displayMetrics.density).toInt()
+                binding.root.setPadding(pad, pad, pad, pad)
+                (binding.root.layoutParams as? ViewGroup.MarginLayoutParams)?.let { params ->
+                    val gap = (4 * binding.root.resources.displayMetrics.density).toInt()
+                    params.setMargins(gap * 2, gap, gap * 2, gap)
+                    binding.root.layoutParams = params
+                }
+            }
             binding.root.setOnClickListener { onSelect(item, true) }
             binding.root.setOnLongClickListener {
                 onHold(item)
                 true
             }
-            binding.root.setOnFocusChangeListener { _, hasFocus ->
-                if (hasFocus) {
-                    binding.root.isSelected = true
-                    onSelect(item, false)
+            if (phoneListMode) {
+                binding.root.onFocusChangeListener = null
+            } else {
+                binding.root.setOnFocusChangeListener { _, hasFocus ->
+                    if (hasFocus) {
+                        binding.root.isSelected = true
+                        onSelect(item, false)
+                    }
                 }
             }
         }

@@ -50,6 +50,7 @@ import com.olympus.iptv.data.SavedPlaylist
 import com.olympus.iptv.data.WatchEntry
 import com.olympus.iptv.ui.DeviceForm
 import com.olympus.iptv.ui.InsetsPad
+import com.olympus.iptv.ui.browse.GuideFeel
 import com.olympus.iptv.ui.channelLogo
 import com.olympus.iptv.databinding.ActivityPlayerBinding
 import com.olympus.iptv.playlist.CatalogDb
@@ -131,6 +132,7 @@ class PlayerActivity : AppCompatActivity() {
     private var menuBaseBottom = 0
     private var overlayBaseTop = 0
     private var sleepMinutes = 0
+    private var skipIntroSeries = emptySet<String>()
     private val sleepFire = Runnable {
         if (!isDestroyed) {
             player?.playWhenReady = false
@@ -279,7 +281,13 @@ class PlayerActivity : AppCompatActivity() {
             val store = (application as OlympusIptvApp).playlistStore
             preferredAudio = withContext(Dispatchers.IO) { store.audioLanguage() }
             preferredSubtitle = withContext(Dispatchers.IO) { store.subtitleLanguage() }
-            multiViewEnabled = withContext(Dispatchers.IO) { store.multiView() }
+            // Multi-view needs a second ExoPlayer; skip on phones to keep RAM free.
+            multiViewEnabled = if (touchPrimary) {
+                false
+            } else {
+                withContext(Dispatchers.IO) { store.multiView() }
+            }
+            skipIntroSeries = withContext(Dispatchers.IO) { store.skipIntroSeries() }
         }
         } catch (error: Throwable) {
             com.olympus.iptv.AppLog.error("Player", "Player failed to open", error)
@@ -476,7 +484,11 @@ class PlayerActivity : AppCompatActivity() {
             binding.btnLast.visibility =
                 if (channel.kind == ContentKind.LIVE && channel.seriesId.isNullOrBlank()) View.VISIBLE else View.GONE
             binding.btnMultiView.visibility =
-                if (channel.kind == ContentKind.LIVE && channel.seriesId.isNullOrBlank()) View.VISIBLE else View.GONE
+                if (!touchPrimary && channel.kind == ContentKind.LIVE && channel.seriesId.isNullOrBlank()) {
+                    View.VISIBLE
+                } else {
+                    View.GONE
+                }
             binding.btnGoLive.visibility = View.GONE
             subtitleAppliedFor = null
             binding.channelName.text = alias
@@ -491,6 +503,15 @@ class PlayerActivity : AppCompatActivity() {
             refreshEpgForCurrent()
             rememberCurrent()
             val resumeAt = startAt ?: resumePosition(channel)
+            val playAt = if (
+                startAt == null &&
+                shouldAutoSkip(channel) &&
+                resumeAt < EpisodeSequence.INTRO_MS
+            ) {
+                EpisodeSequence.INTRO_MS
+            } else {
+                resumeAt
+            }
             val warmed = takeGuideWarm(channel.id) ?: takeSpare(channel.id)
             if (warmed != null) {
                 val previous = player
@@ -498,14 +519,14 @@ class PlayerActivity : AppCompatActivity() {
                 warmed.addListener(trackListener)
                 watchPlaybackEvents(warmed)
                 binding.playerView.player = warmed
-                if (resumeAt > 0L) warmed.seekTo(resumeAt)
+                if (playAt > 0L) warmed.seekTo(playAt)
                 warmed.playWhenReady = true
                 if (previous != null && previous !== warmed) recycle(previous)
             } else {
                 val exo = player ?: return@launch
                 watchPlaybackEvents(exo)
                 exo.setMediaItem(mediaItem(channel))
-                if (resumeAt > 0L) exo.seekTo(resumeAt)
+                if (playAt > 0L) exo.seekTo(playAt)
                 exo.prepare()
                 exo.playWhenReady = true
             }
@@ -812,6 +833,11 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun prepareSpare(direction: Int, channel: Channel?) {
+        // Phones: one player only — no next/prev pre-buffer to save decoder/RAM.
+        if (touchPrimary) {
+            clearSpare(direction)
+            return
+        }
         if (channel == null || channel.kind != ContentKind.LIVE || channel.streamUrl.isBlank() || channel.id == current?.id) {
             clearSpare(direction)
             return
@@ -847,6 +873,11 @@ class PlayerActivity : AppCompatActivity() {
     private fun preloadAround(playingId: String) {
         val now = current ?: return
         if (now.kind != ContentKind.LIVE) return
+        if (touchPrimary) {
+            clearSpare(1)
+            clearSpare(-1)
+            return
+        }
         preloadJob?.cancel()
         preloadJob = lifecycleScope.launch {
             val nextChannel = withContext(Dispatchers.IO) { adjacent(now, 1) }
@@ -1125,7 +1156,7 @@ class PlayerActivity : AppCompatActivity() {
                 if (!nextHanded) hideNextPanel()
                 return@launch
             }
-            openNext(next, skipIntro = false)
+            openNext(next, skipIntro = shouldAutoSkip(next))
         }
     }
 
@@ -1203,6 +1234,7 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun onSkipIntro() {
         lifecycleScope.launch {
+            rememberSkipIntroFor(current?.seriesId ?: pendingNext?.seriesId)
             if (nextHanded) {
                 seekIntro()
                 return@launch
@@ -1216,6 +1248,18 @@ class PlayerActivity : AppCompatActivity() {
             openNext(next, skipIntro = true)
         }
     }
+
+    private fun rememberSkipIntroFor(seriesId: String?) {
+        val id = seriesId?.trim().orEmpty()
+        if (id.isEmpty() || id in skipIntroSeries) return
+        skipIntroSeries = skipIntroSeries + id
+        (application as OlympusIptvApp).appScope.launch {
+            runCatching { (application as OlympusIptvApp).playlistStore.rememberSkipIntro(id) }
+        }
+    }
+
+    private fun shouldAutoSkip(channel: Channel?): Boolean =
+        GuideFeel.autoSkipIntro(channel?.seriesId, skipIntroSeries)
 
     private fun openNext(next: Channel, skipIntro: Boolean) {
         if (nextHanded) return
@@ -1235,11 +1279,12 @@ class PlayerActivity : AppCompatActivity() {
         }
         current = next
         stepping = true
+        val auto = skipIntro || shouldAutoSkip(next)
         lifecycleScope.launch {
             val resume = resumePosition(next)
-            val start = if (skipIntro && resume < EpisodeSequence.INTRO_MS) EpisodeSequence.INTRO_MS else resume
+            val start = if (auto && resume < EpisodeSequence.INTRO_MS) EpisodeSequence.INTRO_MS else resume
             playCurrent(startAt = start)
-            if (skipIntro || start >= EpisodeSequence.INTRO_MS) hideNextPanel() else showSkipButton()
+            if (auto || start >= EpisodeSequence.INTRO_MS) hideNextPanel() else showSkipButton()
         }
     }
 
@@ -2038,6 +2083,7 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun toggleMultiView() {
+        if (touchPrimary) return
         multiViewEnabled = !multiViewEnabled
         lifecycleScope.launch(Dispatchers.IO) {
             (application as OlympusIptvApp).playlistStore.saveMultiView(multiViewEnabled)
@@ -2052,7 +2098,7 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun syncMultiView(channel: Channel?) {
         if (!::binding.isInitialized) return
-        if (!multiViewEnabled || !isLiveNow(channel)) {
+        if (touchPrimary || !multiViewEnabled || !isLiveNow(channel)) {
             stopSecondary()
             return
         }

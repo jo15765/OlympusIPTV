@@ -181,17 +181,21 @@ class OlympusIptvApp : Application() {
         epgRepository.attach(catalogDb, appScope)
         DashboardHost.start(this)
         com.olympus.iptv.vpn.AppTunnel.restore(this)
+        val touch = com.olympus.iptv.ui.DeviceForm.isTouchPrimary(this)
         Coil.setImageLoader(
             ImageLoader.Builder(this)
                 .crossfade(false)
                 .respectCacheHeaders(false)
                 .memoryCache {
-                    MemoryCache.Builder(this).maxSizePercent(0.08).build()
+                    // Phones keep a smaller in-memory logo cache so guide scroll stays smooth.
+                    MemoryCache.Builder(this)
+                        .maxSizePercent(if (touch) 0.04 else 0.08)
+                        .build()
                 }
                 .diskCache {
                     DiskCache.Builder()
                         .directory(cacheDir.resolve("logos"))
-                        .maxSizeBytes(48L * 1024 * 1024)
+                        .maxSizeBytes(if (touch) 24L * 1024 * 1024 else 48L * 1024 * 1024)
                         .build()
                 }
                 .build()

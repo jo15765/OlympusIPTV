@@ -247,6 +247,7 @@ class BrowseActivity : AppCompatActivity() {
             )
             setupMobileChrome()
             enlargeTouchChips()
+            categoryAdapter.phoneListMode = true
             listOf(
                 binding.cardAdminRefresh, binding.cardAdminWeb, binding.cardAdminEpg, binding.cardAdminVpn,
                 binding.refreshNowCard, binding.refreshIntervalCard
@@ -257,10 +258,11 @@ class BrowseActivity : AppCompatActivity() {
         wireHomeContinue()
         paintQueueChip()
 
-        binding.categoryList.layoutManager = androidx.recyclerview.widget.GridLayoutManager(
-            this,
-            if (touchPrimary) MOBILE_CARD_SPAN else CARD_SPAN
-        )
+        binding.categoryList.layoutManager = if (touchPrimary) {
+            LinearLayoutManager(this)
+        } else {
+            androidx.recyclerview.widget.GridLayoutManager(this, CARD_SPAN)
+        }
         binding.channelList.layoutManager = LinearLayoutManager(this)
         binding.categoryList.adapter = categoryAdapter
         binding.channelList.adapter = channelAdapter
@@ -271,13 +273,18 @@ class BrowseActivity : AppCompatActivity() {
         binding.channelList.itemAnimator = null
         binding.categoryList.setHasFixedSize(true)
         binding.channelList.setHasFixedSize(true)
-        binding.categoryList.setItemViewCacheSize(12)
-        binding.channelList.setItemViewCacheSize(24)
-        val cardSpan = if (touchPrimary) MOBILE_CARD_SPAN else CARD_SPAN
-        (binding.categoryList.layoutManager as androidx.recyclerview.widget.GridLayoutManager).initialPrefetchItemCount = cardSpan * 2
-        (binding.channelList.layoutManager as LinearLayoutManager).initialPrefetchItemCount = 8
-        binding.channelList.recycledViewPool.setMaxRecycledViews(0, 32)
-        binding.channelList.recycledViewPool.setMaxRecycledViews(1, 16)
+        binding.categoryList.setItemViewCacheSize(if (touchPrimary) 8 else 12)
+        binding.channelList.setItemViewCacheSize(if (touchPrimary) 12 else 24)
+        if (!touchPrimary) {
+            (binding.categoryList.layoutManager as androidx.recyclerview.widget.GridLayoutManager)
+                .initialPrefetchItemCount = CARD_SPAN * 2
+        } else {
+            (binding.categoryList.layoutManager as LinearLayoutManager).initialPrefetchItemCount = 6
+        }
+        (binding.channelList.layoutManager as LinearLayoutManager).initialPrefetchItemCount =
+            if (touchPrimary) 4 else 8
+        binding.channelList.recycledViewPool.setMaxRecycledViews(0, if (touchPrimary) 16 else 32)
+        binding.channelList.recycledViewPool.setMaxRecycledViews(1, if (touchPrimary) 8 else 16)
         binding.channelList.addOnScrollListener(object : androidx.recyclerview.widget.RecyclerView.OnScrollListener() {
             override fun onScrollStateChanged(recyclerView: androidx.recyclerview.widget.RecyclerView, newState: Int) {
                 val idle = newState == androidx.recyclerview.widget.RecyclerView.SCROLL_STATE_IDLE
@@ -287,8 +294,9 @@ class BrowseActivity : AppCompatActivity() {
                     val layout = recyclerView.layoutManager as? LinearLayoutManager ?: return
                     val last = layout.findLastVisibleItemPosition()
                     channelAdapter.refreshLogos(layout.findFirstVisibleItemPosition(), last)
-                    channelAdapter.prefetch(recyclerView.context, last + 1, 12, 42)
-                    scheduleEpisodePrefetch()
+                    val prefetchCount = if (touchPrimary) 4 else 12
+                    channelAdapter.prefetch(recyclerView.context, last + 1, prefetchCount, 42)
+                    if (!touchPrimary) scheduleEpisodePrefetch()
                     loadVisibleGuidePrograms()
                 }
             }
@@ -444,6 +452,7 @@ class BrowseActivity : AppCompatActivity() {
             val favoritesJob = async(Dispatchers.IO) { store.favorites(saved.id) }
             val deviceJob = async(Dispatchers.IO) { store.deviceId() }
             val lineupJob = async(Dispatchers.IO) { store.lineup(saved.id) }
+            val lastSectionJob = async(Dispatchers.IO) { store.lastGuideSection() }
             val hideEmptyJob = async(Dispatchers.IO) {
                 store.hideEmptyGroups().also { hideEmptyGroups = it }
             }
@@ -535,6 +544,13 @@ class BrowseActivity : AppCompatActivity() {
                             if (!isDestroyed) loadSavedBuckets(saved.id, db)
                         }
                     }
+                }
+            }
+            val lastKey = lastSectionJob.await()
+            if (!isDestroyed && !intent.getBooleanExtra(EXTRA_SKIP_RESUME, false)) {
+                when (GuideFeel.sectionFromKey(lastKey)) {
+                    "vod" -> setSection(GuideSection.MOVIES)
+                    "series" -> setSection(GuideSection.SHOWS)
                 }
             }
         }
@@ -1403,31 +1419,40 @@ class BrowseActivity : AppCompatActivity() {
             val appJobs = application as OlympusIptvApp
             binding.root.post {
                 if (isDestroyed) return@post
-                // Paint Favorites/groups first; skip warm work when the catalog stamp is unchanged.
-                val warmDelay = if (touchPrimary) 4_500L else 2_000L
-                appJobs.appScope.launch {
-                    delay(warmDelay)
-                    if (isDestroyed) return@launch
-                    val stamp = runCatching { appJobs.catalogDb.libraryStamp(savedId) }.getOrNull() ?: 0L
-                    val stampKey = stamp.toString()
-                    val last = runCatching { appJobs.playlistStore.catalogStamp(savedId) }.getOrNull().orEmpty()
-                    val catalogFresh = stamp > 0L && stampKey == last
-                    if (!catalogFresh) {
-                        runCatching { appJobs.catalogDb.cleanGroupImages(savedId) }
-                        delay(if (touchPrimary) 2_500L else 750L)
+                // Phones: never warm dashboard/Watchmode on cold open — New / web trigger that later.
+                // TV: still defer, and skip when the catalog stamp is unchanged.
+                if (touchPrimary) {
+                    appJobs.appScope.launch {
+                        delay(6_000L)
                         if (isDestroyed) return@launch
-                        runCatching { appJobs.catalogDb.warmDashboard(savedId) }
-                        if (stamp > 0L) {
-                            runCatching { appJobs.playlistStore.saveCatalogStamp(savedId, stampKey) }
-                        }
+                        runCatching { appJobs.catalogDb.cleanGroupImages(savedId) }
                     }
-                    delay(if (touchPrimary) 3_000L else 1_000L)
-                    if (isDestroyed) return@launch
-                    val cacheFile = java.io.File(appJobs.filesDir, "watchmode-week.json")
-                    val needsFresh = !catalogFresh ||
-                        com.olympus.iptv.playlist.Watchmode.needsRefresh(cacheFile) ||
-                        appJobs.freshCards(savedId).isNullOrEmpty()
-                    if (needsFresh) appJobs.warmFresh(savedId)
+                } else {
+                    val warmDelay = 2_000L
+                    appJobs.appScope.launch {
+                        delay(warmDelay)
+                        if (isDestroyed) return@launch
+                        val stamp = runCatching { appJobs.catalogDb.libraryStamp(savedId) }.getOrNull() ?: 0L
+                        val stampKey = stamp.toString()
+                        val last = runCatching { appJobs.playlistStore.catalogStamp(savedId) }.getOrNull().orEmpty()
+                        val catalogFresh = stamp > 0L && stampKey == last
+                        if (!catalogFresh) {
+                            runCatching { appJobs.catalogDb.cleanGroupImages(savedId) }
+                            delay(750L)
+                            if (isDestroyed) return@launch
+                            runCatching { appJobs.catalogDb.warmDashboard(savedId) }
+                            if (stamp > 0L) {
+                                runCatching { appJobs.playlistStore.saveCatalogStamp(savedId, stampKey) }
+                            }
+                        }
+                        delay(1_000L)
+                        if (isDestroyed) return@launch
+                        val cacheFile = java.io.File(appJobs.filesDir, "watchmode-week.json")
+                        val needsFresh = !catalogFresh ||
+                            com.olympus.iptv.playlist.Watchmode.needsRefresh(cacheFile) ||
+                            appJobs.freshCards(savedId).isNullOrEmpty()
+                        if (needsFresh) appJobs.warmFresh(savedId)
+                    }
                 }
             }
         }
@@ -1733,6 +1758,8 @@ class BrowseActivity : AppCompatActivity() {
         guideMenu = GuideMenu.GROUPS
         previousMenu = GuideMenu.GROUPS
         armGroupFocus()
+        // Prefer the Continue strip when Movies/Shows have something to resume.
+        landOnContinue = next != GuideSection.TV
         section = next
         if (next != GuideSection.SHOWS) {
             episodePrefetchJob?.cancel()
@@ -1745,14 +1772,45 @@ class BrowseActivity : AppCompatActivity() {
         binding.tabLive.isSelected = next == GuideSection.TV
         binding.tabVod.isSelected = next == GuideSection.MOVIES
         binding.tabShows.isSelected = next == GuideSection.SHOWS
+        rememberGuideSection(next)
         if (renderedSection == next && loaded != null) {
             showGuide()
-            focusGroups()
+            paintHomeContinue()
+            if (landOnContinue && binding.homeContinue.visibility == View.VISIBLE) {
+                focusHomeContinue()
+            } else {
+                focusGroups()
+            }
             return
         }
         categoryAdapter.submit(emptyList(), null)
         channelAdapter.submit(emptyList())
         binding.groupColumn.post { render(restoreFocus = true) }
+    }
+
+    private fun rememberGuideSection(next: GuideSection) {
+        val key = when (next) {
+            GuideSection.TV -> "live"
+            GuideSection.MOVIES -> "vod"
+            GuideSection.SHOWS -> "series"
+        }
+        (application as OlympusIptvApp).appScope.launch {
+            runCatching { (application as OlympusIptvApp).playlistStore.saveLastGuideSection(key) }
+        }
+    }
+
+    private fun focusHomeContinue() {
+        if (binding.homeContinue.visibility != View.VISIBLE) {
+            landOnContinue = false
+            focusGroups()
+            return
+        }
+        landOnContinue = false
+        landOnGroups = false
+        binding.homeContinuePlay.post {
+            if (isDestroyed || binding.homeContinue.visibility != View.VISIBLE) return@post
+            if (!binding.homeContinuePlay.requestFocus()) binding.homeContinue.requestFocus()
+        }
     }
 
     private fun showDevicePane() {
@@ -2784,6 +2842,14 @@ class BrowseActivity : AppCompatActivity() {
                 }
             }
         }
+        if (event.action == KeyEvent.ACTION_DOWN &&
+            focusIsIn(binding.shortcutRow) &&
+            event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN &&
+            binding.homeContinue.visibility == View.VISIBLE
+        ) {
+            binding.homeContinuePlay.requestFocus()
+            return true
+        }
         if (event.action == KeyEvent.ACTION_DOWN && focusIsIn(binding.categoryList)) {
             val item = binding.categoryList.findContainingItemView(currentFocus ?: binding.categoryList)
             val pos = if (item == null) -1 else binding.categoryList.getChildAdapterPosition(item)
@@ -2806,9 +2872,17 @@ class BrowseActivity : AppCompatActivity() {
                     }
                 }
                 KeyEvent.KEYCODE_DPAD_UP -> {
-                    if (pos in 0 until span && binding.shortcutRow.visibility == View.VISIBLE) {
-                        binding.btnFavoritesSetup.requestFocus()
-                        return true
+                    if (pos in 0 until span) {
+                        when {
+                            binding.homeContinue.visibility == View.VISIBLE -> {
+                                binding.homeContinuePlay.requestFocus()
+                                return true
+                            }
+                            binding.shortcutRow.visibility == View.VISIBLE -> {
+                                binding.btnFavoritesSetup.requestFocus()
+                                return true
+                            }
+                        }
                     }
                 }
             }
@@ -2971,7 +3045,8 @@ class BrowseActivity : AppCompatActivity() {
         channelAdapter.posterMode = posters
         binding.contentHint.visibility = if (posters) View.VISIBLE else View.GONE
         val manager = binding.channelList.layoutManager
-        val posterSpan = if (touchPrimary) MOBILE_CARD_SPAN else 4
+        // Phones: one poster column scrolls smoother than a 2-up grid on mid-range devices.
+        val posterSpan = if (touchPrimary) 1 else 4
         if (posters && manager !is androidx.recyclerview.widget.GridLayoutManager) {
             binding.channelList.layoutManager = androidx.recyclerview.widget.GridLayoutManager(this, posterSpan)
         } else if (posters && manager is androidx.recyclerview.widget.GridLayoutManager && manager.spanCount != posterSpan) {
@@ -2993,23 +3068,137 @@ class BrowseActivity : AppCompatActivity() {
 
     private fun setupMobileChrome() {
         binding.mobileTopBar.visibility = View.VISIBLE
+        binding.mobileBottomTabs.visibility = View.VISIBLE
+        binding.mobileSectionRow.visibility = View.GONE
         binding.mobileBack.setOnClickListener { onMobileBack() }
-        binding.mobileTitle.setOnClickListener {
-            val next = when (section) {
-                GuideSection.TV -> GuideSection.MOVIES
-                GuideSection.MOVIES -> GuideSection.SHOWS
-                GuideSection.SHOWS -> GuideSection.TV
-            }
-            openSection(next)
-        }
-        binding.mobileTabLive.setOnClickListener { openSection(GuideSection.TV) }
-        binding.mobileTabMovies.setOnClickListener { openSection(GuideSection.MOVIES) }
-        binding.mobileTabShows.setOnClickListener { openSection(GuideSection.SHOWS) }
+        binding.mobileTitle.setOnClickListener { /* section switching is the bottom tabs */ }
+        val openLive = View.OnClickListener { openSection(GuideSection.TV) }
+        val openMovies = View.OnClickListener { openSection(GuideSection.MOVIES) }
+        val openShows = View.OnClickListener { openSection(GuideSection.SHOWS) }
+        binding.mobileTabLive.setOnClickListener(openLive)
+        binding.mobileTabMovies.setOnClickListener(openMovies)
+        binding.mobileTabShows.setOnClickListener(openShows)
+        binding.bottomTabLive.setOnClickListener(openLive)
+        binding.bottomTabMovies.setOnClickListener(openMovies)
+        binding.bottomTabShows.setOnClickListener(openShows)
+        paintBottomTabs()
+    }
+
+    private fun paintBottomTabs() {
+        if (!touchPrimary || !::binding.isInitialized) return
+        binding.bottomTabLive.isSelected = section == GuideSection.TV
+        binding.bottomTabMovies.isSelected = section == GuideSection.MOVIES
+        binding.bottomTabShows.isSelected = section == GuideSection.SHOWS
+        binding.bottomTabLive.setTextColor(
+            getColor(if (section == GuideSection.TV) R.color.accent else R.color.text_primary)
+        )
+        binding.bottomTabMovies.setTextColor(
+            getColor(if (section == GuideSection.MOVIES) R.color.accent else R.color.text_primary)
+        )
+        binding.bottomTabShows.setTextColor(
+            getColor(if (section == GuideSection.SHOWS) R.color.accent else R.color.text_primary)
+        )
     }
 
     private fun wireHomeContinue() {
         binding.homeContinue.setOnClickListener { openHomeContinue() }
         binding.homeContinuePlay.setOnClickListener { openHomeContinue() }
+        binding.homeContinue.setOnLongClickListener {
+            openContinueGroup()
+            true
+        }
+        binding.homeContinuePlay.setOnLongClickListener {
+            openContinueGroup()
+            true
+        }
+        binding.homeContinue.setOnKeyListener { _, keyCode, event ->
+            if (event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener false
+            when (keyCode) {
+                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER,
+                KeyEvent.KEYCODE_BUTTON_A -> {
+                    openHomeContinue()
+                    true
+                }
+                KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                    binding.homeContinuePlay.requestFocus()
+                    true
+                }
+                KeyEvent.KEYCODE_DPAD_DOWN -> {
+                    focusGroups()
+                    true
+                }
+                KeyEvent.KEYCODE_DPAD_UP -> {
+                    if (binding.shortcutRow.visibility == View.VISIBLE) {
+                        binding.btnFavoritesSetup.requestFocus()
+                        true
+                    } else {
+                        false
+                    }
+                }
+                else -> false
+            }
+        }
+        binding.homeContinuePlay.setOnKeyListener { _, keyCode, event ->
+            if (event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener false
+            when (keyCode) {
+                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER,
+                KeyEvent.KEYCODE_BUTTON_A -> {
+                    openHomeContinue()
+                    true
+                }
+                KeyEvent.KEYCODE_DPAD_LEFT -> {
+                    binding.homeContinue.requestFocus()
+                    true
+                }
+                KeyEvent.KEYCODE_DPAD_DOWN -> {
+                    focusGroups()
+                    true
+                }
+                KeyEvent.KEYCODE_DPAD_UP -> {
+                    if (binding.shortcutRow.visibility == View.VISIBLE) {
+                        binding.btnFavoritesSetup.requestFocus()
+                        true
+                    } else {
+                        false
+                    }
+                }
+                else -> false
+            }
+        }
+    }
+
+    private fun wireHomeContinueFocusChain() {
+        val continueVisible = binding.homeContinue.visibility == View.VISIBLE
+        val downId = if (GuideFeel.chipDownTarget(continueVisible) == "homeContinue") {
+            R.id.homeContinue
+        } else {
+            R.id.categoryList
+        }
+        listOf(
+            binding.btnFavoritesSetup,
+            binding.btnQueue,
+            binding.btnFresh,
+            binding.btnRemind,
+            binding.btnParental
+        ).forEach { chip ->
+            chip.nextFocusDownId = downId
+        }
+        if (!continueVisible) return
+        binding.homeContinue.nextFocusDownId = R.id.categoryList
+        binding.homeContinuePlay.nextFocusDownId = R.id.categoryList
+        binding.homeContinue.nextFocusRightId = R.id.homeContinuePlay
+        binding.homeContinuePlay.nextFocusLeftId = R.id.homeContinue
+        if (binding.shortcutRow.visibility == View.VISIBLE) {
+            binding.homeContinue.nextFocusUpId = R.id.btnFavoritesSetup
+            binding.homeContinuePlay.nextFocusUpId = R.id.btnFavoritesSetup
+        } else {
+            binding.homeContinue.nextFocusUpId = View.NO_ID
+            binding.homeContinuePlay.nextFocusUpId = View.NO_ID
+        }
+        if (touchPrimary) {
+            binding.homeContinue.isFocusableInTouchMode = false
+            binding.homeContinuePlay.isFocusableInTouchMode = false
+        }
     }
 
     private fun paintQueueChip() {
@@ -3047,6 +3236,7 @@ class BrowseActivity : AppCompatActivity() {
         if (!::binding.isInitialized) return
         if (binding.groupColumn.visibility != View.VISIBLE) {
             binding.homeContinue.visibility = View.GONE
+            wireHomeContinueFocusChain()
             return
         }
         val config = activeConfig
@@ -3056,6 +3246,7 @@ class BrowseActivity : AppCompatActivity() {
                 val first = rows.firstOrNull()
                 if (first == null) {
                     binding.homeContinue.visibility = View.GONE
+                    wireHomeContinueFocusChain()
                     return
                 }
                 binding.homeContinueTitle.text = first.name
@@ -3068,6 +3259,7 @@ class BrowseActivity : AppCompatActivity() {
                 val first = rows.firstOrNull()
                 if (first == null) {
                     binding.homeContinue.visibility = View.GONE
+                    wireHomeContinueFocusChain()
                     return
                 }
                 binding.homeContinueTitle.text = first.name
@@ -3076,6 +3268,14 @@ class BrowseActivity : AppCompatActivity() {
                 binding.homeContinue.tag = first
             }
         }
+        wireHomeContinueFocusChain()
+        if (GuideFeel.landOnContinueStrip(section == GuideSection.TV, binding.homeContinue.visibility == View.VISIBLE) &&
+            landOnContinue
+        ) {
+            focusHomeContinue()
+        } else if (landOnContinue) {
+            landOnContinue = false
+        }
     }
 
     private fun openHomeContinue() {
@@ -3083,13 +3283,29 @@ class BrowseActivity : AppCompatActivity() {
         when (section) {
             GuideSection.TV -> {
                 selectedCategoryId = PlaylistLoader.RECENT_ID
-                showChannels()
-                openFullGuide()
+                selectedCategoryName = getString(R.string.recent_watched)
+                categoryAdapter.setSelected(PlaylistLoader.RECENT_ID)
                 play(channel, queueOverride = listOf(channel), zapMode = PlayerActivity.ZAP_LIST)
             }
             GuideSection.MOVIES, GuideSection.SHOWS -> {
                 selectedCategoryId = PlaylistLoader.CONTINUE_ID
+                selectedCategoryName = getString(R.string.continue_group)
+                categoryAdapter.setSelected(PlaylistLoader.CONTINUE_ID)
                 play(channel)
+            }
+        }
+    }
+
+    private fun openContinueGroup() {
+        when (section) {
+            GuideSection.TV -> {
+                val category = Category(PlaylistLoader.RECENT_ID, getString(R.string.recent_watched), kind)
+                selectCategory(category, immediate = true)
+            }
+            GuideSection.MOVIES, GuideSection.SHOWS -> {
+                if (!hasContinue(section)) return
+                val category = Category(PlaylistLoader.CONTINUE_ID, getString(R.string.continue_group), kind)
+                selectCategory(category, immediate = true)
             }
         }
     }
@@ -3142,7 +3358,8 @@ class BrowseActivity : AppCompatActivity() {
         }
         channelAdapter.paintRowFocus(binding.channelList)
         val row = binding.guideRow
-        if (row.isLaidOut && !skipGuideTransition) {
+        // TV gets a short column morph; phones skip it — transitions feel laggy on touch devices.
+        if (!touchPrimary && row.isLaidOut && !skipGuideTransition) {
             TransitionManager.beginDelayedTransition(row, AutoTransition().apply { duration = 180 })
         }
         skipGuideTransition = false
@@ -3152,6 +3369,7 @@ class BrowseActivity : AppCompatActivity() {
         }
         val phoneChrome = touchPrimary
         binding.mobileTopBar.visibility = if (phoneChrome) View.VISIBLE else View.GONE
+        binding.mobileBottomTabs.visibility = if (phoneChrome) View.VISIBLE else View.GONE
         binding.navRail.visibility = if (showSettings && !phoneChrome) View.VISIBLE else View.GONE
         binding.navDivider.visibility = if (showSettings && !phoneChrome) View.VISIBLE else View.GONE
         if (!showGroups && focusIsIn(binding.groupColumn)) binding.groupColumn.clearFocus()
@@ -3160,15 +3378,13 @@ class BrowseActivity : AppCompatActivity() {
         binding.groupPills.visibility = View.GONE
         binding.contentDivider.visibility = if (showGroups && showChannels) View.VISIBLE else View.GONE
         binding.contentColumn.visibility = if (showChannels) View.VISIBLE else View.GONE
-        binding.programPane.visibility = if (showPrograms) View.VISIBLE else View.GONE
+        // Phone: skip the side-by-side EPG pane — one column of channels is enough and much lighter.
+        binding.programPane.visibility = if (showPrograms && !phoneChrome) View.VISIBLE else View.GONE
         if (phoneChrome) {
             val pinOpen = binding.groupPin.visibility == View.VISIBLE ||
                 binding.groupPinWrong.visibility == View.VISIBLE
             binding.mobileBack.visibility = if (full || pinOpen) View.VISIBLE else View.GONE
-            binding.mobileSectionRow.visibility = if (showGroups) View.VISIBLE else View.GONE
-            binding.mobileTabLive.isSelected = live
-            binding.mobileTabMovies.isSelected = section == GuideSection.MOVIES
-            binding.mobileTabShows.isSelected = section == GuideSection.SHOWS
+            binding.mobileSectionRow.visibility = View.GONE
             binding.mobileTitle.text = when {
                 full && selectedCategoryName.isNotBlank() -> selectedCategoryName
                 live -> getString(R.string.nav_tv)
@@ -3176,6 +3392,7 @@ class BrowseActivity : AppCompatActivity() {
                 section == GuideSection.SHOWS -> getString(R.string.nav_shows)
                 else -> getString(R.string.rail_title)
             }
+            paintBottomTabs()
         } else {
             binding.mobileSectionRow.visibility = View.GONE
         }
@@ -4174,6 +4391,7 @@ class BrowseActivity : AppCompatActivity() {
 
     private var focusGroupIndex = -1
     private var landOnGroups = false
+    private var landOnContinue = false
     private var groupFocusTries = 0
 
     private fun armGroupFocus() {
@@ -4833,7 +5051,8 @@ class BrowseActivity : AppCompatActivity() {
 
     private fun schedulePrefetch(channels: List<Channel>) {
         epgPrefetchWait?.let { focusHandler.removeCallbacks(it) }
-        val snapshot = channels.filter { it.kind == ContentKind.LIVE }.take(8)
+        val limit = if (touchPrimary) 3 else 8
+        val snapshot = channels.filter { it.kind == ContentKind.LIVE }.take(limit)
         if (snapshot.isEmpty()) return
         val query = channelQuery
         val run = Runnable {
@@ -4848,7 +5067,8 @@ class BrowseActivity : AppCompatActivity() {
     private fun prefetchEpg(channels: List<Channel>) {
         val saved = playlist ?: return
         epgPrefetchJob?.cancel()
-        val pending = channels.filter { it.kind == ContentKind.LIVE && !epgCache.containsKey(it.id) }.take(8)
+        val limit = if (touchPrimary) 3 else 8
+        val pending = channels.filter { it.kind == ContentKind.LIVE && !epgCache.containsKey(it.id) }.take(limit)
         if (pending.isEmpty()) return
         epgPrefetchJob = lifecycleScope.launch {
             val loaded = coroutineScope {
@@ -5114,7 +5334,6 @@ class BrowseActivity : AppCompatActivity() {
         const val EXTRA_PLAYLIST_ID = "playlist_id"
         const val EXTRA_SKIP_RESUME = "skip_resume"
         private const val CARD_SPAN = 3
-        private const val MOBILE_CARD_SPAN = 2
         private const val PAGE_SIZE = 200
         private const val FOCUS_SETTLE_MS = 160L
         private const val EPG_CACHE_CAP = 120

@@ -55,6 +55,8 @@ class PlaylistStore(private val context: Context) {
     private val quietEndKey = intPreferencesKey("quiet_end_minute")
     private val parentalTimeoutKey = intPreferencesKey("parental_timeout_minutes")
     private val multiViewKey = booleanPreferencesKey("multi_view")
+    private val lastGuideSectionKey = stringPreferencesKey("last_guide_section")
+    private val skipIntroSeriesKey = stringPreferencesKey("skip_intro_series_json")
     private val lastChannelKey = stringPreferencesKey("last_channel_json")
     private val previousChannelKey = stringPreferencesKey("previous_channel_json")
     private val favoritesSetupKey = booleanPreferencesKey("favorites_setup_done")
@@ -324,6 +326,37 @@ class PlaylistStore(private val context: Context) {
     }
 
     suspend fun multiView(): Boolean = devicePrefs().multiView
+
+    suspend fun lastGuideSection(): String {
+        val raw = context.dataStore.data.first()[lastGuideSectionKey].orEmpty()
+        return when (raw.trim().lowercase()) {
+            "vod", "movies" -> "vod"
+            "series", "shows" -> "series"
+            else -> "live"
+        }
+    }
+
+    suspend fun saveLastGuideSection(section: String) {
+        val chosen = when (section.trim().lowercase()) {
+            "vod", "movies" -> "vod"
+            "series", "shows" -> "series"
+            else -> "live"
+        }
+        context.dataStore.edit { prefs -> prefs[lastGuideSectionKey] = chosen }
+    }
+
+    suspend fun skipIntroSeries(): Set<String> =
+        decodeStringMap(context.dataStore.data.first()[skipIntroSeriesKey]).keys
+
+    suspend fun rememberSkipIntro(seriesId: String) {
+        val id = seriesId.trim()
+        if (id.isEmpty()) return
+        context.dataStore.edit { prefs ->
+            val map = decodeStringMap(prefs[skipIntroSeriesKey])
+            map[id] = "1"
+            prefs[skipIntroSeriesKey] = gson.toJson(map)
+        }
+    }
 
     suspend fun saveMultiView(enabled: Boolean) {
         context.dataStore.edit { prefs -> prefs[multiViewKey] = enabled }
@@ -614,6 +647,8 @@ class PlaylistStore(private val context: Context) {
             prefs.remove(quietEndKey)
             prefs.remove(parentalTimeoutKey)
             prefs.remove(multiViewKey)
+            prefs.remove(lastGuideSectionKey)
+            prefs.remove(skipIntroSeriesKey)
             prefs.remove(lastChannelKey)
             prefs.remove(previousChannelKey)
             prefs.remove(favoritesSetupKey)

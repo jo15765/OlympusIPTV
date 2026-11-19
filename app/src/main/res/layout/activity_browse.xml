@@ -277,10 +277,13 @@
                 android:layout_height="wrap_content"
                 android:layout_marginHorizontal="20dp"
                 android:layout_marginBottom="12dp"
-                android:background="@drawable/bg_panel"
+                android:background="@drawable/bg_focusable"
                 android:clickable="true"
+                android:descendantFocusability="afterDescendants"
                 android:focusable="true"
+                android:focusableInTouchMode="true"
                 android:gravity="center_vertical"
+                android:nextFocusDown="@id/categoryList"
                 android:orientation="horizontal"
                 android:paddingHorizontal="16dp"
                 android:paddingVertical="12dp"
@@ -290,11 +293,13 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
+                    android:focusable="false"
                     android:orientation="vertical">
 
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:focusable="false"
                         android:text="@string/continue_watching_home"
                         android:textColor="@color/accent"
                         android:textSize="13sp"
@@ -306,6 +311,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
                         android:ellipsize="end"
+                        android:focusable="false"
                         android:maxLines="1"
                         android:textColor="@color/text_primary"
                         android:textSize="16sp"
@@ -317,6 +323,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
                         android:ellipsize="end"
+                        android:focusable="false"
                         android:maxLines="1"
                         android:textColor="@color/text_secondary"
                         android:textSize="13sp" />
@@ -325,14 +332,19 @@
                 <TextView
                     android:id="@+id/homeContinuePlay"
                     android:layout_width="wrap_content"
-                    android:layout_height="40dp"
+                    android:layout_height="44dp"
                     android:layout_marginStart="12dp"
                     android:background="@drawable/bg_button"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:focusableInTouchMode="true"
                     android:gravity="center"
-                    android:paddingHorizontal="16dp"
+                    android:nextFocusLeft="@id/homeContinue"
+                    android:nextFocusDown="@id/categoryList"
+                    android:paddingHorizontal="18dp"
                     android:text="@string/fresh_play"
                     android:textColor="@color/bg"
-                    android:textSize="14sp"
+                    android:textSize="15sp"
                     android:textStyle="bold" />
             </LinearLayout>
 
@@ -1841,6 +1853,60 @@
                     android:textSize="14sp" />
             </LinearLayout>
         </ScrollView>
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/mobileBottomTabs"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:background="@color/bg_elevated"
+        android:elevation="8dp"
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:paddingHorizontal="4dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/bottomTabLive"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@drawable/bg_nav"
+            android:clickable="true"
+            android:focusable="false"
+            android:gravity="center"
+            android:text="@string/nav_tv"
+            android:textColor="@color/text_primary"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/bottomTabMovies"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@drawable/bg_nav"
+            android:clickable="true"
+            android:focusable="false"
+            android:gravity="center"
+            android:text="@string/vod"
+            android:textColor="@color/text_primary"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/bottomTabShows"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@drawable/bg_nav"
+            android:clickable="true"
+            android:focusable="false"
+            android:gravity="center"
+            android:text="@string/nav_shows"
+            android:textColor="@color/text_primary"
+            android:textSize="14sp"
+            android:textStyle="bold" />
     </LinearLayout>
     </LinearLayout>
 
