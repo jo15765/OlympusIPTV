@@ -1,6 +1,7 @@
 package com.olympus.iptv.ui.login
 
 import android.content.Intent
+import android.content.pm.ActivityInfo
 import android.graphics.Typeface
 import android.os.Bundle
 import android.text.InputFilter
@@ -13,6 +14,7 @@ import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
 import com.olympus.iptv.OlympusIptvApp
 import com.olympus.iptv.R
@@ -20,6 +22,8 @@ import com.olympus.iptv.data.AutoFavorites
 import com.olympus.iptv.databinding.ActivityFavoritesSetupBinding
 import com.olympus.iptv.playlist.CatalogIngest
 import com.olympus.iptv.playlist.LineupClient
+import com.olympus.iptv.ui.DeviceForm
+import com.olympus.iptv.ui.InsetsPad
 import com.olympus.iptv.ui.browse.BrowseActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -47,18 +51,32 @@ class FavoritesSetupActivity : AppCompatActivity() {
     private var lastCard: View? = null
     private var currentSport = ""
     private val chosen = mutableMapOf<String, MutableSet<String>>()
+    private val touchPrimary by lazy { DeviceForm.isTouchPrimary(this) }
     private val http = OkHttpClient.Builder().callTimeout(8, TimeUnit.SECONDS).build()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityFavoritesSetupBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        if (touchPrimary) {
+            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            WindowCompat.setDecorFitsSystemWindows(window, false)
+            InsetsPad.apply(
+                binding.root,
+                top = true,
+                bottom = true,
+                left = true,
+                right = true
+            )
+            enableTouchScrolling()
+        }
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 if (binding.sportsPanel.visibility == View.VISIBLE) {
                     binding.sportsPanel.visibility = View.GONE
+                    binding.setupScroll.visibility = View.VISIBLE
                     binding.cardBoard.visibility = View.VISIBLE
-                    binding.cardTeams.requestFocus()
+                    focusCard(binding.cardTeams)
                 } else if (fromGuide) {
                     finish()
                 } else {
@@ -83,7 +101,7 @@ class FavoritesSetupActivity : AppCompatActivity() {
         val catalogReadyOnOpen = intent.getBooleanExtra(EXTRA_CATALOG_READY, false)
         if (catalogReadyOnOpen) {
             showFavorites()
-            binding.cardLocal.requestFocus()
+            focusCard(binding.cardLocal)
         } else {
             showLoading(true)
         }
@@ -104,8 +122,27 @@ class FavoritesSetupActivity : AppCompatActivity() {
             val international = (application as OlympusIptvApp).playlistStore.lineup(playlistId).includeInternational == true
             if (!international) applyCountryFilter(false)
             showFavorites()
-            if (showedSplash || currentFocus == null) binding.cardLocal.requestFocus()
+            if (showedSplash || currentFocus == null) focusCard(binding.cardLocal)
         }
+    }
+
+    private fun enableTouchScrolling() {
+        binding.setupScroll.isSmoothScrollingEnabled = true
+        binding.setupScroll.isNestedScrollingEnabled = true
+        binding.teamScroll.isSmoothScrollingEnabled = true
+        binding.teamScroll.isNestedScrollingEnabled = true
+        listOf(
+            binding.cardLocal, binding.cardSports, binding.cardTeams, binding.cardSlingBlue,
+            binding.cardSlingOrange, binding.cardFilo, binding.cardUtoob, binding.cardFubo,
+            binding.cardDirectv, binding.cardFrndly, binding.cardHulu, binding.btnNext
+        ).forEach { card ->
+            card.isFocusableInTouchMode = false
+        }
+    }
+
+    private fun focusCard(card: View) {
+        if (touchPrimary) return
+        card.requestFocus()
     }
 
     private suspend fun catalogNeedsDownload(): Boolean {
@@ -176,6 +213,7 @@ class FavoritesSetupActivity : AppCompatActivity() {
         catalogReady = true
         binding.loadingPane.visibility = View.GONE
         binding.setupHeading.visibility = View.VISIBLE
+        binding.setupScroll.visibility = View.VISIBLE
         binding.cardBoard.visibility = View.VISIBLE
         binding.btnNext.visibility = if (fromGuide) View.GONE else View.VISIBLE
     }
@@ -184,6 +222,7 @@ class FavoritesSetupActivity : AppCompatActivity() {
         catalogReady = !loading
         binding.loadingPane.visibility = if (loading) View.VISIBLE else View.GONE
         binding.setupHeading.visibility = if (loading) View.GONE else View.VISIBLE
+        binding.setupScroll.visibility = if (loading) View.GONE else View.VISIBLE
         binding.cardBoard.visibility = if (loading) View.GONE else View.VISIBLE
     }
 
@@ -236,7 +275,7 @@ class FavoritesSetupActivity : AppCompatActivity() {
             }
             if (isFinishing) return@launch
             setBusy(false)
-            lastCard?.requestFocus()
+            lastCard?.let { focusCard(it) }
             val result = outcome.getOrNull()
             if (result == null) {
                 binding.statusText.setText(R.string.favorites_setup_none)
@@ -267,7 +306,7 @@ class FavoritesSetupActivity : AppCompatActivity() {
             }
             if (isFinishing) return@launch
             setBusy(false)
-            lastCard?.requestFocus()
+            lastCard?.let { focusCard(it) }
             val result = outcome.getOrNull()
             if (result == null) {
                 binding.statusText.setText(R.string.favorites_setup_none)
@@ -304,7 +343,7 @@ class FavoritesSetupActivity : AppCompatActivity() {
             }
             if (isFinishing) return@launch
             setBusy(false)
-            lastCard?.requestFocus()
+            lastCard?.let { focusCard(it) }
             val result = outcome.getOrNull()
             if (result == null) {
                 binding.statusText.setText(R.string.favorites_setup_none)
@@ -365,7 +404,7 @@ class FavoritesSetupActivity : AppCompatActivity() {
             val counts = runCatching { savePicks(AutoFavorites.sportsPicks(guideChannels())) }.getOrNull()
             if (isFinishing) return@launch
             setBusy(false)
-            lastCard?.requestFocus()
+            lastCard?.let { focusCard(it) }
             showCount(counts)
         }
     }
@@ -379,10 +418,11 @@ class FavoritesSetupActivity : AppCompatActivity() {
     }
 
     private fun showSports() {
+        binding.setupScroll.visibility = View.GONE
         binding.cardBoard.visibility = View.GONE
         binding.sportsPanel.visibility = View.VISIBLE
         if (currentSport.isEmpty()) binding.statusText.setText(R.string.favorites_setup_pick_sport)
-        binding.sportRow.getChildAt(0)?.requestFocus()
+        binding.sportRow.getChildAt(0)?.let { focusCard(it) }
     }
 
     private fun selectSport(sport: AutoFavorites.Sport, chip: TextView) {
@@ -616,6 +656,7 @@ class FavoritesSetupActivity : AppCompatActivity() {
             setPadding(dp(14), dp(8), dp(14), dp(8))
             setBackgroundResource(R.drawable.bg_focusable)
             isFocusable = true
+            isFocusableInTouchMode = !touchPrimary
             isClickable = true
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -635,6 +676,7 @@ class FavoritesSetupActivity : AppCompatActivity() {
             setPadding(dp(12), dp(8), dp(12), dp(8))
             setBackgroundResource(R.drawable.bg_focusable)
             isFocusable = true
+            isFocusableInTouchMode = !touchPrimary
             isClickable = true
             isSelected = name in selected
             layoutParams = LinearLayout.LayoutParams(

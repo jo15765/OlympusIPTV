@@ -7,6 +7,7 @@ import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewTreeObserver
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
@@ -35,7 +36,18 @@ class ParentalActivity : AppCompatActivity() {
     private val selected = LinkedHashSet<String>()
     private var pinDigits = ""
     private var pinTargets = emptyList<String>()
+    private var pinKeyIndex = 4
+    private var pinFocusGuard: ViewTreeObserver.OnGlobalFocusChangeListener? = null
     @Volatile private var saving = false
+
+    private val pinKeys: List<View> by lazy {
+        listOf(
+            binding.pin1, binding.pin2, binding.pin3,
+            binding.pin4, binding.pin5, binding.pin6,
+            binding.pin7, binding.pin8, binding.pin9,
+            binding.pinClearDigit, binding.pin0, binding.pinCancel
+        )
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -46,6 +58,16 @@ class ParentalActivity : AppCompatActivity() {
             finish()
             return
         }
+        if (com.olympus.iptv.ui.DeviceForm.isTouchPrimary(this)) {
+            androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
+            com.olympus.iptv.ui.InsetsPad.apply(
+                binding.parentalContent,
+                top = true,
+                bottom = true,
+                left = true,
+                right = true
+            )
+        }
         binding.groupList.layoutManager = GridLayoutManager(this, 3)
         binding.groupList.itemAnimator = null
         binding.groupList.setHasFixedSize(true)
@@ -55,6 +77,7 @@ class ParentalActivity : AppCompatActivity() {
         binding.btnClearPin.setOnClickListener { clearSelected() }
         binding.pinCancel.setOnClickListener { hidePin() }
         binding.pinClearDigit.setOnClickListener { clearLastDigit() }
+        binding.pinScrim.setOnClickListener { /* absorb taps behind the pad */ }
         wirePad()
         lifecycleScope.launch {
             val app = application as OlympusIptvApp
@@ -82,11 +105,16 @@ class ParentalActivity : AppCompatActivity() {
             adapter.notifyDataSetChanged()
             updateHint()
             binding.groupList.post {
-                if (isDestroyed) return@post
+                if (isDestroyed || pinOpen()) return@post
                 binding.groupList.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
                     ?: binding.btnBack.requestFocus()
             }
         }
+    }
+
+    override fun onDestroy() {
+        detachPinFocusGuard()
+        super.onDestroy()
     }
 
     private fun wirePad() {
@@ -105,7 +133,20 @@ class ParentalActivity : AppCompatActivity() {
         for ((view, digit) in keys) {
             view.setOnClickListener { appendDigit(digit) }
         }
+        for ((index, key) in pinKeys.withIndex()) {
+            val col = index % 3
+            val row = index / 3
+            key.nextFocusLeftId = pinKeys[row * 3 + (col - 1).coerceAtLeast(0)].id
+            key.nextFocusRightId = pinKeys[row * 3 + (col + 1).coerceAtMost(2)].id
+            key.nextFocusUpId = pinKeys[(row - 1).coerceAtLeast(0) * 3 + col].id
+            key.nextFocusDownId = pinKeys[(row + 1).coerceAtMost(3) * 3 + col].id
+            key.setOnFocusChangeListener { _, hasFocus ->
+                if (hasFocus) pinKeyIndex = index
+            }
+        }
     }
+
+    private fun pinOpen(): Boolean = binding.groupPin.visibility == View.VISIBLE
 
     private fun beginPin() {
         if (selected.isEmpty()) {
@@ -115,12 +156,16 @@ class ParentalActivity : AppCompatActivity() {
         if (saving) return
         pinTargets = selected.toList()
         pinDigits = ""
+        pinKeyIndex = 4
         binding.groupPinTitle.setText(
             if (pinTargets.size == 1) R.string.group_pin_set else R.string.group_pin_set_many
         )
         paintDigits()
+        setBackgroundFocusEnabled(false)
+        binding.pinScrim.visibility = View.VISIBLE
         binding.groupPin.visibility = View.VISIBLE
-        binding.pin5.requestFocus()
+        attachPinFocusGuard()
+        binding.groupPin.post { reclaimPinFocus() }
     }
 
     private fun clearSelected() {
@@ -137,16 +182,97 @@ class ParentalActivity : AppCompatActivity() {
     }
 
     private fun hidePin() {
+        detachPinFocusGuard()
         pinTargets = emptyList()
         pinDigits = ""
         binding.groupPin.visibility = View.GONE
+        binding.pinScrim.visibility = View.GONE
+        setBackgroundFocusEnabled(true)
         adapter.notifyDataSetChanged()
         updateHint()
         binding.groupList.post {
-            if (isDestroyed) return@post
+            if (isDestroyed || pinOpen()) return@post
             binding.groupList.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
                 ?: binding.btnSetPin.requestFocus()
         }
+    }
+
+    private fun setBackgroundFocusEnabled(enabled: Boolean) {
+        binding.parentalContent.descendantFocusability =
+            if (enabled) ViewGroup.FOCUS_AFTER_DESCENDANTS else ViewGroup.FOCUS_BLOCK_DESCENDANTS
+        binding.btnBack.isFocusable = enabled
+        binding.btnSetPin.isFocusable = enabled
+        binding.btnClearPin.isFocusable = enabled
+        binding.groupList.isFocusable = enabled
+        if (!enabled) {
+            binding.parentalContent.clearFocus()
+            binding.groupList.clearFocus()
+        }
+    }
+
+    private fun focusInPin(): Boolean {
+        var view = currentFocus ?: return false
+        while (true) {
+            if (view === binding.groupPin) return true
+            view = view.parent as? View ?: return false
+        }
+    }
+
+    private fun reclaimPinFocus() {
+        if (isDestroyed || !pinOpen()) return
+        val index = pinKeyIndex.coerceIn(0, pinKeys.lastIndex)
+        val target = pinKeys[index]
+        if (!target.requestFocus()) {
+            binding.pin5.requestFocus()
+        }
+    }
+
+    private fun movePinFocus(dx: Int, dy: Int): Boolean {
+        if (!pinOpen()) return false
+        if (!focusInPin()) {
+            reclaimPinFocus()
+            return true
+        }
+        val index = pinKeys.indexOfFirst { it === currentFocus }.let {
+            if (it >= 0) it else pinKeyIndex
+        }.coerceIn(0, pinKeys.lastIndex)
+        val col = index % 3
+        val row = index / 3
+        val nextCol = (col + dx).coerceIn(0, 2)
+        val nextRow = (row + dy).coerceIn(0, 3)
+        val next = nextRow * 3 + nextCol
+        pinKeyIndex = next
+        pinKeys[next].requestFocus()
+        return true
+    }
+
+    private fun attachPinFocusGuard() {
+        if (pinFocusGuard != null) return
+        val guard = ViewTreeObserver.OnGlobalFocusChangeListener { _, newFocus ->
+            if (!pinOpen() || isDestroyed) return@OnGlobalFocusChangeListener
+            val inside = newFocus != null && run {
+                var view: View? = newFocus
+                while (view != null) {
+                    if (view === binding.groupPin) return@run true
+                    view = view.parent as? View
+                }
+                false
+            }
+            if (!inside) {
+                binding.groupPin.post {
+                    if (pinOpen() && !focusInPin()) reclaimPinFocus()
+                }
+            }
+        }
+        pinFocusGuard = guard
+        binding.root.viewTreeObserver.addOnGlobalFocusChangeListener(guard)
+    }
+
+    private fun detachPinFocusGuard() {
+        val guard = pinFocusGuard ?: return
+        pinFocusGuard = null
+        val observer = binding.root.viewTreeObserver
+        if (observer.isAlive) observer.removeOnGlobalFocusChangeListener(guard)
     }
 
     private fun paintDigits() {
@@ -220,7 +346,9 @@ class ParentalActivity : AppCompatActivity() {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (binding.groupPin.visibility == View.VISIBLE && event.action == KeyEvent.ACTION_DOWN) {
+        if (!pinOpen()) return super.dispatchKeyEvent(event)
+        if (event.action == KeyEvent.ACTION_DOWN) {
+            if (!focusInPin()) reclaimPinFocus()
             val digit = when (event.keyCode) {
                 in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9 -> ('0' + (event.keyCode - KeyEvent.KEYCODE_0))
                 in KeyEvent.KEYCODE_NUMPAD_0..KeyEvent.KEYCODE_NUMPAD_9 ->
@@ -231,19 +359,46 @@ class ParentalActivity : AppCompatActivity() {
                 appendDigit(digit)
                 return true
             }
-            if (event.keyCode == KeyEvent.KEYCODE_DEL || event.keyCode == KeyEvent.KEYCODE_FORWARD_DEL) {
-                clearLastDigit()
-                return true
+            when (event.keyCode) {
+                KeyEvent.KEYCODE_DEL, KeyEvent.KEYCODE_FORWARD_DEL -> {
+                    clearLastDigit()
+                    return true
+                }
+                KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_ESCAPE, KeyEvent.KEYCODE_BUTTON_B -> {
+                    hidePin()
+                    return true
+                }
+                KeyEvent.KEYCODE_DPAD_UP -> return movePinFocus(0, -1)
+                KeyEvent.KEYCODE_DPAD_DOWN -> return movePinFocus(0, 1)
+                KeyEvent.KEYCODE_DPAD_LEFT -> return movePinFocus(-1, 0)
+                KeyEvent.KEYCODE_DPAD_RIGHT -> return movePinFocus(1, 0)
+                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER,
+                KeyEvent.KEYCODE_BUTTON_A -> {
+                    (currentFocus ?: pinKeys[pinKeyIndex.coerceIn(0, pinKeys.lastIndex)]).performClick()
+                    return true
+                }
             }
-            if (event.keyCode == KeyEvent.KEYCODE_BACK ||
-                event.keyCode == KeyEvent.KEYCODE_ESCAPE ||
-                event.keyCode == KeyEvent.KEYCODE_BUTTON_B
+        }
+        if (event.action == KeyEvent.ACTION_UP) {
+            when (event.keyCode) {
+                KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
+                KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT,
+                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER,
+                KeyEvent.KEYCODE_BUTTON_A, KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_ESCAPE,
+                KeyEvent.KEYCODE_BUTTON_B, KeyEvent.KEYCODE_DEL, KeyEvent.KEYCODE_FORWARD_DEL ->
+                    return true
+            }
+            if (event.keyCode in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9 ||
+                event.keyCode in KeyEvent.KEYCODE_NUMPAD_0..KeyEvent.KEYCODE_NUMPAD_9
             ) {
-                hidePin()
                 return true
             }
         }
-        return super.dispatchKeyEvent(event)
+        if (!focusInPin()) {
+            reclaimPinFocus()
+            return true
+        }
+        return true
     }
 
     private val adapter = object : RecyclerView.Adapter<Holder>() {

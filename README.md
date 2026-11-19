@@ -6,7 +6,7 @@
 
 ### For the latest and greatest, build your own APK from this code.
 
-The latest signed file is **0.2.38** (versionCode 39). Install that over the copy already on the TV. Parental locks only the Live TV groups you can see, with multi-select cards and an on-screen numeric PIN pad. From New this week, a series detail keeps the poster and description, then seasons across the screen and that season’s episodes underneath with Play. New this week still only lists titles already in your library, with looser name matching when Watchmode’s title is longer or shorter than the catalog name.
+The latest signed file is **0.2.42** (versionCode 43). **One APK** installs on Android TV / set-top boxes and on phones and tablets (Downloader or sideload). The same build detects the device: remotes keep working on TV; phones get touch scrolling, system-bar insets so the nav bar does not cover play controls, an on-screen Back in the player menu, and free orientation. First open on TV lands focus on Live TV Favorites. Parental PIN focus stays locked to the pad. Web setup opens the full dashboard so favorites and filters can finish in the browser and sync to the device.
 
 **This is a player only. You must provide your own streams.**
 
@@ -23,6 +23,8 @@ Olympus-IPTV does not include channels, movies, shows, or stream addresses. It p
 </div>
 
 - [Start here](#start-here)
+
+- [Phones and tablets](#phones-and-tablets)
 
 - [Video walkthrough](#video-walkthrough)
 
@@ -60,17 +62,36 @@ Olympus-IPTV does not include channels, movies, shows, or stream addresses. It p
 
 </div>
 
-Olympus-IPTV is an Android TV app for a remote. It browses live TV, movies, and series from your playlist. While it is open, it hosts a home dashboard so a phone or computer on the same Wi-Fi can edit the same lineup.
+Olympus-IPTV is one APK for Android TV / set-top boxes and for phones and tablets. On TV it is built for a remote. On a phone it adapts for touch. While the app is open, it hosts a home dashboard so a phone or computer on the same Wi-Fi can edit the same lineup.
 
 | | |
 | --- | --- |
-| Signed file | `C:\Users\chalu\Downloads\olympus-iptv-0.2.38.apk` |
-| What that file is | versionName **0.2.38**, versionCode **39** |
+| Signed file | `C:\Users\chalu\Downloads\olympus-iptv-0.2.42.apk` |
+| What that file is | versionName **0.2.42**, versionCode **43** |
 | What to run for current work | That signed file, or a newer APK you build from this source |
-| Install | Over the existing copy. Uninstalling wipes the saved account, playlist, and favorites. |
+| Install | Over the existing copy (TV or phone). Uninstalling wipes the saved account, playlist, and favorites. Downloader works with the same file. |
 | Launcher name | Two centered lines: Olympus over IPTV |
 
-The signed file is **0.2.38**. A TV that already has an account opens on the left rail, and the group cards fill in as soon as the saved group names are ready — not after a long background warm-up. The login screen is created only when no account is stored. Live TV shows Favorites setup, Queue, New / Just Added, Reminders, and Parental above the groups. The top of that groups screen shows today’s date and a 12-hour clock (`MM/DD/YYYY  hh:mm AM/PM`), updated each minute.
+The signed file is **0.2.42**. A device that already has an account opens with focus on the Live TV Favorites group card on TV; the left rail stays available with Left on the remote. Group cards fill in as soon as the saved group names are ready — not after a long background warm-up. The login screen is created only when no account is stored. Live TV shows Favorites setup, Queue, New / Just Added, Reminders, and Parental above the groups. The top of that groups screen shows today’s date and a 12-hour clock (`MM/DD/YYYY  hh:mm AM/PM`), updated each minute.
+
+---
+
+<div align="center">
+
+## Phones and tablets
+
+</div>
+
+There is **no separate mobile APK**. The same `olympus-iptv-0.2.42.apk` detects whether it is running on a television (Leanback / UI mode) or a touch-first phone or tablet.
+
+| On phones and tablets | What changed |
+| --- | --- |
+| System navigation bar | Player and main screens pad for system bars so the 3-button or gesture bar does not cover play controls or key chrome |
+| Player Back | On-screen **Back** in the playback menu; system Back / gesture closes the menu first, then leaves the player |
+| Touch | Tap the video to show or hide controls; Favorites setup scrolls with a finger; orientation is unlocked |
+| Immersive watch | While controls are hidden, system bars hide; swipe shows them briefly; when the menu is open, bars stay visible and controls sit above them |
+
+TV remotes and landscape-first layouts are unchanged on set-top boxes.
 
 ---
 
@@ -97,11 +118,11 @@ It walks through enabling unknown sources on an Onn box, installing Downloader b
 </div>
 
 - Plays live channels, movies, and series from an M3U or M3U8 URL, or from an Xtream host, username, and password.
-- Runs on a Shield, an Onn streaming box, and a Google TV Streamer from one APK. Minimum is Android 7 (API 24). The APK includes 32-bit and 64-bit ARM. Shield Experience 9.2.4 is Android 11. The number in parentheses on that Shield screen is NVIDIA’s build, not the Android version.
+- Runs from **one APK** on a Shield, Onn, Google TV Streamer, and other Android TVs, and on Android phones and tablets (including install via Downloader). Minimum is Android 7 (API 24). The APK includes 32-bit and 64-bit ARM. Shield Experience 9.2.4 is Android 11. The number in parentheses on that Shield screen is NVIDIA’s build, not the Android version.
 - Signs in with an email and a 5-digit US ZIP. The ZIP is only used to place local channels. Include VOD starts checked. Include International starts unchecked, so foreign groups stay out until you turn that on.
 - Creates a device id shaped `OI-XXXX-XXXX-XXXX`. One email can have more than one device. Each device keeps its own lineup, favorites, catalog, and recordings.
 - Pulls the provider catalog once per list (live, movies, shows), shows a percent in steps of 5, then the counts, then the auto-add cards. Later opens skip the favorites splash when the catalog is already on the device. Favorites setup, at the top of Live TV, can open that screen again without Continue. Back from there returns focus to that chip.
-- Lets the first account be saved from the dashboard address on the login screen. The page shows **Set up this TV** until an account exists. Saving it stores the account on the set. The login screen moves on as soon as that save lands. Opening the app again reads that saved account once and opens the group screen as soon as the saved live groups are ready. Dashboard warm-up and “New” card prep wait until after that first paint. The login screen is created only when no account is stored.
+- Lets the first account be saved from the dashboard address on the login screen. The page shows **Set up this device** until an account exists. Saving it stores the account on the device and opens the full dashboard so favorites and filters can finish in the browser and sync back. The login screen on the player moves on as soon as that save lands. Opening the app again reads that saved account once and opens the group screen as soon as the saved live groups are ready. Dashboard warm-up and “New” card prep wait until after that first paint. The login screen is created only when no account is stored.
 - Browses with a remote: **Search, Live TV, Movies, Shows, Recordings, Admin, and About.** On Live TV, the top of the groups screen has Favorites setup, Queue, New / Just Added, Reminders, and Parental, plus the current date and 12-hour time on the right. There is no favorite-channel name strip across the top, no Settings item, and no Sign out.
 
 ---
@@ -239,7 +260,9 @@ Search looks through TV, Movies, and Shows and groups the hits under those headi
 
 The player is Media3 ExoPlayer on its own HTTP stack. Logos use Coil. Catalog and dashboard calls use OkHttp. The player does not send your streams through that client.
 
-The top caption shows the lineup name, the current program, and the next program. Up and Down change channel inside the group, through the live list, or along the list that was on screen, depending on how you opened it. OK while the program is playing opens Audio, Subtitles, Record, Picture, **Last**, **Go live**, and **Multi-view** along the bottom. Audio picks a language carried in the stream. The player prefers **English (US)** when that track exists, remembers the language you last chose for a channel, and reuses that choice the next time the channel opens. Subtitles picks a track in the stream or an English file, and the language you last chose is remembered the same way. Record asks what to record. Picture picks Fit, Fill, or Stretch and keeps that choice for the next stream. **Last** is for live TV. It returns to the live channel you were on before this one. The remote’s Last Channel key does the same. You need at least two live channels in that trail before Last has somewhere to go. Pause on live keeps you in the timeshift window; Left and Right step about ten seconds inside that window when the stream allows it. **Go live** jumps back to the live edge. **Multi-view** shows the previous live channel beside the current one, muted, and keeps that preference. Catch-up and other non-live titles show a seek bar at the bottom. Back closes that row. The caption hides itself.
+On a phone or tablet, tap the picture to show or hide the control row. That row sits above the system navigation bar. An on-screen **Back** closes the menu; another Back (or the system gesture) leaves the player. While the menu is hidden, the system bars hide for immersive watching.
+
+The top caption shows the lineup name, the current program, and the next program. Up and Down change channel inside the group, through the live list, or along the list that was on screen, depending on how you opened it. OK while the program is playing (or tap on a phone) opens Audio, Subtitles, Record, Picture, **Last**, **Go live**, and **Multi-view** along the bottom. Audio picks a language carried in the stream. The player prefers **English (US)** when that track exists, remembers the language you last chose for a channel, and reuses that choice the next time the channel opens. Subtitles picks a track in the stream or an English file, and the language you last chose is remembered the same way. Record asks what to record. Picture picks Fit, Fill, or Stretch and keeps that choice for the next stream. **Last** is for live TV. It returns to the live channel you were on before this one. The remote’s Last Channel key does the same. You need at least two live channels in that trail before Last has somewhere to go. Pause on live keeps you in the timeshift window; Left and Right step about ten seconds inside that window when the stream allows it. **Go live** jumps back to the live edge. **Multi-view** shows the previous live channel beside the current one, muted, and keeps that preference. Catch-up and other non-live titles show a seek bar at the bottom. Back closes that row. The caption hides itself.
 
 When a movie or episode ends, a countdown offers the next title. For a series that is the next episode, with **Skip intro**. For Queue or a favorites list that still has titles after this one, that is the next item, with **Play next**. **Back to menu** leaves the player and returns to the guide. If you do nothing, the next title starts when the countdown reaches 0.
 
@@ -433,7 +456,7 @@ $env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
 .\gradlew.bat :app:assembleDebug
 ```
 
-The debug APK is `app/build/outputs/apk/debug/app-debug.apk`. Put a Watchmode key in `local.properties` as `watchmode.apiKey` before that build if you want **New** to load. Put an OpenSubtitles key there as `opensubtitles.apiKey` if you want that source in **Subtitles**. Neither key is written into the repository. The signed release is `C:\Users\chalu\Downloads\olympus-iptv-0.2.38.apk` (with `olympus-iptv-0.2.38.apk.idsig` beside it).
+The debug APK is `app/build/outputs/apk/debug/app-debug.apk`. Put a Watchmode key in `local.properties` as `watchmode.apiKey` before that build if you want **New** to load. Put an OpenSubtitles key there as `opensubtitles.apiKey` if you want that source in **Subtitles**. Neither key is written into the repository. The signed release is `C:\Users\chalu\Downloads\olympus-iptv-0.2.42.apk` (with `olympus-iptv-0.2.42.apk.idsig` beside it). That one file is for both set-top boxes and mobile Android.
 
 Android Studio: use a 1920×1080 Google TV emulator. Apply Changes does not pick up new screens. Stop the app, then Debug. Click the emulator window before the arrow keys. The emulator is a different device from a Shield or an Onn box, so it does not have that box’s account, playlist, or favorites.
 
@@ -511,6 +534,26 @@ clearcast-tuner/
 ## Version history
 
 </div>
+
+### 0.2.42
+
+- One APK for Android TV and phones/tablets: detects Leanback/TV vs touch, pads UI for system navigation bars, immersive player with on-screen Back, tap to toggle controls, and unlocked orientation on phones.
+- Favorites setup scrolls by finger; Browse / Fresh / Parental clear the system bar on phones.
+- Parental Set PIN keeps focus inside the pad until Cancel or four digits.
+- Web setup wording uses “device”; after save the dashboard opens so favorites and filters can finish in the browser and sync to the player.
+
+### 0.2.41
+
+- First open focuses the Live TV Favorites group card instead of the left rail.
+- New / Just Added: thicker focus rings on title cards and episode rows; grid focus lands on a real card and returns to the same card after detail.
+
+### 0.2.40
+
+- Player writes stream start, spooling/rebuffers, HTTP load failures, and playback errors to the Error log, with a sanitized URL and a provider-vs-app cause hint.
+
+### 0.2.39
+
+- New this week series navigation: clearer season/episode focus rings, season changes no longer freeze the remote, and Play starts the selected episode in that season’s queue.
 
 ### 0.2.38
 
@@ -717,7 +760,7 @@ clearcast-tuner/
 
 - This is a player only. You must provide your own streams. The app does not ship channels, movies, shows, or playlist credentials.
 - It is a beta. Feedback is greatly appreciated.
-- **0.2.38** is the latest signed file. Anything newer than that needs a build from this source.
+- **0.2.40** is the latest signed file. Anything newer than that needs a build from this source.
 - The dashboard is only for the home network, and only while the app process is running.
 - The TV has to be opened, and left able to run its recorder, for a dashboard schedule to record and for a Record-tab guide to load.
 - One recording at a time. Series record is a queue, not several streams at once.

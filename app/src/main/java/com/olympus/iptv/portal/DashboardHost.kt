@@ -19,6 +19,7 @@ import com.olympus.iptv.data.PlaylistType
 import com.olympus.iptv.data.SavedPlaylist
 import com.olympus.iptv.data.SmbSettings
 import com.olympus.iptv.playlist.CatalogDb
+import com.olympus.iptv.playlist.CatalogIngest
 import com.olympus.iptv.playlist.GroupLock
 import com.olympus.iptv.playlist.PlaylistLoader
 import com.olympus.iptv.playlist.XtreamClient
@@ -1203,7 +1204,7 @@ object DashboardHost {
             writeJson(socket, 400, mapOf("error" to "The playlist did not respond"))
             return
         }
-        runBlocking {
+        val deviceId = runBlocking {
             app.playlistStore.saveSession(playlist)
             val lineup = app.playlistStore.lineup(playlist.id)
             app.playlistStore.saveLineup(
@@ -1213,8 +1214,19 @@ object DashboardHost {
                     revision = System.currentTimeMillis()
                 )
             )
+            app.playlistStore.deviceId()
         }
-        writeJson(socket, 200, mapOf("ok" to true))
+        clearGuideCache()
+        CatalogIngest.start(app, playlist)
+        writeJson(
+            socket,
+            200,
+            mapOf(
+                "ok" to true,
+                "email" to email.trim().lowercase(Locale.US),
+                "deviceId" to deviceId
+            )
+        )
     }
 
     private fun buildSetupPlaylist(

@@ -1091,8 +1091,8 @@
       </div>
     </div>
     <form class="card login" id="setup" hidden>
-      <h2>Set up this TV</h2>
-      <p>Enter the account and playlist here. The set-top box continues once this is saved.</p>
+      <h2>Set up this device</h2>
+      <p>Enter the account and playlist here. After you save, finish favorites and filters in this dashboard — they sync to the device.</p>
       <label for="setupEmail">Email</label>
       <input id="setupEmail" type="email" autocomplete="username" required />
       <label for="setupZip">ZIP code</label>
@@ -1121,13 +1121,13 @@
       <label class="intl-switch"><input id="setupVod" type="checkbox" checked /><span class="switch" aria-hidden="true"></span> Include movies and shows</label>
       <label class="intl-switch"><input id="setupIntl" type="checkbox" /><span class="switch" aria-hidden="true"></span> Include international channels</label>
       <p class="error" id="setupError"></p>
-      <button class="primary" type="submit">Save on the TV</button>
+      <button class="primary" type="submit">Save on the device</button>
     </form>
 
     <div class="gate-row">
     <form class="card login" id="login" hidden>
       <h2>Open your lineup</h2>
-      <p>Use the email shown on the TV.</p>
+      <p>Use the email shown on the device.</p>
       <label for="email">Email Address</label>
       <input id="email" type="email" autocomplete="username" required />
       <p class="error" id="loginError"></p>
@@ -4505,7 +4505,7 @@
         }
         session.lineup = body.lineup;
         paintStrip();
-        if (status) status.textContent = "Updated on the TV";
+        if (status) status.textContent = "Updated on the device";
         pageDirty = false;
         return true;
       } finally {
@@ -4604,6 +4604,49 @@
       document.querySelector("#setupXtream").hidden = m3u;
       document.querySelector("#setupM3u").hidden = !m3u;
     });
+    async function refreshSessionCatalog() {
+      if (!session || !accountEmail || !session.deviceId) return false;
+      try {
+        const response = await fetch("/api/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: accountEmail, deviceId: session.deviceId })
+        });
+        const body = await response.json();
+        if (!response.ok) return false;
+        session.catalog = body.catalog || session.catalog || { groups: [], channels: [], countries: [] };
+        session.lineup = Object.assign(blankLineup(), body.lineup || session.lineup || {});
+        session.favorites = body.favorites || session.favorites || { ids: [], revision: 0 };
+        paintRefreshAge(body.refreshedAt);
+        forgetTabPaint();
+        openTab(tab || "favorites");
+        const count = Number(session.catalog.channelCount || 0);
+        const groups = session.catalog.groups || [];
+        return count > 0 || groups.length > 0;
+      } catch (_) {
+        return false;
+      }
+    }
+
+    function watchCatalogAfterSetup() {
+      let tries = 0;
+      const tick = async () => {
+        tries += 1;
+        const ready = await refreshSessionCatalog();
+        if (ready || tries >= 60) {
+          if (ready) {
+            document.querySelector("#address").textContent =
+              "Catalog is ready. Add favorites and filters here — Save pushes them to the device.";
+          }
+          return;
+        }
+        document.querySelector("#address").textContent =
+          "Loading the catalog on the device… favorites and filters unlock as groups arrive.";
+        setTimeout(tick, 2000);
+      };
+      setTimeout(tick, 1500);
+    }
+
     setupForm.addEventListener("submit", async (event) => {
       event.preventDefault();
       const error = document.querySelector("#setupError");
@@ -4629,7 +4672,20 @@
         const body = await response.json();
         if (!response.ok) throw new Error(body.error || "Could not save the playlist");
         setupForm.hidden = true;
-        document.querySelector("#address").textContent = "Saved on the TV. The set-top box will continue from here.";
+        const email = (body.email || payload.email || "").trim().toLowerCase();
+        const deviceId = body.deviceId || "";
+        document.querySelector("#address").textContent =
+          "Saved on the device. Finish favorites and filters here — they sync to the player.";
+        if (!email) return;
+        accountEmail = email;
+        sessionStorage.setItem("olympus-email", email);
+        if (deviceId) {
+          await openDevice(deviceId);
+          showTab("favorites");
+          watchCatalogAfterSetup();
+        } else {
+          await loadDevices(email);
+        }
       } catch (failure) {
         error.textContent = failure.message || "Could not save the playlist";
       }

@@ -232,6 +232,16 @@ class BrowseActivity : AppCompatActivity() {
         }
         binding = ActivityBrowseBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        if (com.olympus.iptv.ui.DeviceForm.isTouchPrimary(this)) {
+            androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
+            com.olympus.iptv.ui.InsetsPad.apply(
+                binding.guideShell,
+                top = true,
+                bottom = true,
+                left = true,
+                right = true
+            )
+        }
 
         binding.categoryList.layoutManager = androidx.recyclerview.widget.GridLayoutManager(this, CARD_SPAN)
         binding.channelList.layoutManager = LinearLayoutManager(this)
@@ -410,7 +420,7 @@ class BrowseActivity : AppCompatActivity() {
         binding.tabLive.isSelected = true
         binding.tabVod.isSelected = false
         binding.tabShows.isSelected = false
-        binding.tabLive.post { if (currentFocus == null) binding.tabLive.requestFocus() }
+        armGroupFocus()
         val db = app.catalogDb
         coroutineScope {
             val favoritesJob = async(Dispatchers.IO) { store.favorites(saved.id) }
@@ -444,7 +454,7 @@ class BrowseActivity : AppCompatActivity() {
                 val local = lineupJob.await()
                 applyFavorites(favoritesJob.await())
                 activeConfig = local
-                if (binding.groupColumn.visibility == View.VISIBLE) render(restoreFocus = false)
+                if (binding.groupColumn.visibility == View.VISIBLE) render(restoreFocus = landOnGroups)
                 loadSavedBuckets(saved.id, db)
                 if (catalogJob?.isActive == true) {
                     launch {
@@ -499,7 +509,7 @@ class BrowseActivity : AppCompatActivity() {
                     val local = lineupJob.await()
                     applyFavorites(favoritesJob.await())
                     activeConfig = local
-                    if (binding.groupColumn.visibility == View.VISIBLE) render(restoreFocus = false)
+                    if (binding.groupColumn.visibility == View.VISIBLE) render(restoreFocus = landOnGroups)
                     loadSavedBuckets(saved.id, db)
                     if (catalogJob?.isActive == true) {
                         launch {
@@ -1387,7 +1397,7 @@ class BrowseActivity : AppCompatActivity() {
         epgRepo.useXmltv(fetched.xmltvByChannel.orEmpty())
         renderedSection = null
         if (binding.groupColumn.visibility == View.VISIBLE) {
-            render(restoreFocus = false)
+            render(restoreFocus = landOnGroups)
             return
         }
         if (!openGuide ||
@@ -1407,9 +1417,9 @@ class BrowseActivity : AppCompatActivity() {
         binding.tabLive.isSelected = true
         binding.tabVod.isSelected = false
         binding.tabShows.isSelected = false
-        render(restoreFocus = false)
+        armGroupFocus()
+        render(restoreFocus = true)
         reloadRecent()
-        binding.tabLive.post { if (currentFocus == null) binding.tabLive.requestFocus() }
     }
 
     private fun publishGuide() {
@@ -3805,7 +3815,7 @@ class BrowseActivity : AppCompatActivity() {
     private fun armGroupFocus() {
         landOnGroups = true
         groupFocusTries = 0
-        focusGroupIndex = 0
+        focusGroupIndex = -1
         if (focusIsIn(binding.navRail)) currentFocus?.clearFocus()
     }
 
@@ -3815,11 +3825,14 @@ class BrowseActivity : AppCompatActivity() {
             if (landOnGroups) retryGroupFocus()
             return
         }
-        val index = if (landOnGroups || focusGroupIndex >= 0) {
-            (if (landOnGroups) 0 else focusGroupIndex).coerceIn(0, categoryAdapter.itemCount - 1)
-                .also { if (!landOnGroups) focusGroupIndex = -1 }
-        } else {
-            categoryAdapter.selectedPosition()
+        val index = when {
+            landOnGroups -> categoryAdapter.selectedPosition()
+                .coerceIn(0, categoryAdapter.itemCount - 1)
+            focusGroupIndex >= 0 -> focusGroupIndex
+                .coerceIn(0, categoryAdapter.itemCount - 1)
+                .also { focusGroupIndex = -1 }
+            else -> categoryAdapter.selectedPosition()
+                .coerceIn(0, categoryAdapter.itemCount - 1)
         }
         binding.categoryList.scrollToPosition(index)
         binding.categoryList.post {

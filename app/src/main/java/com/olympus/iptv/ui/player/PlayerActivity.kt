@@ -2,17 +2,24 @@ package com.olympus.iptv.ui.player
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ActivityInfo
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -21,13 +28,18 @@ import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.datasource.HttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.analytics.AnalyticsListener
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.exoplayer.source.LoadEventInfo
+import androidx.media3.exoplayer.source.MediaLoadData
 import androidx.media3.ui.AspectRatioFrameLayout
 import coil.load
 import com.olympus.iptv.OlympusIptvApp
 import com.olympus.iptv.R
+import java.io.IOException
 import com.olympus.iptv.data.Channel
 import com.olympus.iptv.data.ChannelNames
 import com.olympus.iptv.data.ContentKind
@@ -36,6 +48,8 @@ import com.olympus.iptv.data.LineupConfig
 import com.olympus.iptv.data.PlaylistStore
 import com.olympus.iptv.data.SavedPlaylist
 import com.olympus.iptv.data.WatchEntry
+import com.olympus.iptv.ui.DeviceForm
+import com.olympus.iptv.ui.InsetsPad
 import com.olympus.iptv.ui.channelLogo
 import com.olympus.iptv.databinding.ActivityPlayerBinding
 import com.olympus.iptv.playlist.CatalogDb
@@ -94,6 +108,12 @@ class PlayerActivity : AppCompatActivity() {
     private var playbackReady = false
     private var playbackToken = 0
     private var recoverAttempt = 0
+    private var hadPlaybackReady = false
+    private var bufferStartedAt = 0L
+    private var bufferWatchToken = 0
+    private var playbackWatch: Player.Listener? = null
+    private var loadWatch: AnalyticsListener? = null
+    private var watchedPlayer: ExoPlayer? = null
     private var filtersReady = false
     private var nameConfig = LineupConfig()
     private var providerName = ""
@@ -107,6 +127,9 @@ class PlayerActivity : AppCompatActivity() {
     private var secondaryPlayer: ExoPlayer? = null
     private var seekDragging = false
     private var seekJob: Job? = null
+    private var touchPrimary = false
+    private var menuBaseBottom = 0
+    private var overlayBaseTop = 0
     private val epgRepo: EpgRepository
         get() = (application as OlympusIptvApp).epgRepository
 
@@ -116,6 +139,7 @@ class PlayerActivity : AppCompatActivity() {
         binding.overlay.animate().alpha(0f).setDuration(250).withEndAction {
             binding.overlay.visibility = View.GONE
             binding.overlay.alpha = 1f
+            if (touchPrimary) setPhoneSystemBarsHidden(true)
         }.start()
     }
     private val seekTick = object : Runnable {
@@ -134,11 +158,23 @@ class PlayerActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         try {
+        touchPrimary = DeviceForm.isTouchPrimary(this)
+        requestedOrientation = if (touchPrimary) {
+            ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        } else {
+            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        }
         binding = ActivityPlayerBinding.inflate(layoutInflater)
         setContentView(binding.root)
         binding.playerView.useController = false
         binding.playerView.setKeepContentOnPlayerReset(true)
         applyPicture(pictureMode)
+        setupPhoneChrome()
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                handlePlayerBack()
+            }
+        })
         lifecycleScope.launch {
             val mode = withContext(Dispatchers.IO) {
                 (application as OlympusIptvApp).playlistStore.pictureMode()
@@ -176,6 +212,7 @@ class PlayerActivity : AppCompatActivity() {
         val playbackUrl = current?.streamUrl.orEmpty()
         val libraryPlayback = playbackUrl.startsWith("file:") || playbackUrl.startsWith("http://127.0.0.1")
         if (libraryPlayback) binding.btnRecord.visibility = View.GONE
+        binding.btnMenuBack.setOnClickListener { handlePlayerBack() }
         binding.btnRecord.setOnClickListener {
             hidePlaybackMenu()
             offerRecording()
@@ -207,7 +244,8 @@ class PlayerActivity : AppCompatActivity() {
         binding.btnSkipIntro.setOnClickListener { onSkipIntro() }
         binding.btnPlayNext.setOnClickListener { playPendingNext() }
         binding.btnNextMenu.setOnClickListener { escapeToMenu() }
-        binding.playerView.setOnClickListener { showPlaybackMenu() }
+        binding.playerView.setOnClickListener { togglePlaybackChrome() }
+        binding.playerViewB.setOnClickListener { togglePlaybackChrome() }
         binding.seekBar.setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: android.widget.SeekBar?, progress: Int, fromUser: Boolean) {
                 if (!fromUser) return
@@ -238,6 +276,121 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
+    private fun setupPhoneChrome() {
+        if (!touchPrimary) {
+            binding.btnMenuBack.visibility = View.GONE
+            return
+        }
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        menuBaseBottom = binding.playbackMenu.paddingBottom
+        overlayBaseTop = binding.overlay.paddingTop
+        val menuLeft = binding.playbackMenu.paddingLeft
+        val menuTop = binding.playbackMenu.paddingTop
+        val menuRight = binding.playbackMenu.paddingRight
+        val overlayLeft = binding.overlay.paddingLeft
+        val overlayBottom = binding.overlay.paddingBottom
+        val overlayRight = binding.overlay.paddingRight
+        InsetsPad.apply(
+            binding.playbackMenu,
+            bottom = true,
+            left = true,
+            right = true,
+            baseLeft = menuLeft,
+            baseTop = menuTop,
+            baseRight = menuRight,
+            baseBottom = menuBaseBottom
+        )
+        InsetsPad.apply(
+            binding.overlay,
+            top = true,
+            left = true,
+            right = true,
+            baseLeft = overlayLeft,
+            baseTop = overlayBaseTop,
+            baseRight = overlayRight,
+            baseBottom = overlayBottom
+        )
+        val seekLeft = binding.seekPane.paddingLeft
+        val seekTop = binding.seekPane.paddingTop
+        val seekRight = binding.seekPane.paddingRight
+        val seekBottom = binding.seekPane.paddingBottom
+        InsetsPad.apply(
+            binding.seekPane,
+            left = true,
+            right = true,
+            baseLeft = seekLeft,
+            baseTop = seekTop,
+            baseRight = seekRight,
+            baseBottom = seekBottom
+        )
+        val nextParams = binding.nextPanel.layoutParams as? android.widget.FrameLayout.LayoutParams
+        if (nextParams != null) {
+            InsetsPad.applyMargins(
+                binding.nextPanel,
+                bottom = true,
+                right = true,
+                baseLeft = nextParams.leftMargin,
+                baseTop = nextParams.topMargin,
+                baseRight = nextParams.rightMargin,
+                baseBottom = nextParams.bottomMargin
+            )
+        }
+        InsetsPad.apply(
+            binding.subtitlePanel,
+            top = true,
+            bottom = true,
+            left = true,
+            baseLeft = binding.subtitlePanel.paddingLeft,
+            baseTop = binding.subtitlePanel.paddingTop,
+            baseRight = binding.subtitlePanel.paddingRight,
+            baseBottom = binding.subtitlePanel.paddingBottom
+        )
+        binding.playbackMenu.orientation = LinearLayout.HORIZONTAL
+        binding.btnMenuBack.visibility = View.VISIBLE
+        setPhoneSystemBarsHidden(true)
+    }
+
+    private fun setPhoneSystemBarsHidden(hide: Boolean) {
+        if (!touchPrimary) return
+        val controller = WindowCompat.getInsetsController(window, window.decorView)
+        controller.systemBarsBehavior =
+            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        if (hide) {
+            controller.hide(WindowInsetsCompat.Type.systemBars())
+        } else {
+            controller.show(WindowInsetsCompat.Type.systemBars())
+        }
+    }
+
+    private fun togglePlaybackChrome() {
+        if (binding.subtitlePanel.visibility == View.VISIBLE) {
+            closeSubtitlePanel()
+            return
+        }
+        if (binding.playbackMenu.visibility == View.VISIBLE) {
+            hidePlaybackMenu()
+            binding.overlay.visibility = View.GONE
+            if (touchPrimary) setPhoneSystemBarsHidden(true)
+        } else {
+            showPlaybackMenu()
+        }
+    }
+
+    private fun handlePlayerBack() {
+        if (binding.subtitlePanel.visibility == View.VISIBLE) {
+            closeSubtitlePanel()
+            return
+        }
+        if (binding.playbackMenu.visibility == View.VISIBLE) {
+            hidePlaybackMenu()
+            binding.overlay.visibility = View.GONE
+            if (touchPrimary) setPhoneSystemBarsHidden(true)
+            return
+        }
+        armBrowseBack()
+        finish()
+    }
+
     private fun playCurrent(seedMeta: String? = null, seedNext: String? = null, startAt: Long? = null) {
         val seed = current ?: queue.getOrNull(index)
         if (seed == null) {
@@ -261,11 +414,18 @@ class PlayerActivity : AppCompatActivity() {
             val savedId = playlistId
             if (!savedId.isNullOrBlank()) ensureFilters(savedId)
             val loaded = hydrate(seed)
-            if (loaded.streamUrl.isBlank()) return@launch
+            if (loaded.streamUrl.isBlank()) {
+                PlaybackTrace.blankUrl(loaded)
+                return@launch
+            }
             val alias = lineupName(loaded, seed)
             providerName = loaded.name
             val channel = loaded
             current = channel
+            hadPlaybackReady = false
+            bufferStartedAt = 0L
+            bufferWatchToken += 1
+            PlaybackTrace.start(channel)
             if (zapMode == ZAP_LIST && index in queue.indices) {
                 val updated = queue.toMutableList()
                 updated[index] = channel
@@ -300,12 +460,14 @@ class PlayerActivity : AppCompatActivity() {
                 val previous = player
                 player = warmed
                 warmed.addListener(trackListener)
+                watchPlaybackEvents(warmed)
                 binding.playerView.player = warmed
                 if (resumeAt > 0L) warmed.seekTo(resumeAt)
                 warmed.playWhenReady = true
                 if (previous != null && previous !== warmed) recycle(previous)
             } else {
                 val exo = player ?: return@launch
+                watchPlaybackEvents(exo)
                 exo.setMediaItem(mediaItem(channel))
                 if (resumeAt > 0L) exo.seekTo(resumeAt)
                 exo.prepare()
@@ -384,14 +546,32 @@ class PlayerActivity : AppCompatActivity() {
             .setMediaSourceFactory(DefaultMediaSourceFactory(this).setDataSourceFactory(http))
             .build()
             .also { exo ->
-            exo.addListener(trackListener)
-            exo.addListener(object : Player.Listener {
+                exo.addListener(trackListener)
+                watchPlaybackEvents(exo)
+            }
+    }
+
+    private fun watchPlaybackEvents(exo: ExoPlayer) {
+        val previousPlayer = watchedPlayer
+        val previousWatch = playbackWatch
+        val previousLoad = loadWatch
+        if (previousPlayer != null && previousPlayer !== exo) {
+            previousWatch?.let { runCatching { previousPlayer.removeListener(it) } }
+            previousLoad?.let { runCatching { previousPlayer.removeAnalyticsListener(it) } }
+        }
+        if (exo === watchedPlayer && playbackWatch != null) return
+        val listener = object : Player.Listener {
                 override fun onPlayerError(error: PlaybackException) {
                     if (player !== exo) return
                     val channel = current
-                    if (channel != null && channel.kind == ContentKind.LIVE && channel.seriesId.isNullOrBlank()) {
+                    if (channel != null &&
+                        channel.kind == ContentKind.LIVE &&
+                        channel.seriesId.isNullOrBlank()
+                    ) {
+                        PlaybackTrace.error(channel, error, recovering = true)
                         recoverLive(exo, channel, error)
                     } else {
+                        PlaybackTrace.error(channel, error, recovering = false)
                         Toast.makeText(
                             this@PlayerActivity,
                             "${getString(R.string.error_playback)}: ${error.message}",
@@ -400,37 +580,89 @@ class PlayerActivity : AppCompatActivity() {
                     }
                 }
 
-                override fun onPlaybackStateChanged(state: Int) {
-                    if (player !== exo) return
-                    val channel = current
-                    if (state == Player.STATE_ENDED &&
-                        channel != null &&
-                        channel.kind == ContentKind.LIVE &&
-                        channel.seriesId.isNullOrBlank()
-                    ) {
-                        recoverLive(exo, channel, null)
-                        return
-                    }
-                    if (state == Player.STATE_ENDED &&
-                        playbackReady &&
-                        channel != null &&
-                        channel.streamUrl.isNotBlank() &&
-                        (channel.kind != ContentKind.LIVE || !channel.seriesId.isNullOrBlank())
-                    ) {
-                        playbackReady = false
-                        offerNext(channel)
-                    }
-                    if (state == Player.STATE_READY && exo.playWhenReady) {
-                        playbackReady = true
-                        recoverAttempt = 0
-                        refreshStreamTracks()
-                        if (binding.channelMeta.text == getString(R.string.playback_reconnecting)) {
-                            refreshEpgQuietly()
-                        }
+            override fun onPlaybackStateChanged(state: Int) {
+                if (player !== exo) return
+                val channel = current
+                when (state) {
+                    Player.STATE_BUFFERING -> onBufferingStarted()
+                    Player.STATE_READY -> onBufferingEnded()
+                    Player.STATE_IDLE, Player.STATE_ENDED -> {
+                        bufferStartedAt = 0L
+                        bufferWatchToken += 1
                     }
                 }
-            })
+                if (state == Player.STATE_ENDED &&
+                    channel != null &&
+                    channel.kind == ContentKind.LIVE &&
+                    channel.seriesId.isNullOrBlank()
+                ) {
+                    recoverLive(exo, channel, null)
+                    return
+                }
+                if (state == Player.STATE_ENDED &&
+                    playbackReady &&
+                    channel != null &&
+                    channel.streamUrl.isNotBlank() &&
+                    (channel.kind != ContentKind.LIVE || !channel.seriesId.isNullOrBlank())
+                ) {
+                    playbackReady = false
+                    offerNext(channel)
+                }
+                if (state == Player.STATE_READY && exo.playWhenReady) {
+                    playbackReady = true
+                    recoverAttempt = 0
+                    refreshStreamTracks()
+                    if (binding.channelMeta.text == getString(R.string.playback_reconnecting)) {
+                        refreshEpgQuietly()
+                    }
+                }
+            }
         }
+        val analytics = object : AnalyticsListener {
+            override fun onLoadError(
+                eventTime: AnalyticsListener.EventTime,
+                loadEventInfo: LoadEventInfo,
+                mediaLoadData: MediaLoadData,
+                error: IOException,
+                wasCanceled: Boolean
+            ) {
+                if (player !== exo || wasCanceled) return
+                val status = (error as? HttpDataSource.InvalidResponseCodeException)?.responseCode
+                PlaybackTrace.loadFailed(current, status, error.message)
+            }
+        }
+        playbackWatch = listener
+        loadWatch = analytics
+        watchedPlayer = exo
+        exo.addListener(listener)
+        exo.addAnalyticsListener(analytics)
+    }
+
+    private fun onBufferingStarted() {
+        if (bufferStartedAt == 0L) bufferStartedAt = SystemClock.elapsedRealtime()
+        val token = ++bufferWatchToken
+        val started = bufferStartedAt
+        hideHandler.postDelayed({
+            if (isDestroyed || token != bufferWatchToken) return@postDelayed
+            if (player?.playbackState != Player.STATE_BUFFERING) return@postDelayed
+            val waited = SystemClock.elapsedRealtime() - started
+            if (waited >= STILL_SPOOL_MS) PlaybackTrace.stillBuffering(current, waited)
+        }, STILL_SPOOL_MS)
+    }
+
+    private fun onBufferingEnded() {
+        val started = bufferStartedAt
+        bufferStartedAt = 0L
+        bufferWatchToken += 1
+        if (started <= 0L) {
+            hadPlaybackReady = true
+            return
+        }
+        val waited = SystemClock.elapsedRealtime() - started
+        val initial = !hadPlaybackReady
+        hadPlaybackReady = true
+        val minLog = if (initial) INITIAL_SPOOL_LOG_MS else REBUFFER_LOG_MS
+        if (waited >= minLog) PlaybackTrace.spool(current, initial, waited)
     }
 
     private val trackListener = object : Player.Listener {
@@ -444,10 +676,14 @@ class PlayerActivity : AppCompatActivity() {
         recoverJob?.cancel()
         binding.channelMeta.text = getString(R.string.playback_reconnecting)
         val behind = error?.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW
+        recoverAttempt += 1
+        PlaybackTrace.recover(channel, recoverAttempt, behind)
         recoverJob = lifecycleScope.launch {
-            delay((600L + recoverAttempt * 400L).coerceAtMost(3_000L))
-            recoverAttempt += 1
+            delay((600L + (recoverAttempt - 1) * 400L).coerceAtMost(3_000L))
             if (token != playbackToken || player !== exo || isDestroyed) return@launch
+            hadPlaybackReady = false
+            bufferStartedAt = 0L
+            bufferWatchToken += 1
             exo.playWhenReady = true
             if (behind) {
                 exo.seekToDefaultPosition()
@@ -1048,7 +1284,8 @@ class PlayerActivity : AppCompatActivity() {
     private var swallowMenuClick = false
 
     private fun menuButtonFocused(): Boolean =
-        binding.btnAudio.isFocused ||
+        binding.btnMenuBack.isFocused ||
+            binding.btnAudio.isFocused ||
             binding.btnSubtitles.isFocused ||
             binding.btnRecord.isFocused ||
             binding.btnPicture.isFocused ||
@@ -1059,12 +1296,20 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun showPlaybackMenu() {
         paintGoLive()
+        if (touchPrimary) {
+            binding.btnMenuBack.visibility = View.VISIBLE
+            setPhoneSystemBarsHidden(false)
+            layoutPhoneMenu()
+        } else {
+            binding.btnMenuBack.visibility = View.GONE
+        }
         binding.playbackMenu.visibility = View.VISIBLE
         binding.overlay.visibility = View.VISIBLE
         binding.overlay.alpha = 1f
         hideHandler.removeCallbacks(hideOverlay)
         hideHandler.postDelayed(hideOverlay, 8000)
         val shown = listOf(
+            binding.btnMenuBack,
             binding.btnAudio,
             binding.btnSubtitles,
             binding.btnRecord,
@@ -1081,16 +1326,42 @@ class PlayerActivity : AppCompatActivity() {
             button.nextFocusUpId = button.id
             button.nextFocusDownId = button.id
         }
-        shown.firstOrNull()?.requestFocus()
+        if (!touchPrimary) shown.firstOrNull()?.requestFocus()
+        ViewCompat.requestApplyInsets(binding.playbackMenu)
+        ViewCompat.requestApplyInsets(binding.overlay)
+    }
+
+    private fun layoutPhoneMenu() {
+        if (!touchPrimary) return
+        val narrow = resources.configuration.screenWidthDp < 700
+        if (!narrow) {
+            binding.playbackMenu.orientation = LinearLayout.HORIZONTAL
+            binding.playbackMenu.gravity = Gravity.CENTER
+            return
+        }
+        binding.playbackMenu.orientation = LinearLayout.VERTICAL
+        binding.playbackMenu.gravity = Gravity.CENTER_HORIZONTAL
+        val gap = (8 * resources.displayMetrics.density).toInt()
+        for (i in 0 until binding.playbackMenu.childCount) {
+            val child = binding.playbackMenu.getChildAt(i)
+            if (child.visibility != View.VISIBLE) continue
+            val params = child.layoutParams as? LinearLayout.LayoutParams ?: continue
+            params.width = LinearLayout.LayoutParams.MATCH_PARENT
+            params.marginStart = 0
+            params.topMargin = if (i == 0) 0 else gap
+            child.layoutParams = params
+        }
     }
 
     private fun hidePlaybackMenu() {
         if (!::binding.isInitialized) return
         binding.playbackMenu.visibility = View.GONE
+        if (touchPrimary && binding.overlay.visibility != View.VISIBLE) setPhoneSystemBarsHidden(true)
     }
 
     private fun openAudio() {
         val exo = player ?: return
+        if (touchPrimary) setPhoneSystemBarsHidden(false)
         binding.subtitleHeading.setText(R.string.audio)
         binding.subtitlePanel.visibility = View.VISIBLE
         binding.subtitleRows.removeAllViews()
@@ -1107,6 +1378,7 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun openPicture() {
+        if (touchPrimary) setPhoneSystemBarsHidden(false)
         binding.subtitleHeading.setText(R.string.picture)
         binding.subtitlePanel.visibility = View.VISIBLE
         binding.subtitleRows.removeAllViews()
@@ -1151,6 +1423,7 @@ class PlayerActivity : AppCompatActivity() {
         val exo = player
         val series = !channel.seriesId.isNullOrBlank() && channel.streamUrl.isNotBlank()
         panelEmbedded = if (exo == null) emptyList() else streamChoices(exo, C.TRACK_TYPE_TEXT)
+        if (touchPrimary) setPhoneSystemBarsHidden(false)
         binding.subtitleHeading.setText(R.string.subtitles)
         binding.subtitlePanel.visibility = View.VISIBLE
         if (!series) {
@@ -1446,6 +1719,13 @@ class PlayerActivity : AppCompatActivity() {
     private fun closeSubtitlePanel() {
         subtitleJob?.cancel()
         if (::binding.isInitialized) binding.subtitlePanel.visibility = View.GONE
+        if (touchPrimary &&
+            ::binding.isInitialized &&
+            binding.playbackMenu.visibility != View.VISIBLE &&
+            binding.overlay.visibility != View.VISIBLE
+        ) {
+            setPhoneSystemBarsHidden(true)
+        }
     }
 
     private fun offerRecording() {
@@ -1628,16 +1908,7 @@ class PlayerActivity : AppCompatActivity() {
                 event.keyCode == KeyEvent.KEYCODE_ESCAPE ||
                 event.keyCode == KeyEvent.KEYCODE_BUTTON_B)
         ) {
-            if (binding.subtitlePanel.visibility == View.VISIBLE) {
-                closeSubtitlePanel()
-                return true
-            }
-            if (binding.playbackMenu.visibility == View.VISIBLE) {
-                hidePlaybackMenu()
-                return true
-            }
-            armBrowseBack()
-            finish()
+            handlePlayerBack()
             return true
         }
         if (centerKey(event.keyCode)) {
@@ -1745,6 +2016,9 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     companion object {
+        private const val INITIAL_SPOOL_LOG_MS = 1_500L
+        private const val REBUFFER_LOG_MS = 400L
+        private const val STILL_SPOOL_MS = 2_500L
         private const val EXTRA_ID = "id"
         private const val EXTRA_NAME = "name"
         private const val EXTRA_URL = "url"

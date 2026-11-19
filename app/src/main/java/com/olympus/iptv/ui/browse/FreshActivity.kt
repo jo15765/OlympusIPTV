@@ -50,8 +50,12 @@ class FreshActivity : AppCompatActivity() {
     private val episodeAdapter = EpisodeAdapter()
     private var shown: CatalogDb.FreshTitle? = null
     private var seriesEpisodes = emptyList<Channel>()
+    private var episodesBySeason: Map<Int, List<Channel>> = emptyMap()
+    private var seasonNumbers = emptyList<Int>()
     private var season = 1
     private var seriesJob: Job? = null
+    private var seasonSwitchToken = 0
+    private var listFocusPos = 0
     private lateinit var cacheFile: File
     private var opening = false
 
@@ -62,6 +66,23 @@ class FreshActivity : AppCompatActivity() {
         if (playlistId.isBlank()) {
             finish()
             return
+        }
+        if (com.olympus.iptv.ui.DeviceForm.isTouchPrimary(this)) {
+            androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
+            com.olympus.iptv.ui.InsetsPad.apply(
+                binding.freshMain,
+                top = true,
+                bottom = true,
+                left = true,
+                right = true
+            )
+            com.olympus.iptv.ui.InsetsPad.apply(
+                binding.freshDetail,
+                top = true,
+                bottom = true,
+                left = true,
+                right = true
+            )
         }
         cacheFile = File(filesDir, "watchmode-week.json")
         binding.freshList.layoutManager = GridLayoutManager(this, COLUMNS)
@@ -79,10 +100,10 @@ class FreshActivity : AppCompatActivity() {
         })
         binding.detailSeasonList.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
         binding.detailSeasonList.itemAnimator = null
+        binding.detailSeasonList.setHasFixedSize(true)
         binding.detailSeasonList.adapter = seasonAdapter
         binding.detailEpisodeList.layoutManager = LinearLayoutManager(this)
         binding.detailEpisodeList.itemAnimator = null
-        binding.detailEpisodeList.setHasFixedSize(true)
         binding.detailEpisodeList.adapter = episodeAdapter
         binding.freshStatus.visibility = View.VISIBLE
         binding.freshStatus.text = getString(R.string.fresh_loading)
@@ -144,11 +165,41 @@ class FreshActivity : AppCompatActivity() {
         }
         binding.freshStatus.visibility = View.GONE
         binding.freshList.post {
-            if (isDestroyed) return@post
+            if (isDestroyed || binding.freshDetail.visibility == View.VISIBLE) return@post
             val grid = binding.freshList.layoutManager as? GridLayoutManager
             val last = grid?.findLastVisibleItemPosition() ?: -1
             if (last >= 0) prefetchFrom(last + 1)
-            binding.freshList.requestFocus()
+            if (currentFocus == null || !focusIsIn(binding.freshList)) {
+                focusFreshCard(listFocusPos)
+            }
+        }
+    }
+
+    private fun focusIsIn(root: View): Boolean {
+        var view = currentFocus ?: return false
+        while (true) {
+            if (view === root) return true
+            view = view.parent as? View ?: return false
+        }
+    }
+
+    private fun focusFreshCard(position: Int) {
+        if (isDestroyed || rows.isEmpty()) return
+        val index = position.coerceIn(0, rows.lastIndex)
+        listFocusPos = index
+        binding.freshList.scrollToPosition(index)
+        binding.freshList.post {
+            if (isDestroyed || binding.freshDetail.visibility == View.VISIBLE) return@post
+            val target = binding.freshList.findViewHolderForAdapterPosition(index)?.itemView
+            if (target != null) {
+                target.requestFocus()
+            } else {
+                binding.freshList.post {
+                    if (!isDestroyed && binding.freshDetail.visibility != View.VISIBLE) {
+                        binding.freshList.findViewHolderForAdapterPosition(index)?.itemView?.requestFocus()
+                    }
+                }
+            }
         }
     }
 
@@ -172,8 +223,8 @@ class FreshActivity : AppCompatActivity() {
 
     private fun showDetail(title: CatalogDb.FreshTitle) {
         seriesJob?.cancel()
-        seriesEpisodes = emptyList()
-        season = 1
+        seriesJob = null
+        clearSeriesState()
         shown = title
         binding.freshDetail.visibility = View.VISIBLE
         binding.detailService.text = if (title.day.isBlank()) {
@@ -199,7 +250,9 @@ class FreshActivity : AppCompatActivity() {
             binding.detailPlay.visibility = View.VISIBLE
             binding.detailPlay.text = getString(R.string.fresh_play)
             binding.detailPlay.setOnClickListener { openMovie(title) }
-            binding.detailPlay.requestFocus()
+            binding.detailPlay.post {
+                if (!isDestroyed && shown?.id == title.id) binding.detailPlay.requestFocus()
+            }
         }
         if (waiting) loadDescription(title)
     }
@@ -207,14 +260,23 @@ class FreshActivity : AppCompatActivity() {
     private fun hideDetail() {
         seriesJob?.cancel()
         seriesJob = null
+        seasonSwitchToken += 1
         shown = null
-        seriesEpisodes = emptyList()
+        clearSeriesState()
         seasonAdapter.submit(emptyList())
         episodeAdapter.submit(emptyList())
         binding.detailSeriesPane.visibility = View.GONE
         binding.detailPlay.visibility = View.VISIBLE
+        binding.detailEpisodeStatus.visibility = View.GONE
         binding.freshDetail.visibility = View.GONE
-        binding.freshList.requestFocus()
+        focusFreshCard(listFocusPos)
+    }
+
+    private fun clearSeriesState() {
+        seriesEpisodes = emptyList()
+        episodesBySeason = emptyMap()
+        seasonNumbers = emptyList()
+        season = 1
     }
 
     private fun loadDescription(title: CatalogDb.FreshTitle) {
@@ -263,7 +325,9 @@ class FreshActivity : AppCompatActivity() {
             val cached = withContext(Dispatchers.IO) {
                 runCatching { EpisodeCache.peek(filesDir, playlistId, seriesId) }.getOrNull()
             }
-            if (!cached.isNullOrEmpty() && shown?.id == title.id) presentSeries(cached, focus = true)
+            if (!cached.isNullOrEmpty() && shown?.id == title.id) {
+                presentSeries(cached, focusSeasons = true)
+            }
             val fresh = withContext(Dispatchers.IO) {
                 runCatching { EpisodeSequence.fetch(saved, seriesId) }.getOrDefault(emptyList())
             }
@@ -278,44 +342,71 @@ class FreshActivity : AppCompatActivity() {
             withContext(Dispatchers.IO) {
                 runCatching { EpisodeCache.store(filesDir, playlistId, seriesId, fresh) }
             }
-            if (shown?.id == title.id) presentSeries(fresh, focus = seriesEpisodes.isEmpty())
+            if (shown?.id == title.id) {
+                val hadList = seriesEpisodes.isNotEmpty()
+                presentSeries(fresh, focusSeasons = !hadList)
+            }
         }
     }
 
-    private fun presentSeries(loaded: List<Channel>, focus: Boolean) {
+    private fun presentSeries(loaded: List<Channel>, focusSeasons: Boolean) {
         if (isDestroyed || loaded.isEmpty()) return
-        seriesEpisodes = loaded
-        binding.detailEpisodeStatus.visibility = View.GONE
-        val numbers = seasonNumbers()
+        val grouped = FreshSeriesNav.bySeason(loaded)
+        val numbers = FreshSeriesNav.seasons(loaded)
         if (numbers.isEmpty()) return
-        if (season !in numbers) season = numbers.first()
-        seasonAdapter.submit(numbers)
-        showSeasonEpisodes(focusSeasons = focus)
+        seriesEpisodes = loaded
+        episodesBySeason = grouped
+        season = FreshSeriesNav.pickSeason(numbers, season)
+        binding.detailEpisodeStatus.visibility = View.GONE
+        val seasonsChanged = !FreshSeriesNav.sameSeasons(seasonNumbers, numbers)
+        seasonNumbers = numbers
+        if (seasonsChanged) {
+            seasonAdapter.submit(numbers)
+        } else {
+            seasonAdapter.refreshSelection()
+        }
+        val episodes = grouped[season].orEmpty()
+        episodeAdapter.submit(episodes)
+        if (focusSeasons) {
+            focusSeasonChip(numbers.indexOf(season).coerceAtLeast(0))
+        }
     }
 
-    private fun seasonNumbers(): List<Int> =
-        seriesEpisodes.map { it.season ?: 1 }.distinct().sorted()
-
-    private fun showSeasonEpisodes(focusSeasons: Boolean) {
-        val numbers = seasonNumbers()
-        val shownEps = seriesEpisodes.filter { (it.season ?: 1) == season }
-        episodeAdapter.submit(shownEps)
-        seasonAdapter.notifyDataSetChanged()
-        val seasonIndex = numbers.indexOf(season).coerceAtLeast(0)
-        if (numbers.isNotEmpty()) binding.detailSeasonList.scrollToPosition(seasonIndex)
-        if (focusSeasons && numbers.isNotEmpty()) {
-            binding.detailSeasonList.post {
-                if (isDestroyed) return@post
-                binding.detailSeasonList.findViewHolderForAdapterPosition(seasonIndex)?.itemView?.requestFocus()
+    private fun selectSeason(number: Int) {
+        if (isDestroyed || number !in seasonNumbers) return
+        if (number == season) return
+        val previous = season
+        season = number
+        val token = ++seasonSwitchToken
+        val episodes = episodesBySeason[number].orEmpty()
+        val previousIndex = seasonNumbers.indexOf(previous)
+        val nextIndex = seasonNumbers.indexOf(number)
+        if (previousIndex >= 0) seasonAdapter.notifyItemChanged(previousIndex)
+        if (nextIndex >= 0) seasonAdapter.notifyItemChanged(nextIndex)
+        binding.detailEpisodeList.post {
+            if (isDestroyed || token != seasonSwitchToken || shown == null) return@post
+            episodeAdapter.submit(episodes)
+            if (nextIndex >= 0) {
+                binding.detailSeasonList.scrollToPosition(nextIndex)
+                binding.detailSeasonList.findViewHolderForAdapterPosition(nextIndex)?.itemView?.requestFocus()
             }
-        } else if (shownEps.isNotEmpty()) {
-            binding.detailEpisodeList.post {
-                if (isDestroyed) return@post
-                binding.detailEpisodeList.findViewHolderForAdapterPosition(0)
-                    ?.itemView
-                    ?.findViewById<View>(R.id.episodePlay)
-                    ?.requestFocus()
-                    ?: binding.detailEpisodeList.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
+        }
+    }
+
+    private fun focusSeasonChip(index: Int) {
+        if (index < 0) return
+        binding.detailSeasonList.scrollToPosition(index)
+        binding.detailSeasonList.post {
+            if (isDestroyed || binding.freshDetail.visibility != View.VISIBLE) return@post
+            val holder = binding.detailSeasonList.findViewHolderForAdapterPosition(index)
+            if (holder != null) {
+                holder.itemView.requestFocus()
+            } else {
+                binding.detailSeasonList.post {
+                    if (!isDestroyed) {
+                        binding.detailSeasonList.findViewHolderForAdapterPosition(index)?.itemView?.requestFocus()
+                    }
+                }
             }
         }
     }
@@ -354,8 +445,8 @@ class FreshActivity : AppCompatActivity() {
 
     private fun playEpisode(episode: Channel) {
         if (opening || playlistId.isBlank() || episode.id.isBlank()) return
-        val queue = seriesEpisodes.filter { (it.season ?: 1) == season }
-        if (queue.isEmpty()) return
+        val queue = FreshSeriesNav.playQueue(seriesEpisodes, episode.season ?: season)
+        if (queue.isEmpty() || queue.none { it.id == episode.id }) return
         opening = true
         try {
             SeriesPlay.open(this, playlistId, queue, episode)
@@ -411,7 +502,17 @@ class FreshActivity : AppCompatActivity() {
                     getString(R.string.fresh_when, title.service, title.day)
                 }
                 bindArt(binding.freshLogo, title.logoUrl, 160, 220)
-                binding.root.setOnClickListener { showDetail(title) }
+                binding.root.setOnFocusChangeListener { _, hasFocus ->
+                    if (hasFocus) {
+                        val pos = bindingAdapterPosition
+                        if (pos != RecyclerView.NO_POSITION) listFocusPos = pos
+                    }
+                }
+                binding.root.setOnClickListener {
+                    val pos = bindingAdapterPosition
+                    if (pos != RecyclerView.NO_POSITION) listFocusPos = pos
+                    showDetail(title)
+                }
                 binding.root.setOnLongClickListener {
                     if (playlistId.isBlank()) return@setOnLongClickListener true
                     WatchQueue.offer(
@@ -440,6 +541,18 @@ class FreshActivity : AppCompatActivity() {
             notifyDataSetChanged()
         }
 
+        fun refreshSelection() {
+            if (numbers.isEmpty()) return
+            notifyItemRangeChanged(0, numbers.size)
+        }
+
+        override fun getItemId(position: Int): Long =
+            numbers.getOrNull(position)?.toLong() ?: position.toLong()
+
+        init {
+            setHasStableIds(true)
+        }
+
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder {
             val row = ItemSeasonBinding.inflate(LayoutInflater.from(parent.context), parent, false)
             return Holder(row)
@@ -457,12 +570,9 @@ class FreshActivity : AppCompatActivity() {
                 row.seasonCheck.visibility = View.GONE
                 row.root.isSelected = number == season
                 row.root.setOnClickListener {
-                    if (season == number) {
-                        showSeasonEpisodes(focusSeasons = false)
-                        return@setOnClickListener
-                    }
-                    season = number
-                    showSeasonEpisodes(focusSeasons = false)
+                    val index = bindingAdapterPosition
+                    if (index == RecyclerView.NO_POSITION) return@setOnClickListener
+                    selectSeason(number)
                 }
             }
         }
@@ -475,6 +585,13 @@ class FreshActivity : AppCompatActivity() {
             items.clear()
             items.addAll(list)
             notifyDataSetChanged()
+        }
+
+        override fun getItemId(position: Int): Long =
+            items.getOrNull(position)?.id?.hashCode()?.toLong() ?: position.toLong()
+
+        init {
+            setHasStableIds(true)
         }
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder {
@@ -507,9 +624,14 @@ class FreshActivity : AppCompatActivity() {
                 val plot = episode.blurb.orEmpty()
                 row.episodePlot.text = plot
                 row.episodePlot.visibility = if (plot.isBlank()) View.GONE else View.VISIBLE
-                bindArt(row.episodeArt, episode.logoUrl ?: shown?.logoUrl, 168, 94)
-                row.episodePlay.setOnClickListener { playEpisode(episode) }
-                row.root.setOnClickListener { playEpisode(episode) }
+                val art = episode.logoUrl?.takeIf { it.isNotBlank() } ?: shown?.logoUrl
+                if (row.episodeArt.tag != art) {
+                    row.episodeArt.tag = art
+                    bindArt(row.episodeArt, art, 168, 94)
+                }
+                val play = View.OnClickListener { playEpisode(episode) }
+                row.root.setOnClickListener(play)
+                row.episodePlay.setOnClickListener(play)
             }
         }
     }
