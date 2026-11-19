@@ -27,8 +27,9 @@ android {
         applicationId = "com.olympus.iptv"
         minSdk = 24
         targetSdk = 35
-        versionCode = 54
-        versionName = "0.2.53"
+        versionCode = 57
+        versionName = "0.2.56"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "WATCHMODE_API_KEY", "\"$watchmodeKey\"")
         buildConfigField("String", "OPENSUBTITLES_API_KEY", "\"$opensubtitlesKey\"")
         buildConfigField("String", "SENDGRID_API_KEY", "\"$sendgridKey\"")
@@ -95,4 +96,7 @@ dependencies {
     implementation(libs.smbj)
     implementation(libs.bouncycastle)
     testImplementation(libs.junit)
+    androidTestImplementation(libs.junit)
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
 }

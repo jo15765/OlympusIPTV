@@ -179,6 +179,59 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         VisiblePage(visible, cursor, exhausted)
     }
 
+    /**
+     * Page channels for a group the user already opened. Skips country / hidden-group filters
+     * so a card count (e.g. 24/7 Shows 1102) always matches a non-empty list. Only per-channel
+     * hides still apply.
+     */
+    fun readGroupPage(
+        playlistId: String,
+        bucket: String,
+        categoryId: String,
+        limit: Int,
+        after: PageCursor?,
+        hiddenChannels: Set<String> = emptySet()
+    ): VisiblePage = read {
+        val db = readableDatabase
+        val hide = if (hiddenChannels.isEmpty()) {
+            SqlFilter("", emptyList())
+        } else {
+            val ids = hiddenChannels.filter { it.isNotBlank() }.take(400)
+            if (ids.isEmpty()) {
+                SqlFilter("", emptyList())
+            } else {
+                SqlFilter(
+                    " AND id NOT IN (${ids.joinToString(",") { "?" }})",
+                    ids
+                )
+            }
+        }
+        val visible = ArrayList<com.olympus.iptv.data.Channel>(limit)
+        var cursor = after
+        var exhausted = false
+        var rounds = 0
+        while (visible.size < limit && rounds < 20) {
+            rounds += 1
+            val need = (limit - visible.size).coerceAtLeast(1)
+            val raw = pageAfter(db, playlistId, bucket, categoryId, need, cursor, hide)
+            if (raw.isEmpty()) {
+                exhausted = true
+                break
+            }
+            for (channel in raw) {
+                visible.add(channel)
+                cursor = PageCursor(channel.number, channel.name, channel.id)
+                if (visible.size == limit) break
+            }
+            if (visible.size == limit) break
+            if (raw.size < need) {
+                exhausted = true
+                break
+            }
+        }
+        VisiblePage(visible, cursor, exhausted)
+    }
+
     fun countryChoices(playlistId: String, groups: List<DashboardGroup> = dashboardGroups(playlistId)): List<CountryOption> {
         val summed = HashMap<String, Int>()
         for (group in groups) {

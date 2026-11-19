@@ -311,8 +311,7 @@ class BrowseActivity : AppCompatActivity() {
             override fun onScrolled(recyclerView: androidx.recyclerview.widget.RecyclerView, dx: Int, dy: Int) {
                 if (dy != 0) scheduleGuideAlign(recyclerView, binding.programList)
                 if (dy <= 0 || selectedCategoryId == null || selectedCategoryId == PlaylistLoader.FAVORITES_ID) return
-                val layout = recyclerView.layoutManager as? LinearLayoutManager ?: return
-                if (layout.findLastVisibleItemPosition() >= channelAdapter.itemCount - 30) loadGroupPage(reset = false)
+                maybePrefetchGroupPage(recyclerView)
             }
         })
         binding.programList.addOnScrollListener(object : androidx.recyclerview.widget.RecyclerView.OnScrollListener() {
@@ -3824,11 +3823,8 @@ class BrowseActivity : AppCompatActivity() {
         binding.categoryList.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
         binding.groupColumn.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
         if (focusIsIn(binding.categoryList)) currentFocus?.clearFocus()
-        // Huge Live groups choke the side-by-side EPG. Unknown count → channel list until counted.
-        val counted = selectedCategoryId?.let { groupCounts[it] }
-        val largeLive = section == GuideSection.TV &&
-            (counted == null || counted >= LARGE_LIVE_GROUP)
-        if (section == GuideSection.TV && !touchPrimary && !largeLive) {
+        // TV Live always opens the guide pane. Mega-folders use name/hour filler (no EPG fetch).
+        if (section == GuideSection.TV && !touchPrimary) {
             if (guideMenu != GuideMenu.PROGRAMS) previousMenu = guideMenu
             guideMenu = GuideMenu.PROGRAMS
         } else {
@@ -4422,8 +4418,13 @@ class BrowseActivity : AppCompatActivity() {
         loadGuidePrograms(visibleChannels.subList(from, to + 1))
     }
 
+    private fun nameOnlyGuideGroup(): Boolean {
+        if (section != GuideSection.TV) return false
+        val count = groupCounts[selectedCategoryId] ?: 0
+        return count >= LARGE_LIVE_GROUP
+    }
+
     private fun loadGuidePrograms(channels: List<Channel>) {
-        val saved = playlist ?: return
         val missing = channels.filter { it.kind == ContentKind.LIVE && programAdapter.programsFor(it.id) == null }
         if (missing.isEmpty()) {
             binding.programList.post {
@@ -4432,6 +4433,18 @@ class BrowseActivity : AppCompatActivity() {
             }
             return
         }
+        // Mega Live folders (24/7, etc.): hour blocks of the channel name — skip provider EPG.
+        if (nameOnlyGuideGroup()) {
+            for (channel in missing) {
+                programAdapter.put(channel.id, emptyList())
+            }
+            binding.programList.post {
+                lastLabelShiftScroll = programAdapter.scrollX
+                applyGuideRowHeight(programAdapter.refreshLabelShift(binding.programList))
+            }
+            return
+        }
+        val saved = playlist ?: return
         guideJob?.cancel()
         guideJob = lifecycleScope.launch {
             fetchGuidePrograms(saved, missing.take(8), 8)
@@ -5113,6 +5126,15 @@ class BrowseActivity : AppCompatActivity() {
         }
     }
 
+    private fun maybePrefetchGroupPage(recyclerView: androidx.recyclerview.widget.RecyclerView) {
+        if (pageExhausted || pageLoading) return
+        val layout = recyclerView.layoutManager as? LinearLayoutManager ?: return
+        val last = layout.findLastVisibleItemPosition()
+        if (last == androidx.recyclerview.widget.RecyclerView.NO_POSITION) return
+        val remain = pagePrefetchRemain(selectedCategoryId)
+        if (last >= channelAdapter.itemCount - remain) loadGroupPage(reset = false)
+    }
+
     private fun loadGroupPage(reset: Boolean) {
         if (reset) {
             pageCursor = null
@@ -5142,19 +5164,50 @@ class BrowseActivity : AppCompatActivity() {
         val hiddenCountries = config.hiddenCountries.orEmpty().toSet()
         val pageBucket = if (categoryId == PlaylistLoader.ALL_ID) CatalogDb.LIVE else bucket
         val pageCategory = if (categoryId == PlaylistLoader.ALL_ID) null else categoryId
+        val pageLimit = pageSizeFor(categoryId)
+        val groupName = selectedCategoryName.trim()
         channelJob = lifecycleScope.launch {
             val page = withContext(Dispatchers.IO) {
-                (application as OlympusIptvApp).catalogDb.readVisiblePage(
-                    saved.id,
-                    pageBucket,
-                    pageCategory,
-                    pageSizeFor(categoryId),
-                    cursor,
-                    hiddenChannels,
-                    hiddenGroups,
-                    hiddenCountries,
-                    config.includeInternational
-                )
+                val db = (application as OlympusIptvApp).catalogDb
+                if (pageCategory != null) {
+                    // Opened group: page that category directly so card count and list stay aligned.
+                    var opened = db.readGroupPage(
+                        saved.id,
+                        pageBucket,
+                        pageCategory,
+                        pageLimit,
+                        cursor,
+                        hiddenChannels
+                    )
+                    // If id matched the card count but rows use a different key, retry by group title.
+                    if (opened.channels.isEmpty() &&
+                        cursor == null &&
+                        groupName.isNotBlank() &&
+                        !groupName.equals(pageCategory, ignoreCase = true)
+                    ) {
+                        opened = db.readGroupPage(
+                            saved.id,
+                            pageBucket,
+                            groupName,
+                            pageLimit,
+                            null,
+                            hiddenChannels
+                        )
+                    }
+                    opened
+                } else {
+                    db.readVisiblePage(
+                        saved.id,
+                        pageBucket,
+                        null,
+                        pageLimit,
+                        cursor,
+                        hiddenChannels,
+                        hiddenGroups,
+                        hiddenCountries,
+                        config.includeInternational
+                    )
+                }
             }
             val named = prepareGroup(page.channels, config)
             if (!stillShowing(query, sectionNow, categoryId)) {
@@ -5165,6 +5218,21 @@ class BrowseActivity : AppCompatActivity() {
             if (page.exhausted) pageExhausted = true
             pageLoading = false
             if (cursor == null) {
+                if (named.isEmpty() && !page.exhausted) {
+                    // Keep skeleton while skipping empty filtered pages — do not flash "No channels".
+                    emptyPageSkips += 1
+                    if (emptyPageSkips <= MAX_EMPTY_PAGE_SKIPS) {
+                        binding.channelList.post { loadGroupPage(reset = false) }
+                    } else {
+                        pageExhausted = true
+                        visibleChannels = emptyList()
+                        showChannelSkeleton(false)
+                        channelAdapter.submit(emptyList(), groupLabel(categoryId), sequentialNumbers = false)
+                        finishChannelPane(emptyList())
+                        markChannelsReady()
+                    }
+                    return@launch
+                }
                 visibleChannels = named
                 showChannelSkeleton(false)
                 channelAdapter.submit(named, groupLabel(categoryId), sequentialNumbers = false)
@@ -5182,15 +5250,26 @@ class BrowseActivity : AppCompatActivity() {
                 }
                 finishChannelPane(named)
                 markChannelsReady()
+                binding.channelList.post { maybePrefetchGroupPage(binding.channelList) }
             } else if (named.isNotEmpty()) {
-                val seen = visibleChannels.mapTo(HashSet()) { it.id }
-                val fresh = named.filter { it.id !in seen }
-                if (fresh.isNotEmpty()) {
-                    channelAdapter.append(fresh)
-                    visibleChannels = visibleChannels + fresh
-                    scheduleEpisodePrefetch()
+                if (visibleChannels.isEmpty()) {
+                    visibleChannels = named
+                    showChannelSkeleton(false)
+                    channelAdapter.submit(named, groupLabel(categoryId), sequentialNumbers = false)
+                    binding.channelList.scrollToPosition(0)
+                    finishChannelPane(named)
+                    markChannelsReady()
+                } else {
+                    val seen = visibleChannels.mapTo(HashSet()) { it.id }
+                    val fresh = named.filter { it.id !in seen }
+                    if (fresh.isNotEmpty()) {
+                        channelAdapter.append(fresh)
+                        visibleChannels = visibleChannels + fresh
+                        scheduleEpisodePrefetch()
+                    }
                 }
                 revealPendingChannel()
+                binding.channelList.post { maybePrefetchGroupPage(binding.channelList) }
             }
             if (pageExhausted) deliverPendingChannels()
             // Skip empty filtered pages without tight recursion — cap so a bad group cannot spin forever.
@@ -5200,21 +5279,25 @@ class BrowseActivity : AppCompatActivity() {
                     binding.channelList.post { loadGroupPage(reset = false) }
                 } else {
                     pageExhausted = true
+                    if (visibleChannels.isEmpty()) {
+                        showChannelSkeleton(false)
+                        finishChannelPane(emptyList())
+                    }
                     revealPendingChannel()
                 }
             } else {
                 emptyPageSkips = 0
-                if (named.isEmpty()) revealPendingChannel()
+                if (named.isEmpty()) {
+                    if (visibleChannels.isEmpty() && pageExhausted) finishChannelPane(emptyList())
+                    revealPendingChannel()
+                }
             }
-            if (section == GuideSection.TV &&
-                binding.programPane.visibility == View.VISIBLE &&
-                (groupCounts[categoryId] ?: visibleChannels.size) < LARGE_LIVE_GROUP
-            ) {
+            if (section == GuideSection.TV && binding.programPane.visibility == View.VISIBLE) {
                 syncProgramGuide()
             } else if (landOnOpened) {
                 focusOpenedGuide()
             }
-            if (cursor == null) restoreHeldChannel()
+            if (cursor == null && named.isNotEmpty()) restoreHeldChannel()
         }
     }
 
@@ -5817,9 +5900,11 @@ class BrowseActivity : AppCompatActivity() {
         private const val CARD_SPAN = 3
         private const val PAGE_SIZE_TV = 200
         private const val PAGE_SIZE_PHONE = 100
-        private const val PAGE_SIZE_HUGE = 60
+        private const val PAGE_SIZE_HUGE = 20
         private const val LARGE_LIVE_GROUP = 250
-        private const val MAX_EMPTY_PAGE_SKIPS = 8
+        private const val HUGE_PREFETCH_REMAIN = 5
+        private const val DEFAULT_PREFETCH_REMAIN = 30
+        private const val MAX_EMPTY_PAGE_SKIPS = 40
         private const val FOCUS_SETTLE_MS = 160L
         private const val EPG_CACHE_CAP = 120
     }
@@ -5831,5 +5916,10 @@ class BrowseActivity : AppCompatActivity() {
             touchPrimary -> PAGE_SIZE_PHONE
             else -> PAGE_SIZE_TV
         }
+    }
+
+    private fun pagePrefetchRemain(categoryId: String?): Int {
+        val count = groupCounts[categoryId] ?: 0
+        return if (count >= LARGE_LIVE_GROUP) HUGE_PREFETCH_REMAIN else DEFAULT_PREFETCH_REMAIN
     }
 }
