@@ -7,7 +7,6 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
-import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
@@ -38,86 +37,110 @@ class EpisodesActivity : AppCompatActivity() {
     private var episodes = emptyList<Channel>()
     private var watched = emptySet<String>()
     private var season = 1
-    private var showingEpisodes = false
     private val seasons = EpisodeSeasons()
     private val adapter = EpisodeAdapter()
+    private var loading = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityEpisodesBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        if (playlistId.isBlank() || seriesId.isBlank()) {
+            finish()
+            return
+        }
         binding.showTitle.text = showName
         binding.seasonList.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
+        binding.seasonList.itemAnimator = null
         binding.seasonList.adapter = seasons
         binding.episodeList.layoutManager = LinearLayoutManager(this)
+        binding.episodeList.itemAnimator = null
+        binding.episodeList.setHasFixedSize(true)
         binding.episodeList.adapter = adapter
         binding.markSeason.setOnClickListener { toggleSeason(season) }
-        bindArt(binding.showArt, showLogo, 72, 108)
-        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
-            override fun handleOnBackPressed() {
-                if (showingEpisodes) {
-                    showSeasons(focus = true)
-                } else {
-                    isEnabled = false
-                    onBackPressedDispatcher.onBackPressed()
-                }
-            }
-        })
-        lifecycleScope.launch {
+        bindArt(binding.showArt, showLogo, 56, 84)
+        lifecycleScope.launch { loadEpisodes() }
+    }
+
+    private suspend fun loadEpisodes() {
+        if (loading) return
+        loading = true
+        try {
             val app = application as OlympusIptvApp
-            val saved = withContext(Dispatchers.IO) { app.playlistStore.account(playlistId) }
-            if (saved == null) {
-                finish()
-                return@launch
+            val saved = withContext(Dispatchers.IO) {
+                runCatching { app.playlistStore.account(playlistId) }.getOrNull()
+            }
+            if (saved == null || isDestroyed) {
+                if (!isDestroyed) finish()
+                return
             }
             val cached = withContext(Dispatchers.IO) {
-                EpisodeCache.peek(filesDir, playlistId, seriesId)
+                runCatching { EpisodeCache.peek(filesDir, playlistId, seriesId) }.getOrNull()
             }
-            watched = withContext(Dispatchers.IO) { app.catalogDb.watchedEpisodes(playlistId, seriesId) }
-            if (isFinishing) return@launch
+            watched = withContext(Dispatchers.IO) {
+                runCatching { app.catalogDb.watchedEpisodes(playlistId, seriesId) }.getOrDefault(emptySet())
+            }
+            if (isDestroyed) return
             val hadCache = !cached.isNullOrEmpty()
             if (hadCache) {
-                presentEpisodes(cached, focus = true)
+                presentEpisodes(cached.orEmpty(), focus = true)
             } else {
                 binding.statusLine.visibility = View.VISIBLE
                 binding.statusLine.text = getString(R.string.episodes_loading)
             }
-            val fresh = EpisodeSequence.fetch(saved, seriesId)
-            if (isFinishing) return@launch
+            val fresh = withContext(Dispatchers.IO) {
+                runCatching { EpisodeSequence.fetch(saved, seriesId) }.getOrDefault(emptyList())
+            }
+            if (isDestroyed) return
             if (fresh.isEmpty()) {
                 if (!hadCache) {
                     binding.statusLine.visibility = View.VISIBLE
                     binding.statusLine.text = getString(R.string.episodes_none)
                     binding.seasonPane.visibility = View.GONE
+                    binding.episodePane.visibility = View.GONE
                 }
-                return@launch
+                return
             }
-            withContext(Dispatchers.IO) { EpisodeCache.store(filesDir, playlistId, seriesId, fresh) }
-            if (fresh == episodes) return@launch
+            withContext(Dispatchers.IO) {
+                runCatching { EpisodeCache.store(filesDir, playlistId, seriesId, fresh) }
+            }
+            if (fresh == episodes) return
             presentEpisodes(fresh, focus = !hadCache)
+        } catch (_: OutOfMemoryError) {
+            runCatching { (application as OlympusIptvApp).catalogDb.releaseSearchExport() }
+            if (!isDestroyed && episodes.isEmpty()) {
+                binding.statusLine.visibility = View.VISIBLE
+                binding.statusLine.text = getString(R.string.episodes_none)
+            }
+        } finally {
+            loading = false
         }
     }
 
     private fun presentEpisodes(loaded: List<Channel>, focus: Boolean) {
+        if (isDestroyed || loaded.isEmpty()) return
         episodes = loaded
         binding.statusLine.visibility = View.GONE
         binding.seasonPane.visibility = View.VISIBLE
+        binding.episodePane.visibility = View.VISIBLE
         val selectedStillThere = loaded.any { (it.season ?: 1) == season }
         if (focus || !selectedStillThere) {
             val next = loaded.firstOrNull { it.id !in watched }
             season = next?.season ?: loaded.firstOrNull()?.season ?: 1
         }
-        if (showingEpisodes) showSeason(focusNext = false) else showSeasons(focus = focus)
+        showBreakdown(focusEpisodes = focus)
     }
 
     override fun onResume() {
         super.onResume()
-        if (episodes.isEmpty() || playlistId.isBlank()) return
+        if (episodes.isEmpty() || playlistId.isBlank() || seriesId.isBlank()) return
         lifecycleScope.launch {
             watched = withContext(Dispatchers.IO) {
-                (application as OlympusIptvApp).catalogDb.watchedEpisodes(playlistId, seriesId)
+                runCatching {
+                    (application as OlympusIptvApp).catalogDb.watchedEpisodes(playlistId, seriesId)
+                }.getOrDefault(emptySet())
             }
-            if (showingEpisodes) showSeason(focusNext = false) else showSeasons(focus = false)
+            if (!isDestroyed) showBreakdown(focusEpisodes = false)
         }
     }
 
@@ -128,24 +151,10 @@ class EpisodesActivity : AppCompatActivity() {
         return inSeason.isNotEmpty() && inSeason.all { it.id in watched }
     }
 
-    private fun showSeasons(focus: Boolean) {
-        showingEpisodes = false
-        binding.episodePane.visibility = View.GONE
-        binding.seasonPane.visibility = View.VISIBLE
+    private fun showBreakdown(focusEpisodes: Boolean) {
+        if (isDestroyed) return
         val numbers = seasonNumbers()
         seasons.submit(numbers)
-        if (!focus || numbers.isEmpty()) return
-        val index = numbers.indexOf(season).coerceAtLeast(0)
-        binding.seasonList.scrollToPosition(index)
-        binding.seasonList.post {
-            binding.seasonList.findViewHolderForAdapterPosition(index)?.itemView?.requestFocus()
-        }
-    }
-
-    private fun showSeason(focusNext: Boolean) {
-        showingEpisodes = true
-        binding.seasonPane.visibility = View.GONE
-        binding.episodePane.visibility = View.VISIBLE
         val shown = episodes.filter { (it.season ?: 1) == season }
         val next = shown.indexOfFirst { it.id !in watched }
         val complete = shown.isNotEmpty() && next < 0
@@ -153,11 +162,19 @@ class EpisodesActivity : AppCompatActivity() {
         binding.markSeason.text = getString(if (complete) R.string.season_clear else R.string.season_mark)
         binding.markSeason.isEnabled = shown.isNotEmpty()
         adapter.submit(shown)
-        if (focusNext && shown.isNotEmpty()) {
+        val seasonIndex = numbers.indexOf(season).coerceAtLeast(0)
+        if (numbers.isNotEmpty()) binding.seasonList.scrollToPosition(seasonIndex)
+        if (focusEpisodes && shown.isNotEmpty()) {
             val index = if (next >= 0) next else 0
             binding.episodeList.scrollToPosition(index)
             binding.episodeList.post {
+                if (isDestroyed) return@post
                 binding.episodeList.findViewHolderForAdapterPosition(index)?.itemView?.requestFocus()
+            }
+        } else if (numbers.isNotEmpty()) {
+            binding.seasonList.post {
+                if (isDestroyed) return@post
+                binding.seasonList.findViewHolderForAdapterPosition(seasonIndex)?.itemView?.requestFocus()
             }
         }
     }
@@ -170,12 +187,16 @@ class EpisodesActivity : AppCompatActivity() {
         lifecycleScope.launch {
             val app = application as OlympusIptvApp
             withContext(Dispatchers.IO) {
-                if (done) app.catalogDb.clearWatched(playlistId, ids)
-                else app.catalogDb.markWatchedAll(playlistId, seriesId, number, ids)
+                runCatching {
+                    if (done) app.catalogDb.clearWatched(playlistId, ids)
+                    else app.catalogDb.markWatchedAll(playlistId, seriesId, number, ids)
+                }
             }
-            if (isFinishing) return@launch
-            watched = withContext(Dispatchers.IO) { app.catalogDb.watchedEpisodes(playlistId, seriesId) }
-            if (showingEpisodes) showSeason(focusNext = false) else showSeasons(focus = false)
+            if (isDestroyed) return@launch
+            watched = withContext(Dispatchers.IO) {
+                runCatching { app.catalogDb.watchedEpisodes(playlistId, seriesId) }.getOrDefault(emptySet())
+            }
+            if (!isDestroyed) showBreakdown(focusEpisodes = false)
         }
     }
 
@@ -191,20 +212,26 @@ class EpisodesActivity : AppCompatActivity() {
     }
 
     private fun toggleEpisode(episode: Channel) {
-        if (playlistId.isBlank()) return
+        if (playlistId.isBlank() || episode.id.isBlank()) return
         val marked = episode.id in watched
         lifecycleScope.launch {
             val app = application as OlympusIptvApp
             withContext(Dispatchers.IO) {
-                if (marked) app.catalogDb.clearWatched(playlistId, listOf(episode.id))
-                else app.catalogDb.markWatched(playlistId, episode.id, seriesId, episode.season ?: season)
+                runCatching {
+                    if (marked) app.catalogDb.clearWatched(playlistId, listOf(episode.id))
+                    else app.catalogDb.markWatched(playlistId, episode.id, seriesId, episode.season ?: season)
+                }
             }
-            if (isFinishing) return@launch
-            watched = withContext(Dispatchers.IO) { app.catalogDb.watchedEpisodes(playlistId, seriesId) }
-            showSeason(focusNext = false)
+            if (isDestroyed) return@launch
+            watched = withContext(Dispatchers.IO) {
+                runCatching { app.catalogDb.watchedEpisodes(playlistId, seriesId) }.getOrDefault(emptySet())
+            }
+            if (isDestroyed) return@launch
+            showBreakdown(focusEpisodes = false)
             val index = adapter.indexOf(episode.id)
             if (index >= 0) {
                 binding.episodeList.post {
+                    if (isDestroyed) return@post
                     binding.episodeList.findViewHolderForAdapterPosition(index)?.itemView?.requestFocus()
                 }
             }
@@ -212,7 +239,9 @@ class EpisodesActivity : AppCompatActivity() {
     }
 
     private fun play(episode: Channel) {
+        if (episode.id.isBlank()) return
         val queue = episodes.filter { (it.season ?: 1) == season }
+        if (queue.isEmpty()) return
         SeriesPlay.open(this, playlistId, queue, episode)
     }
 
@@ -245,19 +274,26 @@ class EpisodesActivity : AppCompatActivity() {
             return Holder(row)
         }
 
-        override fun onBindViewHolder(holder: Holder, position: Int) = holder.bind(numbers[position])
+        override fun onBindViewHolder(holder: Holder, position: Int) {
+            numbers.getOrNull(position)?.let { holder.bind(it) }
+        }
 
         override fun getItemCount(): Int = numbers.size
 
         inner class Holder(private val row: ItemSeasonBinding) : RecyclerView.ViewHolder(row.root) {
             fun bind(number: Int) {
                 val done = seasonDone(number)
+                val active = number == season
                 row.seasonName.text = getString(R.string.season_number, number)
                 row.seasonCheck.visibility = if (done) View.VISIBLE else View.GONE
-                bindArt(row.seasonArt, showLogo, 116, 162)
+                row.root.isSelected = active
                 row.root.setOnClickListener {
+                    if (season == number) {
+                        showBreakdown(focusEpisodes = true)
+                        return@setOnClickListener
+                    }
                     season = number
-                    showSeason(focusNext = true)
+                    showBreakdown(focusEpisodes = true)
                 }
                 row.root.setOnLongClickListener {
                     toggleSeason(number)
@@ -283,7 +319,9 @@ class EpisodesActivity : AppCompatActivity() {
             return Holder(row)
         }
 
-        override fun onBindViewHolder(holder: Holder, position: Int) = holder.bind(items[position], position)
+        override fun onBindViewHolder(holder: Holder, position: Int) {
+            items.getOrNull(position)?.let { holder.bind(it, position) }
+        }
 
         override fun getItemCount(): Int = items.size
 

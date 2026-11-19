@@ -22,7 +22,14 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
     @Volatile private var liveCountryHold: LiveCountryHold? = null
     @Volatile private var searchExportHold: SearchExportHold? = null
 
-    private inline fun <T> read(block: () -> T): T = block()
+    private inline fun <T> read(block: () -> T): T {
+        try {
+            return block()
+        } catch (oom: OutOfMemoryError) {
+            releaseSearchExport()
+            throw oom
+        }
+    }
 
     private inline fun <T> write(block: () -> T): T = writer.withLock(block)
 
@@ -35,7 +42,6 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         applyPragma(db, "PRAGMA synchronous=NORMAL")
         applyPragma(db, "PRAGMA temp_store=MEMORY")
         applyPragma(db, "PRAGMA busy_timeout=3000")
-        // Keep SQLite caches modest — large mmap/page caches were competing with the Java heap on TV.
         applyPragma(db, "PRAGMA cache_size=-16384")
         applyPragma(db, "PRAGMA mmap_size=33554432")
         db.setMaxSqlCacheSize(50)
@@ -92,11 +98,11 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         val db = readableDatabase
         LoadedPlaylist(
             liveCategories = readCategories(db, playlistId, LIVE),
-            liveChannels = readChannels(db, playlistId, LIVE),
+            liveChannels = emptyList(),
             vodCategories = readCategories(db, playlistId, VOD),
-            vodChannels = readChannels(db, playlistId, VOD),
+            vodChannels = emptyList(),
             seriesCategories = readCategories(db, playlistId, SERIES),
-            seriesChannels = readChannels(db, playlistId, SERIES)
+            seriesChannels = emptyList()
         )
     }
 
@@ -440,7 +446,6 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         }
     }
 
-    /** Rewrites stored channel names that still carry a listed prefix or suffix. */
     fun rewriteNames(playlistId: String, prefixes: List<String>, suffixes: List<String>): Int {
         if (playlistId.isBlank() || (prefixes.isEmpty() && suffixes.isEmpty())) return 0
         val changes = ArrayList<Pair<String, String>>()
@@ -481,7 +486,6 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         }
     }
 
-    /** Removes picture characters from stored group and channel names. */
     fun stripImages(playlistId: String): ImageStrip = write {
         val db = writableDatabase
         val samples = ArrayList<Pair<String, String>>()
@@ -566,7 +570,6 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         ImageStrip(changed, samples)
     }
 
-    /** Live channels the guide is allowed to show, parsed from the channel name. */
     fun parseVisibleNames(playlistId: String, config: com.olympus.iptv.data.LineupConfig): ParsedNames = read {
         val db = readableDatabase
         val parsed = HashMap<String, List<com.olympus.iptv.data.EpgProgram>>()
@@ -614,63 +617,9 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
     }
 
     fun exportSearchCatalog(playlistId: String): Pair<List<Map<String, String>>, List<Map<String, String>>> {
-        val stamp = libraryStamp(playlistId)
-        searchExportHold?.let {
-            if (it.playlistId == playlistId && it.stamp == stamp) return it.groups to it.channels
-        }
-        readSearchExport(playlistId, stamp)?.let { saved ->
-            // Disk cache only — do not keep the full catalog pinned in the Java heap.
-            return saved
-        }
-        return read {
-            val db = readableDatabase
-            val groups = ArrayList<Map<String, String>>()
-            db.query(
-                "categories",
-                arrayOf("id", "name", "bucket"),
-                "playlist_id=?",
-                arrayOf(playlistId),
-                null,
-                null,
-                null
-            ).use { cursor ->
-                while (cursor.moveToNext()) {
-                    groups.add(
-                        mapOf(
-                            "id" to cursor.getString(0),
-                            "name" to (cursor.getString(1) ?: cursor.getString(0)),
-                            "kind" to searchKind(cursor.getString(2))
-                        )
-                    )
-                }
-            }
-            val channels = ArrayList<Map<String, String>>()
-            db.query(
-                "channels",
-                arrayOf("id", "name", "category_id", "group_title", "bucket", "logo_url"),
-                "playlist_id=?",
-                arrayOf(playlistId),
-                null,
-                null,
-                null
-            ).use { cursor ->
-                while (cursor.moveToNext()) {
-                    val groupId = cursor.getString(2) ?: cursor.getString(3) ?: ""
-                    channels.add(
-                        mapOf(
-                            "id" to cursor.getString(0),
-                            "name" to (cursor.getString(1) ?: ""),
-                            "groupId" to groupId,
-                            "kind" to searchKind(cursor.getString(4)),
-                            "logo" to (cursor.getString(5) ?: "")
-                        )
-                    )
-                }
-            }
-            writeSearchExport(playlistId, stamp, groups, channels)
-            // Return without retaining searchExportHold — callers should not keep this forever.
-            groups to channels
-        }
+        searchExportHold = null
+        if (playlistId.isBlank()) return emptyList<Map<String, String>>() to emptyList()
+        return emptyList<Map<String, String>>() to emptyList()
     }
 
     private fun searchKind(bucket: String?): String = when (bucket) {
@@ -1262,11 +1211,7 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         val group: String
     )
 
-    /**
-     * Movies and series whose names fall in one of the premiere prefixes.
-     * Uses the name index instead of reading the whole catalog.
-     */
-    fun titlesForPremieres(playlistId: String, prefixes: List<String>): List<CatalogTitle> = read {
+    fun titlesForPremieres(playlistId: String, prefixes: List<String>): List<CatalogTitle> {
         if (playlistId.isBlank() || prefixes.isEmpty()) return emptyList()
         val sql = """
             SELECT c.id, c.bucket, c.name, c.logo_url, IFNULL(c.group_title, ''), IFNULL(cat.name, '')
@@ -1279,25 +1224,36 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         val seen = HashSet<String>()
         val rows = ArrayList<CatalogTitle>()
         val buckets = arrayOf(VOD, SERIES)
-        val db = readableDatabase
-        for (prefix in prefixes) {
-            val end = prefixEnd(prefix)
-            for (bucket in buckets) {
-                db.rawQuery(sql, arrayOf(playlistId, bucket, prefix, end)).use { cursor ->
-                    while (cursor.moveToNext()) {
-                        val name = cursor.getString(2) ?: continue
-                        val id = cursor.getString(0) ?: continue
-                        val rowBucket = cursor.getString(1) ?: continue
-                        if (!seen.add("$rowBucket\u0000$id")) continue
-                        val group = listOf(cursor.getString(4), cursor.getString(5))
-                            .filter { it.isNotBlank() }
-                            .joinToString(" ")
-                        rows.add(CatalogTitle(id, rowBucket, name, cursor.getString(3), group))
+        val capped = if (prefixes.size > 96) prefixes.take(96) else prefixes
+        try {
+            val db = readableDatabase
+            for (prefix in capped) {
+                if (prefix.isBlank()) continue
+                val end = prefixEnd(prefix)
+                for (bucket in buckets) {
+                    db.rawQuery(sql, arrayOf(playlistId, bucket, prefix, end)).use { cursor ->
+                        while (cursor.moveToNext()) {
+                            val name = cursor.getString(2) ?: continue
+                            val id = cursor.getString(0) ?: continue
+                            val rowBucket = cursor.getString(1) ?: continue
+                            if (!seen.add("$rowBucket\u0000$id")) continue
+                            val groupTitle = cursor.getString(4).orEmpty()
+                            val catName = cursor.getString(5).orEmpty()
+                            val group = when {
+                                groupTitle.isNotBlank() && catName.isNotBlank() -> "$groupTitle $catName"
+                                groupTitle.isNotBlank() -> groupTitle
+                                else -> catName
+                            }
+                            rows.add(CatalogTitle(id, rowBucket, name, cursor.getString(3), group))
+                            if (rows.size >= 400) return rows
+                        }
                     }
                 }
             }
+        } catch (_: OutOfMemoryError) {
+            releaseSearchExport()
         }
-        rows
+        return rows
     }
 
     private fun prefixEnd(prefix: String): String {
@@ -1459,7 +1415,6 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         rows
     }
 
-    /** Groups, country counts, and the channel total, reused until the library changes. */
     fun dashboardSnapshot(playlistId: String): DashboardSnapshot {
         val stamp = libraryStamp(playlistId)
         dashHold?.let { if (it.playlistId == playlistId && it.stamp == stamp) return it.body }
@@ -1577,11 +1532,12 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         ).use { it.moveToFirst() }
     }
 
-    fun liveGuide(playlistId: String): List<com.olympus.iptv.data.AutoFavorites.GuideChannel> = read {
+    fun liveGuide(playlistId: String, limit: Int = LIVE_GUIDE_CAP): List<com.olympus.iptv.data.AutoFavorites.GuideChannel> = read {
         val rows = ArrayList<com.olympus.iptv.data.AutoFavorites.GuideChannel>()
+        val cap = limit.coerceIn(1, LIVE_GUIDE_CAP)
         readableDatabase.rawQuery(
-            "SELECT id, name, IFNULL(group_title, '') FROM channels WHERE playlist_id=? AND bucket=?",
-            arrayOf(playlistId, LIVE)
+            "SELECT id, name, IFNULL(group_title, '') FROM channels WHERE playlist_id=? AND bucket=? LIMIT ?",
+            arrayOf(playlistId, LIVE, cap.toString())
         ).use { cursor ->
             while (cursor.moveToNext()) {
                 rows.add(
@@ -1645,10 +1601,6 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         return changed
     }
 
-    /**
-     * Rewrites the stored group label. This is the name the guide reads, not a separate overlay.
-     * Returns how many category names changed, plus a few before/after samples.
-     */
     fun replaceGroupLabels(
         playlistId: String,
         find: String,
@@ -1735,7 +1687,6 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         names
     }
 
-    /** Rewrites group names that still contain picture characters. Skips a library that was already cleaned. */
     fun cleanGroupImages(playlistId: String): Int = write {
         if (playlistId.isBlank()) return@write 0
         val stamp = libraryStamp(playlistId)
@@ -2108,6 +2059,7 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
     }
 
     companion object {
+        private const val LIVE_GUIDE_CAP = 25_000
         const val LIVE = "live"
         const val VOD = "vod"
         const val SERIES = "series"

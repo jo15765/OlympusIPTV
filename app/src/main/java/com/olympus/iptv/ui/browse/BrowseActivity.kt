@@ -47,7 +47,6 @@ import com.olympus.iptv.data.SavedPlaylist
 import com.olympus.iptv.data.ShowNames
 import com.olympus.iptv.data.WatchEntry
 import com.olympus.iptv.databinding.ActivityBrowseBinding
-import com.olympus.iptv.playlist.CatalogCache
 import com.olympus.iptv.playlist.CatalogDb
 import com.olympus.iptv.playlist.CatchupUrls
 import com.olympus.iptv.playlist.CountryIndex
@@ -432,7 +431,6 @@ class BrowseActivity : AppCompatActivity() {
             val liveCategories = liveJob.await()
             val catalogJob = app.catalogRefresh
             if (liveCategories.isNotEmpty()) {
-                // Returning account: paint groups as soon as categories are ready.
                 moviesPending = true
                 showsPending = true
                 loadingFromDb = true
@@ -484,17 +482,10 @@ class BrowseActivity : AppCompatActivity() {
                 } else if (!hasSaved) {
                     val local = lineupJob.await()
                     applyFavorites(favoritesJob.await())
-                    val legacy = withContext(Dispatchers.IO) { CatalogCache(this@BrowseActivity).read(saved.id, true) }
-                    if (legacy != null && libraryHasItems(legacy)) {
-                        withContext(Dispatchers.IO) { persistLibrary(db, saved.id, legacy) }
-                        showCatalog(legacy, local, openGuide = true)
-                        showLoading(false)
-                    } else {
-                        moviesPending = true
-                        showsPending = true
-                        showLoading(true)
-                        refreshPlaylist()
-                    }
+                    moviesPending = true
+                    showsPending = true
+                    showLoading(true)
+                    refreshPlaylist()
                 } else {
                     moviesPending = true
                     showsPending = true
@@ -618,8 +609,6 @@ class BrowseActivity : AppCompatActivity() {
         val stamp = app.catalogDb.libraryStamp(playlistId).toString()
         val savedStamp = app.playlistStore.catalogStamp(playlistId)
         val savedCountries = app.playlistStore.countryStamp(playlistId)
-        // Do not load/publish the full channel catalog here. That built every channel into
-        // memory and POSTed it to /api/catalog (which ignores the body), and OOMed ~192MB heaps.
         if (stamp != savedStamp) {
             app.playlistStore.saveCatalogStamp(playlistId, stamp)
         }
@@ -1373,13 +1362,17 @@ class BrowseActivity : AppCompatActivity() {
         activeConfig = config
         (application as OlympusIptvApp).guideSource = fetched
         val app = application as OlympusIptvApp
-        if (app.guideChannels.isEmpty()) app.guideChannels = fetched.liveChannels
+        if (fetched.liveChannels.isNotEmpty() && fetched.liveChannels.size <= 200) {
+            app.guideChannels = fetched.liveChannels
+        } else if (app.guideChannels.isEmpty() || fetched.liveChannels.isNotEmpty()) {
+            app.guideChannels = emptyList()
+        }
+        com.olympus.iptv.portal.DashboardHost.clearGuideCache()
         publishGuide()
         if (epgRepo.useNameEpg(config.nameEpg == true)) epgCache.clear()
         val savedId = playlist?.id
         if (!savedId.isNullOrBlank()) {
             val appJobs = application as OlympusIptvApp
-            // Defer maintenance so the first group paint is not fighting the DB.
             binding.root.post {
                 if (isDestroyed) return@post
                 appJobs.appScope.launch {
@@ -3072,7 +3065,8 @@ class BrowseActivity : AppCompatActivity() {
         val player = previewPlayer ?: ExoPlayer.Builder(this)
             .setLoadControl(
                 DefaultLoadControl.Builder()
-                    .setBufferDurationsMs(2_000, 15_000, 250, 750)
+                    .setBufferDurationsMs(1_000, 6_000, 250, 500)
+                    .setTargetBufferBytes(4 * 1024 * 1024)
                     .setPrioritizeTimeOverSizeThresholds(true)
                     .build()
             )

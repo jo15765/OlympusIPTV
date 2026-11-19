@@ -29,7 +29,16 @@ object AppLog {
                 val oom = error is OutOfMemoryError ||
                     generateSequence(error.cause) { it.cause }.any { it is OutOfMemoryError }
                 if (oom) {
-                    // Log and try to recover instead of taking the process down for OOM cascades.
+                    runCatching {
+                        val app = context.applicationContext as? OlympusIptvApp
+                        app?.catalogDb?.releaseSearchExport()
+                        app?.guideChannels = emptyList()
+                        app?.guideSource = null
+                        app?.warmPlayer?.release()
+                        app?.warmPlayer = null
+                        app?.warmChannelId = null
+                        com.olympus.iptv.portal.DashboardHost.clearGuideCache()
+                    }
                     runCatching { System.gc() }
                     return@setDefaultUncaughtExceptionHandler
                 }

@@ -78,7 +78,6 @@ object LineupApplier {
         )
     }
 
-    /** Group list only. Does not walk channels. */
     fun groups(
         categories: List<Category>,
         config: LineupConfig,
@@ -108,7 +107,6 @@ object LineupApplier {
             }
     }
 
-    /** Filter, rename, and order one already-small channel list. */
     fun present(channels: List<Channel>, config: LineupConfig): List<Channel> {
         if (channels.isEmpty()) return channels
         val hiddenChannels = config.hiddenChannels.orEmpty().toSet()

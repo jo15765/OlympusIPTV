@@ -13,10 +13,6 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 
-/**
- * US streaming premieres for the current Sunday–Saturday week.
- * Watchmode does not host video. The key stays in local.properties and is not logged.
- */
 object Watchmode {
     private val http = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
@@ -61,18 +57,21 @@ object Watchmode {
         return System.currentTimeMillis() - held.fetchedAt >= DAY_MS
     }
 
-    /** Raw title plus the folded form, so the catalog lookup stays a prefix search. */
     fun lookupPrefixes(premieres: List<Premiere>): List<String> {
         val seen = HashSet<String>()
-        val prefixes = ArrayList<String>()
+        val prefixes = ArrayList<String>(premieres.size * 2)
         for (premiere in premieres) {
+            val folded = foldTitle(premiere.title)
+            val words = folded.split(' ').filter { it.isNotBlank() }
+            if (words.size >= 2) addPrefix(prefixes, seen, words.take(2).joinToString(" "))
+            if (words.size >= 3) addPrefix(prefixes, seen, words.take(3).joinToString(" "))
+            addPrefix(prefixes, seen, folded)
             addPrefix(prefixes, seen, premiere.title)
-            addPrefix(prefixes, seen, foldTitle(premiere.title))
+            if (prefixes.size >= MAX_PREFIXES) break
         }
         return prefixes
     }
 
-    /** Same-week list already on disk. Does not wait on the network. */
     fun load(cacheFile: File, today: LocalDate = LocalDate.now()): List<Premiere> {
         peek(cacheFile, today)?.let { return it }
         return refresh(cacheFile, today)
@@ -131,29 +130,35 @@ object Watchmode {
     }
 
     fun match(premieres: List<Premiere>, catalog: List<CatalogDb.CatalogTitle>): List<CatalogDb.FreshTitle> {
-        val exact = HashMap<String, MutableList<CatalogDb.CatalogTitle>>()
+        if (premieres.isEmpty() || catalog.isEmpty()) return emptyList()
+        val exact = HashMap<String, MutableList<CatalogDb.CatalogTitle>>(catalog.size)
         val buckets = HashMap<String, MutableList<String>>()
+        val heads = HashMap<String, MutableList<String>>()
         for (row in catalog) {
             val key = foldTitle(row.name)
             if (key.length < 3) continue
-            exact.getOrPut(key) { ArrayList() }.add(row)
-            buckets.getOrPut(key.take(4)) { ArrayList() }.add(key)
+            exact.getOrPut(key) { ArrayList(1) }.add(row)
+            buckets.getOrPut(key.take(4)) { ArrayList(1) }.add(key)
+            val words = key.split(' ')
+            if (words.size >= 2) {
+                val head = words[0] + ' ' + words[1]
+                heads.getOrPut(head) { ArrayList(1) }.add(key)
+            }
         }
         val cards = ArrayList<CatalogDb.FreshTitle>()
         val seen = HashSet<String>()
         for (premiere in premieres.sortedWith(compareBy({ it.date }, { it.title }))) {
             val key = foldTitle(premiere.title)
             if (key.length < 3) continue
-            val hit = best(premiere, key, exact, buckets[key.take(4)].orEmpty()) ?: continue
+            val hit = best(premiere, key, exact, buckets[key.take(4)].orEmpty(), heads) ?: continue
             val marker = "${hit.bucket}:${hit.id}:${premiere.sourceId}"
             if (!seen.add(marker)) continue
-            val artwork = imageUrl(hit.logoUrl) ?: imageUrl(premiere.poster)
             cards.add(
                 CatalogDb.FreshTitle(
                     id = hit.id,
                     bucket = hit.bucket,
                     name = premiere.title,
-                    logoUrl = artwork,
+                    logoUrl = imageUrl(hit.logoUrl) ?: imageUrl(premiere.poster),
                     service = premiere.service,
                     detail = detail(premiere),
                     day = premiere.day,
@@ -179,9 +184,11 @@ object Watchmode {
         premiere: Premiere,
         key: String,
         exact: Map<String, List<CatalogDb.CatalogTitle>>,
-        nearby: List<String>
+        nearby: List<String>,
+        heads: Map<String, List<String>>
     ): CatalogDb.CatalogTitle? {
-        val pool = ArrayList<CatalogDb.CatalogTitle>()
+        val wantSeries = premiere.type.startsWith("tv")
+        val pool = ArrayList<CatalogDb.CatalogTitle>(4)
         exact[key]?.let { pool.addAll(it) }
         for (catalogKey in nearby) {
             if (catalogKey == key || !catalogKey.startsWith("$key ")) continue
@@ -190,17 +197,43 @@ object Watchmode {
             if (!usable) continue
             exact[catalogKey]?.let { pool.addAll(it) }
         }
+        if (pool.isEmpty()) {
+            val parts = key.split(' ')
+            if (parts.size >= 2) {
+                val head = parts[0] + ' ' + parts[1]
+                for (catalogKey in heads[head].orEmpty()) {
+                    if (catalogKey == key || !relatedTitle(key, catalogKey, wantSeries)) continue
+                    exact[catalogKey]?.let { pool.addAll(it) }
+                }
+            }
+        }
         if (pool.isEmpty()) return null
         val words = serviceWords[premiere.service].orEmpty()
-        val wantSeries = premiere.type.startsWith("tv")
         return pool.maxByOrNull { row ->
-            var score = if (foldTitle(row.name) == key) 100 else 60
-            val group = row.group.lowercase()
-            if (words.any { group.contains(it) }) score += 25
+            val folded = foldTitle(row.name)
+            var score = when {
+                folded == key -> 100
+                relatedTitle(key, folded, wantSeries) -> 70
+                else -> 60
+            }
+            val group = row.group
+            if (words.any { group.contains(it, ignoreCase = true) }) score += 25
             if (wantSeries && row.bucket == CatalogDb.SERIES) score += 10
             if (!wantSeries && row.bucket == CatalogDb.VOD) score += 10
             score
         }
+    }
+
+    private fun relatedTitle(premiereKey: String, catalogKey: String, wantSeries: Boolean): Boolean {
+        if (catalogKey.startsWith("$premiereKey ")) return true
+        if (premiereKey.startsWith("$catalogKey ") && catalogKey.length >= 8) return true
+        if (!wantSeries) return false
+        if (premiereKey.length >= 10 && catalogKey.contains(premiereKey)) return true
+        if (catalogKey.length >= 10 && premiereKey.contains(catalogKey)) return true
+        val premiereWords = premiereKey.split(' ')
+        val catalogWords = catalogKey.split(' ')
+        if (premiereWords.size < 2 || catalogWords.size < 2) return false
+        return premiereWords[0] == catalogWords[0] && premiereWords[1] == catalogWords[1]
     }
 
     private fun detail(premiere: Premiere): String {
@@ -416,6 +449,7 @@ object Watchmode {
     private val YEAR = Regex("\\d{4}.*")
     private val SEASON_TOKEN = Regex("s\\d{1,2}.*")
     private const val DAY_MS = 20L * 60L * 60L * 1000L
+    private const val MAX_PREFIXES = 96
 }
 
 class WatchmodeException(val kind: Kind, cause: Throwable? = null) : Exception(cause) {

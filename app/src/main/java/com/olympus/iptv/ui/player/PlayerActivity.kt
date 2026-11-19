@@ -370,7 +370,8 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun newPlayer(): ExoPlayer {
         val control = DefaultLoadControl.Builder()
-            .setBufferDurationsMs(2_000, 15_000, 250, 750)
+            .setBufferDurationsMs(1_500, 8_000, 250, 500)
+            .setTargetBufferBytes(6 * 1024 * 1024)
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
         val http = DefaultHttpDataSource.Factory()

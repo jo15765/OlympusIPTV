@@ -17,6 +17,7 @@ import com.olympus.iptv.playlist.LoadedPlaylist
 import com.olympus.iptv.playlist.Watchmode
 import com.olympus.iptv.playlist.WatchmodeException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -25,7 +26,22 @@ import kotlinx.coroutines.SupervisorJob
 import java.io.File
 
 class OlympusIptvApp : Application() {
-    val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val appErrors = CoroutineExceptionHandler { _, error ->
+        AppLog.error("App", "Background work failed", error)
+        if (error is OutOfMemoryError ||
+            generateSequence(error.cause) { it.cause }.any { it is OutOfMemoryError }
+        ) {
+            runCatching { catalogDb.releaseSearchExport() }
+            runCatching { com.olympus.iptv.portal.DashboardHost.clearGuideCache() }
+            guideChannels = emptyList()
+            guideSource = null
+            warmPlayer?.release()
+            warmPlayer = null
+            warmChannelId = null
+            runCatching { System.gc() }
+        }
+    }
+    val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO + appErrors)
     @Volatile var catalogRefresh: Job? = null
     @Volatile var catalogLiveReady: CompletableDeferred<Boolean>? = null
 
@@ -76,7 +92,7 @@ class OlympusIptvApp : Application() {
     private fun prepareFresh(playlistId: String) {
         val cacheFile = File(filesDir, "watchmode-week.json")
         val week = Watchmode.weekKey()
-        val stamp = catalogDb.libraryStamp(playlistId)
+        val stamp = runCatching { catalogDb.libraryStamp(playlistId) }.getOrDefault(0L)
         val held = freshHold
         if (held != null && held.playlistId == playlistId && held.week == week &&
             held.stamp == stamp && !Watchmode.needsRefresh(cacheFile)
@@ -97,14 +113,22 @@ class OlympusIptvApp : Application() {
                 Watchmode.load(cacheFile)
             }
             val catalog = catalogDb.titlesForPremieres(playlistId, Watchmode.lookupPrefixes(premieres))
-            if (catalog.isEmpty()) return
-            val cards = Watchmode.match(premieres, catalog)
-            val next = FreshHold(playlistId, catalogDb.libraryStamp(playlistId), week, cards)
+            val cards = if (catalog.isEmpty()) emptyList() else Watchmode.match(premieres, catalog)
+            val next = FreshHold(
+                playlistId,
+                runCatching { catalogDb.libraryStamp(playlistId) }.getOrDefault(stamp),
+                week,
+                cards
+            )
             freshHold = next
             freshFailure = null
             writeFreshFile(next)
         } catch (error: WatchmodeException) {
             freshFailure = error.kind
+        } catch (error: OutOfMemoryError) {
+            runCatching { catalogDb.releaseSearchExport() }
+            runCatching { System.gc() }
+            freshFailure = WatchmodeException.Kind.FAILED
         } catch (_: Exception) {
             freshFailure = WatchmodeException.Kind.FAILED
         }
@@ -157,8 +181,6 @@ class OlympusIptvApp : Application() {
         epgRepository.attach(catalogDb, appScope)
         DashboardHost.start(this)
         com.olympus.iptv.vpn.AppTunnel.restore(this)
-        // Heavy catalog warm-up runs after Browse paints (see BrowseActivity.showCatalog).
-        // Starting it here contended with the first group load and made returning launches feel slow.
         Coil.setImageLoader(
             ImageLoader.Builder(this)
                 .crossfade(false)

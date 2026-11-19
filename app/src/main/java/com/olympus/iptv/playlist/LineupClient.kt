@@ -203,8 +203,6 @@ class LineupClient(context: Context) {
         channels: List<Map<String, String>>,
         stamp: String
     ) = withContext(Dispatchers.IO) {
-        // Intentionally a no-op: posting the full channel list OOM'd TV heaps, and the
-        // local /api/catalog handler already ignores groups/channels. Dashboard search uses SQL.
         val normalized = email.trim().lowercase()
         if (normalized.isBlank() || deviceId.isBlank() || stamp.isBlank()) return@withContext
         if (groups.isEmpty() && channels.isEmpty()) return@withContext

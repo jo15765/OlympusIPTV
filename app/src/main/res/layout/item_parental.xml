@@ -1,39 +1,65 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/card"
     android:layout_width="match_parent"
-    android:layout_height="64dp"
-    android:layout_marginBottom="8dp"
+    android:layout_height="wrap_content"
+    android:layout_margin="6dp"
     android:background="@drawable/bg_focusable"
     android:clickable="true"
     android:focusable="true"
-    android:gravity="center_vertical"
-    android:orientation="horizontal"
-    android:paddingHorizontal="16dp">
+    android:focusableInTouchMode="true"
+    android:minHeight="88dp">
 
-    <TextView
-        android:id="@+id/name"
-        android:layout_width="0dp"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:ellipsize="end"
-        android:maxLines="1"
-        android:textColor="@color/text_primary"
-        android:textSize="18sp" />
+        android:gravity="center_vertical"
+        android:orientation="vertical"
+        android:paddingHorizontal="14dp"
+        android:paddingVertical="12dp">
 
-    <TextView
-        android:id="@+id/kind"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="12dp"
-        android:textColor="@color/text_secondary"
-        android:textSize="14sp" />
+        <TextView
+            android:id="@+id/name"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="2"
+            android:textColor="@color/text_primary"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/detail"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp" />
+    </LinearLayout>
 
     <ImageView
         android:id="@+id/lock"
         android:layout_width="22dp"
         android:layout_height="22dp"
-        android:layout_marginStart="12dp"
-        android:contentDescription="@null"
+        android:layout_gravity="top|end"
+        android:layout_margin="8dp"
+        android:contentDescription="@string/group_locked"
         android:src="@drawable/ic_lock"
         android:visibility="gone" />
-</LinearLayout>
+
+    <TextView
+        android:id="@+id/selectedMark"
+        android:layout_width="28dp"
+        android:layout_height="28dp"
+        android:layout_gravity="bottom|end"
+        android:layout_margin="8dp"
+        android:background="@drawable/bg_check"
+        android:gravity="center"
+        android:text="✓"
+        android:textColor="@color/bg"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+</FrameLayout>

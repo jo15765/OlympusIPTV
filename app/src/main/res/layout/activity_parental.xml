@@ -33,16 +33,45 @@
                 android:textSize="15sp" />
 
             <TextView
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="14dp"
+                android:layout_weight="1"
                 android:text="@string/parental_title"
                 android:textColor="@color/text_primary"
                 android:textSize="24sp"
                 android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/btnSetPin"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:background="@drawable/bg_button"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:paddingHorizontal="16dp"
+                android:text="@string/parental_set_pin"
+                android:textColor="@color/bg"
+                android:textSize="15sp" />
+
+            <TextView
+                android:id="@+id/btnClearPin"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:layout_marginStart="10dp"
+                android:background="@drawable/bg_button_secondary"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:paddingHorizontal="16dp"
+                android:text="@string/parental_clear_pin"
+                android:textColor="@color/text_primary"
+                android:textSize="15sp" />
         </LinearLayout>
 
         <TextView
+            android:id="@+id/parentalHint"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
@@ -62,14 +91,14 @@
 
     <LinearLayout
         android:id="@+id/groupPin"
-        android:layout_width="360dp"
+        android:layout_width="420dp"
         android:layout_height="wrap_content"
         android:layout_gravity="center"
         android:background="@drawable/bg_panel"
         android:elevation="18dp"
         android:orientation="vertical"
-        android:paddingHorizontal="28dp"
-        android:paddingVertical="24dp"
+        android:paddingHorizontal="24dp"
+        android:paddingVertical="20dp"
         android:visibility="gone">
 
         <TextView
@@ -85,40 +114,37 @@
         <TextView
             android:id="@+id/groupPinDigits"
             android:layout_width="match_parent"
-            android:layout_height="72dp"
-            android:layout_marginTop="16dp"
+            android:layout_height="64dp"
+            android:layout_marginTop="14dp"
             android:background="@color/bg_elevated"
             android:gravity="center"
-            android:letterSpacing="0.3"
+            android:letterSpacing="0.35"
             android:text="––––"
             android:textColor="@color/text_primary"
-            android:textSize="36sp" />
+            android:textSize="34sp" />
 
-        <TextView
-            android:id="@+id/groupPinCancel"
+        <GridLayout
+            android:id="@+id/pinPad"
             android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:layout_marginTop="16dp"
-            android:background="@drawable/bg_focusable"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:text="@string/group_pin_cancel"
-            android:textColor="@color/text_primary"
-            android:textSize="16sp" />
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:alignmentMode="alignMargins"
+            android:columnCount="3"
+            android:rowCount="4"
+            android:useDefaultMargins="true">
 
-        <TextView
-            android:id="@+id/groupPinClear"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:layout_marginTop="8dp"
-            android:background="@drawable/bg_focusable"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:text="@string/group_pin_clear"
-            android:textColor="@color/text_primary"
-            android:textSize="16sp"
-            android:visibility="gone" />
+            <TextView android:id="@+id/pin1" style="@style/OlympusIptvPinKey" android:text="1" />
+            <TextView android:id="@+id/pin2" style="@style/OlympusIptvPinKey" android:text="2" />
+            <TextView android:id="@+id/pin3" style="@style/OlympusIptvPinKey" android:text="3" />
+            <TextView android:id="@+id/pin4" style="@style/OlympusIptvPinKey" android:text="4" />
+            <TextView android:id="@+id/pin5" style="@style/OlympusIptvPinKey" android:text="5" />
+            <TextView android:id="@+id/pin6" style="@style/OlympusIptvPinKey" android:text="6" />
+            <TextView android:id="@+id/pin7" style="@style/OlympusIptvPinKey" android:text="7" />
+            <TextView android:id="@+id/pin8" style="@style/OlympusIptvPinKey" android:text="8" />
+            <TextView android:id="@+id/pin9" style="@style/OlympusIptvPinKey" android:text="9" />
+            <TextView android:id="@+id/pinClearDigit" style="@style/OlympusIptvPinKey" android:text="⌫" />
+            <TextView android:id="@+id/pin0" style="@style/OlympusIptvPinKey" android:text="0" />
+            <TextView android:id="@+id/pinCancel" style="@style/OlympusIptvPinKey" android:text="@string/group_pin_cancel" />
+        </GridLayout>
     </LinearLayout>
 </FrameLayout>

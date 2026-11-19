@@ -53,6 +53,10 @@ import okhttp3.Request
  */
 object DashboardHost {
     const val PORT = 8765
+    private const val MAX_JSON_BYTES = 512 * 1024
+    private const val MAX_RECORDING_BYTES = 256 * 1024 * 1024
+    private const val MAX_LOGO_BYTES = 1_500_000L
+    private const val LOGO_ALLOW_CAP = 2_000
     @Volatile var port: Int = PORT
     @Volatile private var hostName: String = ""
     @Volatile private var server: ServerSocket? = null
@@ -64,7 +68,12 @@ object DashboardHost {
     @Volatile private var appContext: Context? = null
     @Volatile private var page: ByteArray? = null
     @Volatile private var logo: ByteArray? = null
-    @Volatile private var guideCache: Pair<String, List<AutoFavorites.GuideChannel>>? = null
+    private data class GuideHold(
+        val playlistId: String,
+        val stamp: Long,
+        val rows: List<AutoFavorites.GuideChannel>
+    )
+    @Volatile private var guideHold: GuideHold? = null
     @Volatile private var catalogHold: Pair<CatalogDb.DashboardSnapshot, Map<String, Any>>? = null
 
     private val workers = Executors.newFixedThreadPool(4) { runnable ->
@@ -314,10 +323,14 @@ object DashboardHost {
         }
         val length = headers["content-length"]?.toIntOrNull() ?: 0
         if (method == "PUT" && path == "/api/recordings/file") {
+            if (length <= 0 || length > MAX_RECORDING_BYTES) {
+                writeJson(socket, 413, mapOf("error" to "Recording upload is too large"))
+                return
+            }
             writeRecording(context, socket, query, input, length)
             return
         }
-        if (length > 8 * 1024 * 1024) {
+        if (length > MAX_JSON_BYTES) {
             writeJson(socket, 413, mapOf("error" to "Request is too large"))
             return
         }
@@ -766,9 +779,14 @@ object DashboardHost {
         } else {
             val rank = HashMap<String, Int>(order.size)
             order.forEachIndexed { index, id -> rank[id] = index }
-            val matches = app.catalogDb.slimInGroup(gate.playlist.id, groupId, needle)
+            val matches = app.catalogDb.slimInGroup(
+                gate.playlist.id,
+                groupId,
+                needle,
+                limit = (limit * 8).coerceIn(limit, 800)
+            )
             page = matches.sortedWith(compareBy({ rank[it.id] ?: 999999 }, { it.name.lowercase(Locale.US) })).take(limit)
-            total = matches.size
+            total = app.catalogDb.countInGroup(gate.playlist.id, groupId, needle)
         }
         val pageRows = page.map { channel ->
             rememberLogo(channel.logo)
@@ -829,7 +847,7 @@ object DashboardHost {
             ""
         }
         val result = app.catalogDb.replaceGroupLabels(gate.playlist.id, find, replacement)
-        guideCache = null
+        clearGuideCache()
         val lineup = filled(runBlocking { app.playlistStore.lineup(gate.playlist.id) })
         val names = lineup.groupNames.orEmpty().mapNotNull { (id, name) ->
             val next = com.olympus.iptv.data.GroupRename.replaceAll(name, find, replacement).trim()
@@ -855,7 +873,7 @@ object DashboardHost {
             return
         }
         val result = app.catalogDb.stripImageNames(gate.playlist.id)
-        guideCache = null
+        clearGuideCache()
         val lineup = filled(runBlocking { app.playlistStore.lineup(gate.playlist.id) })
         val groups = lineup.groupNames.orEmpty().mapValues { NameImages.strip(it.value) }
         val channels = lineup.channelNames.orEmpty().mapValues { NameImages.strip(it.value) }
@@ -1028,10 +1046,11 @@ object DashboardHost {
     }
 
     private fun guide(app: OlympusIptvApp, playlistId: String): List<AutoFavorites.GuideChannel> {
-        val cached = guideCache
-        if (cached != null && cached.first == playlistId) return cached.second
+        val stamp = app.catalogDb.libraryStamp(playlistId)
+        val held = guideHold
+        if (held != null && held.playlistId == playlistId && held.stamp == stamp) return held.rows
         val rows = app.catalogDb.liveGuide(playlistId)
-        guideCache = playlistId to rows
+        guideHold = GuideHold(playlistId, stamp, rows)
         return rows
     }
 
@@ -1056,8 +1075,21 @@ object DashboardHost {
                     if (!response.isSuccessful) return@use false
                     val type = response.header("Content-Type").orEmpty().substringBefore(";").ifBlank { "image/jpeg" }
                     if (!type.startsWith("image/")) return@use false
-                    val bytes = response.body?.bytes() ?: return@use false
-                    if (bytes.size > 1_500_000) return@use false
+                    val declared = response.body?.contentLength() ?: -1L
+                    if (declared > MAX_LOGO_BYTES) return@use false
+                    val source = response.body?.source() ?: return@use false
+                    val buffer = okio.Buffer()
+                    var read = 0L
+                    while (!source.exhausted()) {
+                        val chunk = source.read(buffer, 64 * 1024)
+                        if (chunk < 0) break
+                        read += chunk
+                        if (read > MAX_LOGO_BYTES) {
+                            buffer.clear()
+                            return@use false
+                        }
+                    }
+                    val bytes = buffer.readByteArray()
                     file.parentFile?.mkdirs()
                     file.writeBytes(bytes)
                     typeFile.writeText(type)
@@ -1074,7 +1106,17 @@ object DashboardHost {
     }
 
     private fun rememberLogo(url: String?) {
-        if (!url.isNullOrBlank() && publicLogo(url)) logoAllow[url] = true
+        if (url.isNullOrBlank() || !publicLogo(url)) return
+        if (logoAllow.size >= LOGO_ALLOW_CAP) {
+            val drop = logoAllow.keys.take(logoAllow.size / 4)
+            for (key in drop) logoAllow.remove(key)
+        }
+        logoAllow[url] = true
+    }
+
+    fun clearGuideCache() {
+        guideHold = null
+        catalogHold = null
     }
 
     private fun publicLogo(value: String): Boolean {

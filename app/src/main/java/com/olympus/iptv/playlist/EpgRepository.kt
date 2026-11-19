@@ -52,12 +52,16 @@ class EpgRepository(
     fun installNameEpg(playlistId: String, byChannel: Map<String, List<EpgProgram>>) {
         val prefix = "$playlistId::"
         parsedNames.keys.removeAll { it.startsWith(prefix) }
+        var kept = 0
         for ((id, programs) in byChannel) {
+            if (kept >= PARSED_NAMES_CAP) break
             parsedNames["$playlistId::$id"] = programs
+            kept += 1
         }
         nameEpg = true
         cache.entries.removeIf { it.key.startsWith(prefix) && it.value.isEmpty() }
         trimCache()
+        trimParsedNames()
     }
 
     suspend fun nowNext(
@@ -147,6 +151,14 @@ class EpgRepository(
         for (key in keys) cache.remove(key)
     }
 
+    private fun trimParsedNames() {
+        val over = parsedNames.size - PARSED_NAMES_CAP
+        if (over <= 0) return
+        val drop = over + PARSED_NAMES_CAP / 5
+        val keys = parsedNames.keys.take(drop)
+        for (key in keys) parsedNames.remove(key)
+    }
+
     private fun foldXmltv(map: Map<String, List<EpgProgram>>): Map<String, List<EpgProgram>> {
         if (map.isEmpty()) return emptyMap()
         val folded = HashMap<String, List<EpgProgram>>(map.size)
@@ -162,5 +174,6 @@ class EpgRepository(
     private companion object {
         private const val HOUR_MS = 60L * 60L * 1000L
         private const val CACHE_CAP = 256
+        private const val PARSED_NAMES_CAP = 2_000
     }
 }

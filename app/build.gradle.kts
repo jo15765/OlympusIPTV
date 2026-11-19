@@ -25,8 +25,8 @@ android {
         applicationId = "com.olympus.iptv"
         minSdk = 24
         targetSdk = 35
-        versionCode = 36
-        versionName = "0.2.35"
+        versionCode = 38
+        versionName = "0.2.37"
         buildConfigField("String", "WATCHMODE_API_KEY", "\"$watchmodeKey\"")
         buildConfigField("String", "OPENSUBTITLES_API_KEY", "\"$opensubtitlesKey\"")
     }

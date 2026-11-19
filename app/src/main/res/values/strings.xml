@@ -257,7 +257,7 @@
     <string name="fresh_service">New to %1$s</string>
     <string name="fresh_when">%1$s · %2$s</string>
     <string name="fresh_loading">Looking up this week’s premieres…</string>
-    <string name="fresh_empty">Nothing premiering this week is in your Movies or TV Shows.</string>
+    <string name="fresh_empty">Nothing premiering this week matched a title in your Movies or TV Shows library.</string>
     <string name="fresh_need_key">This build has no Watchmode key, so this week’s releases cannot load.</string>
     <string name="fresh_rejected">The Watchmode key was not accepted.</string>
     <string name="fresh_failed">This week’s releases could not be loaded.</string>
@@ -434,10 +434,17 @@
     <string name="epg_card_parental_detail">Choose a group, set a 4-digit PIN, and that group shows a lock.</string>
     <string name="parental_chip">Parental</string>
     <string name="parental_title">Parental controls</string>
-    <string name="parental_hint">Press OK on a group to set a 4-digit PIN. A lock then shows on that group. Remove lock clears it.</string>
+    <string name="parental_hint">Select one or more Live TV groups, then Set PIN or Remove lock. Use the on-screen keypad for a 4-digit numeric PIN.</string>
     <string name="parental_live">Live TV</string>
     <string name="parental_movies">Movies</string>
     <string name="parental_shows">Shows</string>
+    <string name="parental_set_pin">Set PIN</string>
+    <string name="parental_clear_pin">Remove lock</string>
+    <string name="parental_select_first">Select at least one group first.</string>
+    <string name="parental_locked">Locked</string>
+    <string name="parental_unlocked">Unlocked</string>
+    <string name="parental_selected_count">%1$d selected</string>
+    <string name="group_pin_set_many">Lock selected groups</string>
     <string name="favorites_setup_subtitle">Add the channels you watch. You can change this later.</string>
     <string name="favorites_setup_continue">Continue</string>
     <string name="favorites_setup_local">Local Major Networks</string>

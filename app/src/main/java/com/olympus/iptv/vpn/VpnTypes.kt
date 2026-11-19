@@ -15,7 +15,7 @@ internal object VpnHttp {
         .callTimeout(50, TimeUnit.SECONDS)
         .build()
 
-    fun text(response: Response): String = response.body?.string().orEmpty().take(20_000_000)
+    fun text(response: Response): String = response.body?.string().orEmpty().take(512_000)
 
     fun explain(code: Int, body: String): String {
         val message = runCatching {
