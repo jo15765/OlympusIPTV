@@ -36,7 +36,20 @@ class QueueActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityQueueBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        binding.queueList.layoutManager = GridLayoutManager(this, 5)
+        val touch = com.olympus.iptv.ui.DeviceForm.isTouchPrimary(this)
+        if (touch) {
+            androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
+            com.olympus.iptv.ui.InsetsPad.apply(
+                binding.root,
+                top = true,
+                bottom = true,
+                left = true,
+                right = true
+            )
+            binding.queueList.isNestedScrollingEnabled = true
+        }
+        val span = if (touch) 2 else 5
+        binding.queueList.layoutManager = GridLayoutManager(this, span)
         binding.queueList.adapter = adapter
     }
 

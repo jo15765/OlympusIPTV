@@ -130,6 +130,13 @@ class PlayerActivity : AppCompatActivity() {
     private var touchPrimary = false
     private var menuBaseBottom = 0
     private var overlayBaseTop = 0
+    private var sleepMinutes = 0
+    private val sleepFire = Runnable {
+        if (!isDestroyed) {
+            player?.playWhenReady = false
+            finish()
+        }
+    }
     private val epgRepo: EpgRepository
         get() = (application as OlympusIptvApp).epgRepository
 
@@ -160,7 +167,7 @@ class PlayerActivity : AppCompatActivity() {
         try {
         touchPrimary = DeviceForm.isTouchPrimary(this)
         requestedOrientation = if (touchPrimary) {
-            ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            rememberedPhoneOrientation()
         } else {
             ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
         }
@@ -241,6 +248,10 @@ class PlayerActivity : AppCompatActivity() {
             hidePlaybackMenu()
             toggleMultiView()
         }
+        binding.btnSleep.setOnClickListener {
+            hidePlaybackMenu()
+            openSleepTimer()
+        }
         binding.btnSkipIntro.setOnClickListener { onSkipIntro() }
         binding.btnPlayNext.setOnClickListener { playPendingNext() }
         binding.btnNextMenu.setOnClickListener { escapeToMenu() }
@@ -279,9 +290,34 @@ class PlayerActivity : AppCompatActivity() {
     private fun setupPhoneChrome() {
         if (!touchPrimary) {
             binding.btnMenuBack.visibility = View.GONE
+            binding.phoneDock.visibility = View.GONE
+            binding.touchTip.visibility = View.GONE
             return
         }
         WindowCompat.setDecorFitsSystemWindows(window, false)
+        binding.btnPhoneBack.setOnClickListener { handlePlayerBack() }
+        binding.btnPhonePlay.setOnClickListener { togglePause() }
+        binding.btnPhoneMenu.setOnClickListener { showPlaybackMenu() }
+        binding.phoneSeek.setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: android.widget.SeekBar?, progress: Int, fromUser: Boolean) {
+                if (!fromUser) return
+                val exo = player ?: return
+                val duration = exo.duration.takeIf { it > 0 } ?: return
+                binding.seekLabel.text = formatClock((duration * progress) / 1000L)
+            }
+            override fun onStartTrackingTouch(seekBar: android.widget.SeekBar?) {
+                seekDragging = true
+            }
+            override fun onStopTrackingTouch(seekBar: android.widget.SeekBar?) {
+                seekDragging = false
+                val exo = player ?: return
+                val duration = exo.duration.takeIf { it > 0 } ?: return
+                val progress = seekBar?.progress ?: return
+                exo.seekTo((duration * progress) / 1000L)
+            }
+        })
+        showTouchTipOnce()
+        layoutPhonePortraitDock()
         menuBaseBottom = binding.playbackMenu.paddingBottom
         overlayBaseTop = binding.overlay.paddingTop
         val menuLeft = binding.playbackMenu.paddingLeft
@@ -572,11 +608,7 @@ class PlayerActivity : AppCompatActivity() {
                         recoverLive(exo, channel, error)
                     } else {
                         PlaybackTrace.error(channel, error, recovering = false)
-                        Toast.makeText(
-                            this@PlayerActivity,
-                            "${getString(R.string.error_playback)}: ${error.message}",
-                            Toast.LENGTH_LONG
-                        ).show()
+                        toastPlaybackIssue(error)
                     }
                 }
 
@@ -678,6 +710,9 @@ class PlayerActivity : AppCompatActivity() {
         val behind = error?.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW
         recoverAttempt += 1
         PlaybackTrace.recover(channel, recoverAttempt, behind)
+        if (recoverAttempt >= 3) {
+            toastPlaybackIssue(error)
+        }
         recoverJob = lifecycleScope.launch {
             delay((600L + (recoverAttempt - 1) * 400L).coerceAtMost(3_000L))
             if (token != playbackToken || player !== exo || isDestroyed) return@launch
@@ -694,6 +729,24 @@ class PlayerActivity : AppCompatActivity() {
             }
             exo.playWhenReady = true
         }
+    }
+
+    private fun toastPlaybackIssue(error: PlaybackException?) {
+        val code = error?.errorCode ?: -1
+        val provider = when {
+            error == null -> true
+            code == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW -> true
+            code in 2_000..3_999 -> true
+            code in 6_000..6_999 -> true
+            code in 4_000..5_999 -> false
+            else -> true
+        }
+        val message = if (provider) {
+            getString(R.string.playback_issue_provider)
+        } else {
+            getString(R.string.playback_issue_app)
+        }
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
     }
 
     private fun refreshEpgQuietly() {
@@ -794,13 +847,22 @@ class PlayerActivity : AppCompatActivity() {
     private fun preloadAround(playingId: String) {
         val now = current ?: return
         if (now.kind != ContentKind.LIVE) return
-        clearSpare(1)
-        clearSpare(-1)
         preloadJob?.cancel()
         preloadJob = lifecycleScope.launch {
             val nextChannel = withContext(Dispatchers.IO) { adjacent(now, 1) }
+            val prevChannel = withContext(Dispatchers.IO) { adjacent(now, -1) }
             if (!isActive || current?.id != playingId) return@launch
-            if (nextChannel != null) warmEpg(nextChannel)
+            if (nextChannel != null) {
+                warmEpg(nextChannel)
+                prepareSpare(1, nextChannel)
+            } else {
+                clearSpare(1)
+            }
+            if (prevChannel != null) {
+                prepareSpare(-1, prevChannel)
+            } else {
+                clearSpare(-1)
+            }
         }
     }
 
@@ -1292,10 +1354,12 @@ class PlayerActivity : AppCompatActivity() {
             binding.btnLast.isFocused ||
             binding.btnGoLive.isFocused ||
             binding.btnMultiView.isFocused ||
+            binding.btnSleep.isFocused ||
             binding.btnSkipIntro.isFocused
 
     private fun showPlaybackMenu() {
         paintGoLive()
+        paintSleepLabel()
         if (touchPrimary) {
             binding.btnMenuBack.visibility = View.VISIBLE
             setPhoneSystemBarsHidden(false)
@@ -1316,7 +1380,8 @@ class PlayerActivity : AppCompatActivity() {
             binding.btnPicture,
             binding.btnLast,
             binding.btnGoLive,
-            binding.btnMultiView
+            binding.btnMultiView,
+            binding.btnSleep
         ).filter { it.visibility == View.VISIBLE }
         shown.forEachIndexed { index, button ->
             val previous = shown[if (index == 0) 0 else index - 1]
@@ -1375,6 +1440,100 @@ class PlayerActivity : AppCompatActivity() {
             }
         }
         binding.subtitleRows.getChildAt(0)?.requestFocus()
+    }
+
+    private fun openSleepTimer() {
+        if (touchPrimary) setPhoneSystemBarsHidden(false)
+        binding.subtitleHeading.setText(R.string.sleep_timer)
+        binding.subtitlePanel.visibility = View.VISIBLE
+        binding.subtitleRows.removeAllViews()
+        binding.subtitleStatus.text = if (sleepMinutes > 0) {
+            getString(R.string.sleep_armed)
+        } else {
+            ""
+        }
+        val choices = listOf(
+            0 to R.string.sleep_off,
+            30 to R.string.sleep_30,
+            60 to R.string.sleep_60,
+            90 to R.string.sleep_90
+        )
+        var focusIndex = 0
+        choices.forEachIndexed { index, (minutes, label) ->
+            val text = if (minutes == sleepMinutes) {
+                getString(R.string.track_on, getString(label))
+            } else {
+                getString(label)
+            }
+            if (minutes == sleepMinutes) focusIndex = index
+            addSubtitleRow(text) {
+                armSleepTimer(minutes)
+                closeSubtitlePanel()
+            }
+        }
+        if (touchPrimary) {
+            addSubtitleRow(
+                getString(
+                    if (rememberedPhoneOrientation() == ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED) {
+                        R.string.player_orientation_lock
+                    } else {
+                        R.string.player_orientation_free
+                    }
+                )
+            ) {
+                togglePhoneOrientationLock()
+                closeSubtitlePanel()
+            }
+        }
+        binding.subtitleRows.getChildAt(focusIndex)?.requestFocus()
+    }
+
+    private fun armSleepTimer(minutes: Int) {
+        hideHandler.removeCallbacks(sleepFire)
+        sleepMinutes = minutes
+        if (minutes <= 0) {
+            paintSleepLabel()
+            return
+        }
+        hideHandler.postDelayed(sleepFire, minutes * 60_000L)
+        paintSleepLabel()
+        Toast.makeText(this, R.string.sleep_armed, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun paintSleepLabel() {
+        if (!::binding.isInitialized) return
+        binding.btnSleep.text = if (sleepMinutes > 0) {
+            getString(R.string.sleep_timer) + " · " + sleepMinutes
+        } else {
+            getString(R.string.sleep_timer)
+        }
+    }
+
+    private fun playerPrefs() = getSharedPreferences("olympus_player", MODE_PRIVATE)
+
+    private fun rememberedPhoneOrientation(): Int {
+        val locked = playerPrefs().getInt("phone_orientation", ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED)
+        return if (locked == ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT ||
+            locked == ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        ) {
+            locked
+        } else {
+            ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
+    }
+
+    private fun togglePhoneOrientationLock() {
+        val prefs = playerPrefs()
+        val current = rememberedPhoneOrientation()
+        val next = when {
+            current != ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED ->
+                ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT ->
+                ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
+            else -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        }
+        prefs.edit().putInt("phone_orientation", next).apply()
+        requestedOrientation = next
     }
 
     private fun openPicture() {
@@ -1744,12 +1903,23 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun configureSeekPane(channel: Channel) {
         hideHandler.removeCallbacks(seekTick)
+        val portrait = touchPrimary &&
+            resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT
         if (isLiveNow(channel)) {
             binding.seekPane.visibility = View.GONE
+            binding.phoneSeek.visibility = View.GONE
+            layoutPhonePortraitDock()
             return
         }
-        binding.seekPane.visibility = View.VISIBLE
+        if (portrait) {
+            binding.seekPane.visibility = View.GONE
+            binding.phoneSeek.visibility = View.VISIBLE
+        } else {
+            binding.seekPane.visibility = View.VISIBLE
+            binding.phoneSeek.visibility = View.VISIBLE
+        }
         paintSeekBar()
+        layoutPhonePortraitDock()
         hideHandler.postDelayed(seekTick, 500L)
     }
 
@@ -1759,11 +1929,58 @@ class PlayerActivity : AppCompatActivity() {
         val duration = exo.duration
         if (duration <= 0L) {
             binding.seekLabel.text = formatClock(exo.currentPosition.coerceAtLeast(0L))
+            paintPhonePlayLabel()
             return
         }
         val position = exo.currentPosition.coerceIn(0L, duration)
-        binding.seekBar.progress = ((position * 1000L) / duration).toInt().coerceIn(0, 1000)
+        val progress = ((position * 1000L) / duration).toInt().coerceIn(0, 1000)
+        binding.seekBar.progress = progress
+        binding.phoneSeek.progress = progress
         binding.seekLabel.text = "${formatClock(position)} / ${formatClock(duration)}"
+        paintPhonePlayLabel()
+    }
+
+    private fun layoutPhonePortraitDock() {
+        if (!touchPrimary || !::binding.isInitialized) return
+        val portrait = resources.configuration.orientation ==
+            android.content.res.Configuration.ORIENTATION_PORTRAIT
+        binding.phoneDock.visibility = if (portrait) View.VISIBLE else View.GONE
+        if (portrait) {
+            binding.playbackMenu.visibility = View.GONE
+            InsetsPad.apply(
+                binding.phoneDock,
+                bottom = true,
+                left = true,
+                right = true
+            )
+            paintPhonePlayLabel()
+        }
+    }
+
+    private fun paintPhonePlayLabel() {
+        if (!touchPrimary || !::binding.isInitialized) return
+        val playing = player?.playWhenReady == true
+        binding.btnPhonePlay.setText(if (playing) R.string.player_pause else R.string.player_play)
+    }
+
+    private fun showTouchTipOnce() {
+        if (!touchPrimary) return
+        val prefs = playerPrefs()
+        if (prefs.getBoolean("touch_tip_seen", false)) return
+        binding.touchTip.visibility = View.VISIBLE
+        binding.touchTip.postDelayed({
+            if (!isDestroyed && ::binding.isInitialized) binding.touchTip.visibility = View.GONE
+            prefs.edit().putBoolean("touch_tip_seen", true).apply()
+        }, 4_500L)
+    }
+
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        if (touchPrimary) {
+            layoutPhonePortraitDock()
+            current?.let { configureSeekPane(it) }
+            if (binding.playbackMenu.visibility == View.VISIBLE) layoutPhoneMenu()
+        }
     }
 
     private fun formatClock(ms: Long): String {
@@ -1796,6 +2013,7 @@ class PlayerActivity : AppCompatActivity() {
         val exo = player ?: return
         exo.playWhenReady = !exo.playWhenReady
         paintGoLive()
+        paintPhonePlayLabel()
         if (isLiveNow() && !exo.playWhenReady) {
             hideHandler.removeCallbacks(seekTick)
             hideHandler.post(seekTick)
@@ -2003,6 +2221,7 @@ class PlayerActivity : AppCompatActivity() {
         seekJob?.cancel()
         hideHandler.removeCallbacks(hideOverlay)
         hideHandler.removeCallbacks(seekTick)
+        hideHandler.removeCallbacks(sleepFire)
         preloadJob?.cancel()
         stopSecondary()
         secondaryPlayer?.release()

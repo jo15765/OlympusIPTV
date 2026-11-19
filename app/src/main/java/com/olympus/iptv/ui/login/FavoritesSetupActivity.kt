@@ -70,18 +70,13 @@ class FavoritesSetupActivity : AppCompatActivity() {
             )
             enableTouchScrolling()
         }
+        if (fromGuide || touchPrimary) {
+            binding.btnBack.visibility = View.VISIBLE
+            binding.btnBack.setOnClickListener { leaveSetup() }
+        }
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                if (binding.sportsPanel.visibility == View.VISIBLE) {
-                    binding.sportsPanel.visibility = View.GONE
-                    binding.setupScroll.visibility = View.VISIBLE
-                    binding.cardBoard.visibility = View.VISIBLE
-                    focusCard(binding.cardTeams)
-                } else if (fromGuide) {
-                    finish()
-                } else {
-                    openGuide()
-                }
+                leaveSetup()
             }
         })
         binding.cardLocal.setOnClickListener { choose(binding.cardLocal); addLocal() }
@@ -123,6 +118,19 @@ class FavoritesSetupActivity : AppCompatActivity() {
             if (!international) applyCountryFilter(false)
             showFavorites()
             if (showedSplash || currentFocus == null) focusCard(binding.cardLocal)
+        }
+    }
+
+    private fun leaveSetup() {
+        if (binding.sportsPanel.visibility == View.VISIBLE) {
+            binding.sportsPanel.visibility = View.GONE
+            binding.setupScroll.visibility = View.VISIBLE
+            binding.cardBoard.visibility = View.VISIBLE
+            focusCard(binding.cardTeams)
+        } else if (fromGuide) {
+            finish()
+        } else {
+            openGuide()
         }
     }
 

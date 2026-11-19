@@ -49,6 +49,19 @@ class EpisodesActivity : AppCompatActivity() {
             finish()
             return
         }
+        if (com.olympus.iptv.ui.DeviceForm.isTouchPrimary(this)) {
+            androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
+            com.olympus.iptv.ui.InsetsPad.apply(
+                binding.root,
+                top = true,
+                bottom = true,
+                left = true,
+                right = true
+            )
+            binding.seasonList.isNestedScrollingEnabled = true
+            binding.episodeList.isNestedScrollingEnabled = true
+            binding.markSeason.isFocusableInTouchMode = false
+        }
         binding.showTitle.text = showName
         binding.seasonList.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
         binding.seasonList.itemAnimator = null

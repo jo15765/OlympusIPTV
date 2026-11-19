@@ -60,10 +60,29 @@ class SearchActivity : AppCompatActivity() {
         }
         binding = ActivitySearchBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        val touchPrimary = com.olympus.iptv.ui.DeviceForm.isTouchPrimary(this)
+        if (touchPrimary) {
+            androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
+            com.olympus.iptv.ui.InsetsPad.apply(
+                binding.root,
+                top = true,
+                bottom = true,
+                left = true,
+                right = true
+            )
+            binding.resultGrid.isNestedScrollingEnabled = true
+            binding.btnBack.isFocusableInTouchMode = false
+            binding.btnSearch.isFocusableInTouchMode = false
+            binding.btnHideKeyboard.isFocusableInTouchMode = false
+        }
 
-        val span = (resources.displayMetrics.widthPixels / resources.displayMetrics.density / 220f)
-            .toInt()
-            .coerceIn(3, 6)
+        val span = if (touchPrimary) {
+            2
+        } else {
+            (resources.displayMetrics.widthPixels / resources.displayMetrics.density / 220f)
+                .toInt()
+                .coerceIn(3, 6)
+        }
         val layout = GridLayoutManager(this, span)
         adapter = SearchTileAdapter(
             isFavorite = { channel, section ->
@@ -229,7 +248,9 @@ class SearchActivity : AppCompatActivity() {
         searchWait?.let { searchHandler.removeCallbacks(it) }
         val run = Runnable { showMatches(rawQuery) }
         searchWait = run
-        if (rawQuery.isBlank()) searchHandler.post(run) else searchHandler.postDelayed(run, 180L)
+        // Typeahead: first character searches almost immediately; short debounce only for rapid typing.
+        if (rawQuery.isBlank()) searchHandler.post(run)
+        else searchHandler.postDelayed(run, if (rawQuery.trim().length <= 1) 40L else 90L)
     }
 
     private fun showMatches(rawQuery: String) {

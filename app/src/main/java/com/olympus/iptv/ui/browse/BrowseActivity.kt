@@ -13,6 +13,7 @@ import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
@@ -102,6 +103,7 @@ class BrowseActivity : AppCompatActivity() {
     private var kind = ContentKind.LIVE
     private var renderedSection: GuideSection? = null
     private var selectedCategoryId: String? = PlaylistLoader.FAVORITES_ID
+    private var touchPrimary = false
     private var openingPlayer = false
     private var returnMenu = GuideMenu.GROUPS
     private var returnChannelId: String? = null
@@ -232,7 +234,9 @@ class BrowseActivity : AppCompatActivity() {
         }
         binding = ActivityBrowseBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        if (com.olympus.iptv.ui.DeviceForm.isTouchPrimary(this)) {
+        touchPrimary = com.olympus.iptv.ui.DeviceForm.isTouchPrimary(this)
+        if (touchPrimary) {
+            requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
             androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
             com.olympus.iptv.ui.InsetsPad.apply(
                 binding.guideShell,
@@ -241,9 +245,22 @@ class BrowseActivity : AppCompatActivity() {
                 left = true,
                 right = true
             )
+            setupMobileChrome()
+            enlargeTouchChips()
+            listOf(
+                binding.cardAdminRefresh, binding.cardAdminWeb, binding.cardAdminEpg, binding.cardAdminVpn,
+                binding.refreshNowCard, binding.refreshIntervalCard
+            ).forEach { card ->
+                card.isFocusableInTouchMode = false
+            }
         }
+        wireHomeContinue()
+        paintQueueChip()
 
-        binding.categoryList.layoutManager = androidx.recyclerview.widget.GridLayoutManager(this, CARD_SPAN)
+        binding.categoryList.layoutManager = androidx.recyclerview.widget.GridLayoutManager(
+            this,
+            if (touchPrimary) MOBILE_CARD_SPAN else CARD_SPAN
+        )
         binding.channelList.layoutManager = LinearLayoutManager(this)
         binding.categoryList.adapter = categoryAdapter
         binding.channelList.adapter = channelAdapter
@@ -256,7 +273,8 @@ class BrowseActivity : AppCompatActivity() {
         binding.channelList.setHasFixedSize(true)
         binding.categoryList.setItemViewCacheSize(12)
         binding.channelList.setItemViewCacheSize(24)
-        (binding.categoryList.layoutManager as androidx.recyclerview.widget.GridLayoutManager).initialPrefetchItemCount = CARD_SPAN * 2
+        val cardSpan = if (touchPrimary) MOBILE_CARD_SPAN else CARD_SPAN
+        (binding.categoryList.layoutManager as androidx.recyclerview.widget.GridLayoutManager).initialPrefetchItemCount = cardSpan * 2
         (binding.channelList.layoutManager as LinearLayoutManager).initialPrefetchItemCount = 8
         binding.channelList.recycledViewPool.setMaxRecycledViews(0, 32)
         binding.channelList.recycledViewPool.setMaxRecycledViews(1, 16)
@@ -1385,12 +1403,31 @@ class BrowseActivity : AppCompatActivity() {
             val appJobs = application as OlympusIptvApp
             binding.root.post {
                 if (isDestroyed) return@post
+                // Paint Favorites/groups first; skip warm work when the catalog stamp is unchanged.
+                val warmDelay = if (touchPrimary) 4_500L else 2_000L
                 appJobs.appScope.launch {
-                    delay(750)
+                    delay(warmDelay)
                     if (isDestroyed) return@launch
-                    runCatching { appJobs.catalogDb.cleanGroupImages(savedId) }
-                    launch { runCatching { appJobs.catalogDb.warmDashboard(savedId) } }
-                    appJobs.warmFresh(savedId)
+                    val stamp = runCatching { appJobs.catalogDb.libraryStamp(savedId) }.getOrNull() ?: 0L
+                    val stampKey = stamp.toString()
+                    val last = runCatching { appJobs.playlistStore.catalogStamp(savedId) }.getOrNull().orEmpty()
+                    val catalogFresh = stamp > 0L && stampKey == last
+                    if (!catalogFresh) {
+                        runCatching { appJobs.catalogDb.cleanGroupImages(savedId) }
+                        delay(if (touchPrimary) 2_500L else 750L)
+                        if (isDestroyed) return@launch
+                        runCatching { appJobs.catalogDb.warmDashboard(savedId) }
+                        if (stamp > 0L) {
+                            runCatching { appJobs.playlistStore.saveCatalogStamp(savedId, stampKey) }
+                        }
+                    }
+                    delay(if (touchPrimary) 3_000L else 1_000L)
+                    if (isDestroyed) return@launch
+                    val cacheFile = java.io.File(appJobs.filesDir, "watchmode-week.json")
+                    val needsFresh = !catalogFresh ||
+                        com.olympus.iptv.playlist.Watchmode.needsRefresh(cacheFile) ||
+                        appJobs.freshCards(savedId).isNullOrEmpty()
+                    if (needsFresh) appJobs.warmFresh(savedId)
                 }
             }
         }
@@ -2082,12 +2119,15 @@ class BrowseActivity : AppCompatActivity() {
             if (redraw && source != null) render(restoreFocus = false, reloadChannels = false)
             updateGroupClock()
         }
+        paintQueueChip()
         if (returningFromPlayer) {
             playerClosedAt = android.os.SystemClock.uptimeMillis()
             restorePlaybackFocus = true
-            binding.channelList.post { restoreAfterPlayer() }
             holdChannelId = returnChannelId
-            binding.channelList.post { adoptRemoteLineup() }
+            binding.channelList.post {
+                restoreAfterPlayer()
+                adoptRemoteLineup()
+            }
             return
         }
         val stagedPins = (application as OlympusIptvApp).stagedLineup?.takeIf { it.first == playlist?.id }?.second
@@ -2281,37 +2321,168 @@ class BrowseActivity : AppCompatActivity() {
     private var pinCategory: Category? = null
     private var pinOpens = false
     private var pinDigits = ""
+    private var pinKeyIndex = 4
     private var dialDigits = ""
     private val dialJump = Runnable { jumpDial() }
+    private var guidePinWired = false
+
+    private val guidePinKeys: List<View> by lazy {
+        listOf(
+            binding.guidePin1, binding.guidePin2, binding.guidePin3,
+            binding.guidePin4, binding.guidePin5, binding.guidePin6,
+            binding.guidePin7, binding.guidePin8, binding.guidePin9,
+            binding.guidePinClearDigit, binding.guidePin0, binding.groupPinCancel
+        )
+    }
+
+    private fun wireGuidePinPad() {
+        if (guidePinWired) return
+        guidePinWired = true
+        val digits = listOf(
+            binding.guidePin0 to '0',
+            binding.guidePin1 to '1',
+            binding.guidePin2 to '2',
+            binding.guidePin3 to '3',
+            binding.guidePin4 to '4',
+            binding.guidePin5 to '5',
+            binding.guidePin6 to '6',
+            binding.guidePin7 to '7',
+            binding.guidePin8 to '8',
+            binding.guidePin9 to '9'
+        )
+        for ((view, digit) in digits) {
+            view.setOnClickListener { appendGuidePinDigit(digit) }
+        }
+        binding.guidePinClearDigit.setOnClickListener { clearGuidePinDigit() }
+        binding.groupPinCancel.setOnClickListener { cancelGroupPinToGroups() }
+        binding.groupPinWrongOk.setOnClickListener { dismissWrongPinToGroups() }
+        binding.groupPinScrim.setOnClickListener { /* absorb */ }
+        for ((index, key) in guidePinKeys.withIndex()) {
+            val col = index % 3
+            val row = index / 3
+            key.nextFocusLeftId = guidePinKeys[row * 3 + (col - 1).coerceAtLeast(0)].id
+            key.nextFocusRightId = guidePinKeys[row * 3 + (col + 1).coerceAtMost(2)].id
+            key.nextFocusUpId = guidePinKeys[(row - 1).coerceAtLeast(0) * 3 + col].id
+            key.nextFocusDownId = guidePinKeys[(row + 1).coerceAtMost(3) * 3 + col].id
+            key.setOnFocusChangeListener { _, hasFocus ->
+                if (hasFocus) pinKeyIndex = index
+            }
+        }
+    }
 
     private fun showGroupPin(category: Category, open: Boolean) {
+        wireGuidePinPad()
         pinCategory = category
         pinOpens = open
         pinDigits = ""
+        pinKeyIndex = 4
         binding.groupPinTitle.setText(if (open) R.string.group_pin_title else R.string.group_pin_set)
-        binding.groupPinError.visibility = View.GONE
-        binding.groupPinClear.visibility = if (!open && GroupLock.locked(activeConfig, category.id)) View.VISIBLE else View.GONE
+        binding.groupPinWrong.visibility = View.GONE
+        binding.groupPinClear.visibility =
+            if (!open && GroupLock.locked(activeConfig, category.id)) View.VISIBLE else View.GONE
         paintGroupPin()
-        binding.groupPinCancel.setOnClickListener { hideGroupPin() }
         binding.groupPinClear.setOnClickListener {
             val current = pinCategory ?: return@setOnClickListener
             saveGroupPin(current.id, null)
             hideGroupPin()
             categoryAdapter.refreshDetails()
+            focusGroups()
         }
+        binding.guideShell.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
+        if (touchPrimary) {
+            val params = binding.groupPin.layoutParams as? FrameLayout.LayoutParams
+            if (params != null) {
+                val margin = (16 * resources.displayMetrics.density).toInt()
+                params.width = FrameLayout.LayoutParams.MATCH_PARENT
+                params.marginStart = margin
+                params.marginEnd = margin
+                binding.groupPin.layoutParams = params
+            }
+            binding.mobileTopBar.visibility = View.VISIBLE
+            binding.mobileBack.visibility = View.VISIBLE
+        }
+        binding.groupPinScrim.visibility = View.VISIBLE
         binding.groupPin.visibility = View.VISIBLE
-        binding.groupPinCancel.requestFocus()
+        binding.groupPinWrong.visibility = View.GONE
+        binding.groupPin.post { reclaimGuidePinFocus() }
     }
 
     private fun hideGroupPin() {
         pinCategory = null
         pinDigits = ""
         binding.groupPin.visibility = View.GONE
-        binding.groupPinError.visibility = View.GONE
+        binding.groupPinScrim.visibility = View.GONE
+        binding.groupPinWrong.visibility = View.GONE
+        binding.guideShell.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
+    }
+
+    private fun cancelGroupPinToGroups() {
+        hideGroupPin()
+        showMenu(GuideMenu.GROUPS)
+        armGroupFocus()
+        focusGroups()
+    }
+
+    private fun dismissWrongPinToGroups() {
+        binding.groupPinWrong.visibility = View.GONE
+        hideGroupPin()
+        showMenu(GuideMenu.GROUPS)
+        armGroupFocus()
+        focusGroups()
+    }
+
+    private fun showWrongPinModal() {
+        pinDigits = ""
+        paintGroupPin()
+        binding.groupPin.visibility = View.GONE
+        binding.groupPinWrong.visibility = View.VISIBLE
+        binding.groupPinWrongOk.post { binding.groupPinWrongOk.requestFocus() }
     }
 
     private fun paintGroupPin() {
         binding.groupPinDigits.text = "•".repeat(pinDigits.length).padEnd(4, '–')
+    }
+
+    private fun appendGuidePinDigit(digit: Char) {
+        if (!digit.isDigit() || pinDigits.length >= 4) return
+        pinDigits += digit
+        paintGroupPin()
+        if (pinDigits.length == 4) submitGroupPin()
+    }
+
+    private fun clearGuidePinDigit() {
+        if (pinDigits.isEmpty()) return
+        pinDigits = pinDigits.dropLast(1)
+        paintGroupPin()
+    }
+
+    private fun reclaimGuidePinFocus() {
+        if (binding.groupPin.visibility != View.VISIBLE) return
+        val index = pinKeyIndex.coerceIn(0, guidePinKeys.lastIndex)
+        if (!guidePinKeys[index].requestFocus()) {
+            binding.guidePin5.requestFocus()
+        }
+    }
+
+    private fun moveGuidePinFocus(dx: Int, dy: Int): Boolean {
+        if (binding.groupPin.visibility != View.VISIBLE) return false
+        val index = guidePinKeys.indexOfFirst { it === currentFocus }.let {
+            if (it >= 0) it else pinKeyIndex
+        }.coerceIn(0, guidePinKeys.lastIndex)
+        val col = index % 3
+        val row = index / 3
+        val next = (row + dy).coerceIn(0, 3) * 3 + (col + dx).coerceIn(0, 2)
+        pinKeyIndex = next
+        guidePinKeys[next].requestFocus()
+        return true
+    }
+
+    private fun focusInGuidePin(): Boolean {
+        var view = currentFocus ?: return false
+        while (true) {
+            if (view === binding.groupPin || view === binding.groupPinWrong) return true
+            view = view.parent as? View ?: return false
+        }
     }
 
     private fun submitGroupPin() {
@@ -2320,6 +2491,8 @@ class BrowseActivity : AppCompatActivity() {
             saveGroupPin(category.id, pinDigits)
             hideGroupPin()
             categoryAdapter.refreshDetails()
+            Toast.makeText(this, R.string.pin_set_ok, Toast.LENGTH_SHORT).show()
+            focusGroups()
             return
         }
         if (GroupLock.accepts(activeConfig, category.id, pinDigits)) {
@@ -2335,10 +2508,7 @@ class BrowseActivity : AppCompatActivity() {
             }
             return
         }
-        pinDigits = ""
-        paintGroupPin()
-        binding.groupPinError.setText(R.string.group_pin_wrong)
-        binding.groupPinError.visibility = View.VISIBLE
+        showWrongPinModal()
     }
 
     private fun saveGroupPin(groupId: String, digits: String?) {
@@ -2375,28 +2545,75 @@ class BrowseActivity : AppCompatActivity() {
     }
 
     private fun onGroupPinKey(event: KeyEvent): Boolean {
+        if (binding.groupPinWrong.visibility == View.VISIBLE) {
+            if (event.action != KeyEvent.ACTION_DOWN) return true
+            if (event.keyCode == KeyEvent.KEYCODE_DPAD_CENTER ||
+                event.keyCode == KeyEvent.KEYCODE_ENTER ||
+                event.keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER ||
+                event.keyCode == KeyEvent.KEYCODE_BUTTON_A ||
+                event.keyCode == KeyEvent.KEYCODE_BACK ||
+                event.keyCode == KeyEvent.KEYCODE_ESCAPE ||
+                event.keyCode == KeyEvent.KEYCODE_BUTTON_B
+            ) {
+                dismissWrongPinToGroups()
+            }
+            return true
+        }
         if (binding.groupPin.visibility != View.VISIBLE) return false
-        if (event.action != KeyEvent.ACTION_DOWN) return true
-        val digit = when (event.keyCode) {
-            in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9 -> event.keyCode - KeyEvent.KEYCODE_0
-            in KeyEvent.KEYCODE_NUMPAD_0..KeyEvent.KEYCODE_NUMPAD_9 -> event.keyCode - KeyEvent.KEYCODE_NUMPAD_0
-            else -> -1
+        if (event.action == KeyEvent.ACTION_DOWN) {
+            if (!focusInGuidePin()) reclaimGuidePinFocus()
+            val digit = when (event.keyCode) {
+                in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9 ->
+                    ('0' + (event.keyCode - KeyEvent.KEYCODE_0))
+                in KeyEvent.KEYCODE_NUMPAD_0..KeyEvent.KEYCODE_NUMPAD_9 ->
+                    ('0' + (event.keyCode - KeyEvent.KEYCODE_NUMPAD_0))
+                else -> null
+            }
+            if (digit != null) {
+                appendGuidePinDigit(digit)
+                return true
+            }
+            when (event.keyCode) {
+                KeyEvent.KEYCODE_DEL, KeyEvent.KEYCODE_FORWARD_DEL -> {
+                    clearGuidePinDigit()
+                    return true
+                }
+                KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_ESCAPE, KeyEvent.KEYCODE_BUTTON_B -> {
+                    cancelGroupPinToGroups()
+                    return true
+                }
+                KeyEvent.KEYCODE_DPAD_UP -> return moveGuidePinFocus(0, -1)
+                KeyEvent.KEYCODE_DPAD_DOWN -> return moveGuidePinFocus(0, 1)
+                KeyEvent.KEYCODE_DPAD_LEFT -> return moveGuidePinFocus(-1, 0)
+                KeyEvent.KEYCODE_DPAD_RIGHT -> return moveGuidePinFocus(1, 0)
+                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER,
+                KeyEvent.KEYCODE_BUTTON_A -> {
+                    (currentFocus ?: guidePinKeys[pinKeyIndex.coerceIn(0, guidePinKeys.lastIndex)])
+                        .performClick()
+                    return true
+                }
+            }
         }
-        if (digit >= 0) {
-            if (pinDigits.length < 4) pinDigits += digit.toString()
-            binding.groupPinError.visibility = View.GONE
-            paintGroupPin()
-            if (pinDigits.length == 4) submitGroupPin()
+        if (event.action == KeyEvent.ACTION_UP) {
+            when (event.keyCode) {
+                KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
+                KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT,
+                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER,
+                KeyEvent.KEYCODE_BUTTON_A, KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_ESCAPE,
+                KeyEvent.KEYCODE_BUTTON_B, KeyEvent.KEYCODE_DEL, KeyEvent.KEYCODE_FORWARD_DEL ->
+                    return true
+            }
+            if (event.keyCode in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9 ||
+                event.keyCode in KeyEvent.KEYCODE_NUMPAD_0..KeyEvent.KEYCODE_NUMPAD_9
+            ) {
+                return true
+            }
+        }
+        if (!focusInGuidePin()) {
+            reclaimGuidePinFocus()
             return true
         }
-        if (event.keyCode == KeyEvent.KEYCODE_BACK ||
-            event.keyCode == KeyEvent.KEYCODE_ESCAPE ||
-            event.keyCode == KeyEvent.KEYCODE_BUTTON_B
-        ) {
-            hideGroupPin()
-            return true
-        }
-        return false
+        return true
     }
 
     private fun onDialKey(event: KeyEvent): Boolean {
@@ -2754,8 +2971,11 @@ class BrowseActivity : AppCompatActivity() {
         channelAdapter.posterMode = posters
         binding.contentHint.visibility = if (posters) View.VISIBLE else View.GONE
         val manager = binding.channelList.layoutManager
+        val posterSpan = if (touchPrimary) MOBILE_CARD_SPAN else 4
         if (posters && manager !is androidx.recyclerview.widget.GridLayoutManager) {
-            binding.channelList.layoutManager = androidx.recyclerview.widget.GridLayoutManager(this, 4)
+            binding.channelList.layoutManager = androidx.recyclerview.widget.GridLayoutManager(this, posterSpan)
+        } else if (posters && manager is androidx.recyclerview.widget.GridLayoutManager && manager.spanCount != posterSpan) {
+            manager.spanCount = posterSpan
         } else if (!posters && manager is androidx.recyclerview.widget.GridLayoutManager) {
             binding.channelList.layoutManager = LinearLayoutManager(this)
         }
@@ -2770,6 +2990,129 @@ class BrowseActivity : AppCompatActivity() {
     private var previewPlayer: ExoPlayer? = null
     private var previewChannelId: String? = null
     private var previewJob: Job? = null
+
+    private fun setupMobileChrome() {
+        binding.mobileTopBar.visibility = View.VISIBLE
+        binding.mobileBack.setOnClickListener { onMobileBack() }
+        binding.mobileTitle.setOnClickListener {
+            val next = when (section) {
+                GuideSection.TV -> GuideSection.MOVIES
+                GuideSection.MOVIES -> GuideSection.SHOWS
+                GuideSection.SHOWS -> GuideSection.TV
+            }
+            openSection(next)
+        }
+        binding.mobileTabLive.setOnClickListener { openSection(GuideSection.TV) }
+        binding.mobileTabMovies.setOnClickListener { openSection(GuideSection.MOVIES) }
+        binding.mobileTabShows.setOnClickListener { openSection(GuideSection.SHOWS) }
+    }
+
+    private fun wireHomeContinue() {
+        binding.homeContinue.setOnClickListener { openHomeContinue() }
+        binding.homeContinuePlay.setOnClickListener { openHomeContinue() }
+    }
+
+    private fun paintQueueChip() {
+        val saved = playlist ?: return
+        lifecycleScope.launch {
+            val count = withContext(Dispatchers.IO) {
+                (application as OlympusIptvApp).playlistStore.queue(saved.id).size
+            }
+            if (isDestroyed) return@launch
+            binding.btnQueue.text = if (count > 0) {
+                getString(R.string.queue_chip_count, count)
+            } else {
+                getString(R.string.nav_queue)
+            }
+        }
+    }
+
+    private fun enlargeTouchChips() {
+        if (!touchPrimary) return
+        val min = (48 * resources.displayMetrics.density).toInt()
+        val padH = (16 * resources.displayMetrics.density).toInt()
+        listOf(
+            binding.btnFavoritesSetup, binding.btnQueue, binding.btnFresh,
+            binding.btnRemind, binding.btnParental,
+            binding.mobileTabLive, binding.mobileTabMovies, binding.mobileTabShows,
+            binding.mobileBack
+        ).forEach { chip ->
+            chip.minHeight = min
+            chip.setPadding(padH, chip.paddingTop, padH, chip.paddingBottom)
+            chip.isFocusableInTouchMode = false
+        }
+    }
+
+    private fun paintHomeContinue() {
+        if (!::binding.isInitialized) return
+        if (binding.groupColumn.visibility != View.VISIBLE) {
+            binding.homeContinue.visibility = View.GONE
+            return
+        }
+        val config = activeConfig
+        when (section) {
+            GuideSection.TV -> {
+                val rows = recentChannels(GuideSection.TV, config)
+                val first = rows.firstOrNull()
+                if (first == null) {
+                    binding.homeContinue.visibility = View.GONE
+                    return
+                }
+                binding.homeContinueTitle.text = first.name
+                binding.homeContinueMeta.text = getString(R.string.recent_card)
+                binding.homeContinue.visibility = View.VISIBLE
+                binding.homeContinue.tag = first
+            }
+            GuideSection.MOVIES, GuideSection.SHOWS -> {
+                val rows = continueChannels(section, config)
+                val first = rows.firstOrNull()
+                if (first == null) {
+                    binding.homeContinue.visibility = View.GONE
+                    return
+                }
+                binding.homeContinueTitle.text = first.name
+                binding.homeContinueMeta.text = continueText(first) ?: getString(R.string.continue_card)
+                binding.homeContinue.visibility = View.VISIBLE
+                binding.homeContinue.tag = first
+            }
+        }
+    }
+
+    private fun openHomeContinue() {
+        val channel = binding.homeContinue.tag as? Channel ?: return
+        when (section) {
+            GuideSection.TV -> {
+                selectedCategoryId = PlaylistLoader.RECENT_ID
+                showChannels()
+                openFullGuide()
+                play(channel, queueOverride = listOf(channel), zapMode = PlayerActivity.ZAP_LIST)
+            }
+            GuideSection.MOVIES, GuideSection.SHOWS -> {
+                selectedCategoryId = PlaylistLoader.CONTINUE_ID
+                play(channel)
+            }
+        }
+    }
+
+    private fun onMobileBack() {
+        when {
+            binding.groupPinWrong.visibility == View.VISIBLE -> dismissWrongPinToGroups()
+            binding.groupPin.visibility == View.VISIBLE -> cancelGroupPinToGroups()
+            guideMenu == GuideMenu.CHANNELS || guideMenu == GuideMenu.PROGRAMS -> {
+                showMenu(GuideMenu.GROUPS)
+                armGroupFocus()
+                focusGroups()
+            }
+            binding.devicePane.visibility == View.VISIBLE ||
+                binding.aboutPane.visibility == View.VISIBLE ||
+                binding.adminPane.visibility == View.VISIBLE ||
+                binding.refreshPane.visibility == View.VISIBLE ||
+                binding.vpnPane.visibility == View.VISIBLE -> {
+                openSection(section)
+            }
+            else -> Unit
+        }
+    }
 
     private fun showMenu(next: GuideMenu) {
         if (next == GuideMenu.PROGRAMS && section != GuideSection.TV) return
@@ -2807,8 +3150,10 @@ class BrowseActivity : AppCompatActivity() {
             binding.groupColumn.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
             binding.categoryList.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
         }
-        binding.navRail.visibility = if (showSettings) View.VISIBLE else View.GONE
-        binding.navDivider.visibility = if (showSettings) View.VISIBLE else View.GONE
+        val phoneChrome = touchPrimary
+        binding.mobileTopBar.visibility = if (phoneChrome) View.VISIBLE else View.GONE
+        binding.navRail.visibility = if (showSettings && !phoneChrome) View.VISIBLE else View.GONE
+        binding.navDivider.visibility = if (showSettings && !phoneChrome) View.VISIBLE else View.GONE
         if (!showGroups && focusIsIn(binding.groupColumn)) binding.groupColumn.clearFocus()
         binding.groupColumn.visibility = if (showGroups) View.VISIBLE else View.GONE
         binding.shortcutRow.visibility = if (showGroups && live) View.VISIBLE else View.GONE
@@ -2816,6 +3161,25 @@ class BrowseActivity : AppCompatActivity() {
         binding.contentDivider.visibility = if (showGroups && showChannels) View.VISIBLE else View.GONE
         binding.contentColumn.visibility = if (showChannels) View.VISIBLE else View.GONE
         binding.programPane.visibility = if (showPrograms) View.VISIBLE else View.GONE
+        if (phoneChrome) {
+            val pinOpen = binding.groupPin.visibility == View.VISIBLE ||
+                binding.groupPinWrong.visibility == View.VISIBLE
+            binding.mobileBack.visibility = if (full || pinOpen) View.VISIBLE else View.GONE
+            binding.mobileSectionRow.visibility = if (showGroups) View.VISIBLE else View.GONE
+            binding.mobileTabLive.isSelected = live
+            binding.mobileTabMovies.isSelected = section == GuideSection.MOVIES
+            binding.mobileTabShows.isSelected = section == GuideSection.SHOWS
+            binding.mobileTitle.text = when {
+                full && selectedCategoryName.isNotBlank() -> selectedCategoryName
+                live -> getString(R.string.nav_tv)
+                section == GuideSection.MOVIES -> getString(R.string.vod)
+                section == GuideSection.SHOWS -> getString(R.string.nav_shows)
+                else -> getString(R.string.rail_title)
+            }
+        } else {
+            binding.mobileSectionRow.visibility = View.GONE
+        }
+        paintHomeContinue()
         val content = binding.contentColumn.layoutParams as LinearLayout.LayoutParams
         val programs = binding.programPane.layoutParams as LinearLayout.LayoutParams
         val density = resources.displayMetrics.density
@@ -3885,8 +4249,16 @@ class BrowseActivity : AppCompatActivity() {
     private fun cardDetail(category: Category): String {
         val titles = section != GuideSection.TV
         val base = when (category.id) {
-            PlaylistLoader.RECENT_ID -> getString(R.string.recent_card)
-            PlaylistLoader.CONTINUE_ID -> getString(R.string.continue_card)
+            PlaylistLoader.RECENT_ID -> {
+                val wanted = sectionKey(section)
+                val count = recentEntries.count { entrySection(it) == wanted }
+                if (count > 0) getString(R.string.recent_count, count) else getString(R.string.recent_card)
+            }
+            PlaylistLoader.CONTINUE_ID -> {
+                val wanted = sectionKey(section)
+                val count = recentEntries.count { entrySection(it) == wanted && it.canResume() }
+                if (count > 0) getString(R.string.continue_count, count) else getString(R.string.continue_card)
+            }
             PlaylistLoader.FAVORITES_ID -> {
                 val prefix = favoriteSection(section) + ":"
                 val label = if (titles) R.string.group_titles else R.string.group_channels
@@ -3981,6 +4353,7 @@ class BrowseActivity : AppCompatActivity() {
         categoryAdapter.submit(categories, selectedCategoryId)
         refreshGroupCounts()
         if (binding.groupPills.visibility == View.VISIBLE) syncGroupPills()
+        paintHomeContinue()
         if (reloadChannels && binding.contentColumn.visibility == View.VISIBLE) showChannels()
         renderedSection = section
         if (restoreFocus) focusGroups()
@@ -4003,7 +4376,8 @@ class BrowseActivity : AppCompatActivity() {
             return
         }
         if (categoryId == PlaylistLoader.RECENT_ID || categoryId == PlaylistLoader.CONTINUE_ID) {
-            showChannelWait(getString(R.string.updating_lineup))
+            // Keep prior rows visible; swap when the list is ready so open feels instant.
+            binding.libraryStatus.visibility = View.GONE
             channelJob = lifecycleScope.launch {
                 val channels = withContext(Dispatchers.IO) {
                     if (categoryId == PlaylistLoader.CONTINUE_ID) continueChannels(sectionNow, config)
@@ -4019,7 +4393,7 @@ class BrowseActivity : AppCompatActivity() {
                 publishChannels(emptyList(), scrollTop = true)
                 return
             }
-            showChannelWait(getString(R.string.updating_lineup))
+            binding.libraryStatus.visibility = View.GONE
             channelJob = lifecycleScope.launch {
                 val channels = withContext(Dispatchers.IO) { libraryFavorites(sectionNow, config) }
                 if (!stillShowing(query, sectionNow, categoryId)) return@launch
@@ -4121,7 +4495,12 @@ class BrowseActivity : AppCompatActivity() {
             pageCursor = null
             pageExhausted = false
             pageLoading = false
-            showChannelWait(getString(R.string.updating_lineup))
+            // First page paints as soon as DB returns — no blank “updating” flash.
+            binding.libraryStatus.visibility = View.GONE
+            binding.errorText.visibility = View.GONE
+            if (visibleChannels.isEmpty()) {
+                channelAdapter.submit(emptyList(), groupLabel(selectedCategoryId), sequentialNumbers = false)
+            }
         }
         if (pageExhausted || pageLoading) return
         val saved = playlist ?: return
@@ -4162,7 +4541,17 @@ class BrowseActivity : AppCompatActivity() {
             if (cursor == null) {
                 visibleChannels = named
                 channelAdapter.submit(named, groupLabel(categoryId), sequentialNumbers = false)
-                binding.channelList.scrollToPosition(0)
+                val restoreId = returnChannelId ?: holdChannelId
+                val restoreRow = if (!restoreId.isNullOrBlank()) {
+                    named.indexOfFirst { it.id == restoreId }
+                } else {
+                    -1
+                }
+                if (restoreRow >= 0) {
+                    binding.channelList.scrollToPosition(restoreRow)
+                } else {
+                    binding.channelList.scrollToPosition(0)
+                }
                 finishChannelPane(named)
                 markChannelsReady()
             } else if (named.isNotEmpty()) {
@@ -4725,6 +5114,7 @@ class BrowseActivity : AppCompatActivity() {
         const val EXTRA_PLAYLIST_ID = "playlist_id"
         const val EXTRA_SKIP_RESUME = "skip_resume"
         private const val CARD_SPAN = 3
+        private const val MOBILE_CARD_SPAN = 2
         private const val PAGE_SIZE = 200
         private const val FOCUS_SETTLE_MS = 160L
         private const val EPG_CACHE_CAP = 120

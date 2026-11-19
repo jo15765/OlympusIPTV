@@ -1540,6 +1540,7 @@
           <div class="quick-head">
             <div>
               <h2>Auto-add to favorites</h2>
+              <p class="hint" id="catalogLoadingBanner" hidden>Catalog still loading on the device… auto-add unlocks when groups arrive.</p>
               <p class="hint" id="quickStatus">Add a few channels you watch, then search below for anything else. Off keeps Countries on USA only.</p>
             </div>
             <button class="section-save" type="button">Save</button>
@@ -4480,6 +4481,9 @@
       selectedGroupId = null;
       showTab("countries");
       lineupLive = true;
+      const ready = catalogIsReady();
+      paintCatalogReady(ready);
+      if (!ready) watchCatalogAfterSetup();
     }
     async function saveLineup(quiet) {
       const status = document.querySelector("#saveStatus");
@@ -4604,6 +4608,26 @@
       document.querySelector("#setupXtream").hidden = m3u;
       document.querySelector("#setupM3u").hidden = !m3u;
     });
+    function catalogIsReady() {
+      const count = Number((session && session.catalog && session.catalog.channelCount) || 0);
+      const groups = (session && session.catalog && session.catalog.groups) || [];
+      return count > 0 || groups.length > 0;
+    }
+
+    function paintCatalogReady(ready) {
+      const banner = document.querySelector("#catalogLoadingBanner");
+      const status = document.querySelector("#quickStatus");
+      const cards = document.querySelector(".quick-cards");
+      if (banner) banner.hidden = !!ready;
+      if (status) {
+        status.textContent = ready
+          ? "Add a few channels you watch, then search below for anything else. Off keeps Countries on USA only."
+          : "Catalog still loading on the device… auto-add unlocks when groups arrive.";
+      }
+      if (cards) cards.style.opacity = ready ? "1" : "0.45";
+      if (cards) cards.style.pointerEvents = ready ? "" : "none";
+    }
+
     async function refreshSessionCatalog() {
       if (!session || !accountEmail || !session.deviceId) return false;
       try {
@@ -4620,9 +4644,9 @@
         paintRefreshAge(body.refreshedAt);
         forgetTabPaint();
         openTab(tab || "favorites");
-        const count = Number(session.catalog.channelCount || 0);
-        const groups = session.catalog.groups || [];
-        return count > 0 || groups.length > 0;
+        const ready = catalogIsReady();
+        paintCatalogReady(ready);
+        return ready;
       } catch (_) {
         return false;
       }
@@ -4630,18 +4654,24 @@
 
     function watchCatalogAfterSetup() {
       let tries = 0;
+      paintCatalogReady(false);
       const tick = async () => {
         tries += 1;
         const ready = await refreshSessionCatalog();
         if (ready || tries >= 60) {
+          paintCatalogReady(ready);
           if (ready) {
             document.querySelector("#address").textContent =
               "Catalog is ready. Add favorites and filters here — Save pushes them to the device.";
+          } else {
+            document.querySelector("#address").textContent =
+              "Catalog is still catching up. Refresh this page in a minute, or use Search once groups appear.";
           }
           return;
         }
         document.querySelector("#address").textContent =
           "Loading the catalog on the device… favorites and filters unlock as groups arrive.";
+        paintCatalogReady(false);
         setTimeout(tick, 2000);
       };
       setTimeout(tick, 1500);

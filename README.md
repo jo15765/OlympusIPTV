@@ -6,7 +6,7 @@
 
 ### For the latest and greatest, build your own APK from this code.
 
-The latest signed file is **0.2.42** (versionCode 43). **One APK** installs on Android TV / set-top boxes and on phones and tablets (Downloader or sideload). The same build detects the device: remotes keep working on TV; phones get touch scrolling, system-bar insets so the nav bar does not cover play controls, an on-screen Back in the player menu, and free orientation. First open on TV lands focus on Live TV Favorites. Parental PIN focus stays locked to the pad. Web setup opens the full dashboard so favorites and filters can finish in the browser and sync to the device.
+The latest signed file is still **0.2.42** (versionCode 43). This source is **0.2.44** (versionCode 45) — build from here for everything below; no new signed APK is published with this pass. **One APK** installs on Android TV / set-top boxes and on phones and tablets (Downloader or sideload). Remotes keep working on TV. Phones get guide chrome (Back, Live/Movies/Shows chips, two-column cards), portrait player dock, larger tap targets, and touch-friendly Episodes / Queue / Search / Admin. Locked groups open with **Enter PIN** and a number pad; wrong PIN → **Incorrect PIN** → back to groups. Daily feel: faster Live zap (adjacent channels pre-buffered), sleep timer, provider-vs-app recovery toast, instant group first page, live search typeahead, Continue/Queue badges, and cold start that skips warm work when the catalog stamp is unchanged.
 
 **This is a player only. You must provide your own streams.**
 
@@ -68,11 +68,12 @@ Olympus-IPTV is one APK for Android TV / set-top boxes and for phones and tablet
 | --- | --- |
 | Signed file | `C:\Users\chalu\Downloads\olympus-iptv-0.2.42.apk` |
 | What that file is | versionName **0.2.42**, versionCode **43** |
-| What to run for current work | That signed file, or a newer APK you build from this source |
+| Source in this tree | versionName **0.2.44**, versionCode **45** (not signed yet) |
+| What to run for current work | Build from this source for 0.2.44 changes, or the signed 0.2.42 file until the next release |
 | Install | Over the existing copy (TV or phone). Uninstalling wipes the saved account, playlist, and favorites. Downloader works with the same file. |
 | Launcher name | Two centered lines: Olympus over IPTV |
 
-The signed file is **0.2.42**. A device that already has an account opens with focus on the Live TV Favorites group card on TV; the left rail stays available with Left on the remote. Group cards fill in as soon as the saved group names are ready — not after a long background warm-up. The login screen is created only when no account is stored. Live TV shows Favorites setup, Queue, New / Just Added, Reminders, and Parental above the groups. The top of that groups screen shows today’s date and a 12-hour clock (`MM/DD/YYYY  hh:mm AM/PM`), updated each minute.
+The signed file is still **0.2.42**. Source **0.2.44** includes **0.2.43** (PIN unlock pad, phone guide chrome, Continue strip, deferred warm-up, web catalog-ready) plus immediate-feel optimizations: pre-buffered Live zap, sleep timer, recovery toasts, faster group open, live search, Queue/Continue badges, PIN-set toast, and phone touch scroll / orientation lock. A device that already has an account opens with focus on the Live TV Favorites group card on TV; the left rail stays available with Left on the remote. Group cards fill in as soon as the saved group names are ready. The login screen is created only when no account is stored. Live TV shows Favorites setup, Queue (with a count when the queue is not empty), New / Just Added, Reminders, and Parental above the groups. The top of that groups screen shows today’s date and a 12-hour clock (`MM/DD/YYYY  hh:mm AM/PM`), updated each minute. Movies and Shows (and Recent on Live TV) also show a one-tap **Continue watching** strip above the group cards when something is in progress; Continue and Recently watched cards show how many titles they hold.
 
 ---
 
@@ -82,13 +83,16 @@ The signed file is **0.2.42**. A device that already has an account opens with f
 
 </div>
 
-There is **no separate mobile APK**. The same `olympus-iptv-0.2.42.apk` detects whether it is running on a television (Leanback / UI mode) or a touch-first phone or tablet.
+There is **no separate mobile APK**. The same binary (signed **0.2.42**, or a **0.2.44** build from this source) detects whether it is running on a television (Leanback / UI mode) or a touch-first phone or tablet.
 
 | On phones and tablets | What changed |
 | --- | --- |
+| Guide chrome | Top **Back** + title; Live / Movies / Shows chips; left TV rail hidden; group cards use two columns; larger chips |
+| Visible Back | Guide (opened group / PIN), Fresh, Parental, Favorites setup, Search, and the player all show an on-screen Back |
+| Touch scroll | Favorites setup, Episodes, Queue, Search, and Admin/Refresh cards scroll without focus traps |
+| Player | Portrait dock with scrubber, large Back / Play-Pause / Menu; sleep timer; first-run tip; optional rotation lock remembered for next open |
 | System navigation bar | Player and main screens pad for system bars so the 3-button or gesture bar does not cover play controls or key chrome |
-| Player Back | On-screen **Back** in the playback menu; system Back / gesture closes the menu first, then leaves the player |
-| Touch | Tap the video to show or hide controls; Favorites setup scrolls with a finger; orientation is unlocked |
+| Touch | Tap the video to show or hide controls; orientation is unlocked by default |
 | Immersive watch | While controls are hidden, system bars hide; swipe shows them briefly; when the menu is open, bars stay visible and controls sit above them |
 
 TV remotes and landscape-first layouts are unchanged on set-top boxes.
@@ -248,7 +252,7 @@ Auto-add can pull local major networks, major sports networks, teams you pick, a
 
 </div>
 
-Search looks through TV, Movies, and Shows and groups the hits under those headings. Search or the keyboard search key hides the on-screen keyboard and moves to the first result. Hide keyboard does the same. A word, or the start of a word, matches anywhere in the name. A single character matches a name that has a word starting with that character. It does not require FTS5.
+Search looks through TV, Movies, and Shows and groups the hits under those headings. Results update as you type (typeahead after the first character). Search or the keyboard search key hides the on-screen keyboard and moves to the first result. Hide keyboard does the same. A word, or the start of a word, matches anywhere in the name. A single character matches a name that has a word starting with that character. It does not require FTS5.
 
 ---
 
@@ -260,9 +264,9 @@ Search looks through TV, Movies, and Shows and groups the hits under those headi
 
 The player is Media3 ExoPlayer on its own HTTP stack. Logos use Coil. Catalog and dashboard calls use OkHttp. The player does not send your streams through that client.
 
-On a phone or tablet, tap the picture to show or hide the control row. That row sits above the system navigation bar. An on-screen **Back** closes the menu; another Back (or the system gesture) leaves the player. While the menu is hidden, the system bars hide for immersive watching.
+On a phone or tablet, tap the picture to show or hide the control row. That row sits above the system navigation bar. Portrait adds a dock with scrubber, Back, Play/Pause, and Menu. An on-screen **Back** closes the menu; another Back (or the system gesture) leaves the player. While the menu is hidden, the system bars hide for immersive watching. A first-run tip explains tap-for-controls. Sleep → Lock rotation remembers portrait or landscape for the next open.
 
-The top caption shows the lineup name, the current program, and the next program. Up and Down change channel inside the group, through the live list, or along the list that was on screen, depending on how you opened it. OK while the program is playing (or tap on a phone) opens Audio, Subtitles, Record, Picture, **Last**, **Go live**, and **Multi-view** along the bottom. Audio picks a language carried in the stream. The player prefers **English (US)** when that track exists, remembers the language you last chose for a channel, and reuses that choice the next time the channel opens. Subtitles picks a track in the stream or an English file, and the language you last chose is remembered the same way. Record asks what to record. Picture picks Fit, Fill, or Stretch and keeps that choice for the next stream. **Last** is for live TV. It returns to the live channel you were on before this one. The remote’s Last Channel key does the same. You need at least two live channels in that trail before Last has somewhere to go. Pause on live keeps you in the timeshift window; Left and Right step about ten seconds inside that window when the stream allows it. **Go live** jumps back to the live edge. **Multi-view** shows the previous live channel beside the current one, muted, and keeps that preference. Catch-up and other non-live titles show a seek bar at the bottom. Back closes that row. The caption hides itself.
+The top caption shows the lineup name, the current program, and the next program. Up and Down change channel inside the group, through the live list, or along the list that was on screen, depending on how you opened it. Live neighbors are prepared in the background so channel changes feel quicker. OK while the program is playing (or tap on a phone) opens Audio, Subtitles, Record, Picture, **Last**, **Go live**, **Multi-view**, and **Sleep** along the bottom. Audio picks a language carried in the stream. The player prefers **English (US)** when that track exists, remembers the language you last chose for a channel, and reuses that choice the next time the channel opens. Subtitles picks a track in the stream or an English file, and the language you last chose is remembered the same way. Record asks what to record. Picture picks Fit, Fill, or Stretch and keeps that choice for the next stream. **Sleep** offers Off / 30 / 60 / 90 minutes, then pauses and leaves the player. If reconnect fails repeatedly, a plain toast says whether it looks like a **provider stream issue** or an **app playback issue**. **Last** is for live TV. It returns to the live channel you were on before this one. The remote’s Last Channel key does the same. You need at least two live channels in that trail before Last has somewhere to go. Pause on live keeps you in the timeshift window; Left and Right step about ten seconds inside that window when the stream allows it. **Go live** jumps back to the live edge. **Multi-view** shows the previous live channel beside the current one, muted, and keeps that preference. Catch-up and other non-live titles show a seek bar at the bottom. Back closes that row. The caption hides itself.
 
 When a movie or episode ends, a countdown offers the next title. For a series that is the next episode, with **Skip intro**. For Queue or a favorites list that still has titles after this one, that is the next item, with **Play next**. **Back to menu** leaves the player and returns to the guide. If you do nothing, the next title starts when the countdown reaches 0.
 
@@ -318,7 +322,7 @@ Sign in with the email and the device id from Admin, then Web-UI. Opening a devi
 
 The sign-in page shows the Olympus-IPTV mark, the address for this Wi-Fi, and the current log. The page can edit countries, groups, channels, strip rules, bulk group rename, image removal, favorites, recordings, reminders, and a JSON export or import of the lineup. Backup export and import is how the same lineup moves to another device on the account. Import first shows a short preview of hidden countries, groups, channels, renames, and parental PINs, then asks before it writes. The groups list uses the same rules as the TV, so a group that is off the guide is off the web. On the TV, Admin is two rows of two cards: Refresh Options, Web-UI, EPG edits, and VPN. The web Admin page uses the same large cards, plus the error log, each with a short status. Each card opens its own page. Back returns to the cards. Each log stays one file. At 400 KB the current log is renamed with the date and time and a new file starts. Older files are kept. Passwords and stream credentials are not written into the log.
 
-Parental controls are the **Parental** chip at the top of Live TV, and the **Parental controls** card on EPG edits. That screen lists only the Live TV groups that are visible on the guide (same hide and country rules as the group cards). Groups are multi-select cards. Select one or more, then **Set PIN** or **Remove lock**. Set PIN opens an on-screen 0–9 keypad; digits are numeric only, and the dialog closes when the fourth digit is entered. A lock then sits on those groups here and in the top right of their Live TV cards. Hold OK on a locked group card still asks for the unlock PIN. The web Groups row has Lock for the same password. Opening a locked group asks for the password and stays on the group screen until it is correct. After a correct PIN, that group stays unlocked for the parental unlock time on EPG edits (5, 15, 30, or 60 minutes; default 15), then locks again. Cancel returns to the groups. A wrong password shows “Incorrect password. Try again.” over the box. The password is stored as a code in the lineup, shared by the TV and the web.
+Parental controls are the **Parental** chip at the top of Live TV, and the **Parental controls** card on EPG edits. That screen lists only the Live TV groups that are visible on the guide (same hide and country rules as the group cards). Groups are multi-select cards. Select one or more, then **Set PIN** or **Remove lock**. Set PIN opens an on-screen 0–9 keypad; digits are numeric only, and the dialog closes when the fourth digit is entered. A lock then sits on those groups here and in the top right of their Live TV cards. Hold OK on a locked group card still asks for the unlock PIN. The web Groups row has Lock for the same password. Opening a locked group shows **Enter PIN** with the on-screen number pad (focus stays on the pad on TV; tap works on phones). After a correct PIN, that group opens and stays unlocked for the parental unlock time on EPG edits (5, 15, 30, or 60 minutes; default 15), then locks again. Cancel returns to the groups. A wrong PIN shows an **Incorrect PIN** modal; OK closes every PIN dialog and returns to the group cards. The PIN is stored as a code in the lineup, shared by the TV and the web. After web setup, Favorites polls until the device catalog is ready and shows a clear “catalog still loading” state so auto-add is not empty or confusing.
 
 **EPG edits** on the web page is the same kind of card grid as the TV screen: Show/Hide Countries, Show/Hide Groups/Channels, Show everything again, Bulk Channel Stripper, Bulk Group Renamer, Sanitize Group & Channel Names, Parse channel names into the guide, and Remove images. Countries and Groups open those tabs. Every other card opens its own page. Save on that page is what sends the edit. Back returns to the cards.
 
@@ -456,7 +460,7 @@ $env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
 .\gradlew.bat :app:assembleDebug
 ```
 
-The debug APK is `app/build/outputs/apk/debug/app-debug.apk`. Put a Watchmode key in `local.properties` as `watchmode.apiKey` before that build if you want **New** to load. Put an OpenSubtitles key there as `opensubtitles.apiKey` if you want that source in **Subtitles**. Neither key is written into the repository. The signed release is `C:\Users\chalu\Downloads\olympus-iptv-0.2.42.apk` (with `olympus-iptv-0.2.42.apk.idsig` beside it). That one file is for both set-top boxes and mobile Android.
+The debug APK is `app/build/outputs/apk/debug/app-debug.apk`. Put a Watchmode key in `local.properties` as `watchmode.apiKey` before that build if you want **New** to load. Put an OpenSubtitles key there as `opensubtitles.apiKey` if you want that source in **Subtitles**. Neither key is written into the repository. The latest signed release remains `C:\Users\chalu\Downloads\olympus-iptv-0.2.42.apk` (with `olympus-iptv-0.2.42.apk.idsig` beside it) until you build **0.2.44** from this source. That one file is for both set-top boxes and mobile Android.
 
 Android Studio: use a 1920×1080 Google TV emulator. Apply Changes does not pick up new screens. Stop the app, then Debug. Click the emulator window before the arrow keys. The emulator is a different device from a Shield or an Onn box, so it does not have that box’s account, playlist, or favorites.
 
@@ -534,6 +538,22 @@ clearcast-tuner/
 ## Version history
 
 </div>
+
+### 0.2.44
+
+- Live zap pre-buffers the next and previous channel; group open paints the first page without a blank “updating” flash; return from player keeps the channel row.
+- Player **Sleep** timer (30 / 60 / 90 / off); reconnect failures show a plain provider-vs-app toast; Picture (aspect) stays in the menu.
+- Search typeahead starts after the first character; Queue chip and Continue/Recent cards show counts; **PIN set** toast after locking.
+- Phone: larger chips, touch scroll on Episodes / Queue / Search / Admin, remembered rotation lock from Sleep menu.
+- Cold start skips dashboard/Watchmode warm when the catalog stamp is unchanged. Source only — signed APK not rebuilt.
+
+### 0.2.43
+
+- Locked group unlock: **Enter PIN** with on-screen 0–9 pad (TV focus + phone tap). Wrong PIN → **Incorrect PIN** modal; OK closes all PIN UI and returns to groups.
+- Phone guide: top Back/title, Live/Movies/Shows chips, hidden TV rail, two-column group cards; Back on Fresh, Favorites setup, opened groups, and PIN.
+- Portrait player dock (scrubber + Back / Play-Pause / Menu) and a one-time “tap for controls” tip.
+- Continue watching strip above group cards; cold start defers dashboard warm and Watchmode after Favorites/groups paint.
+- Web Favorites: catalog-still-loading banner and poll until groups arrive.
 
 ### 0.2.42
 

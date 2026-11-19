@@ -11,6 +11,42 @@
         android:layout_height="match_parent"
         android:orientation="vertical">
 
+    <LinearLayout
+        android:id="@+id/mobileTopBar"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="12dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/mobileBack"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:background="@drawable/bg_nav"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:paddingHorizontal="14dp"
+            android:text="@string/mobile_back"
+            android:textColor="@color/text_primary"
+            android:textSize="15sp" />
+
+        <TextView
+            android:id="@+id/mobileTitle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="@string/rail_title"
+            android:textColor="@color/text_primary"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
     <HorizontalScrollView
         android:id="@+id/groupPills"
         android:layout_width="match_parent"
@@ -234,6 +270,97 @@
                         android:text="@string/parental_chip" />
                 </LinearLayout>
             </HorizontalScrollView>
+
+            <LinearLayout
+                android:id="@+id/homeContinue"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="20dp"
+                android:layout_marginBottom="12dp"
+                android:background="@drawable/bg_panel"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingHorizontal="16dp"
+                android:paddingVertical="12dp"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/continue_watching_home"
+                        android:textColor="@color/accent"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/homeContinueTitle"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:textColor="@color/text_primary"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/homeContinueMeta"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="13sp" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/homeContinuePlay"
+                    android:layout_width="wrap_content"
+                    android:layout_height="40dp"
+                    android:layout_marginStart="12dp"
+                    android:background="@drawable/bg_button"
+                    android:gravity="center"
+                    android:paddingHorizontal="16dp"
+                    android:text="@string/fresh_play"
+                    android:textColor="@color/bg"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/mobileSectionRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                android:gravity="center"
+                android:orientation="horizontal"
+                android:paddingHorizontal="16dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/mobileTabLive"
+                    style="@style/OlympusIptvChip"
+                    android:text="@string/nav_tv" />
+
+                <TextView
+                    android:id="@+id/mobileTabMovies"
+                    style="@style/OlympusIptvChip"
+                    android:text="@string/vod" />
+
+                <TextView
+                    android:id="@+id/mobileTabShows"
+                    style="@style/OlympusIptvChip"
+                    android:text="@string/nav_shows" />
+            </LinearLayout>
 
             <TextView
                 android:layout_width="match_parent"
@@ -1752,16 +1879,28 @@
             android:textSize="11sp" />
     </LinearLayout>
 
+    <View
+        android:id="@+id/groupPinScrim"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#CC141210"
+        android:clickable="true"
+        android:focusable="false"
+        android:visibility="gone" />
+
     <LinearLayout
         android:id="@+id/groupPin"
-        android:layout_width="360dp"
+        android:layout_width="420dp"
         android:layout_height="wrap_content"
         android:layout_gravity="center"
         android:background="@drawable/bg_panel"
+        android:clickable="true"
+        android:descendantFocusability="afterDescendants"
         android:elevation="18dp"
+        android:focusable="true"
         android:orientation="vertical"
-        android:paddingHorizontal="28dp"
-        android:paddingVertical="24dp"
+        android:paddingHorizontal="24dp"
+        android:paddingVertical="20dp"
         android:visibility="gone">
 
         <TextView
@@ -1775,55 +1914,49 @@
             android:textSize="22sp"
             android:textStyle="bold" />
 
-        <FrameLayout
-            android:layout_width="match_parent"
-            android:layout_height="72dp"
-            android:layout_marginTop="16dp">
-
-            <TextView
-                android:id="@+id/groupPinDigits"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:background="@color/bg_elevated"
-                android:focusable="false"
-                android:gravity="center"
-                android:letterSpacing="0.3"
-                android:text="––––"
-                android:textColor="@color/text_primary"
-                android:textSize="36sp" />
-
-            <TextView
-                android:id="@+id/groupPinError"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:background="@color/bg_elevated"
-                android:focusable="false"
-                android:gravity="center"
-                android:paddingHorizontal="12dp"
-                android:text="@string/group_pin_wrong"
-                android:textColor="@color/danger"
-                android:textSize="16sp"
-                android:visibility="gone" />
-        </FrameLayout>
-
         <TextView
-            android:id="@+id/groupPinCancel"
+            android:id="@+id/groupPinDigits"
             android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:layout_marginTop="16dp"
-            android:background="@drawable/bg_focusable"
-            android:clickable="true"
-            android:focusable="true"
+            android:layout_height="64dp"
+            android:layout_marginTop="14dp"
+            android:background="@color/bg_elevated"
+            android:focusable="false"
             android:gravity="center"
-            android:text="@string/group_pin_cancel"
+            android:letterSpacing="0.35"
+            android:text="––––"
             android:textColor="@color/text_primary"
-            android:textSize="16sp" />
+            android:textSize="34sp" />
+
+        <GridLayout
+            android:id="@+id/groupPinPad"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:alignmentMode="alignMargins"
+            android:columnCount="3"
+            android:descendantFocusability="afterDescendants"
+            android:rowCount="4"
+            android:useDefaultMargins="true">
+
+            <TextView android:id="@+id/guidePin1" style="@style/OlympusIptvPinKey" android:text="1" />
+            <TextView android:id="@+id/guidePin2" style="@style/OlympusIptvPinKey" android:text="2" />
+            <TextView android:id="@+id/guidePin3" style="@style/OlympusIptvPinKey" android:text="3" />
+            <TextView android:id="@+id/guidePin4" style="@style/OlympusIptvPinKey" android:text="4" />
+            <TextView android:id="@+id/guidePin5" style="@style/OlympusIptvPinKey" android:text="5" />
+            <TextView android:id="@+id/guidePin6" style="@style/OlympusIptvPinKey" android:text="6" />
+            <TextView android:id="@+id/guidePin7" style="@style/OlympusIptvPinKey" android:text="7" />
+            <TextView android:id="@+id/guidePin8" style="@style/OlympusIptvPinKey" android:text="8" />
+            <TextView android:id="@+id/guidePin9" style="@style/OlympusIptvPinKey" android:text="9" />
+            <TextView android:id="@+id/guidePinClearDigit" style="@style/OlympusIptvPinKey" android:text="⌫" />
+            <TextView android:id="@+id/guidePin0" style="@style/OlympusIptvPinKey" android:text="0" />
+            <TextView android:id="@+id/groupPinCancel" style="@style/OlympusIptvPinKey" android:text="@string/group_pin_cancel" />
+        </GridLayout>
 
         <TextView
             android:id="@+id/groupPinClear"
             android:layout_width="match_parent"
             android:layout_height="48dp"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="10dp"
             android:background="@drawable/bg_focusable"
             android:clickable="true"
             android:focusable="true"
@@ -1832,6 +1965,43 @@
             android:textColor="@color/text_primary"
             android:textSize="16sp"
             android:visibility="gone" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/groupPinWrong"
+        android:layout_width="360dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:background="@drawable/bg_panel"
+        android:elevation="24dp"
+        android:orientation="vertical"
+        android:paddingHorizontal="28dp"
+        android:paddingVertical="24dp"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:focusable="false"
+            android:gravity="center"
+            android:text="@string/group_pin_wrong"
+            android:textColor="@color/danger"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/groupPinWrongOk"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="18dp"
+            android:background="@drawable/bg_button"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:text="@string/group_pin_wrong_ok"
+            android:textColor="@color/bg"
+            android:textSize="16sp"
+            android:textStyle="bold" />
     </LinearLayout>
 
     <LinearLayout

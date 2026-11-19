@@ -107,6 +107,8 @@ class FreshActivity : AppCompatActivity() {
         binding.detailEpisodeList.adapter = episodeAdapter
         binding.freshStatus.visibility = View.VISIBLE
         binding.freshStatus.text = getString(R.string.fresh_loading)
+        binding.btnBack.setOnClickListener { leaveFresh() }
+        binding.detailBack.setOnClickListener { leaveFresh() }
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 leaveFresh()

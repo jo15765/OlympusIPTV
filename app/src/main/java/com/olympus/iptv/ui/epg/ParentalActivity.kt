@@ -289,6 +289,7 @@ class ParentalActivity : AppCompatActivity() {
             selected.clear()
             applyPins(targets, code)
             hidePin()
+            Toast.makeText(this, R.string.pin_set_ok, Toast.LENGTH_SHORT).show()
         }
     }
 
