@@ -7,26 +7,36 @@ import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
+import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import coil.load
 import coil.size.Scale
 import com.olympus.iptv.OlympusIptvApp
 import com.olympus.iptv.R
+import com.olympus.iptv.data.Channel
 import com.olympus.iptv.data.ContentKind
+import com.olympus.iptv.data.ShowNames
 import com.olympus.iptv.databinding.ActivityFreshBinding
 import com.olympus.iptv.databinding.ItemFreshBinding
+import com.olympus.iptv.databinding.ItemFreshEpisodeBinding
+import com.olympus.iptv.databinding.ItemSeasonBinding
 import com.olympus.iptv.playlist.CatalogDb
+import com.olympus.iptv.playlist.EpisodeCache
+import com.olympus.iptv.playlist.EpisodeSequence
 import com.olympus.iptv.playlist.Watchmode
 import com.olympus.iptv.playlist.WatchmodeException
 import com.olympus.iptv.playlist.XtreamClient
 import com.olympus.iptv.ui.player.PlayerActivity
+import com.olympus.iptv.ui.player.SeriesPlay
 import com.olympus.iptv.ui.prefetchLogos
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -36,7 +46,12 @@ class FreshActivity : AppCompatActivity() {
     private val playlistId by lazy { intent.getStringExtra(EXTRA_PLAYLIST_ID).orEmpty() }
     private val rows = ArrayList<CatalogDb.FreshTitle>()
     private val adapter = FreshAdapter()
+    private val seasonAdapter = SeasonAdapter()
+    private val episodeAdapter = EpisodeAdapter()
     private var shown: CatalogDb.FreshTitle? = null
+    private var seriesEpisodes = emptyList<Channel>()
+    private var season = 1
+    private var seriesJob: Job? = null
     private lateinit var cacheFile: File
     private var opening = false
 
@@ -62,6 +77,13 @@ class FreshActivity : AppCompatActivity() {
                 prefetchFrom(grid.findLastVisibleItemPosition() + 1)
             }
         })
+        binding.detailSeasonList.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
+        binding.detailSeasonList.itemAnimator = null
+        binding.detailSeasonList.adapter = seasonAdapter
+        binding.detailEpisodeList.layoutManager = LinearLayoutManager(this)
+        binding.detailEpisodeList.itemAnimator = null
+        binding.detailEpisodeList.setHasFixedSize(true)
+        binding.detailEpisodeList.adapter = episodeAdapter
         binding.freshStatus.visibility = View.VISIBLE
         binding.freshStatus.text = getString(R.string.fresh_loading)
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
@@ -149,6 +171,9 @@ class FreshActivity : AppCompatActivity() {
     }
 
     private fun showDetail(title: CatalogDb.FreshTitle) {
+        seriesJob?.cancel()
+        seriesEpisodes = emptyList()
+        season = 1
         shown = title
         binding.freshDetail.visibility = View.VISIBLE
         binding.detailService.text = if (title.day.isBlank()) {
@@ -157,19 +182,37 @@ class FreshActivity : AppCompatActivity() {
             getString(R.string.fresh_when, title.service, title.day)
         }
         binding.detailName.text = title.name
-        binding.detailPlay.text = getString(
-            if (title.bucket == CatalogDb.SERIES) R.string.fresh_episodes else R.string.fresh_play
-        )
-        binding.detailPlay.setOnClickListener { open(title) }
-        bindArt(binding.detailLogo, title.logoUrl, 220, 330)
+        bindArt(binding.detailLogo, title.logoUrl, 160, 230)
         val waiting = title.detail.startsWith("Premieres ") || title.detail.matches(SEASON_ONLY)
         binding.detailBody.text = if (waiting) getString(R.string.fresh_detail_loading) else title.detail
-        binding.detailPlay.requestFocus()
+        val series = title.bucket == CatalogDb.SERIES
+        if (series) {
+            binding.detailPlay.visibility = View.GONE
+            binding.detailSeriesPane.visibility = View.VISIBLE
+            binding.detailEpisodeStatus.visibility = View.VISIBLE
+            binding.detailEpisodeStatus.text = getString(R.string.episodes_loading)
+            seasonAdapter.submit(emptyList())
+            episodeAdapter.submit(emptyList())
+            loadSeries(title)
+        } else {
+            binding.detailSeriesPane.visibility = View.GONE
+            binding.detailPlay.visibility = View.VISIBLE
+            binding.detailPlay.text = getString(R.string.fresh_play)
+            binding.detailPlay.setOnClickListener { openMovie(title) }
+            binding.detailPlay.requestFocus()
+        }
         if (waiting) loadDescription(title)
     }
 
     private fun hideDetail() {
+        seriesJob?.cancel()
+        seriesJob = null
         shown = null
+        seriesEpisodes = emptyList()
+        seasonAdapter.submit(emptyList())
+        episodeAdapter.submit(emptyList())
+        binding.detailSeriesPane.visibility = View.GONE
+        binding.detailPlay.visibility = View.VISIBLE
         binding.freshDetail.visibility = View.GONE
         binding.freshList.requestFocus()
     }
@@ -192,15 +235,92 @@ class FreshActivity : AppCompatActivity() {
                 }
                 return@launch
             }
-            val season = title.detail.takeIf { it.startsWith("Season ") }?.substringBefore('.')?.trim()
-            val body = if (season.isNullOrBlank() || plot.startsWith(season)) plot else "$season. $plot"
+            val seasonLine = title.detail.takeIf { it.startsWith("Season ") }?.substringBefore('.')?.trim()
+            val body = if (seasonLine.isNullOrBlank() || plot.startsWith(seasonLine)) plot else "$seasonLine. $plot"
             val index = rows.indexOfFirst { it.id == title.id && it.bucket == title.bucket && it.service == title.service }
             if (index >= 0) rows[index] = rows[index].copy(detail = body)
             if (shown?.id == title.id && shown?.service == title.service) binding.detailBody.text = body
         }
     }
 
-    private fun open(title: CatalogDb.FreshTitle) {
+    private fun loadSeries(title: CatalogDb.FreshTitle) {
+        val app = application as OlympusIptvApp
+        seriesJob = lifecycleScope.launch {
+            val channel = withContext(Dispatchers.IO) {
+                runCatching { app.catalogDb.readChannel(playlistId, title.bucket, title.id) }.getOrNull()
+            }
+            if (isDestroyed || shown?.id != title.id) return@launch
+            if (channel == null) {
+                binding.detailEpisodeStatus.visibility = View.VISIBLE
+                binding.detailEpisodeStatus.text = getString(R.string.channel_missing)
+                return@launch
+            }
+            val seriesId = channel.seriesId?.takeIf { it.isNotBlank() } ?: channel.id
+            val saved = withContext(Dispatchers.IO) {
+                runCatching { app.playlistStore.account(playlistId) }.getOrNull()
+            }
+            if (saved == null || isDestroyed || shown?.id != title.id) return@launch
+            val cached = withContext(Dispatchers.IO) {
+                runCatching { EpisodeCache.peek(filesDir, playlistId, seriesId) }.getOrNull()
+            }
+            if (!cached.isNullOrEmpty() && shown?.id == title.id) presentSeries(cached, focus = true)
+            val fresh = withContext(Dispatchers.IO) {
+                runCatching { EpisodeSequence.fetch(saved, seriesId) }.getOrDefault(emptyList())
+            }
+            if (isDestroyed || shown?.id != title.id) return@launch
+            if (fresh.isEmpty()) {
+                if (seriesEpisodes.isEmpty()) {
+                    binding.detailEpisodeStatus.visibility = View.VISIBLE
+                    binding.detailEpisodeStatus.text = getString(R.string.episodes_none)
+                }
+                return@launch
+            }
+            withContext(Dispatchers.IO) {
+                runCatching { EpisodeCache.store(filesDir, playlistId, seriesId, fresh) }
+            }
+            if (shown?.id == title.id) presentSeries(fresh, focus = seriesEpisodes.isEmpty())
+        }
+    }
+
+    private fun presentSeries(loaded: List<Channel>, focus: Boolean) {
+        if (isDestroyed || loaded.isEmpty()) return
+        seriesEpisodes = loaded
+        binding.detailEpisodeStatus.visibility = View.GONE
+        val numbers = seasonNumbers()
+        if (numbers.isEmpty()) return
+        if (season !in numbers) season = numbers.first()
+        seasonAdapter.submit(numbers)
+        showSeasonEpisodes(focusSeasons = focus)
+    }
+
+    private fun seasonNumbers(): List<Int> =
+        seriesEpisodes.map { it.season ?: 1 }.distinct().sorted()
+
+    private fun showSeasonEpisodes(focusSeasons: Boolean) {
+        val numbers = seasonNumbers()
+        val shownEps = seriesEpisodes.filter { (it.season ?: 1) == season }
+        episodeAdapter.submit(shownEps)
+        seasonAdapter.notifyDataSetChanged()
+        val seasonIndex = numbers.indexOf(season).coerceAtLeast(0)
+        if (numbers.isNotEmpty()) binding.detailSeasonList.scrollToPosition(seasonIndex)
+        if (focusSeasons && numbers.isNotEmpty()) {
+            binding.detailSeasonList.post {
+                if (isDestroyed) return@post
+                binding.detailSeasonList.findViewHolderForAdapterPosition(seasonIndex)?.itemView?.requestFocus()
+            }
+        } else if (shownEps.isNotEmpty()) {
+            binding.detailEpisodeList.post {
+                if (isDestroyed) return@post
+                binding.detailEpisodeList.findViewHolderForAdapterPosition(0)
+                    ?.itemView
+                    ?.findViewById<View>(R.id.episodePlay)
+                    ?.requestFocus()
+                    ?: binding.detailEpisodeList.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
+            }
+        }
+    }
+
+    private fun openMovie(title: CatalogDb.FreshTitle) {
         if (opening || playlistId.isBlank() || title.id.isBlank()) return
         opening = true
         val app = application as OlympusIptvApp
@@ -214,29 +334,37 @@ class FreshActivity : AppCompatActivity() {
                     Toast.makeText(this@FreshActivity, R.string.channel_missing, Toast.LENGTH_SHORT).show()
                     return@launch
                 }
-                if (title.bucket == CatalogDb.SERIES || !channel.seriesId.isNullOrBlank()) {
-                    startActivity(EpisodesActivity.intent(this@FreshActivity, playlistId, channel))
-                } else {
-                    val playing = if (channel.kind == ContentKind.LIVE) channel.copy(kind = ContentKind.VOD) else channel
-                    app.playbackQueue = listOf(playing)
-                    startActivity(
-                        PlayerActivity.intent(
-                            this@FreshActivity,
-                            channel = playing,
-                            channelMeta = title.detail,
-                            channelNext = "",
-                            startIndex = 0,
-                            playlistId = playlistId
-                        )
+                val playing = if (channel.kind == ContentKind.LIVE) channel.copy(kind = ContentKind.VOD) else channel
+                app.playbackQueue = listOf(playing)
+                startActivity(
+                    PlayerActivity.intent(
+                        this@FreshActivity,
+                        channel = playing,
+                        channelMeta = title.detail,
+                        channelNext = "",
+                        startIndex = 0,
+                        playlistId = playlistId
                     )
-                }
+                )
             } finally {
                 opening = false
             }
         }
     }
 
-    private fun bindArt(view: android.widget.ImageView, url: String?, widthDp: Int, heightDp: Int) {
+    private fun playEpisode(episode: Channel) {
+        if (opening || playlistId.isBlank() || episode.id.isBlank()) return
+        val queue = seriesEpisodes.filter { (it.season ?: 1) == season }
+        if (queue.isEmpty()) return
+        opening = true
+        try {
+            SeriesPlay.open(this, playlistId, queue, episode)
+        } finally {
+            opening = false
+        }
+    }
+
+    private fun bindArt(view: ImageView, url: String?, widthDp: Int, heightDp: Int) {
         if (url.isNullOrBlank()) {
             view.setImageResource(R.drawable.ic_channel_placeholder)
             return
@@ -299,6 +427,89 @@ class FreshActivity : AppCompatActivity() {
                     )
                     true
                 }
+            }
+        }
+    }
+
+    private inner class SeasonAdapter : RecyclerView.Adapter<SeasonAdapter.Holder>() {
+        private val numbers = ArrayList<Int>()
+
+        fun submit(list: List<Int>) {
+            numbers.clear()
+            numbers.addAll(list)
+            notifyDataSetChanged()
+        }
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder {
+            val row = ItemSeasonBinding.inflate(LayoutInflater.from(parent.context), parent, false)
+            return Holder(row)
+        }
+
+        override fun onBindViewHolder(holder: Holder, position: Int) {
+            numbers.getOrNull(position)?.let { holder.bind(it) }
+        }
+
+        override fun getItemCount(): Int = numbers.size
+
+        inner class Holder(private val row: ItemSeasonBinding) : RecyclerView.ViewHolder(row.root) {
+            fun bind(number: Int) {
+                row.seasonName.text = getString(R.string.season_number, number)
+                row.seasonCheck.visibility = View.GONE
+                row.root.isSelected = number == season
+                row.root.setOnClickListener {
+                    if (season == number) {
+                        showSeasonEpisodes(focusSeasons = false)
+                        return@setOnClickListener
+                    }
+                    season = number
+                    showSeasonEpisodes(focusSeasons = false)
+                }
+            }
+        }
+    }
+
+    private inner class EpisodeAdapter : RecyclerView.Adapter<EpisodeAdapter.Holder>() {
+        private val items = ArrayList<Channel>()
+
+        fun submit(list: List<Channel>) {
+            items.clear()
+            items.addAll(list)
+            notifyDataSetChanged()
+        }
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder {
+            val row = ItemFreshEpisodeBinding.inflate(LayoutInflater.from(parent.context), parent, false)
+            return Holder(row)
+        }
+
+        override fun onBindViewHolder(holder: Holder, position: Int) {
+            items.getOrNull(position)?.let { holder.bind(it, position) }
+        }
+
+        override fun getItemCount(): Int = items.size
+
+        inner class Holder(private val row: ItemFreshEpisodeBinding) : RecyclerView.ViewHolder(row.root) {
+            fun bind(episode: Channel, position: Int) {
+                val number = episode.number ?: (position + 1)
+                val title = shown?.name.orEmpty()
+                row.episodeTitle.text = ShowNames.episodeHeading(
+                    title,
+                    episode.season ?: season,
+                    number,
+                    episode.name
+                )
+                val meta = listOfNotNull(
+                    episode.aired?.takeIf { it.isNotBlank() },
+                    episode.runtime?.takeIf { it.isNotBlank() }
+                ).joinToString(" · ")
+                row.episodeMeta.text = meta
+                row.episodeMeta.visibility = if (meta.isBlank()) View.GONE else View.VISIBLE
+                val plot = episode.blurb.orEmpty()
+                row.episodePlot.text = plot
+                row.episodePlot.visibility = if (plot.isBlank()) View.GONE else View.VISIBLE
+                bindArt(row.episodeArt, episode.logoUrl ?: shown?.logoUrl, 168, 94)
+                row.episodePlay.setOnClickListener { playEpisode(episode) }
+                row.root.setOnClickListener { playEpisode(episode) }
             }
         }
     }

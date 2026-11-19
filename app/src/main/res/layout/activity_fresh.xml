@@ -53,71 +53,125 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:background="@color/bg"
-        android:orientation="horizontal"
-        android:padding="36dp"
+        android:orientation="vertical"
+        android:paddingHorizontal="36dp"
+        android:paddingTop="24dp"
+        android:paddingBottom="16dp"
         android:visibility="gone">
 
-        <ImageView
-            android:id="@+id/detailLogo"
-            android:layout_width="220dp"
-            android:layout_height="320dp"
-            android:contentDescription="@null"
-            android:scaleType="fitCenter"
-            android:src="@drawable/ic_channel_placeholder" />
-
         <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_marginStart="28dp"
-            android:layout_weight="1"
-            android:orientation="vertical">
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="top"
+            android:orientation="horizontal">
 
-            <TextView
-                android:id="@+id/detailService"
-                android:layout_width="match_parent"
+            <ImageView
+                android:id="@+id/detailLogo"
+                android:layout_width="160dp"
+                android:layout_height="230dp"
+                android:contentDescription="@null"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_channel_placeholder" />
+
+            <LinearLayout
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:textColor="@color/accent"
-                android:textSize="16sp" />
-
-            <TextView
-                android:id="@+id/detailName"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:textColor="@color/text_primary"
-                android:textSize="28sp"
-                android:textStyle="bold" />
-
-            <ScrollView
-                android:id="@+id/detailScroll"
-                android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:layout_marginTop="14dp"
+                android:layout_marginStart="24dp"
                 android:layout_weight="1"
-                android:focusable="true">
+                android:orientation="vertical">
 
                 <TextView
-                    android:id="@+id/detailBody"
+                    android:id="@+id/detailService"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="18sp" />
-            </ScrollView>
+                    android:textColor="@color/accent"
+                    android:textSize="16sp" />
+
+                <TextView
+                    android:id="@+id/detailName"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:textColor="@color/text_primary"
+                    android:textSize="26sp"
+                    android:textStyle="bold" />
+
+                <ScrollView
+                    android:id="@+id/detailScroll"
+                    android:layout_width="match_parent"
+                    android:layout_height="120dp"
+                    android:layout_marginTop="10dp"
+                    android:focusable="true">
+
+                    <TextView
+                        android:id="@+id/detailBody"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="16sp" />
+                </ScrollView>
+
+                <TextView
+                    android:id="@+id/detailPlay"
+                    android:layout_width="wrap_content"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/bg_button"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:focusableInTouchMode="true"
+                    android:gravity="center"
+                    android:paddingHorizontal="24dp"
+                    android:text="@string/fresh_play"
+                    android:textColor="@color/bg"
+                    android:textSize="17sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/detailSeriesPane"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_marginTop="14dp"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:visibility="gone">
 
             <TextView
-                android:id="@+id/detailPlay"
-                android:layout_width="wrap_content"
-                android:layout_height="52dp"
-                android:layout_marginTop="16dp"
-                android:background="@drawable/bg_button"
-                android:clickable="true"
-                android:focusable="true"
-                android:focusableInTouchMode="true"
-                android:gravity="center"
-                android:paddingHorizontal="28dp"
-                android:text="@string/fresh_play"
-                android:textColor="@color/bg"
-                android:textSize="18sp" />
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/seasons_label"
+                android:textAllCaps="true"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/detailSeasonList"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:clipToPadding="false"
+                android:descendantFocusability="afterDescendants"
+                android:minHeight="48dp" />
+
+            <TextView
+                android:id="@+id/detailEpisodeStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:textColor="@color/text_secondary"
+                android:textSize="15sp"
+                android:visibility="gone" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/detailEpisodeList"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_marginTop="8dp"
+                android:layout_weight="1"
+                android:clipToPadding="false"
+                android:descendantFocusability="afterDescendants" />
         </LinearLayout>
     </LinearLayout>
 </FrameLayout>

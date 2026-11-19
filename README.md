@@ -6,7 +6,7 @@
 
 ### For the latest and greatest, build your own APK from this code.
 
-The latest signed file is **0.2.37** (versionCode 38). Install that over the copy already on the TV. Parental locks only the Live TV groups you can see, with multi-select cards and an on-screen numeric PIN pad. Opening a show (including from New this week) keeps seasons across the top and that season’s episodes underneath. New this week still only lists titles already in your library, with looser name matching when Watchmode’s title is longer or shorter than the catalog name.
+The latest signed file is **0.2.38** (versionCode 39). Install that over the copy already on the TV. Parental locks only the Live TV groups you can see, with multi-select cards and an on-screen numeric PIN pad. From New this week, a series detail keeps the poster and description, then seasons across the screen and that season’s episodes underneath with Play. New this week still only lists titles already in your library, with looser name matching when Watchmode’s title is longer or shorter than the catalog name.
 
 **This is a player only. You must provide your own streams.**
 
@@ -64,13 +64,13 @@ Olympus-IPTV is an Android TV app for a remote. It browses live TV, movies, and 
 
 | | |
 | --- | --- |
-| Signed file | `C:\Users\chalu\Downloads\olympus-iptv-0.2.37.apk` |
-| What that file is | versionName **0.2.37**, versionCode **38** |
+| Signed file | `C:\Users\chalu\Downloads\olympus-iptv-0.2.38.apk` |
+| What that file is | versionName **0.2.38**, versionCode **39** |
 | What to run for current work | That signed file, or a newer APK you build from this source |
 | Install | Over the existing copy. Uninstalling wipes the saved account, playlist, and favorites. |
 | Launcher name | Two centered lines: Olympus over IPTV |
 
-The signed file is **0.2.37**. A TV that already has an account opens on the left rail, and the group cards fill in as soon as the saved group names are ready — not after a long background warm-up. The login screen is created only when no account is stored. Live TV shows Favorites setup, Queue, New / Just Added, Reminders, and Parental above the groups. The top of that groups screen shows today’s date and a 12-hour clock (`MM/DD/YYYY  hh:mm AM/PM`), updated each minute.
+The signed file is **0.2.38**. A TV that already has an account opens on the left rail, and the group cards fill in as soon as the saved group names are ready — not after a long background warm-up. The login screen is created only when no account is stored. Live TV shows Favorites setup, Queue, New / Just Added, Reminders, and Parental above the groups. The top of that groups screen shows today’s date and a 12-hour clock (`MM/DD/YYYY  hh:mm AM/PM`), updated each minute.
 
 ---
 
@@ -168,7 +168,7 @@ When an episode ends, the player counts down from 10. At 0 it plays the next epi
 | What Watchmode does | Names, dates, artwork, and descriptions. It does not host video. |
 | What gets a poster | Only a premiere whose title is already in your Movies or TV Shows. Exact matches, the same title with a year or season on the end, and shared short heads (for example a shorter library name vs a longer Watchmode name) still count. Anything you cannot play is left off. |
 | The grid | Four posters per row. Each card shows the whole poster, the title, and the service underneath. The artwork is the same poster used in Movies or Shows. The list scrolls. |
-| Select a poster | Opens the service, the day, and the description. From there a movie plays, or a series opens seasons across the top with that season’s episodes underneath. Back from that page returns to the grid. Back from the grid returns to Live TV. Hold the center button to add it to Queue. |
+| Select a poster | Opens the poster, service, day, and description on one detail card. A movie keeps Play there. A series keeps that card and adds seasons in a horizontal strip under it; choosing a season lists that season’s episodes underneath with a thumbnail, description, length, and Play. Back from that page returns to the grid. Back from the grid returns to Live TV. Hold the center button to add it to Queue. |
 | Refresh | The week is prepared in the background when the app opens and again after the catalog is on the device, so the grid is ready when you open New. A same-week copy is shown immediately and refreshed about once a day. |
 | Key | `watchmode.apiKey` in `local.properties`. It is copied in when you build. It is not written into the repository. Without it, the screen says the releases cannot load. |
 
@@ -433,7 +433,7 @@ $env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
 .\gradlew.bat :app:assembleDebug
 ```
 
-The debug APK is `app/build/outputs/apk/debug/app-debug.apk`. Put a Watchmode key in `local.properties` as `watchmode.apiKey` before that build if you want **New** to load. Put an OpenSubtitles key there as `opensubtitles.apiKey` if you want that source in **Subtitles**. Neither key is written into the repository. The signed release is `C:\Users\chalu\Downloads\olympus-iptv-0.2.37.apk` (with `olympus-iptv-0.2.37.apk.idsig` beside it).
+The debug APK is `app/build/outputs/apk/debug/app-debug.apk`. Put a Watchmode key in `local.properties` as `watchmode.apiKey` before that build if you want **New** to load. Put an OpenSubtitles key there as `opensubtitles.apiKey` if you want that source in **Subtitles**. Neither key is written into the repository. The signed release is `C:\Users\chalu\Downloads\olympus-iptv-0.2.38.apk` (with `olympus-iptv-0.2.38.apk.idsig` beside it).
 
 Android Studio: use a 1920×1080 Google TV emulator. Apply Changes does not pick up new screens. Stop the app, then Debug. Click the emulator window before the arrow keys. The emulator is a different device from a Shield or an Onn box, so it does not have that box’s account, playlist, or favorites.
 
@@ -511,6 +511,10 @@ clearcast-tuner/
 ## Version history
 
 </div>
+
+### 0.2.38
+
+- New this week series detail stays on one screen: poster and description, seasons horizontal under that, then episodes with thumbnail, description, length, and Play.
 
 ### 0.2.37
 
@@ -713,7 +717,7 @@ clearcast-tuner/
 
 - This is a player only. You must provide your own streams. The app does not ship channels, movies, shows, or playlist credentials.
 - It is a beta. Feedback is greatly appreciated.
-- **0.2.37** is the latest signed file. Anything newer than that needs a build from this source.
+- **0.2.38** is the latest signed file. Anything newer than that needs a build from this source.
 - The dashboard is only for the home network, and only while the app process is running.
 - The TV has to be opened, and left able to run its recorder, for a dashboard schedule to record and for a Record-tab guide to load.
 - One recording at a time. Series record is a queue, not several streams at once.
