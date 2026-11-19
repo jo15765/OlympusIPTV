@@ -6,7 +6,7 @@
 
 ### For the latest and greatest, build your own APK from this code.
 
-The latest signed file is **0.2.35** (versionCode 36). Install that over the copy already on the TV. Returning accounts open the group screen as soon as the saved group names are ready (heavy warm-up waits until after that paint). The Live TV groups header shows the current date and time instead of a strip of favorite channel names. The web Error log lists newest entries first. A full-catalog memory publish that could OOM ~192MB heaps is gone; the app also asks Android for a larger heap and keeps Coil/SQLite caches smaller.
+The latest signed file is **0.2.37** (versionCode 38). Install that over the copy already on the TV. Parental locks only the Live TV groups you can see, with multi-select cards and an on-screen numeric PIN pad. Opening a show (including from New this week) keeps seasons across the top and that season’s episodes underneath. New this week still only lists titles already in your library, with looser name matching when Watchmode’s title is longer or shorter than the catalog name.
 
 **This is a player only. You must provide your own streams.**
 
@@ -64,13 +64,13 @@ Olympus-IPTV is an Android TV app for a remote. It browses live TV, movies, and 
 
 | | |
 | --- | --- |
-| Signed file | `C:\Users\chalu\Downloads\olympus-iptv-0.2.35.apk` |
-| What that file is | versionName **0.2.35**, versionCode **36** |
+| Signed file | `C:\Users\chalu\Downloads\olympus-iptv-0.2.37.apk` |
+| What that file is | versionName **0.2.37**, versionCode **38** |
 | What to run for current work | That signed file, or a newer APK you build from this source |
 | Install | Over the existing copy. Uninstalling wipes the saved account, playlist, and favorites. |
 | Launcher name | Two centered lines: Olympus over IPTV |
 
-The signed file is **0.2.35**. A TV that already has an account opens on the left rail, and the group cards fill in as soon as the saved group names are ready — not after a long background warm-up. The login screen is created only when no account is stored. Live TV shows Favorites setup, Queue, New / Just Added, Reminders, and Parental above the groups. The top of that groups screen shows today’s date and a 12-hour clock (`MM/DD/YYYY  hh:mm AM/PM`), updated each minute.
+The signed file is **0.2.37**. A TV that already has an account opens on the left rail, and the group cards fill in as soon as the saved group names are ready — not after a long background warm-up. The login screen is created only when no account is stored. Live TV shows Favorites setup, Queue, New / Just Added, Reminders, and Parental above the groups. The top of that groups screen shows today’s date and a 12-hour clock (`MM/DD/YYYY  hh:mm AM/PM`), updated each minute.
 
 ---
 
@@ -152,7 +152,7 @@ That hold is one menu. Live TV includes move up and move down. Movies and Shows 
 
 Movies are video-on-demand titles that are not part of a series. Shows are series. Both open on the same group cards as TV. OK on a card opens that group’s poster grid and leaves focus on the first title.
 
-Opening a show shows its seasons as a row of posters. It does not start playing on its own. A season poster is checked when every episode in it has been watched. Select a season to see that season’s episodes, each with its description when the provider sends one. An episode title is the season and episode code plus the episode name, such as `S02-E01 - Episode Name`. The series name is not repeated. An episode is checked when playback passes 95 percent. Hold the center button on an episode to check or clear that episode. **Mark this season watched** checks every episode in the open season. Hold the center button on a season poster to do the same thing. When that season is already checked, the control clears the checks. Back from the episode list returns to the seasons. Back from the seasons returns to the shows.
+Opening a show keeps seasons as a horizontal strip across the top and that season’s episodes listed underneath. It does not start playing on its own. A season chip is checked when every episode in it has been watched. Changing the season refreshes the episode list under it. Each episode shows its description and length when the provider sends them. An episode title is the season and episode code plus the episode name, such as `S02-E01 - Episode Name`. The series name is not repeated. An episode is checked when playback passes 95 percent. Hold the center button on an episode to check or clear that episode. **Mark this season watched** checks every episode in the open season. Hold the center button on a season chip to do the same thing. When that season is already checked, the control clears the checks. Back from the show returns to the previous screen.
 
 When the provider sends them, a movie or episode shows a short line with plot, year, and length before it plays.
 
@@ -166,9 +166,9 @@ When an episode ends, the player counts down from 10. At 0 it plays the next epi
 | --- | --- |
 | Services | Netflix, Prime Video, Disney+, Hulu, Max, Apple TV+, Peacock, Paramount+ |
 | What Watchmode does | Names, dates, artwork, and descriptions. It does not host video. |
-| What gets a poster | Only a premiere whose title is already in your Movies or TV Shows. The same title with a year or a season on the end still counts. Anything you cannot play is left off. |
+| What gets a poster | Only a premiere whose title is already in your Movies or TV Shows. Exact matches, the same title with a year or season on the end, and shared short heads (for example a shorter library name vs a longer Watchmode name) still count. Anything you cannot play is left off. |
 | The grid | Four posters per row. Each card shows the whole poster, the title, and the service underneath. The artwork is the same poster used in Movies or Shows. The list scrolls. |
-| Select a poster | Opens the service, the day, and the description. From there a movie plays, or a series opens its episode list. Back from that page returns to the grid. Back from the grid returns to Live TV. Hold the center button to add it to Queue. |
+| Select a poster | Opens the service, the day, and the description. From there a movie plays, or a series opens seasons across the top with that season’s episodes underneath. Back from that page returns to the grid. Back from the grid returns to Live TV. Hold the center button to add it to Queue. |
 | Refresh | The week is prepared in the background when the app opens and again after the catalog is on the device, so the grid is ready when you open New. A same-week copy is shown immediately and refreshed about once a day. |
 | Key | `watchmode.apiKey` in `local.properties`. It is copied in when you build. It is not written into the repository. Without it, the screen says the releases cannot load. |
 
@@ -295,7 +295,7 @@ Sign in with the email and the device id from Admin, then Web-UI. Opening a devi
 
 The sign-in page shows the Olympus-IPTV mark, the address for this Wi-Fi, and the current log. The page can edit countries, groups, channels, strip rules, bulk group rename, image removal, favorites, recordings, reminders, and a JSON export or import of the lineup. Backup export and import is how the same lineup moves to another device on the account. Import first shows a short preview of hidden countries, groups, channels, renames, and parental PINs, then asks before it writes. The groups list uses the same rules as the TV, so a group that is off the guide is off the web. On the TV, Admin is two rows of two cards: Refresh Options, Web-UI, EPG edits, and VPN. The web Admin page uses the same large cards, plus the error log, each with a short status. Each card opens its own page. Back returns to the cards. Each log stays one file. At 400 KB the current log is renamed with the date and time and a new file starts. Older files are kept. Passwords and stream credentials are not written into the log.
 
-Parental controls are the **Parental** chip at the top of Live TV, and the **Parental controls** card on EPG edits. That screen lists Live TV, Movies, and Shows groups. OK on a group sets a 4-digit PIN, and a lock then sits on that group here and in the top right of its card. Remove lock clears it. Hold OK on a group card still opens the same PIN. The web Groups row has Lock for the same password. Opening a locked group asks for the password and stays on the group screen until it is correct. After a correct PIN, that group stays unlocked for the parental unlock time on EPG edits (5, 15, 30, or 60 minutes; default 15), then locks again. Cancel returns to the groups. A wrong password shows “Incorrect password. Try again.” over the box. The password is stored as a code in the lineup, shared by the TV and the web.
+Parental controls are the **Parental** chip at the top of Live TV, and the **Parental controls** card on EPG edits. That screen lists only the Live TV groups that are visible on the guide (same hide and country rules as the group cards). Groups are multi-select cards. Select one or more, then **Set PIN** or **Remove lock**. Set PIN opens an on-screen 0–9 keypad; digits are numeric only, and the dialog closes when the fourth digit is entered. A lock then sits on those groups here and in the top right of their Live TV cards. Hold OK on a locked group card still asks for the unlock PIN. The web Groups row has Lock for the same password. Opening a locked group asks for the password and stays on the group screen until it is correct. After a correct PIN, that group stays unlocked for the parental unlock time on EPG edits (5, 15, 30, or 60 minutes; default 15), then locks again. Cancel returns to the groups. A wrong password shows “Incorrect password. Try again.” over the box. The password is stored as a code in the lineup, shared by the TV and the web.
 
 **EPG edits** on the web page is the same kind of card grid as the TV screen: Show/Hide Countries, Show/Hide Groups/Channels, Show everything again, Bulk Channel Stripper, Bulk Group Renamer, Sanitize Group & Channel Names, Parse channel names into the guide, and Remove images. Countries and Groups open those tabs. Every other card opens its own page. Save on that page is what sends the edit. Back returns to the cards.
 
@@ -321,7 +321,7 @@ Admin, then Error log, shows the log in a window you can scroll and resize. Entr
 | --- | --- |
 | Refresh Options | Checks the provider and saves channels that are not already on this TV. The interval can be 30, 60, 120, 360, 720, or 1440 minutes. The default is 60. |
 | Web-UI | Shows the email, the device id, and the dashboard address. Remove playlist clears this TV’s account, library, favorites, lineup edits, recordings list, watch history, queue, and reminders, keeps the device id, and opens sign-in. |
-| EPG edits | On the TV and on the web page: countries, groups and channels, show everything again, the bulk stripper, the bulk group renamer, Sanitize Group & Channel Names, image removal, and the optional switch that fills an empty guide from channel names. The TV also has Parental controls, which lists the groups and sets the PIN; **Hide empty groups** (on by default), which removes group cards that have no visible channels after your country and hide rules; **Guide density** (Comfortable or Compact); and **Parental unlock time** (5–60 minutes). |
+| EPG edits | On the TV and on the web page: countries, groups and channels, show everything again, the bulk stripper, the bulk group renamer, Sanitize Group & Channel Names, image removal, and the optional switch that fills an empty guide from channel names. The TV also has Parental controls, which lists visible Live TV groups as multi-select cards and sets a numeric PIN from an on-screen pad; **Hide empty groups** (on by default), which removes group cards that have no visible channels after your country and hide rules; **Guide density** (Comfortable or Compact); and **Parental unlock time** (5–60 minutes). |
 | VPN | On the TV and on the web dashboard. The five providers are large cards, two across, in the same style as the Admin cards. PIA VPN, Proton VPN, Surfshark, and NordVPN take the account username and password, then a city, then Connect. Nord can use the access token from its manual setup page in the password box. WireGuard takes a profile instead of a password. The last city stays at the top of the list, and typing filters the rest. Backup city stores a second city. If the first city does not answer, that backup is tried. After a successful connection, a drop keeps the tunnel up and switches to the other city. New streams wait until one answers. Connect sends this app’s internet through that tunnel. The Admin card and the guide show the connected city. The VPN notification includes Disconnect. Home-network addresses, including the dashboard on port 8765, stay on the LAN. The first connection has to be allowed on the TV. |
 | Favorites setup | A chip at the top of Live TV. Opens the auto-add screen again. When the catalog is already loaded it skips the pulling-channels splash. Continue stays on the first-time setup only. Back from that chip returns focus to Favorites setup. |
 | About | Says the app is a player only, credits @bobgoblin, and links https://buymeacoffee.com/avocadopeaches. A square QR code opens that page. |
@@ -385,9 +385,9 @@ Admin, then Error log, shows the log in a window you can scroll and resize. Entr
 - Left and Right move across the group cards. On the program guide, Right moves later in time and Left moves back, until the first slot, which returns to the channel list.
 - Left during full-screen playback returns to the channel list, or steps live timeshift when the stream allows it. Right steps timeshift forward on live. Back from live playback returns to the channel and guide. Back from that screen returns to the group cards.
 - OK or Enter activates the focused control. OK on a group card opens it. OK on a program plays it. OK on a New poster opens its description. OK on a queued title plays it or opens its episodes.
-- Hold OK on live TV for favorites, move up, move down, record, and Remind me. That is one menu. Remind me can be 15, 30, 45, or 60 minutes before the program. The card offers Ignore, a 5-minute snooze, or Tune to channel. The Reminders chip at the top of Live TV lists those reminders, and Edit or Delete changes one. Hold OK on a movie or a show for favorites, record, and Add to Queue. Move up and move down are not on that menu. Hold OK on a season poster to check or clear that season. Hold OK on an episode to check or clear that episode. The Parental chip on Live TV, and Parental controls on EPG edits, list the groups. OK on a group there sets the 4-digit PIN and shows the lock. Hold OK on a group card, before the group is open, opens the same PIN.
+- Hold OK on live TV for favorites, move up, move down, record, and Remind me. That is one menu. Remind me can be 15, 30, 45, or 60 minutes before the program. The card offers Ignore, a 5-minute snooze, or Tune to channel. The Reminders chip at the top of Live TV lists those reminders, and Edit or Delete changes one. Hold OK on a movie or a show for favorites, record, and Add to Queue. Move up and move down are not on that menu. Hold OK on a season chip to check or clear that season. Hold OK on an episode to check or clear that episode. The Parental chip on Live TV, and Parental controls on EPG edits, list visible Live TV groups as multi-select cards. Select groups, then Set PIN (on-screen numeric pad, auto-closes at four digits) or Remove lock. Hold OK on a locked group card, before the group is open, asks for the unlock PIN.
 - On the channel list or the program guide, number keys open a Channel dial. A short pause, or OK, jumps to that row. Back clears the digits first.
-- Back steps one screen, including out of full-screen playback, out of an episode list back to its seasons, out of a New description, and out of the next-episode countdown.
+- Back steps one screen, including out of full-screen playback, out of a show’s seasons and episodes, out of a New description, and out of the next-episode countdown.
 - When an episode ends, Next episode counts down from 10. Skip intro jumps about one minute into the next episode.
 - On an episode, Subtitles sits next to Record, and Audio sits beside them when the stream has an audio track. Subtitles lists tracks carried by the stream, then English subtitles from TVsubtitles.net and, when a key is set, OpenSubtitles. OK switches a track or adds the file and keeps your place. The picture keeps playing.
 - The rename keyboard uses Sft, Spc, and DEL. Left and Right move through the text. Down moves to Save.
@@ -433,7 +433,7 @@ $env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
 .\gradlew.bat :app:assembleDebug
 ```
 
-The debug APK is `app/build/outputs/apk/debug/app-debug.apk`. Put a Watchmode key in `local.properties` as `watchmode.apiKey` before that build if you want **New** to load. Put an OpenSubtitles key there as `opensubtitles.apiKey` if you want that source in **Subtitles**. Neither key is written into the repository. The signed release is `C:\Users\chalu\Downloads\olympus-iptv-0.2.35.apk` (with `olympus-iptv-0.2.35.apk.idsig` beside it).
+The debug APK is `app/build/outputs/apk/debug/app-debug.apk`. Put a Watchmode key in `local.properties` as `watchmode.apiKey` before that build if you want **New** to load. Put an OpenSubtitles key there as `opensubtitles.apiKey` if you want that source in **Subtitles**. Neither key is written into the repository. The signed release is `C:\Users\chalu\Downloads\olympus-iptv-0.2.37.apk` (with `olympus-iptv-0.2.37.apk.idsig` beside it).
 
 Android Studio: use a 1920×1080 Google TV emulator. Apply Changes does not pick up new screens. Stop the app, then Debug. Click the emulator window before the arrow keys. The emulator is a different device from a Shield or an Onn box, so it does not have that box’s account, playlist, or favorites.
 
@@ -493,7 +493,8 @@ clearcast-tuner/
 | Guide | TV, Movies, Shows, Queue, New, Parental, side menu, program guide |
 | New this week | Sunday–Saturday posters you can already play, in the same poster grid as Shows |
 | Queue | Movies and series you held the center button on |
-| Episodes | Season posters, then that season’s episodes with descriptions. Check one episode or the whole season. |
+| Episodes | Seasons across the top, episodes underneath with descriptions and length. Check one episode or the whole season. |
+| Parental | Visible Live TV groups as multi-select cards; Set PIN uses an on-screen numeric pad |
 | Admin | Refresh Options, Web-UI, EPG edits, and VPN, in two rows of two. The web dashboard has the same VPN card |
 | About | Player-only notice, credits, coffee QR |
 | Search | Find a channel, movie, or show and star it |
@@ -510,6 +511,17 @@ clearcast-tuner/
 ## Version history
 
 </div>
+
+### 0.2.37
+
+- Parental, Fresh, Episodes, Watchmode, and catalog paths tightened for speed and crash safety (OOM cleanup, destroyed-activity checks, capped premiere lookups, batch PIN saves).
+- Hot-path comments stripped from those screens.
+
+### 0.2.36
+
+- Parental controls list only visible Live TV groups as multi-select cards. Set PIN uses an on-screen numeric keypad and closes after four digits.
+- New this week matches shorter or longer catalog titles against Watchmode names (shared title heads).
+- Opening a series keeps seasons horizontal across the top and episodes vertical underneath with description and length.
 
 ### 0.2.35
 
@@ -701,7 +713,7 @@ clearcast-tuner/
 
 - This is a player only. You must provide your own streams. The app does not ship channels, movies, shows, or playlist credentials.
 - It is a beta. Feedback is greatly appreciated.
-- **0.2.35** is the latest signed file. Anything newer than that needs a build from this source.
+- **0.2.37** is the latest signed file. Anything newer than that needs a build from this source.
 - The dashboard is only for the home network, and only while the app process is running.
 - The TV has to be opened, and left able to run its recorder, for a dashboard schedule to record and for a Record-tab guide to load.
 - One recording at a time. Series record is a queue, not several streams at once.
