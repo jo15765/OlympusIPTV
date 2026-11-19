@@ -541,6 +541,8 @@ class PlayerActivity : AppCompatActivity() {
                 binding.playerView.player = warmed
                 if (playAt > 0L) warmed.seekTo(playAt)
                 warmed.playWhenReady = true
+                // Warm/spare is often already READY — no state callback fires, so clear Connecting here.
+                syncConnectingFromPlayer(warmed)
                 if (previous != null && previous !== warmed) recycle(previous)
             } else {
                 val exo = player ?: return@launch
@@ -653,6 +655,11 @@ class PlayerActivity : AppCompatActivity() {
                     }
                 }
 
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                if (player !== exo) return
+                if (isPlaying) onBufferingEnded()
+            }
+
             override fun onPlaybackStateChanged(state: Int) {
                 if (player !== exo) return
                 val channel = current
@@ -662,6 +669,9 @@ class PlayerActivity : AppCompatActivity() {
                     Player.STATE_IDLE, Player.STATE_ENDED -> {
                         bufferStartedAt = 0L
                         bufferWatchToken += 1
+                        if (state == Player.STATE_IDLE && !playbackErrorOpen()) {
+                            showConnectingBadge(false)
+                        }
                     }
                 }
                 if (state == Player.STATE_ENDED &&
@@ -712,14 +722,34 @@ class PlayerActivity : AppCompatActivity() {
         exo.addAnalyticsListener(analytics)
     }
 
+    private fun syncConnectingFromPlayer(exo: ExoPlayer) {
+        when {
+            exo.isPlaying || exo.playbackState == Player.STATE_READY -> onBufferingEnded()
+            exo.playbackState == Player.STATE_BUFFERING -> onBufferingStarted()
+            else -> showConnectingBadge(false)
+        }
+    }
+
     private fun onBufferingStarted() {
         if (bufferStartedAt == 0L) bufferStartedAt = SystemClock.elapsedRealtime()
-        showConnectingBadge(true)
         val token = ++bufferWatchToken
         val started = bufferStartedAt
+        // After first paint, live streams rebuffer often — only show Connecting if it sticks.
+        val delayShow = if (hadPlaybackReady) REBUFFER_BADGE_MS else 0L
+        if (delayShow <= 0L) {
+            showConnectingBadge(true)
+        } else {
+            hideHandler.postDelayed({
+                if (isDestroyed || token != bufferWatchToken) return@postDelayed
+                val active = player ?: return@postDelayed
+                if (active.playbackState != Player.STATE_BUFFERING || active.isPlaying) return@postDelayed
+                showConnectingBadge(true)
+            }, delayShow)
+        }
         hideHandler.postDelayed({
             if (isDestroyed || token != bufferWatchToken) return@postDelayed
-            if (player?.playbackState != Player.STATE_BUFFERING) return@postDelayed
+            val active = player ?: return@postDelayed
+            if (active.playbackState != Player.STATE_BUFFERING || active.isPlaying) return@postDelayed
             val waited = SystemClock.elapsedRealtime() - started
             if (waited >= STILL_SPOOL_MS) {
                 PlaybackTrace.stillBuffering(current, waited)
@@ -728,7 +758,8 @@ class PlayerActivity : AppCompatActivity() {
         }, STILL_SPOOL_MS)
         hideHandler.postDelayed({
             if (isDestroyed || token != bufferWatchToken) return@postDelayed
-            if (player?.playbackState != Player.STATE_BUFFERING) return@postDelayed
+            val active = player ?: return@postDelayed
+            if (active.playbackState != Player.STATE_BUFFERING || active.isPlaying) return@postDelayed
             paintConnectingBadge(SystemClock.elapsedRealtime() - started)
         }, 2_000L)
     }
@@ -2413,6 +2444,7 @@ class PlayerActivity : AppCompatActivity() {
     companion object {
         private const val INITIAL_SPOOL_LOG_MS = 1_500L
         private const val REBUFFER_LOG_MS = 400L
+        private const val REBUFFER_BADGE_MS = 1_200L
         private const val STILL_SPOOL_MS = 2_500L
         private const val MAX_LIVE_RECOVER = 3
         private const val EXTRA_ID = "id"

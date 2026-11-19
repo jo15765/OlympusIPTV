@@ -3632,8 +3632,8 @@ class BrowseActivity : AppCompatActivity() {
         val showGroups = !full
         val showChannels = full
         val phoneChrome = touchPrimary
-        // Phones never use the side-by-side EPG pane — keep a full-width channel list that can play.
-        val showPrograms = live && full && !phoneChrome
+        // EPG pane only in PROGRAMS mode. CHANNELS (phones, or huge Live folders) is list-only.
+        val showPrograms = live && full && !phoneChrome && guideMenu == GuideMenu.PROGRAMS
         setNavExpanded(true)
         val blockChannels = live && guideMenu == GuideMenu.PROGRAMS && !phoneChrome
         channelAdapter.guideRowsFocusable = !blockChannels
@@ -3824,9 +3824,10 @@ class BrowseActivity : AppCompatActivity() {
         binding.categoryList.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
         binding.groupColumn.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
         if (focusIsIn(binding.categoryList)) currentFocus?.clearFocus()
-        // Huge Live groups (e.g. 1000+ 24/7) choke the side-by-side EPG grid — open as a channel list.
+        // Huge Live groups choke the side-by-side EPG. Unknown count → channel list until counted.
+        val counted = selectedCategoryId?.let { groupCounts[it] }
         val largeLive = section == GuideSection.TV &&
-            (groupCounts[selectedCategoryId] ?: 0) >= LARGE_LIVE_GROUP
+            (counted == null || counted >= LARGE_LIVE_GROUP)
         if (section == GuideSection.TV && !touchPrimary && !largeLive) {
             if (guideMenu != GuideMenu.PROGRAMS) previousMenu = guideMenu
             guideMenu = GuideMenu.PROGRAMS

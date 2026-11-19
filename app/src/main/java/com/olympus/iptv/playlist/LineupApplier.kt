@@ -168,14 +168,17 @@ object LineupApplier {
     }
 
     private fun countryBlocked(channel: Channel, hiddenCountries: Set<String>, includeInternational: Boolean?): Boolean {
-        val countryId = if (channel.kind == ContentKind.LIVE) {
-            channel.countryId ?: CountryIndex.idFor(channel.groupTitle) ?: CountryIndex.OTHER_ID
-        } else {
-            CountryIndex.idFor(channel.groupTitle)
+        // Match CatalogDb.visibilitySql: blank / unknown country stays visible when
+        // Include International is off. Mapping those to OTHER_ID here emptied whole
+        // Live folders (e.g. provider 24/7 Shows) after SQL had already allowed them.
+        val stored = channel.countryId?.takeIf { it.isNotBlank() && it != CountryIndex.OTHER_ID }
+        val inferred = stored ?: CountryIndex.idFor(channel.groupTitle)?.takeIf { it != CountryIndex.OTHER_ID }
+        if (includeInternational != true && inferred != null && inferred != "us") return true
+        if (hiddenCountries.isEmpty()) return false
+        if (inferred == null) {
+            return channel.kind == ContentKind.LIVE && CountryIndex.OTHER_ID in hiddenCountries
         }
-        if (includeInternational != true && countryId != null && countryId != "us") return true
-        if (countryId == null || hiddenCountries.isEmpty()) return false
-        return countryId in hiddenCountries
+        return inferred in hiddenCountries
     }
 
     private fun sortSlice(channels: List<Channel>, config: LineupConfig): List<Channel> {
