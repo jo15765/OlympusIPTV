@@ -1613,6 +1613,7 @@
         </div>
         <div id="favoriteResults" hidden></div>
         <div class="fav-board" id="favoriteOrder"></div>
+        <p class="hint" id="favoriteUndo" hidden style="margin-top:10px"></p>
       </section>
 
       <section class="card panel" id="panelReminders" hidden>
@@ -3391,7 +3392,35 @@
       }
       note.textContent = shown ? shown + " matches. Movies and shows show up after the TV opens once." : "Nothing matched. Movies and shows show up after the TV opens once.";
     }
-    async function toggleWebFavorite(key, adding) {
+    let favoriteUndoKey = "";
+    let favoriteUndoTimer = 0;
+    function showFavoriteUndo(key) {
+      favoriteUndoKey = key;
+      const bar = document.querySelector("#favoriteUndo");
+      if (!bar) return;
+      bar.hidden = false;
+      bar.replaceChildren();
+      const text = document.createElement("span");
+      text.textContent = "Removed. ";
+      const undo = document.createElement("button");
+      undo.type = "button";
+      undo.className = "section-save";
+      undo.textContent = "Undo";
+      undo.addEventListener("click", () => {
+        clearTimeout(favoriteUndoTimer);
+        bar.hidden = true;
+        const restore = favoriteUndoKey;
+        favoriteUndoKey = "";
+        if (restore) toggleWebFavorite(restore, true, true);
+      });
+      bar.append(text, undo);
+      clearTimeout(favoriteUndoTimer);
+      favoriteUndoTimer = setTimeout(() => {
+        bar.hidden = true;
+        favoriteUndoKey = "";
+      }, 6000);
+    }
+    async function toggleWebFavorite(key, adding, fromUndo) {
       const note = document.querySelector("#favoriteNote");
       note.textContent = "Saving favorite…";
       const response = await fetch("/api/favorites", {
@@ -3407,6 +3436,11 @@
       const body = await response.json().catch(() => ({}));
       if (response.ok && body.favorites) session.favorites = body.favorites;
       renderFavorites();
+      if (response.ok && !adding && !fromUndo) showFavoriteUndo(key);
+      if (adding && fromUndo) {
+        const bar = document.querySelector("#favoriteUndo");
+        if (bar) bar.hidden = true;
+      }
     }
 
     function clipRename(value) {

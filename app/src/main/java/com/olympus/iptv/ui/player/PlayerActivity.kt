@@ -49,6 +49,7 @@ import com.olympus.iptv.data.PlaylistStore
 import com.olympus.iptv.data.SavedPlaylist
 import com.olympus.iptv.data.WatchEntry
 import com.olympus.iptv.ui.DeviceForm
+import com.olympus.iptv.ui.Haptics
 import com.olympus.iptv.ui.InsetsPad
 import com.olympus.iptv.ui.browse.GuideFeel
 import com.olympus.iptv.ui.channelLogo
@@ -423,9 +424,18 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
+    private fun playbackErrorOpen(): Boolean =
+        ::binding.isInitialized && binding.playbackErrorCard.visibility == View.VISIBLE
+
     private fun handlePlayerBack() {
         if (binding.subtitlePanel.visibility == View.VISIBLE) {
             closeSubtitlePanel()
+            return
+        }
+        if (playbackErrorOpen()) {
+            hidePlaybackError()
+            armBrowseBack()
+            finish()
             return
         }
         if (binding.playbackMenu.visibility == View.VISIBLE) {
@@ -657,7 +667,8 @@ class PlayerActivity : AppCompatActivity() {
                 if (state == Player.STATE_ENDED &&
                     channel != null &&
                     channel.kind == ContentKind.LIVE &&
-                    channel.seriesId.isNullOrBlank()
+                    channel.seriesId.isNullOrBlank() &&
+                    !playbackErrorOpen()
                 ) {
                     recoverLive(exo, channel, null)
                     return
@@ -710,8 +721,16 @@ class PlayerActivity : AppCompatActivity() {
             if (isDestroyed || token != bufferWatchToken) return@postDelayed
             if (player?.playbackState != Player.STATE_BUFFERING) return@postDelayed
             val waited = SystemClock.elapsedRealtime() - started
-            if (waited >= STILL_SPOOL_MS) PlaybackTrace.stillBuffering(current, waited)
+            if (waited >= STILL_SPOOL_MS) {
+                PlaybackTrace.stillBuffering(current, waited)
+                paintConnectingBadge(waited)
+            }
         }, STILL_SPOOL_MS)
+        hideHandler.postDelayed({
+            if (isDestroyed || token != bufferWatchToken) return@postDelayed
+            if (player?.playbackState != Player.STATE_BUFFERING) return@postDelayed
+            paintConnectingBadge(SystemClock.elapsedRealtime() - started)
+        }, 2_000L)
     }
 
     private fun onBufferingEnded() {
@@ -732,7 +751,28 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun showConnectingBadge(show: Boolean) {
         if (!::binding.isInitialized) return
-        binding.connectingBadge.visibility = if (show) View.VISIBLE else View.GONE
+        if (show) {
+            paintConnectingBadge(
+                if (bufferStartedAt > 0L) SystemClock.elapsedRealtime() - bufferStartedAt else 0L
+            )
+            binding.connectingBadge.visibility = View.VISIBLE
+        } else {
+            binding.connectingBadge.visibility = View.GONE
+            binding.connectingBadge.setText(R.string.playback_connecting)
+        }
+    }
+
+    private fun paintConnectingBadge(waitedMs: Long) {
+        if (!::binding.isInitialized) return
+        binding.connectingBadge.text = when {
+            recoverAttempt >= 2 || waitedMs >= 8_000L ->
+                getString(R.string.playback_connecting_poor)
+            waitedMs >= STILL_SPOOL_MS ->
+                getString(R.string.playback_connecting_slow)
+            waitedMs >= 2_000L ->
+                getString(R.string.playback_connecting_wait, (waitedMs / 1000L).toInt().coerceAtLeast(1))
+            else -> getString(R.string.playback_connecting)
+        }
     }
 
     private val trackListener = object : Player.Listener {
@@ -744,13 +784,20 @@ class PlayerActivity : AppCompatActivity() {
     private fun recoverLive(exo: ExoPlayer, channel: Channel, error: PlaybackException?) {
         val token = playbackToken
         recoverJob?.cancel()
-        binding.channelMeta.text = getString(R.string.playback_reconnecting)
         val behind = error?.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW
+        val http = (error?.cause as? HttpDataSource.InvalidResponseCodeException)?.responseCode
+            ?: (error?.cause?.cause as? HttpDataSource.InvalidResponseCodeException)?.responseCode
         recoverAttempt += 1
         PlaybackTrace.recover(channel, recoverAttempt, behind)
-        if (recoverAttempt >= 3) {
+        // 403/401 are provider denials — retrying forever freezes the session and spams the log.
+        val hardFail = http == 401 || http == 403 || recoverAttempt >= MAX_LIVE_RECOVER
+        if (hardFail) {
+            runCatching { exo.stop() }
             toastPlaybackIssue(error)
+            return
         }
+        if (playbackErrorOpen()) return
+        binding.channelMeta.text = getString(R.string.playback_reconnecting)
         recoverJob = lifecycleScope.launch {
             delay((600L + (recoverAttempt - 1) * 400L).coerceAtMost(3_000L))
             if (token != playbackToken || player !== exo || isDestroyed) return@launch
@@ -790,13 +837,25 @@ class PlayerActivity : AppCompatActivity() {
     private fun showPlaybackError(message: String) {
         if (!::binding.isInitialized) return
         showConnectingBadge(false)
+        hidePlaybackMenu()
         binding.playbackErrorBody.text = message
         binding.playbackErrorCard.visibility = View.VISIBLE
+        listOf(
+            binding.playbackErrorClose,
+            binding.playbackErrorNext,
+            binding.playbackErrorRetry
+        ).forEach { button ->
+            button.isFocusable = true
+            button.isFocusableInTouchMode = true
+            button.isClickable = true
+        }
         binding.playbackErrorRetry.setOnClickListener {
+            if (touchPrimary) Haptics.tick(binding.playbackErrorRetry)
             hidePlaybackError()
             playCurrent()
         }
         binding.playbackErrorNext.setOnClickListener {
+            if (touchPrimary) Haptics.tick(binding.playbackErrorNext)
             hidePlaybackError()
             nextChannel()
         }
@@ -804,7 +863,11 @@ class PlayerActivity : AppCompatActivity() {
             hidePlaybackError()
             finish()
         }
-        binding.playbackErrorRetry.requestFocus()
+        binding.playbackErrorRetry.post {
+            if (binding.playbackErrorCard.visibility == View.VISIBLE) {
+                binding.playbackErrorRetry.requestFocus()
+            }
+        }
     }
 
     private fun hidePlaybackError() {
@@ -1407,6 +1470,7 @@ class PlayerActivity : AppCompatActivity() {
             }
             current = queue.getOrNull(index)
             stepping = true
+            if (touchPrimary) Haptics.tick(binding.root)
             playCurrent()
             return
         }
@@ -1419,6 +1483,7 @@ class PlayerActivity : AppCompatActivity() {
                 return@launch
             }
             current = next
+            if (touchPrimary) Haptics.tick(binding.root)
             playCurrent()
         }
     }
@@ -2217,6 +2282,16 @@ class PlayerActivity : AppCompatActivity() {
             handlePlayerBack()
             return true
         }
+        if (playbackErrorOpen()) {
+            if (centerKey(event.keyCode) ||
+                event.keyCode == KeyEvent.KEYCODE_DPAD_LEFT ||
+                event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT ||
+                event.keyCode == KeyEvent.KEYCODE_DPAD_UP ||
+                event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN
+            ) {
+                return super.dispatchKeyEvent(event)
+            }
+        }
         if (centerKey(event.keyCode)) {
             if (binding.subtitlePanel.visibility == View.VISIBLE) return super.dispatchKeyEvent(event)
             if (menuButtonFocused()) {
@@ -2243,6 +2318,19 @@ class PlayerActivity : AppCompatActivity() {
             keyCode == KeyEvent.KEYCODE_BUTTON_A
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if (playbackErrorOpen()) {
+            return when (keyCode) {
+                KeyEvent.KEYCODE_DPAD_LEFT,
+                KeyEvent.KEYCODE_DPAD_RIGHT,
+                KeyEvent.KEYCODE_DPAD_UP,
+                KeyEvent.KEYCODE_DPAD_DOWN,
+                KeyEvent.KEYCODE_DPAD_CENTER,
+                KeyEvent.KEYCODE_ENTER,
+                KeyEvent.KEYCODE_NUMPAD_ENTER,
+                KeyEvent.KEYCODE_BUTTON_A -> false
+                else -> true
+            }
+        }
         return when (keyCode) {
             KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_CHANNEL_UP -> {
                 if (binding.subtitlePanel.visibility == View.VISIBLE) return false
@@ -2326,6 +2414,7 @@ class PlayerActivity : AppCompatActivity() {
         private const val INITIAL_SPOOL_LOG_MS = 1_500L
         private const val REBUFFER_LOG_MS = 400L
         private const val STILL_SPOOL_MS = 2_500L
+        private const val MAX_LIVE_RECOVER = 3
         private const val EXTRA_ID = "id"
         private const val EXTRA_NAME = "name"
         private const val EXTRA_URL = "url"

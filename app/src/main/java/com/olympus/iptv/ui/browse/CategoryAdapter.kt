@@ -3,6 +3,7 @@ package com.olympus.iptv.ui.browse
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import com.olympus.iptv.data.Category
 import com.olympus.iptv.databinding.ItemCategoryBinding
@@ -74,9 +75,25 @@ class CategoryAdapter(
                     it.id.contains(normalized, ignoreCase = true)
             }
         }
+        val old = items.toList()
         items.clear()
         items.addAll(next)
-        notifyDataSetChanged()
+        if (old.isEmpty() || next.isEmpty()) {
+            notifyDataSetChanged()
+            return
+        }
+        DiffUtil.calculateDiff(object : DiffUtil.Callback() {
+            override fun getOldListSize(): Int = old.size
+            override fun getNewListSize(): Int = next.size
+            override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean =
+                old[oldItemPosition].id == next[newItemPosition].id
+            override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
+                val a = old[oldItemPosition]
+                val b = next[newItemPosition]
+                return a.id == b.id && a.name == b.name &&
+                    (a.id == selectedId) == (b.id == selectedId)
+            }
+        }, true).dispatchUpdatesTo(this)
     }
 
     override fun getItemId(position: Int): Long = items[position].id.hashCode().toLong()

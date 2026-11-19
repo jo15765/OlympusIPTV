@@ -6,7 +6,7 @@
 
 ### For the latest and greatest, build your own APK from this code.
 
-The latest signed file is **0.2.50** (versionCode 51). **One APK** installs on Android TV / set-top boxes and on phones and tablets. Phones: now-playing resume strip, Live “now” line on channel rows, group name filter, empty Favorites/Continue CTAs, pull-to-refresh, haptics, long-press sheet, skeletons. TV: honey focus scale, dimmed unfocused groups, soft gradient, raised Continue. Player: honey **Connecting…** badge while buffering, and a retry / next / close card when playback fails. Parental **Remove lock** asks for the PIN. Admin shows quiet-hours next to the parental summary. Optional SendGrid alert after two wrong parental PINs (`sendgrid.apiKey` + `sendgrid.fromEmail` in `local.properties`).
+The latest signed file is **0.2.52** (versionCode 53). **One APK** installs on Android TV / set-top boxes and on phones and tablets. Large Live groups (250+) open as a channel list instead of the side-by-side EPG so 24/7 mega-folders stay responsive. Live 401/403 denials stop after a hard fail instead of reconnecting forever. Phones: smaller Live pages, group DiffUtil filter, now-playing strip, “Back to group” chip, search recent queries, empty CTAs, haptics on zap/retry. Player: Connecting badge shows wait / poor-network copy; error card with Retry / Next. Admin: quiet-hours toggle + schedule, Backup export shortcut, parental lock count on the chip. Web Favorites: Undo after remove. Optional SendGrid after two wrong PINs (`sendgrid.apiKey` + `sendgrid.fromEmail` in `local.properties`).
 
 **This is a player only. You must provide your own streams.**
 
@@ -66,14 +66,14 @@ Olympus-IPTV is one APK for Android TV / set-top boxes and for phones and tablet
 
 | | |
 | --- | --- |
-| Signed file | `C:\Users\chalu\Downloads\olympus-iptv-0.2.50.apk` |
-| What that file is | versionName **0.2.50**, versionCode **51** |
-| Source in this tree | versionName **0.2.50**, versionCode **51** |
-| What to run | Install the signed 0.2.50 APK, or build this source |
+| Signed file | `C:\Users\chalu\Downloads\olympus-iptv-0.2.52.apk` |
+| What that file is | versionName **0.2.52**, versionCode **53** |
+| Source in this tree | versionName **0.2.52**, versionCode **53** |
+| What to run | Install the signed 0.2.52 APK, or build this source |
 | Install | Over the existing copy (TV or phone). Uninstalling wipes the saved account, playlist, and favorites. Downloader works with the same file. |
 | Launcher name | Two centered lines: Olympus over IPTV |
 
-**0.2.50** adds the phone now-playing strip, Live row “now” lines, group typeahead filter, empty Favorites/Continue taps, player error card (Retry / Next / close), Coil cancel on recycle, deferred phone EPG prefetch, memory drop when leaving a huge group, PIN required to remove parental locks, quiet-hours on the Admin parental line, web Favorites loading polish (count, disabled search while catalog loads), and a one-time backup/export tip — on top of 0.2.48–0.2.49 polish. A device that already has an account opens with focus on the Live TV Favorites group card on TV; the left rail stays available with Left on the remote. Group cards fill in as soon as the saved group names are ready. The login screen is created only when no account is stored. Live TV shows Favorites setup, Queue (with a count when the queue is not empty), New / Just Added, Reminders, and Parental above the groups. The top of that groups screen shows today’s date and a 12-hour clock (`MM/DD/YYYY  hh:mm AM/PM`), updated each minute. Movies and Shows (and Recent on Live TV) also show a one-tap **Continue watching** strip above the group cards when something is in progress; Continue and Recently watched cards show how many titles they hold.
+**0.2.52** keeps provider Live groups as they arrive (no merge-by-name). Opening a huge Live folder (250+ channels, e.g. a single 24/7 Shows category) uses the channel list and smaller pages instead of building the full EPG grid. Denied Live streams (HTTP 401/403) show the playback error card and stop reconnect spam. A device that already has an account opens with focus on the Live TV Favorites group card on TV; the left rail stays available with Left on the remote. Group cards fill in as soon as the saved group names are ready. The login screen is created only when no account is stored. Live TV shows Favorites setup, Queue (with a count when the queue is not empty), New / Just Added, Reminders, and Parental above the groups. The top of that groups screen shows today’s date and a 12-hour clock (`MM/DD/YYYY  hh:mm AM/PM`), updated each minute. Movies and Shows (and Recent on Live TV) also show a one-tap **Continue watching** strip above the group cards when something is in progress; Continue and Recently watched cards show how many titles they hold.
 
 ---
 
@@ -83,7 +83,7 @@ Olympus-IPTV is one APK for Android TV / set-top boxes and for phones and tablet
 
 </div>
 
-There is **no separate mobile APK**. The same `olympus-iptv-0.2.50.apk` detects whether it is running on a television (Leanback / UI mode) or a touch-first phone or tablet.
+There is **no separate mobile APK**. The same `olympus-iptv-0.2.52.apk` detects whether it is running on a television (Leanback / UI mode) or a touch-first phone or tablet.
 
 | On phones and tablets | What changed |
 | --- | --- |
@@ -152,7 +152,7 @@ It walks through enabling unknown sources on an Onn box, installing Downloader b
 When an account is already saved, the app opens on two panes: the settings rail and the group cards. The login screen is not created. The rail is on screen while the group names load, and the cards fill in as soon as those names are ready from the local library. Heavy work (dashboard snapshot, image cleanup, Watchmode “New” cards) starts after that paint so a returning launch stays quick. The channel list and the hour-by-hour guide stay hidden until a card is opened. It does not start the last channel. The rail stays open, and its divider sits at the end of the longest label. The title on that rail is **Olympus IPTV** on one line. The launcher name under the icon stays on two lines. Above the group cards, Live TV shows the current date and time (`MM/DD/YYYY  hh:mm AM/PM`) instead of a row of favorite channel names.
 
 1. **TV, Movies, or Shows.** Group cards fill the space beside the rail, three smaller cards per row. Choosing one of those on the rail opens its cards and moves focus to the top-left card. A card shows the group name and, once counted, how many channels or titles it holds. Recently watched says Resume watching. Continue says Pick up where you left off. Moving across the cards does not load channels. The counts are read once and kept until the library changes.
-2. **OK on a card**, or Right from a card on the right edge, opens that group and loads it then. Focus leaves the group card. On TV it lands on the program that is on now for the first channel. Movies and Shows land on the first title. The other groups are not listed on that screen. Back from About or Admin returns focus to that same item on the left rail.
+2. **OK on a card**, or Right from a card on the right edge, opens that group and loads it then. Focus leaves the group card. On TV, a Live group under 250 channels opens the side-by-side EPG and lands on the program that is on now for the first channel. A Live group with **250 or more** channels (common for a single provider “24/7 Shows” folder) opens as a channel list instead, with smaller pages (60 rows), so the guide does not freeze building a thousand-row EPG. Movies and Shows land on the first title. The other groups are not listed on that screen. Back from About or Admin returns focus to that same item on the left rail.
 3. **Right** from a channel moves into the guide and later in time. **Left** from the first time slot returns to the channel list. Left from a later slot steps one slot back.
 4. **Back** from the channel list or the guide returns to the group cards. Back from the cards returns to the rail. Back on the rail does not quit the app.
 5. **Left** during full-screen playback returns to the channel list. **Back** during live playback returns to the channel and guide for that group. Back from there returns to the group cards. Back during movie or show playback still leaves the player and returns to the title you started.
@@ -221,6 +221,8 @@ A movie or episode you left in the middle shows Continue and the minute you reac
 
 The guide shows the names you set, not the raw provider strings, everywhere those names appear: the channel column, the group cards, and the dimmed caption at the top of playback. If a program title is only the provider’s channel name, that caption uses the lineup name too.
 
+Live groups stay **provider-split by category id**. The app does not merge folders that share a display name. If another IPTV player shows several small 24/7 groups and Olympus shows one large “24/7 Shows” card with 1000+ channels, that card is one category from the panel — not a name lump in this app. Hide or rename that group on the dashboard if you want it out of the way; Bulk Group Renamer only changes the label, not how channels are counted.
+
 - **Bulk Channel Stripper.** Comma-separated prefixes and suffixes, such as `USA |, HD`. A plain word comes off the start or the end and does not eat a longer word (`HD` does not eat `FHD`). A token with a space or a mark such as `|` or `:` is removed wherever it appears. The saved tokens are listed one per line on the TV and in the dashboard, and they stay after you leave the screen.
 - **Bulk Group Renamer.** Find and replace across group names. Capitalization is ignored. A bar that looks like `|` matches the `|` key. Save rewrites the stored group name, so the guide still shows the new text after you leave and come back. Back leaves the names unchanged.
 - The on-screen keyboard labels the wide keys **Sft**, **Spc**, and **DEL** so they stay on one line.
@@ -282,7 +284,7 @@ The top caption shows the lineup name, the current program, and the next program
 
 When a movie or episode ends, a countdown offers the next title. For a series that is the next episode, with **Skip intro**. For Queue or a favorites list that still has titles after this one, that is the next item, with **Play next**. **Back to menu** leaves the player and returns to the guide. If you do nothing, the next title starts when the countdown reaches 0.
 
-A live channel that loses the source reconnects and keeps playing until you change the channel or leave. Movies and shows still report a playback error. A movie or episode writes its position about every eight seconds and again when you leave.
+A live channel that drops briefly reconnects a few times and keeps playing. **HTTP 401 or 403** (provider denial) stops immediately: the player shows the **Playback stopped** card with Retry / Next / close instead of reconnecting forever. After three failed recovers of any other kind, the same card appears. Movies and shows still report a playback error. A movie or episode writes its position about every eight seconds and again when you leave.
 
 Left from full screen returns to the channel list for the group you opened, unless live timeshift can step back first. Back from full screen leaves the player and returns to the title you started. Back during the next-episode countdown leaves instead of playing the next one. Back from the subtitle list returns to the episode. Left does not leave while that subtitle list is open.
 
@@ -472,7 +474,7 @@ $env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
 .\gradlew.bat :app:assembleDebug
 ```
 
-The debug APK is `app/build/outputs/apk/debug/app-debug.apk`. Put a Watchmode key in `local.properties` as `watchmode.apiKey` before that build if you want **New** to load. Put an OpenSubtitles key there as `opensubtitles.apiKey` if you want that source in **Subtitles**. For optional parental PIN-fail email, also set `sendgrid.apiKey` and `sendgrid.fromEmail`. Keys are not written into the repository. The latest signed release is `C:\Users\chalu\Downloads\olympus-iptv-0.2.50.apk`.
+The debug APK is `app/build/outputs/apk/debug/app-debug.apk`. Put a Watchmode key in `local.properties` as `watchmode.apiKey` before that build if you want **New** to load. Put an OpenSubtitles key there as `opensubtitles.apiKey` if you want that source in **Subtitles**. For optional parental PIN-fail email, also set `sendgrid.apiKey` and `sendgrid.fromEmail`. Keys are not written into the repository. The latest signed release is `C:\Users\chalu\Downloads\olympus-iptv-0.2.52.apk`.
 
 Android Studio: use a 1920×1080 Google TV emulator. Apply Changes does not pick up new screens. Stop the app, then Debug. Click the emulator window before the arrow keys. The emulator is a different device from a Shield or an Onn box, so it does not have that box’s account, playlist, or favorites.
 
@@ -557,6 +559,20 @@ clearcast-tuner/
 
 </div>
 
+### 0.2.52
+
+- Large Live groups (250+ channels) open as a channel list, not the side-by-side EPG; page size drops to 60 and empty filtered pages are capped so mega-folders (e.g. provider 24/7 Shows) stay responsive.
+- Live HTTP 401/403 (and recover after 3 tries) hard-stop with the playback error card — no endless reconnect spam.
+- Groups stay provider-split by category id; a single 1100+ “24/7 Shows” card means the provider sent one category, not an app name-merge.
+- Signed APK: `C:\Users\chalu\Downloads\olympus-iptv-0.2.52.apk` (versionCode 53).
+
+### 0.2.51
+
+- Speed: phone Live pages of 100 (TV stays 200); DiffUtil on group filter; Coil logo decode clamped to row size.
+- UX: search recent queries; phone “Back to group” chip; Connecting badge wait/poor-network copy; haptics on phone zap and error Retry/Next; web Favorites Undo after remove.
+- Product: Admin quiet-hours toggle + schedule presets; Backup export shortcut; Parental chip shows lock count; offline hint when catalog refresh fails.
+- Signed APK: `C:\Users\chalu\Downloads\olympus-iptv-0.2.51.apk` (versionCode 52).
+
 ### 0.2.50
 
 - Phone: now-playing resume strip; Live channel “now” line; groups typeahead filter; empty Favorites/Continue CTAs; backup/export tip once after Admin open.
@@ -564,7 +580,7 @@ clearcast-tuner/
 - Perf: Coil `dispose` on recycle; phone EPG prefetch deferred ~220 ms; drop in-memory channel pages over ~400 rows when returning to groups.
 - Parental: Remove lock requires a matching PIN for every selected lock; Admin parental line includes quiet hours.
 - Web Favorites: catalog-loading banner, disabled search/auto-add until groups arrive, favorite count in the header, clearer empty states.
-- Signed APK: `C:\Users\chalu\Downloads\olympus-iptv-0.2.50.apk` (versionCode 51). Includes 0.2.49 source polish below.
+- Focus fixes for player error buttons, empty CTA (touch-only), and phone login M3U focus.
 
 ### 0.2.49
 
@@ -839,7 +855,9 @@ clearcast-tuner/
 
 - This is a player only. You must provide your own streams. The app does not ship channels, movies, shows, or playlist credentials.
 - It is a beta. Feedback is greatly appreciated.
-- **0.2.50** is the latest signed file in Downloads (`olympus-iptv-0.2.50.apk`, versionCode 51).
+- **0.2.52** is the latest signed file in Downloads (`olympus-iptv-0.2.52.apk`, versionCode 53).
+- Live groups follow the provider’s category ids. Olympus does not split or merge folders by display name; a huge 24/7 card is usually one panel category.
+- Live groups with 250+ channels open as a channel list on TV (not the full EPG grid) so opening stays usable.
 - The dashboard is only for the home network, and only while the app process is running.
 - The TV has to be opened, and left able to run its recorder, for a dashboard schedule to record and for a Record-tab guide to load.
 - One recording at a time. Series record is a queue, not several streams at once.

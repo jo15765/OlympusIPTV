@@ -152,6 +152,7 @@ class BrowseActivity : AppCompatActivity() {
     private var visibleChannels: List<Channel> = emptyList()
     private var pageCursor: CatalogDb.PageCursor? = null
     private var pageExhausted = false
+    private var emptyPageSkips = 0
     private var pendingChannelFocus = -1
     private var pendingChannelFocusId = View.NO_ID
     private var pageLoading = false
@@ -380,6 +381,10 @@ class BrowseActivity : AppCompatActivity() {
         binding.deviceRemovePlaylist.setOnClickListener { confirmRemovePlaylist() }
         binding.refreshNowCard.setOnClickListener { refreshPlaylist(quiet = true) }
         binding.refreshIntervalCard.setOnClickListener { cycleRefreshInterval() }
+        binding.adminQuietToggle.setOnClickListener { toggleAdminQuietHours() }
+        binding.adminQuietSchedule.setOnClickListener { cycleAdminQuietSchedule() }
+        binding.adminBackupLink.setOnClickListener { openBackupShortcut() }
+        binding.btnLastGroup.setOnClickListener { openLastGroup() }
         showRefreshInterval(refreshMinutes)
         binding.btnAbout.setOnClickListener {
             if (binding.aboutPane.visibility == View.VISIBLE) showBlank() else showAboutPane()
@@ -1086,6 +1091,23 @@ class BrowseActivity : AppCompatActivity() {
                     render(restoreFocus = false)
                 }
             }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                withContext(Dispatchers.Main) {
+                    if (isDestroyed) return@withContext
+                    binding.groupsRefresh.isRefreshing = false
+                    showRefreshStatus(getString(R.string.refresh_offline_hint))
+                    Toast.makeText(
+                        this@BrowseActivity,
+                        R.string.refresh_offline_hint,
+                        Toast.LENGTH_LONG
+                    ).show()
+                    if (!quiet) {
+                        binding.refreshLine.visibility = View.VISIBLE
+                        binding.refreshLine.text = getString(R.string.refresh_offline_hint)
+                    }
+                }
             } finally {
                 Process.setThreadPriority(previous)
             }
@@ -2013,8 +2035,109 @@ class BrowseActivity : AppCompatActivity() {
             }
             val quiet = getString(if (prefs.quietHours) R.string.admin_quiet_on else R.string.admin_quiet_off)
             binding.adminParentalSummary.text = base + quiet
+            binding.adminQuietToggle.text = getString(
+                if (prefs.quietHours) R.string.quiet_hours_on else R.string.quiet_hours_off
+            )
+            binding.adminQuietSchedule.text = getString(
+                R.string.admin_quiet_schedule,
+                clockLabel(prefs.quietStartMinute),
+                clockLabel(prefs.quietEndMinute)
+            )
+            paintParentalChip(locked)
+            paintLastGroupChip()
             maybeShowBackupTip()
         }
+    }
+
+    private fun paintParentalChip(locked: Int = activeConfig.groupPins.orEmpty().size) {
+        if (!::binding.isInitialized) return
+        binding.btnParental.text = if (locked > 0) {
+            getString(R.string.parental_chip_count, locked)
+        } else {
+            getString(R.string.parental_chip)
+        }
+    }
+
+    private var lastGroupId: String? = null
+    private var lastGroupName: String? = null
+
+    private fun paintLastGroupChip() {
+        if (!::binding.isInitialized) return
+        val id = lastGroupId
+        val name = lastGroupName
+        if (!touchPrimary || id.isNullOrBlank() || name.isNullOrBlank() ||
+            id == PlaylistLoader.FAVORITES_ID ||
+            binding.groupColumn.visibility != View.VISIBLE
+        ) {
+            binding.btnLastGroup.visibility = View.GONE
+            return
+        }
+        binding.btnLastGroup.text = getString(R.string.last_group_chip, name)
+        binding.btnLastGroup.visibility = View.VISIBLE
+    }
+
+    private fun openLastGroup() {
+        val id = lastGroupId ?: return
+        val category = categoryAdapter.categories().firstOrNull { it.id == id }
+            ?: Category(id = id, name = lastGroupName.orEmpty())
+        Haptics.tick(binding.btnLastGroup)
+        selectCategory(category, immediate = true)
+    }
+
+    private fun clockLabel(minuteOfDay: Int): String {
+        val hour = (minuteOfDay / 60) % 24
+        val minute = minuteOfDay % 60
+        val am = hour < 12
+        val h12 = when {
+            hour == 0 -> 12
+            hour > 12 -> hour - 12
+            else -> hour
+        }
+        return String.format("%d:%02d %s", h12, minute, if (am) "AM" else "PM")
+    }
+
+    private fun toggleAdminQuietHours() {
+        lifecycleScope.launch {
+            val store = (application as OlympusIptvApp).playlistStore
+            val prefs = withContext(Dispatchers.IO) { store.devicePrefs() }
+            withContext(Dispatchers.IO) {
+                store.saveQuietHours(
+                    !prefs.quietHours,
+                    prefs.quietStartMinute,
+                    prefs.quietEndMinute
+                )
+            }
+            com.olympus.iptv.remind.ReminderClock.arm(this@BrowseActivity)
+            paintAdminParentalSummary()
+        }
+    }
+
+    private fun cycleAdminQuietSchedule() {
+        lifecycleScope.launch {
+            val store = (application as OlympusIptvApp).playlistStore
+            val prefs = withContext(Dispatchers.IO) { store.devicePrefs() }
+            val presets = listOf(
+                22 * 60 to 7 * 60,
+                23 * 60 to 7 * 60,
+                0 to 6 * 60,
+                21 * 60 to 8 * 60
+            )
+            val index = presets.indexOfFirst {
+                it.first == prefs.quietStartMinute && it.second == prefs.quietEndMinute
+            }
+            val next = presets[(index + 1).coerceAtLeast(0) % presets.size]
+            withContext(Dispatchers.IO) {
+                store.saveQuietHours(prefs.quietHours || true, next.first, next.second)
+            }
+            com.olympus.iptv.remind.ReminderClock.arm(this@BrowseActivity)
+            paintAdminParentalSummary()
+        }
+    }
+
+    private fun openBackupShortcut() {
+        Haptics.tick(binding.adminBackupLink)
+        showDevicePane()
+        Toast.makeText(this, R.string.admin_backup_detail, Toast.LENGTH_LONG).show()
     }
 
     private fun paintNowPlayingBar() {
@@ -3375,7 +3498,7 @@ class BrowseActivity : AppCompatActivity() {
         val padH = (16 * resources.displayMetrics.density).toInt()
         listOf(
             binding.btnFavoritesSetup, binding.btnQueue, binding.btnFresh,
-            binding.btnRemind, binding.btnParental,
+            binding.btnRemind, binding.btnParental, binding.btnLastGroup,
             binding.mobileTabLive, binding.mobileTabMovies, binding.mobileTabShows,
             binding.mobileBack, binding.mobileAdmin, binding.mobileAbout, binding.mobileSearch,
             binding.groupsSearch,
@@ -3701,7 +3824,10 @@ class BrowseActivity : AppCompatActivity() {
         binding.categoryList.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
         binding.groupColumn.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
         if (focusIsIn(binding.categoryList)) currentFocus?.clearFocus()
-        if (section == GuideSection.TV && !touchPrimary) {
+        // Huge Live groups (e.g. 1000+ 24/7) choke the side-by-side EPG grid — open as a channel list.
+        val largeLive = section == GuideSection.TV &&
+            (groupCounts[selectedCategoryId] ?: 0) >= LARGE_LIVE_GROUP
+        if (section == GuideSection.TV && !touchPrimary && !largeLive) {
             if (guideMenu != GuideMenu.PROGRAMS) previousMenu = guideMenu
             guideMenu = GuideMenu.PROGRAMS
         } else {
@@ -4974,6 +5100,7 @@ class BrowseActivity : AppCompatActivity() {
             pageExhausted = false
         }
         paintNowPlayingBar()
+        paintLastGroupChip()
     }
 
     private fun showChannelSkeleton(show: Boolean) {
@@ -5003,6 +5130,8 @@ class BrowseActivity : AppCompatActivity() {
         val sectionNow = section
         val categoryId = selectedCategoryId ?: return
         pageLoading = true
+        if (reset) emptyPageSkips = 0
+        channelJob?.cancel()
         val query = channelQuery
         val config = activeConfig
         val cursor = pageCursor
@@ -5018,7 +5147,7 @@ class BrowseActivity : AppCompatActivity() {
                     saved.id,
                     pageBucket,
                     pageCategory,
-                    PAGE_SIZE,
+                    pageSizeFor(categoryId),
                     cursor,
                     hiddenChannels,
                     hiddenGroups,
@@ -5063,8 +5192,27 @@ class BrowseActivity : AppCompatActivity() {
                 revealPendingChannel()
             }
             if (pageExhausted) deliverPendingChannels()
-            if (named.isEmpty() && !pageExhausted) loadGroupPage(reset = false) else if (named.isEmpty()) revealPendingChannel()
-            syncProgramGuide()
+            // Skip empty filtered pages without tight recursion — cap so a bad group cannot spin forever.
+            if (named.isEmpty() && !pageExhausted) {
+                emptyPageSkips += 1
+                if (emptyPageSkips <= MAX_EMPTY_PAGE_SKIPS) {
+                    binding.channelList.post { loadGroupPage(reset = false) }
+                } else {
+                    pageExhausted = true
+                    revealPendingChannel()
+                }
+            } else {
+                emptyPageSkips = 0
+                if (named.isEmpty()) revealPendingChannel()
+            }
+            if (section == GuideSection.TV &&
+                binding.programPane.visibility == View.VISIBLE &&
+                (groupCounts[categoryId] ?: visibleChannels.size) < LARGE_LIVE_GROUP
+            ) {
+                syncProgramGuide()
+            } else if (landOnOpened) {
+                focusOpenedGuide()
+            }
             if (cursor == null) restoreHeldChannel()
         }
     }
@@ -5085,20 +5233,28 @@ class BrowseActivity : AppCompatActivity() {
                 continueEmpty -> getString(R.string.empty_continue_cta)
                 else -> getString(R.string.no_channels)
             }
-            binding.errorText.setOnClickListener {
-                when {
-                    favoritesEmpty -> openFavoritesSetup()
-                    continueEmpty -> openSection(
-                        if (section == GuideSection.SHOWS) GuideSection.SHOWS else GuideSection.MOVIES
-                    )
-                    else -> Unit
+            val emptyCta = touchPrimary && (favoritesEmpty || continueEmpty)
+            if (emptyCta) {
+                binding.errorText.setOnClickListener {
+                    when {
+                        favoritesEmpty -> openFavoritesSetup()
+                        continueEmpty -> openSection(
+                            if (section == GuideSection.SHOWS) GuideSection.SHOWS else GuideSection.MOVIES
+                        )
+                        else -> Unit
+                    }
                 }
+            } else {
+                binding.errorText.setOnClickListener(null)
             }
-            binding.errorText.isClickable = favoritesEmpty || continueEmpty
+            binding.errorText.isClickable = emptyCta
+            binding.errorText.isFocusable = false
+            binding.errorText.isFocusableInTouchMode = false
         } else {
             binding.errorText.visibility = View.GONE
             binding.errorText.setOnClickListener(null)
             binding.errorText.isClickable = false
+            binding.errorText.isFocusable = false
             schedulePrefetch(channels)
             scheduleEpisodePrefetch()
             showChannelDetail(channels.first())
@@ -5254,6 +5410,15 @@ class BrowseActivity : AppCompatActivity() {
             return
         }
         selectedCategoryId = category.id
+        if (category.id != PlaylistLoader.FAVORITES_ID &&
+            category.id != PlaylistLoader.CONTINUE_ID &&
+            category.id != PlaylistLoader.RECENT_ID &&
+            category.id != PlaylistLoader.ALL_ID
+        ) {
+            lastGroupId = category.id
+            lastGroupName = category.name
+            paintLastGroupChip()
+        }
         showChannels()
         openFullGuide()
     }
@@ -5649,8 +5814,21 @@ class BrowseActivity : AppCompatActivity() {
         const val EXTRA_PLAYLIST_ID = "playlist_id"
         const val EXTRA_SKIP_RESUME = "skip_resume"
         private const val CARD_SPAN = 3
-        private const val PAGE_SIZE = 200
+        private const val PAGE_SIZE_TV = 200
+        private const val PAGE_SIZE_PHONE = 100
+        private const val PAGE_SIZE_HUGE = 60
+        private const val LARGE_LIVE_GROUP = 250
+        private const val MAX_EMPTY_PAGE_SKIPS = 8
         private const val FOCUS_SETTLE_MS = 160L
         private const val EPG_CACHE_CAP = 120
+    }
+
+    private fun pageSizeFor(categoryId: String?): Int {
+        val count = groupCounts[categoryId] ?: 0
+        return when {
+            count >= LARGE_LIVE_GROUP -> PAGE_SIZE_HUGE
+            touchPrimary -> PAGE_SIZE_PHONE
+            else -> PAGE_SIZE_TV
+        }
     }
 }

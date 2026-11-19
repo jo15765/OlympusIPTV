@@ -55,7 +55,11 @@ class LoginActivity : AppCompatActivity() {
         binding.btnTogglePass.setOnClickListener { togglePassword() }
         binding.checkVod.isChecked = true
         binding.checkInternational.isChecked = false
-        binding.btnM3u.requestFocus()
+        listOf(binding.btnM3u, binding.btnXtream, binding.btnCancel, binding.btnConnect).forEach { button ->
+            button.isFocusable = true
+            button.isFocusableInTouchMode = true
+        }
+        binding.btnM3u.post { binding.btnM3u.requestFocus() }
         listOf(binding.inputEmail, binding.inputUrl, binding.inputUser, binding.inputPass, binding.inputZip)
             .forEach { SoftKeyboard.showWhenFocused(this, it) }
 

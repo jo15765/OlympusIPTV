@@ -337,10 +337,10 @@ class ChannelAdapter(
             return
         }
         view.setTag(R.id.logo, key)
-        view.scaleType = if (poster) android.widget.ImageView.ScaleType.FIT_CENTER
-        else android.widget.ImageView.ScaleType.FIT_CENTER
+        view.scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+        val px = logoPx(view, sizeDp)
         view.load(key) {
-            channelLogo(logoPx(view, sizeDp))
+            channelLogo(px)
             if (poster && cornerPx > 0f) transformations(RoundedCornersTransformation(cornerPx))
             placeholder(R.drawable.ic_channel_placeholder)
             error(R.drawable.ic_channel_placeholder)
@@ -354,8 +354,11 @@ class ChannelAdapter(
         private const val PAYLOAD_FAVORITE = "favorite"
         private const val PAYLOAD_LOGO = "logo"
 
-        private fun logoPx(view: android.view.View, dp: Int): Int =
-            (dp * view.resources.displayMetrics.density).toInt().coerceAtLeast(1)
+        private fun logoPx(view: android.view.View, dp: Int): Int {
+            val fromDp = (dp * view.resources.displayMetrics.density).toInt().coerceAtLeast(1)
+            val measured = maxOf(view.width, view.height)
+            return if (measured > 0) minOf(fromDp, measured) else fromDp
+        }
     }
 
     private fun displayName(item: Channel): String {

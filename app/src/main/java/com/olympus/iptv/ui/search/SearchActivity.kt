@@ -8,6 +8,7 @@ import android.text.TextWatcher
 import android.view.inputmethod.EditorInfo
 import android.view.KeyEvent
 import android.view.View
+import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
@@ -128,6 +129,7 @@ class SearchActivity : AppCompatActivity() {
         SoftKeyboard.keepOffUntilAsked(this, binding.inputSearch)
         binding.btnSearch.setOnClickListener { submitSearch() }
         binding.btnHideKeyboard.setOnClickListener { hideKeyboard() }
+        paintRecentSearches()
         binding.inputSearch.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEARCH || actionId == EditorInfo.IME_ACTION_DONE) {
                 submitSearch()
@@ -203,7 +205,69 @@ class SearchActivity : AppCompatActivity() {
     private fun submitSearch() {
         focusResults = true
         searchWait?.let { searchHandler.removeCallbacks(it) }
-        showMatches(binding.inputSearch.text?.toString().orEmpty())
+        val query = binding.inputSearch.text?.toString().orEmpty()
+        rememberSearch(query)
+        showMatches(query)
+    }
+
+    private fun recentPrefs() = getSharedPreferences("olympus_search_recent", MODE_PRIVATE)
+
+    private fun recentQueries(): List<String> =
+        recentPrefs().getString("q", "")
+            .orEmpty()
+            .split('\u001f')
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+
+    private fun rememberSearch(raw: String) {
+        val query = raw.trim()
+        if (query.length < 2) return
+        val next = (listOf(query) + recentQueries().filter { !it.equals(query, ignoreCase = true) })
+            .take(8)
+        recentPrefs().edit().putString("q", next.joinToString("\u001f")).apply()
+        paintRecentSearches()
+    }
+
+    private fun paintRecentSearches() {
+        if (!::binding.isInitialized) return
+        val row = binding.recentSearchRow
+        row.removeAllViews()
+        val queries = recentQueries()
+        if (queries.isEmpty()) {
+            binding.recentSearches.visibility = View.GONE
+            return
+        }
+        binding.recentSearches.visibility = View.VISIBLE
+        val density = resources.displayMetrics.density
+        val label = TextView(this).apply {
+            text = getString(R.string.search_recent)
+            setTextColor(getColor(R.color.text_secondary))
+            textSize = 13f
+            setPadding(0, 0, (10 * density).toInt(), 0)
+        }
+        row.addView(label)
+        queries.forEach { query ->
+            val chip = TextView(this).apply {
+                text = query
+                setTextColor(getColor(R.color.text_primary))
+                textSize = 14f
+                background = getDrawable(R.drawable.bg_nav)
+                setPadding((12 * density).toInt(), (8 * density).toInt(), (12 * density).toInt(), (8 * density).toInt())
+                isFocusable = true
+                isClickable = true
+                setOnClickListener {
+                    binding.inputSearch.setText(query)
+                    binding.inputSearch.setSelection(query.length)
+                    submitSearch()
+                }
+            }
+            val params = android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            params.marginEnd = (8 * density).toInt()
+            row.addView(chip, params)
+        }
     }
 
     private fun hideKeyboard() {
