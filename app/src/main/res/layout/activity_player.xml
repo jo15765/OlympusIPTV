@@ -1,0 +1,346 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/black">
+
+    <LinearLayout
+        android:id="@+id/playerSplit"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="horizontal">
+
+        <androidx.media3.ui.PlayerView
+            android:id="@+id/playerView"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:keepScreenOn="true" />
+
+        <androidx.media3.ui.PlayerView
+            android:id="@+id/playerViewB"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="0"
+            android:keepScreenOn="true"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/overlay"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top"
+        android:background="#CC0B1220"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="28dp"
+        android:paddingVertical="18dp">
+
+        <ImageView
+            android:id="@+id/overlayLogo"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:background="@drawable/bg_logo"
+            android:contentDescription="@null"
+            android:padding="6dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_channel_placeholder" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/channelName"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text_primary"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/channelMeta"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:textColor="@color/accent"
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/channelNext"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/playbackMenu"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:background="#CC141210"
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:paddingHorizontal="28dp"
+        android:paddingVertical="18dp"
+        android:visibility="gone">
+
+        <Button
+            android:id="@+id/btnAudio"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:background="@drawable/bg_button"
+            android:focusable="true"
+            android:nextFocusLeft="@id/btnAudio"
+            android:nextFocusRight="@id/btnSubtitles"
+            android:nextFocusUp="@id/btnAudio"
+            android:nextFocusDown="@id/btnAudio"
+            android:text="@string/audio"
+            android:textAllCaps="false"
+            android:textColor="@color/bg"
+            android:visibility="gone" />
+
+        <Button
+            android:id="@+id/btnSubtitles"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:layout_marginStart="12dp"
+            android:background="@drawable/bg_button"
+            android:focusable="true"
+            android:nextFocusLeft="@id/btnAudio"
+            android:nextFocusRight="@id/btnRecord"
+            android:nextFocusUp="@id/btnSubtitles"
+            android:nextFocusDown="@id/btnSubtitles"
+            android:text="@string/subtitles"
+            android:textAllCaps="false"
+            android:textColor="@color/bg"
+            android:visibility="gone" />
+
+        <Button
+            android:id="@+id/btnRecord"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:layout_marginStart="12dp"
+            android:background="@drawable/bg_button"
+            android:focusable="true"
+            android:nextFocusLeft="@id/btnSubtitles"
+            android:nextFocusRight="@id/btnPicture"
+            android:nextFocusUp="@id/btnRecord"
+            android:nextFocusDown="@id/btnRecord"
+            android:text="@string/record"
+            android:textAllCaps="false"
+            android:textColor="@color/bg" />
+
+        <Button
+            android:id="@+id/btnPicture"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:layout_marginStart="12dp"
+            android:background="@drawable/bg_button"
+            android:focusable="true"
+            android:nextFocusLeft="@id/btnRecord"
+            android:nextFocusRight="@id/btnLast"
+            android:nextFocusUp="@id/btnPicture"
+            android:nextFocusDown="@id/btnPicture"
+            android:text="@string/picture"
+            android:textAllCaps="false"
+            android:textColor="@color/bg" />
+
+        <Button
+            android:id="@+id/btnLast"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:layout_marginStart="12dp"
+            android:background="@drawable/bg_button"
+            android:focusable="true"
+            android:nextFocusLeft="@id/btnPicture"
+            android:nextFocusRight="@id/btnGoLive"
+            android:nextFocusUp="@id/btnLast"
+            android:nextFocusDown="@id/btnLast"
+            android:text="@string/last_channel"
+            android:textAllCaps="false"
+            android:textColor="@color/bg"
+            android:visibility="gone" />
+
+        <Button
+            android:id="@+id/btnGoLive"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:layout_marginStart="12dp"
+            android:background="@drawable/bg_button"
+            android:focusable="true"
+            android:nextFocusLeft="@id/btnLast"
+            android:nextFocusRight="@id/btnMultiView"
+            android:nextFocusUp="@id/btnGoLive"
+            android:nextFocusDown="@id/btnGoLive"
+            android:text="@string/go_live"
+            android:textAllCaps="false"
+            android:textColor="@color/bg"
+            android:visibility="gone" />
+
+        <Button
+            android:id="@+id/btnMultiView"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:layout_marginStart="12dp"
+            android:background="@drawable/bg_button"
+            android:focusable="true"
+            android:nextFocusLeft="@id/btnGoLive"
+            android:nextFocusRight="@id/btnMultiView"
+            android:nextFocusUp="@id/btnMultiView"
+            android:nextFocusDown="@id/btnMultiView"
+            android:text="@string/multi_view"
+            android:textAllCaps="false"
+            android:textColor="@color/bg"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/seekPane"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:layout_marginBottom="88dp"
+        android:background="#990B1220"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="28dp"
+        android:paddingVertical="10dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/seekLabel"
+            android:layout_width="96dp"
+            android:layout_height="wrap_content"
+            android:textColor="@color/text_primary"
+            android:textSize="14sp" />
+
+        <SeekBar
+            android:id="@+id/seekBar"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:max="1000"
+            android:progress="0" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/nextPanel"
+        android:layout_width="280dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_marginStart="28dp"
+        android:layout_marginTop="28dp"
+        android:layout_marginEnd="28dp"
+        android:layout_marginBottom="110dp"
+        android:background="@drawable/bg_panel"
+        android:orientation="vertical"
+        android:padding="16dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/nextCount"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/text_primary"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/nextName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:ellipsize="end"
+            android:maxLines="2"
+            android:textColor="@color/text_secondary"
+            android:textSize="14sp" />
+
+        <Button
+            android:id="@+id/btnSkipIntro"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/bg_button"
+            android:focusable="true"
+            android:text="@string/skip_intro"
+            android:textAllCaps="false"
+            android:textColor="@color/bg"
+            android:visibility="gone" />
+
+        <Button
+            android:id="@+id/btnPlayNext"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/bg_button"
+            android:focusable="true"
+            android:text="@string/play_next"
+            android:textAllCaps="false"
+            android:textColor="@color/bg"
+            android:visibility="gone" />
+
+        <Button
+            android:id="@+id/btnNextMenu"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/bg_button_secondary"
+            android:focusable="true"
+            android:text="@string/next_menu"
+            android:textAllCaps="false"
+            android:textColor="@color/text_primary"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/subtitlePanel"
+        android:layout_width="420dp"
+        android:layout_height="match_parent"
+        android:layout_gravity="start"
+        android:layout_margin="24dp"
+        android:background="@drawable/bg_panel"
+        android:orientation="vertical"
+        android:padding="16dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/subtitleHeading"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/subtitles"
+            android:textColor="@color/text_primary"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/subtitleStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textColor="@color/text_secondary"
+            android:textSize="14sp" />
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_marginTop="8dp"
+            android:layout_weight="1"
+            android:fillViewport="true"
+            android:focusable="false">
+
+            <LinearLayout
+                android:id="@+id/subtitleRows"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+        </ScrollView>
+    </LinearLayout>
+</FrameLayout>

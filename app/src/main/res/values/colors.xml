@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bg">#141210</color>
+    <color name="nav_rail">#1B1814</color>
+    <color name="bg_elevated">#221F1A</color>
+    <color name="bg_panel">#2C271F</color>
+    <color name="stroke">#433B31</color>
+    <color name="text_primary">#F6F1E7</color>
+    <color name="text_secondary">#C9BBA8</color>
+    <color name="accent">#E2A15A</color>
+    <color name="accent_dim">#B07A38</color>
+    <color name="focus">#F0C48A</color>
+    <color name="danger">#E07A72</color>
+    <color name="chip">#3A3126</color>
+    <color name="black">#000000</color>
+</resources>

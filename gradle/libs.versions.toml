@@ -1,0 +1,43 @@
+[versions]
+agp = "9.5.1"
+kotlin = "2.2.10"
+coreKtx = "1.15.0"
+appcompat = "1.7.0"
+exoplayer = "1.5.1"
+lifecycle = "2.8.7"
+constraintlayout = "2.2.0"
+recyclerview = "1.3.2"
+material = "1.12.0"
+okhttp = "4.12.0"
+gson = "2.11.0"
+coroutines = "1.9.0"
+datastore = "1.1.1"
+coil = "2.7.0"
+smbj = "0.13.0"
+bouncycastle = "1.79"
+junit = "4.13.2"
+
+[libraries]
+androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
+androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
+androidx-constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
+androidx-recyclerview = { group = "androidx.recyclerview", name = "recyclerview", version.ref = "recyclerview" }
+androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycle" }
+androidx-lifecycle-viewmodel-ktx = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-ktx", version.ref = "lifecycle" }
+androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
+material = { group = "com.google.android.material", name = "material", version.ref = "material" }
+media3-exoplayer = { group = "androidx.media3", name = "media3-exoplayer", version.ref = "exoplayer" }
+media3-ui = { group = "androidx.media3", name = "media3-ui", version.ref = "exoplayer" }
+media3-exoplayer-hls = { group = "androidx.media3", name = "media3-exoplayer-hls", version.ref = "exoplayer" }
+media3-exoplayer-dash = { group = "androidx.media3", name = "media3-exoplayer-dash", version.ref = "exoplayer" }
+okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
+gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
+kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
+coil = { group = "io.coil-kt", name = "coil", version.ref = "coil" }
+smbj = { group = "com.hierynomus", name = "smbj", version.ref = "smbj" }
+bouncycastle = { group = "org.bouncycastle", name = "bcprov-jdk18on", version.ref = "bouncycastle" }
+junit = { group = "junit", name = "junit", version.ref = "junit" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }

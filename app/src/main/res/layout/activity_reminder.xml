@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#99000000">
+
+    <LinearLayout
+        android:layout_width="720dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:background="@drawable/bg_panel"
+        android:orientation="vertical"
+        android:padding="28dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/remind_title"
+            android:textColor="@color/accent"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/remindLine"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:textColor="@color/text_primary"
+            android:textSize="22sp"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:gravity="center"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/remindIgnore"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_marginEnd="8dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_button"
+                android:focusable="true"
+                android:nextFocusRight="@id/remindSnooze"
+                android:text="@string/remind_ignore"
+                android:textAllCaps="false"
+                android:textColor="@color/bg" />
+
+            <Button
+                android:id="@+id/remindSnooze"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_marginEnd="8dp"
+                android:layout_weight="1.4"
+                android:background="@drawable/bg_button"
+                android:focusable="true"
+                android:nextFocusLeft="@id/remindIgnore"
+                android:nextFocusRight="@id/remindTune"
+                android:text="@string/remind_snooze"
+                android:textAllCaps="false"
+                android:textColor="@color/bg" />
+
+            <Button
+                android:id="@+id/remindTune"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1.2"
+                android:background="@drawable/bg_button"
+                android:focusable="true"
+                android:nextFocusLeft="@id/remindSnooze"
+                android:text="@string/remind_tune"
+                android:textAllCaps="false"
+                android:textColor="@color/bg" />
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>
