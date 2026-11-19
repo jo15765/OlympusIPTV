@@ -548,6 +548,7 @@
     <string name="catalog_still_loading">Catalog still loading on the device… auto-add unlocks when groups arrive.</string>
     <string name="playback_issue_provider">Provider stream issue. Try again in a moment.</string>
     <string name="playback_issue_app">App playback issue. Try another channel or reopen the player.</string>
+    <string name="playback_no_url">No stream address for this channel. Try Refresh in Admin.</string>
     <string name="sleep_timer">Sleep</string>
     <string name="sleep_off">Sleep off</string>
     <string name="sleep_30">Sleep in 30 min</string>

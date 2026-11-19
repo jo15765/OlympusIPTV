@@ -6,7 +6,7 @@
 
 ### For the latest and greatest, build your own APK from this code.
 
-The latest signed file is **0.2.46** (versionCode 47). **One APK** installs on Android TV / set-top boxes and on phones and tablets (Downloader or sideload). Remotes keep working on TV. Phones get a list-style guide with bottom Live / Movies / Shows tabs, portrait player dock, larger tap targets, and touch-friendly Episodes / Queue / Search / Admin — without the TV rail, AutoTransition morphs, dual-player zap, or cold-start Watchmode warm that made mid-range phones feel laggy. Locked groups open with **Enter PIN** and a number pad; wrong PIN → **Incorrect PIN** → back to groups. Daily feel on TV is unchanged: Continue watching is focusable and resumes with OK/Play (hold OK opens the full Continue/Recent group); Movies/Shows land on that strip when something is in progress; the last Live/Movies/Shows section is remembered; Skip intro is remembered per show; faster Live zap, sleep timer, recovery toast, instant group first page, live search, and cold-start warm skip when the catalog stamp is unchanged.
+The latest signed file is **0.2.47** (versionCode 48). **One APK** installs on Android TV / set-top boxes and on phones and tablets (Downloader or sideload). Remotes keep working on TV. Phones get a list-style guide with bottom Live / Movies / Shows tabs, top Admin / About, portrait player dock, and a full-width Live channel list that plays on tap — without the TV rail, AutoTransition morphs, dual-player zap, or cold-start Watchmode warm that made mid-range phones feel laggy. Locked groups open with **Enter PIN** and a number pad; wrong PIN → **Incorrect PIN** → back to groups. Daily feel on TV is unchanged: Continue watching is focusable and resumes with OK/Play (hold OK opens the full Continue/Recent group); Movies/Shows land on that strip when something is in progress; the last Live/Movies/Shows section is remembered; Skip intro is remembered per show; faster Live zap, sleep timer, recovery toast, instant group first page, live search, and cold-start warm skip when the catalog stamp is unchanged.
 
 **This is a player only. You must provide your own streams.**
 
@@ -66,14 +66,14 @@ Olympus-IPTV is one APK for Android TV / set-top boxes and for phones and tablet
 
 | | |
 | --- | --- |
-| Signed file | `C:\Users\chalu\Downloads\olympus-iptv-0.2.46.apk` |
-| What that file is | versionName **0.2.46**, versionCode **47** |
-| Source in this tree | versionName **0.2.46**, versionCode **47** |
+| Signed file | `C:\Users\chalu\Downloads\olympus-iptv-0.2.47.apk` |
+| What that file is | versionName **0.2.47**, versionCode **48** |
+| Source in this tree | versionName **0.2.47**, versionCode **48** |
 | What to run for current work | That signed file, or a newer APK you build from this source |
 | Install | Over the existing copy (TV or phone). Uninstalling wipes the saved account, playlist, and favorites. Downloader works with the same file. |
 | Launcher name | Two centered lines: Olympus over IPTV |
 
-The signed file is **0.2.46**. It includes **0.2.43–0.2.45** (PIN unlock, Continue strip focus, Skip intro memory, zap/sleep/recovery) plus a phone-first guide and playback trim: bottom Live / Movies / Shows tabs, single-column list groups, no AutoTransition on touch, deferred cold-start warm, smaller Coil caches, lighter logo/EPG prefetch, single ExoPlayer (no multi-view / next-prev pre-buffer on phones). TV remotes, focus, and dual-player zap stay as before. A device that already has an account opens with focus on the Live TV Favorites group card on TV; the left rail stays available with Left on the remote. Group cards fill in as soon as the saved group names are ready. The login screen is created only when no account is stored. Live TV shows Favorites setup, Queue (with a count when the queue is not empty), New / Just Added, Reminders, and Parental above the groups. The top of that groups screen shows today’s date and a 12-hour clock (`MM/DD/YYYY  hh:mm AM/PM`), updated each minute. Movies and Shows (and Recent on Live TV) also show a one-tap **Continue watching** strip above the group cards when something is in progress; Continue and Recently watched cards show how many titles they hold.
+The signed file is **0.2.47**. It includes **0.2.43–0.2.46** (PIN unlock, Continue strip, phone list shell, bottom tabs, lighter warm) plus a Live-on-phone play fix (full-width channel list instead of a zero-width column when the EPG pane is hidden) and top-bar **Admin** / **About** on phones. TV remotes, focus, and dual-player zap stay as before. A device that already has an account opens with focus on the Live TV Favorites group card on TV; the left rail stays available with Left on the remote. Group cards fill in as soon as the saved group names are ready. The login screen is created only when no account is stored. Live TV shows Favorites setup, Queue (with a count when the queue is not empty), New / Just Added, Reminders, and Parental above the groups. The top of that groups screen shows today’s date and a 12-hour clock (`MM/DD/YYYY  hh:mm AM/PM`), updated each minute. Movies and Shows (and Recent on Live TV) also show a one-tap **Continue watching** strip above the group cards when something is in progress; Continue and Recently watched cards show how many titles they hold.
 
 ---
 
@@ -83,14 +83,15 @@ The signed file is **0.2.46**. It includes **0.2.43–0.2.45** (PIN unlock, Cont
 
 </div>
 
-There is **no separate mobile APK**. The same `olympus-iptv-0.2.46.apk` detects whether it is running on a television (Leanback / UI mode) or a touch-first phone or tablet.
+There is **no separate mobile APK**. The same `olympus-iptv-0.2.47.apk` detects whether it is running on a television (Leanback / UI mode) or a touch-first phone or tablet.
 
 | On phones and tablets | What changed |
 | --- | --- |
-| Guide chrome | Top **Back** + title; bottom Live / Movies / Shows tabs (section chips hidden); left TV rail hidden; groups are a single tall list, not a card grid |
+| Guide chrome | Top **Back** + title + **Admin** / **About**; bottom Live / Movies / Shows tabs; left TV rail hidden; groups are a single tall list |
+| Live play | Opening a Live group shows a full-width channel list (not the TV EPG split); tap a row to play |
 | Lighter open | No AutoTransition when columns change; no side-by-side EPG pane; cold start skips dashboard/Watchmode warm (New / web still trigger it); smaller Coil memory/disk logo cache |
 | Scroll | Fewer logo and EPG prefetches while scrolling; Movies/Shows posters use one column |
-| Visible Back | Guide (opened group / PIN), Fresh, Parental, Favorites setup, Search, and the player all show an on-screen Back |
+| Visible Back | Guide (opened group / PIN / Admin / About), Fresh, Parental, Favorites setup, Search, and the player all show an on-screen Back |
 | Touch scroll | Favorites setup, Episodes, Queue, Search, and Admin/Refresh cards scroll without focus traps |
 | Player | Portrait dock with scrubber, large Back / Play-Pause / Menu; sleep timer; first-run tip; optional rotation lock; one ExoPlayer only (no multi-view or next/prev pre-buffer) |
 | System navigation bar | Player and main screens pad for system bars so the 3-button or gesture bar does not cover play controls or key chrome |
@@ -462,7 +463,7 @@ $env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
 .\gradlew.bat :app:assembleDebug
 ```
 
-The debug APK is `app/build/outputs/apk/debug/app-debug.apk`. Put a Watchmode key in `local.properties` as `watchmode.apiKey` before that build if you want **New** to load. Put an OpenSubtitles key there as `opensubtitles.apiKey` if you want that source in **Subtitles**. Neither key is written into the repository. The signed release is `C:\Users\chalu\Downloads\olympus-iptv-0.2.46.apk` (with `olympus-iptv-0.2.46.apk.idsig` beside it). That one file is for both set-top boxes and mobile Android.
+The debug APK is `app/build/outputs/apk/debug/app-debug.apk`. Put a Watchmode key in `local.properties` as `watchmode.apiKey` before that build if you want **New** to load. Put an OpenSubtitles key there as `opensubtitles.apiKey` if you want that source in **Subtitles**. Neither key is written into the repository. The signed release is `C:\Users\chalu\Downloads\olympus-iptv-0.2.47.apk` (with `olympus-iptv-0.2.47.apk.idsig` beside it). That one file is for both set-top boxes and mobile Android.
 
 Android Studio: use a 1920×1080 Google TV emulator. Apply Changes does not pick up new screens. Stop the app, then Debug. Click the emulator window before the arrow keys. The emulator is a different device from a Shield or an Onn box, so it does not have that box’s account, playlist, or favorites.
 
@@ -540,6 +541,12 @@ clearcast-tuner/
 ## Version history
 
 </div>
+
+### 0.2.47
+
+- Phone Live: opening a group uses a full-width channel list (CHANNELS mode) so taps play; the hidden EPG pane no longer steals layout weight and leaves a black screen.
+- Phone top bar: **Admin** and **About** (Back returns to the current section).
+- Missing stream URL shows a toast and closes the player instead of a silent black screen.
 
 ### 0.2.46
 
@@ -796,7 +803,7 @@ clearcast-tuner/
 
 - This is a player only. You must provide your own streams. The app does not ship channels, movies, shows, or playlist credentials.
 - It is a beta. Feedback is greatly appreciated.
-- **0.2.46** is the latest signed file in Downloads. Anything newer than that needs a build from this source.
+- **0.2.47** is the latest signed file in Downloads. Anything newer than that needs a build from this source.
 - The dashboard is only for the home network, and only while the app process is running.
 - The TV has to be opened, and left able to run its recorder, for a dashboard schedule to record and for a Record-tab guide to load.
 - One recording at a time. Series record is a queue, not several streams at once.

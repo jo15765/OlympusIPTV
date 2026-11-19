@@ -1945,6 +1945,13 @@ class BrowseActivity : AppCompatActivity() {
         binding.aboutPane.visibility = View.VISIBLE
         hidePreviewChrome()
         updateGroupClock()
+        if (touchPrimary) {
+            binding.mobileTopBar.visibility = View.VISIBLE
+            binding.mobileBack.visibility = View.VISIBLE
+            binding.mobileTitle.text = getString(R.string.nav_about)
+            paintBottomTabs()
+            paintMobileSettingsChips()
+        }
     }
 
     private fun showAdminPane(focus: View = binding.cardAdminRefresh) {
@@ -1967,6 +1974,13 @@ class BrowseActivity : AppCompatActivity() {
         binding.adminPane.visibility = View.VISIBLE
         hidePreviewChrome()
         updateGroupClock()
+        if (touchPrimary) {
+            binding.mobileTopBar.visibility = View.VISIBLE
+            binding.mobileBack.visibility = View.VISIBLE
+            binding.mobileTitle.text = getString(R.string.nav_admin)
+            paintBottomTabs()
+            paintMobileSettingsChips()
+        }
         focus.post { if (focus.isShown) focus.requestFocus() }
     }
 
@@ -3072,6 +3086,8 @@ class BrowseActivity : AppCompatActivity() {
         binding.mobileSectionRow.visibility = View.GONE
         binding.mobileBack.setOnClickListener { onMobileBack() }
         binding.mobileTitle.setOnClickListener { /* section switching is the bottom tabs */ }
+        binding.mobileAdmin.setOnClickListener { showAdminPane() }
+        binding.mobileAbout.setOnClickListener { showAboutPane() }
         val openLive = View.OnClickListener { openSection(GuideSection.TV) }
         val openMovies = View.OnClickListener { openSection(GuideSection.MOVIES) }
         val openShows = View.OnClickListener { openSection(GuideSection.SHOWS) }
@@ -3082,21 +3098,44 @@ class BrowseActivity : AppCompatActivity() {
         binding.bottomTabMovies.setOnClickListener(openMovies)
         binding.bottomTabShows.setOnClickListener(openShows)
         paintBottomTabs()
+        paintMobileSettingsChips()
     }
 
     private fun paintBottomTabs() {
         if (!touchPrimary || !::binding.isInitialized) return
-        binding.bottomTabLive.isSelected = section == GuideSection.TV
-        binding.bottomTabMovies.isSelected = section == GuideSection.MOVIES
-        binding.bottomTabShows.isSelected = section == GuideSection.SHOWS
+        val settingsOpen = binding.adminPane.visibility == View.VISIBLE ||
+            binding.aboutPane.visibility == View.VISIBLE
+        binding.bottomTabLive.isSelected = !settingsOpen && section == GuideSection.TV
+        binding.bottomTabMovies.isSelected = !settingsOpen && section == GuideSection.MOVIES
+        binding.bottomTabShows.isSelected = !settingsOpen && section == GuideSection.SHOWS
         binding.bottomTabLive.setTextColor(
-            getColor(if (section == GuideSection.TV) R.color.accent else R.color.text_primary)
+            getColor(
+                if (!settingsOpen && section == GuideSection.TV) R.color.accent else R.color.text_primary
+            )
         )
         binding.bottomTabMovies.setTextColor(
-            getColor(if (section == GuideSection.MOVIES) R.color.accent else R.color.text_primary)
+            getColor(
+                if (!settingsOpen && section == GuideSection.MOVIES) R.color.accent else R.color.text_primary
+            )
         )
         binding.bottomTabShows.setTextColor(
-            getColor(if (section == GuideSection.SHOWS) R.color.accent else R.color.text_primary)
+            getColor(
+                if (!settingsOpen && section == GuideSection.SHOWS) R.color.accent else R.color.text_primary
+            )
+        )
+    }
+
+    private fun paintMobileSettingsChips() {
+        if (!touchPrimary || !::binding.isInitialized) return
+        val adminOpen = binding.adminPane.visibility == View.VISIBLE
+        val aboutOpen = binding.aboutPane.visibility == View.VISIBLE
+        binding.mobileAdmin.isSelected = adminOpen
+        binding.mobileAbout.isSelected = aboutOpen
+        binding.mobileAdmin.setTextColor(
+            getColor(if (adminOpen) R.color.accent else R.color.text_primary)
+        )
+        binding.mobileAbout.setTextColor(
+            getColor(if (aboutOpen) R.color.accent else R.color.text_primary)
         )
     }
 
@@ -3224,7 +3263,8 @@ class BrowseActivity : AppCompatActivity() {
             binding.btnFavoritesSetup, binding.btnQueue, binding.btnFresh,
             binding.btnRemind, binding.btnParental,
             binding.mobileTabLive, binding.mobileTabMovies, binding.mobileTabShows,
-            binding.mobileBack
+            binding.mobileBack, binding.mobileAdmin, binding.mobileAbout,
+            binding.bottomTabLive, binding.bottomTabMovies, binding.bottomTabShows
         ).forEach { chip ->
             chip.minHeight = min
             chip.setPadding(padH, chip.paddingTop, padH, chip.paddingBottom)
@@ -3347,9 +3387,11 @@ class BrowseActivity : AppCompatActivity() {
         val showSettings = !full
         val showGroups = !full
         val showChannels = full
-        val showPrograms = live && full
+        val phoneChrome = touchPrimary
+        // Phones never use the side-by-side EPG pane — keep a full-width channel list that can play.
+        val showPrograms = live && full && !phoneChrome
         setNavExpanded(true)
-        val blockChannels = live && guideMenu == GuideMenu.PROGRAMS
+        val blockChannels = live && guideMenu == GuideMenu.PROGRAMS && !phoneChrome
         channelAdapter.guideRowsFocusable = !blockChannels
         binding.channelList.descendantFocusability = if (blockChannels) {
             ViewGroup.FOCUS_BLOCK_DESCENDANTS
@@ -3359,7 +3401,7 @@ class BrowseActivity : AppCompatActivity() {
         channelAdapter.paintRowFocus(binding.channelList)
         val row = binding.guideRow
         // TV gets a short column morph; phones skip it — transitions feel laggy on touch devices.
-        if (!touchPrimary && row.isLaidOut && !skipGuideTransition) {
+        if (!phoneChrome && row.isLaidOut && !skipGuideTransition) {
             TransitionManager.beginDelayedTransition(row, AutoTransition().apply { duration = 180 })
         }
         skipGuideTransition = false
@@ -3367,7 +3409,6 @@ class BrowseActivity : AppCompatActivity() {
             binding.groupColumn.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
             binding.categoryList.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
         }
-        val phoneChrome = touchPrimary
         binding.mobileTopBar.visibility = if (phoneChrome) View.VISIBLE else View.GONE
         binding.mobileBottomTabs.visibility = if (phoneChrome) View.VISIBLE else View.GONE
         binding.navRail.visibility = if (showSettings && !phoneChrome) View.VISIBLE else View.GONE
@@ -3378,14 +3419,20 @@ class BrowseActivity : AppCompatActivity() {
         binding.groupPills.visibility = View.GONE
         binding.contentDivider.visibility = if (showGroups && showChannels) View.VISIBLE else View.GONE
         binding.contentColumn.visibility = if (showChannels) View.VISIBLE else View.GONE
-        // Phone: skip the side-by-side EPG pane — one column of channels is enough and much lighter.
-        binding.programPane.visibility = if (showPrograms && !phoneChrome) View.VISIBLE else View.GONE
+        binding.programPane.visibility = if (showPrograms) View.VISIBLE else View.GONE
         if (phoneChrome) {
             val pinOpen = binding.groupPin.visibility == View.VISIBLE ||
                 binding.groupPinWrong.visibility == View.VISIBLE
-            binding.mobileBack.visibility = if (full || pinOpen) View.VISIBLE else View.GONE
+            val settingsOpen = binding.adminPane.visibility == View.VISIBLE ||
+                binding.aboutPane.visibility == View.VISIBLE ||
+                binding.refreshPane.visibility == View.VISIBLE ||
+                binding.vpnPane.visibility == View.VISIBLE ||
+                binding.devicePane.visibility == View.VISIBLE
+            binding.mobileBack.visibility = if (full || pinOpen || settingsOpen) View.VISIBLE else View.GONE
             binding.mobileSectionRow.visibility = View.GONE
             binding.mobileTitle.text = when {
+                binding.adminPane.visibility == View.VISIBLE -> getString(R.string.nav_admin)
+                binding.aboutPane.visibility == View.VISIBLE -> getString(R.string.nav_about)
                 full && selectedCategoryName.isNotBlank() -> selectedCategoryName
                 live -> getString(R.string.nav_tv)
                 section == GuideSection.MOVIES -> getString(R.string.vod)
@@ -3393,6 +3440,7 @@ class BrowseActivity : AppCompatActivity() {
                 else -> getString(R.string.rail_title)
             }
             paintBottomTabs()
+            paintMobileSettingsChips()
         } else {
             binding.mobileSectionRow.visibility = View.GONE
         }
@@ -3400,7 +3448,13 @@ class BrowseActivity : AppCompatActivity() {
         val content = binding.contentColumn.layoutParams as LinearLayout.LayoutParams
         val programs = binding.programPane.layoutParams as LinearLayout.LayoutParams
         val density = resources.displayMetrics.density
-        if (showChannels && showPrograms && !full) {
+        if (phoneChrome && showChannels) {
+            // Full-width channel list — do not leave weight on a hidden EPG pane.
+            content.width = 0
+            content.weight = 1f
+            programs.width = 0
+            programs.weight = 0f
+        } else if (showChannels && showPrograms && !full) {
             content.width = ((if (guideMenu == GuideMenu.SETTINGS) 180 else 220) * density).toInt()
             content.weight = 0f
             programs.width = 0
@@ -3522,7 +3576,7 @@ class BrowseActivity : AppCompatActivity() {
         binding.categoryList.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
         binding.groupColumn.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
         if (focusIsIn(binding.categoryList)) currentFocus?.clearFocus()
-        if (section == GuideSection.TV) {
+        if (section == GuideSection.TV && !touchPrimary) {
             if (guideMenu != GuideMenu.PROGRAMS) previousMenu = guideMenu
             guideMenu = GuideMenu.PROGRAMS
         } else {
@@ -3549,6 +3603,19 @@ class BrowseActivity : AppCompatActivity() {
         if (visibleChannels.isEmpty()) {
             landOnOpened = false
             openFocusTries = 0
+            return
+        }
+        if (section == GuideSection.TV && touchPrimary) {
+            if (binding.contentColumn.visibility != View.VISIBLE) {
+                retryOpenedFocus()
+                return
+            }
+            if (titleFocusHeld()) {
+                landOnOpened = false
+                openFocusTries = 0
+                return
+            }
+            focusFirstTitle()
             return
         }
         if (section == GuideSection.TV && binding.programPane.visibility != View.VISIBLE) {

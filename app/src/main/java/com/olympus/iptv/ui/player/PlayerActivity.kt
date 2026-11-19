@@ -460,6 +460,8 @@ class PlayerActivity : AppCompatActivity() {
             val loaded = hydrate(seed)
             if (loaded.streamUrl.isBlank()) {
                 PlaybackTrace.blankUrl(loaded)
+                Toast.makeText(this@PlayerActivity, R.string.playback_no_url, Toast.LENGTH_LONG).show()
+                finish()
                 return@launch
             }
             val alias = lineupName(loaded, seed)
