@@ -73,6 +73,9 @@ import com.olympus.iptv.ui.player.PlayerActivity
 import com.olympus.iptv.ui.player.SeriesPlay
 import com.olympus.iptv.ui.search.SearchActivity
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -159,8 +162,8 @@ class BrowseActivity : AppCompatActivity() {
     private val favoriteIds = mutableSetOf<String>()
 
     private val epgCache = java.util.concurrent.ConcurrentHashMap<String, EpgNowNext>()
-    private var favoritesZapKey = ""
-    private var favoritesZapChannels: List<Channel> = emptyList()
+    private val groupClockFormat = SimpleDateFormat("MM/dd/yyyy  hh:mm a", Locale.US)
+    private var groupClockMinute = Long.MIN_VALUE
     private var guideRowsTall = false
     private var lastLabelShiftScroll = Int.MIN_VALUE
 
@@ -426,51 +429,10 @@ class BrowseActivity : AppCompatActivity() {
                 val deviceId = deviceJob.await()
                 if (!isDestroyed) binding.deviceIdValue.text = deviceId
             }
-            val hasSaved = libraryJob.await()
+            val liveCategories = liveJob.await()
             val catalogJob = app.catalogRefresh
-            if (!hasSaved && catalogJob?.isActive == true) {
-                liveJob.cancel()
-                val local = lineupJob.await()
-                applyFavorites(favoritesJob.await())
-                showLoading(true)
-                app.catalogLiveReady?.await()
-                showLoading(false)
-                if (withContext(Dispatchers.IO) { db.hasLibrary(saved.id) }) {
-                    val liveCategories = withContext(Dispatchers.IO) {
-                        db.readCategoriesOnly(saved.id, CatalogDb.LIVE)
-                    }
-                    showCatalog(
-                        LoadedPlaylist(liveCategories = liveCategories, liveChannels = emptyList()),
-                        local,
-                        openGuide = true
-                    )
-                    loadSavedBuckets(saved.id, db)
-                    launch {
-                        catalogJob.join()
-                        if (!isDestroyed) loadSavedBuckets(saved.id, db)
-                    }
-                } else {
-                    moviesPending = true
-                    showsPending = true
-                    refreshPlaylist()
-                }
-            } else if (!hasSaved) {
-                liveJob.cancel()
-                val local = lineupJob.await()
-                applyFavorites(favoritesJob.await())
-                val legacy = withContext(Dispatchers.IO) { CatalogCache(this@BrowseActivity).read(saved.id, true) }
-                if (legacy != null && libraryHasItems(legacy)) {
-                    withContext(Dispatchers.IO) { persistLibrary(db, saved.id, legacy) }
-                    showCatalog(legacy, local, openGuide = true)
-                    showLoading(false)
-                } else {
-                    moviesPending = true
-                    showsPending = true
-                    showLoading(true)
-                    refreshPlaylist()
-                }
-            } else {
-                val liveCategories = liveJob.await()
+            if (liveCategories.isNotEmpty()) {
+                // Returning account: paint groups as soon as categories are ready.
                 moviesPending = true
                 showsPending = true
                 loadingFromDb = true
@@ -480,6 +442,7 @@ class BrowseActivity : AppCompatActivity() {
                     openGuide = true
                 )
                 showLoading(false)
+                libraryJob.cancel()
                 val local = lineupJob.await()
                 applyFavorites(favoritesJob.await())
                 activeConfig = local
@@ -489,6 +452,69 @@ class BrowseActivity : AppCompatActivity() {
                     launch {
                         catalogJob.join()
                         if (!isDestroyed) loadSavedBuckets(saved.id, db)
+                    }
+                }
+            } else {
+                val hasSaved = libraryJob.await()
+                if (!hasSaved && catalogJob?.isActive == true) {
+                    val local = lineupJob.await()
+                    applyFavorites(favoritesJob.await())
+                    showLoading(true)
+                    app.catalogLiveReady?.await()
+                    showLoading(false)
+                    if (withContext(Dispatchers.IO) { db.hasLibrary(saved.id) }) {
+                        val categories = withContext(Dispatchers.IO) {
+                            db.readCategoriesOnly(saved.id, CatalogDb.LIVE)
+                        }
+                        showCatalog(
+                            LoadedPlaylist(liveCategories = categories, liveChannels = emptyList()),
+                            local,
+                            openGuide = true
+                        )
+                        loadSavedBuckets(saved.id, db)
+                        launch {
+                            catalogJob.join()
+                            if (!isDestroyed) loadSavedBuckets(saved.id, db)
+                        }
+                    } else {
+                        moviesPending = true
+                        showsPending = true
+                        refreshPlaylist()
+                    }
+                } else if (!hasSaved) {
+                    val local = lineupJob.await()
+                    applyFavorites(favoritesJob.await())
+                    val legacy = withContext(Dispatchers.IO) { CatalogCache(this@BrowseActivity).read(saved.id, true) }
+                    if (legacy != null && libraryHasItems(legacy)) {
+                        withContext(Dispatchers.IO) { persistLibrary(db, saved.id, legacy) }
+                        showCatalog(legacy, local, openGuide = true)
+                        showLoading(false)
+                    } else {
+                        moviesPending = true
+                        showsPending = true
+                        showLoading(true)
+                        refreshPlaylist()
+                    }
+                } else {
+                    moviesPending = true
+                    showsPending = true
+                    loadingFromDb = true
+                    showCatalog(
+                        LoadedPlaylist(liveCategories = emptyList(), liveChannels = emptyList()),
+                        LineupConfig(),
+                        openGuide = true
+                    )
+                    showLoading(false)
+                    val local = lineupJob.await()
+                    applyFavorites(favoritesJob.await())
+                    activeConfig = local
+                    if (binding.groupColumn.visibility == View.VISIBLE) render(restoreFocus = false)
+                    loadSavedBuckets(saved.id, db)
+                    if (catalogJob?.isActive == true) {
+                        launch {
+                            catalogJob.join()
+                            if (!isDestroyed) loadSavedBuckets(saved.id, db)
+                        }
                     }
                 }
             }
@@ -592,29 +618,17 @@ class BrowseActivity : AppCompatActivity() {
         val stamp = app.catalogDb.libraryStamp(playlistId).toString()
         val savedStamp = app.playlistStore.catalogStamp(playlistId)
         val savedCountries = app.playlistStore.countryStamp(playlistId)
-        coroutineScope {
-            val exportJob = async(Dispatchers.IO) {
-                if (stamp == savedStamp) null
-                else runCatching { app.catalogDb.exportSearchCatalog(playlistId) }.getOrNull()
-            }
-            val countryJob = async(Dispatchers.IO) { app.catalogDb.dashboardSnapshot(playlistId).countries }
-            val exported = exportJob.await()
-            val countries = countryJob.await()
-            val posts = ArrayList<kotlinx.coroutines.Deferred<Unit>>(2)
-            if (exported != null) {
-                posts.add(async(Dispatchers.IO) {
-                    client.publishSearchCatalog(email, deviceId, exported.first, exported.second, stamp)
-                    app.playlistStore.saveCatalogStamp(playlistId, stamp)
-                })
-            }
-            val countryStamp = countries.joinToString("|") { "${it.id}:${it.count}" }
-            if (countryStamp != savedCountries) {
-                posts.add(async(Dispatchers.IO) {
-                    runCatching { client.publishCountries(email, deviceId, countries) }
-                    app.playlistStore.saveCountryStamp(playlistId, countryStamp)
-                })
-            }
-            posts.awaitAll()
+        // Do not load/publish the full channel catalog here. That built every channel into
+        // memory and POSTed it to /api/catalog (which ignores the body), and OOMed ~192MB heaps.
+        if (stamp != savedStamp) {
+            app.playlistStore.saveCatalogStamp(playlistId, stamp)
+        }
+        app.catalogDb.releaseSearchExport()
+        val countries = withContext(Dispatchers.IO) { app.catalogDb.dashboardSnapshot(playlistId).countries }
+        val countryStamp = countries.joinToString("|") { "${it.id}:${it.count}" }
+        if (countryStamp != savedCountries) {
+            runCatching { client.publishCountries(email, deviceId, countries) }
+            app.playlistStore.saveCountryStamp(playlistId, countryStamp)
         }
     }
 
@@ -640,77 +654,23 @@ class BrowseActivity : AppCompatActivity() {
         favoriteOrder.addAll(ids)
         favoriteIds.clear()
         favoriteIds.addAll(ids)
-        favoritesZapKey = ""
-        favoritesZapChannels = emptyList()
         warmFavoriteAndRecentEpg()
-        refreshFavoritesZap(force = true)
+        updateGroupClock(force = true)
     }
 
-    private fun refreshFavoritesZap(force: Boolean = false) {
+    private fun updateGroupClock(force: Boolean = false) {
         if (!::binding.isInitialized) return
-        val saved = playlist ?: return
-        if (section != GuideSection.TV || favoriteOrder.isEmpty()) {
-            binding.favoritesZap.visibility = View.GONE
-            if (binding.favoritesZapRow.childCount > 0) binding.favoritesZapRow.removeAllViews()
-            favoritesZapKey = ""
-            favoritesZapChannels = emptyList()
+        if (section != GuideSection.TV || binding.groupColumn.visibility != View.VISIBLE) {
+            binding.groupClock.visibility = View.GONE
+            groupClockMinute = Long.MIN_VALUE
             return
         }
-        val keys = favoriteOrder.filter { Favorites.inSection(it, Favorites.LIVE) }.take(24)
-        val signature = saved.id + "\u0000" + keys.joinToString("\u0001")
-        if (!force && signature == favoritesZapKey && binding.favoritesZapRow.childCount > 0) {
-            binding.favoritesZap.visibility = View.VISIBLE
-            return
-        }
-        lifecycleScope.launch {
-            if (keys.isEmpty()) {
-                binding.favoritesZap.visibility = View.GONE
-                binding.favoritesZapRow.removeAllViews()
-                favoritesZapKey = signature
-                favoritesZapChannels = emptyList()
-                return@launch
-            }
-            val ordered = if (!force && signature == favoritesZapKey && favoritesZapChannels.isNotEmpty()) {
-                favoritesZapChannels
-            } else {
-                val rows = withContext(Dispatchers.IO) {
-                    (application as OlympusIptvApp).catalogDb.readChannelsByIds(
-                        saved.id,
-                        CatalogDb.LIVE,
-                        keys.map { it.substringAfter(':') }
-                    )
-                }
-                Favorites.ordered(keys, rows.associateBy { it.id }, favoriteIds)
-            }
-            if (isDestroyed) return@launch
-            favoritesZapKey = signature
-            favoritesZapChannels = ordered
-            val density = resources.displayMetrics.density
-            binding.favoritesZapRow.removeAllViews()
-            ordered.forEach { channel ->
-                val chip = TextView(this@BrowseActivity).apply {
-                    text = channel.name
-                    setTextColor(getColor(R.color.text_primary))
-                    textSize = 13f
-                    maxLines = 1
-                    ellipsize = android.text.TextUtils.TruncateAt.END
-                    background = getDrawable(R.drawable.bg_nav)
-                    isFocusable = true
-                    isClickable = true
-                    gravity = android.view.Gravity.CENTER_VERTICAL
-                    setPadding((12 * density).toInt(), (6 * density).toInt(), (12 * density).toInt(), (6 * density).toInt())
-                    setOnClickListener { play(channel, queueOverride = ordered, zapMode = PlayerActivity.ZAP_LIST) }
-                }
-                val params = android.widget.LinearLayout.LayoutParams(
-                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
-                    (36 * density).toInt()
-                )
-                params.marginEnd = (8 * density).toInt()
-                binding.favoritesZapRow.addView(chip, params)
-            }
-            binding.favoritesZap.visibility =
-                if (binding.favoritesZapRow.childCount > 0) View.VISIBLE else View.GONE
-        }
+        val now = System.currentTimeMillis()
+        val minute = now / 60_000L
+        if (!force && minute == groupClockMinute && binding.groupClock.visibility == View.VISIBLE) return
+        groupClockMinute = minute
+        binding.groupClock.text = groupClockFormat.format(Date(now))
+        binding.groupClock.visibility = View.VISIBLE
     }
 
     private fun loadSavedBuckets(playlistId: String, db: CatalogDb) {
@@ -1419,10 +1379,16 @@ class BrowseActivity : AppCompatActivity() {
         val savedId = playlist?.id
         if (!savedId.isNullOrBlank()) {
             val appJobs = application as OlympusIptvApp
-            appJobs.appScope.launch {
-                runCatching { appJobs.catalogDb.cleanGroupImages(savedId) }
-                launch { runCatching { appJobs.catalogDb.warmDashboard(savedId) } }
-                appJobs.warmFresh(savedId)
+            // Defer maintenance so the first group paint is not fighting the DB.
+            binding.root.post {
+                if (isDestroyed) return@post
+                appJobs.appScope.launch {
+                    delay(750)
+                    if (isDestroyed) return@launch
+                    runCatching { appJobs.catalogDb.cleanGroupImages(savedId) }
+                    launch { runCatching { appJobs.catalogDb.warmDashboard(savedId) } }
+                    appJobs.warmFresh(savedId)
+                }
             }
         }
         epgRepo.useXmltv(fetched.xmltvByChannel.orEmpty())
@@ -1837,11 +1803,7 @@ class BrowseActivity : AppCompatActivity() {
         binding.tabLive.isSelected = section == GuideSection.TV
         binding.tabVod.isSelected = section == GuideSection.MOVIES
         binding.tabShows.isSelected = section == GuideSection.SHOWS
-        if (section == GuideSection.TV) refreshFavoritesZap()
-        else {
-            binding.favoritesZap.visibility = View.GONE
-            binding.favoritesZapRow.removeAllViews()
-        }
+        updateGroupClock(force = true)
     }
 
     private fun showBlank() {
@@ -1862,6 +1824,7 @@ class BrowseActivity : AppCompatActivity() {
         binding.vpnPane.visibility = View.GONE
         binding.blankPane.visibility = View.VISIBLE
         hidePreviewChrome()
+        updateGroupClock()
     }
 
     private fun showAboutPane() {
@@ -1883,6 +1846,7 @@ class BrowseActivity : AppCompatActivity() {
         binding.adminPane.visibility = View.GONE
         binding.aboutPane.visibility = View.VISIBLE
         hidePreviewChrome()
+        updateGroupClock()
     }
 
     private fun showAdminPane(focus: View = binding.cardAdminRefresh) {
@@ -1904,6 +1868,7 @@ class BrowseActivity : AppCompatActivity() {
         binding.aboutPane.visibility = View.GONE
         binding.adminPane.visibility = View.VISIBLE
         hidePreviewChrome()
+        updateGroupClock()
         focus.post { if (focus.isShown) focus.requestFocus() }
     }
 
@@ -2046,21 +2011,29 @@ class BrowseActivity : AppCompatActivity() {
         } else {
             registerReceiver(systemClock, filter)
         }
-        focusHandler.postDelayed(clockTick, 30_000L)
+        updateGroupClock(force = true)
+        val delayMs = 60_000L - (System.currentTimeMillis() % 60_000L)
+        focusHandler.postDelayed(clockTick, delayMs.coerceIn(1_000L, 60_000L))
     }
 
     private val systemClock = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
+            updateGroupClock(force = true)
             alignGuideToSystemClock()
         }
     }
 
-    private val clockTick: Runnable = Runnable {
-        if (!isDestroyed && binding.programPane.visibility == View.VISIBLE) {
-            tickGuideHeader()
-            positionNowLine(programAdapter.scrollX)
+    private val clockTick: Runnable = object : Runnable {
+        override fun run() {
+            if (isDestroyed) return
+            updateGroupClock(force = true)
+            if (binding.programPane.visibility == View.VISIBLE) {
+                tickGuideHeader()
+                positionNowLine(programAdapter.scrollX)
+            }
+            val delayMs = 60_000L - (System.currentTimeMillis() % 60_000L)
+            focusHandler.postDelayed(this, delayMs.coerceIn(1_000L, 60_000L))
         }
-        focusHandler.postDelayed(clockTick, 30_000L)
     }
 
     private fun alignGuideToSystemClock() {
@@ -2104,7 +2077,7 @@ class BrowseActivity : AppCompatActivity() {
                 syncProgramRowHeight()
             }
             if (redraw && source != null) render(restoreFocus = false, reloadChannels = false)
-            if (section == GuideSection.TV) refreshFavoritesZap()
+            updateGroupClock()
         }
         if (returningFromPlayer) {
             playerClosedAt = android.os.SystemClock.uptimeMillis()
@@ -4747,6 +4720,6 @@ class BrowseActivity : AppCompatActivity() {
         private const val CARD_SPAN = 3
         private const val PAGE_SIZE = 200
         private const val FOCUS_SETTLE_MS = 160L
-        private const val EPG_CACHE_CAP = 400
+        private const val EPG_CACHE_CAP = 120
     }
 }

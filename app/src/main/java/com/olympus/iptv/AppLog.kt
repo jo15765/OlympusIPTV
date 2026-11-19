@@ -26,6 +26,13 @@ object AppLog {
             previous = Thread.getDefaultUncaughtExceptionHandler()
             Thread.setDefaultUncaughtExceptionHandler { thread, error ->
                 runCatching { error("Crash", "Uncaught on ${thread.name}", error) }
+                val oom = error is OutOfMemoryError ||
+                    generateSequence(error.cause) { it.cause }.any { it is OutOfMemoryError }
+                if (oom) {
+                    // Log and try to recover instead of taking the process down for OOM cascades.
+                    runCatching { System.gc() }
+                    return@setDefaultUncaughtExceptionHandler
+                }
                 if (thread == Looper.getMainLooper().thread) previous?.uncaughtException(thread, error)
             }
         }

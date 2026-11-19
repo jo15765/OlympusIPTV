@@ -6,7 +6,7 @@
 
 ### For the latest and greatest, build your own APK from this code.
 
-The latest signed file is **0.2.35** (versionCode 36). Install that over the copy already on the TV. It keeps the recent guide and player features, shifts EPG titles into view (with taller wrap rows when needed), and fixes the lag and freeze regressions from 0.2.34.
+The latest signed file is **0.2.35** (versionCode 36). Install that over the copy already on the TV. Returning accounts open the group screen as soon as the saved group names are ready (heavy warm-up waits until after that paint). The Live TV groups header shows the current date and time instead of a strip of favorite channel names. The web Error log lists newest entries first. A full-catalog memory publish that could OOM ~192MB heaps is gone; the app also asks Android for a larger heap and keeps Coil/SQLite caches smaller.
 
 **This is a player only. You must provide your own streams.**
 
@@ -70,7 +70,7 @@ Olympus-IPTV is an Android TV app for a remote. It browses live TV, movies, and 
 | Install | Over the existing copy. Uninstalling wipes the saved account, playlist, and favorites. |
 | Launcher name | Two centered lines: Olympus over IPTV |
 
-The signed file is **0.2.35**. A TV that already has an account opens on the left rail, and the group cards fill in when the group names are ready. The login screen is created only when no account is stored. Live TV shows Favorites setup, Queue, New / Just Added, Reminders, and Parental above the groups.
+The signed file is **0.2.35**. A TV that already has an account opens on the left rail, and the group cards fill in as soon as the saved group names are ready — not after a long background warm-up. The login screen is created only when no account is stored. Live TV shows Favorites setup, Queue, New / Just Added, Reminders, and Parental above the groups. The top of that groups screen shows today’s date and a 12-hour clock (`MM/DD/YYYY  hh:mm AM/PM`), updated each minute.
 
 ---
 
@@ -101,8 +101,8 @@ It walks through enabling unknown sources on an Onn box, installing Downloader b
 - Signs in with an email and a 5-digit US ZIP. The ZIP is only used to place local channels. Include VOD starts checked. Include International starts unchecked, so foreign groups stay out until you turn that on.
 - Creates a device id shaped `OI-XXXX-XXXX-XXXX`. One email can have more than one device. Each device keeps its own lineup, favorites, catalog, and recordings.
 - Pulls the provider catalog once per list (live, movies, shows), shows a percent in steps of 5, then the counts, then the auto-add cards. Later opens skip the favorites splash when the catalog is already on the device. Favorites setup, at the top of Live TV, can open that screen again without Continue. Back from there returns focus to that chip.
-- Lets the first account be saved from the dashboard address on the login screen. The page shows **Set up this TV** until an account exists. Saving it stores the account on the set. The login screen moves on as soon as that save lands. Opening the app again reads that saved account once and opens the group screen directly. The login screen is created only when no account is stored.
-- Browses with a remote: **Search, Live TV, Movies, Shows, Recordings, Admin, and About.** On Live TV, the top of the groups screen has Favorites setup, Queue, New / Just Added, Reminders, and Parental. There is no Settings item and no Sign out.
+- Lets the first account be saved from the dashboard address on the login screen. The page shows **Set up this TV** until an account exists. Saving it stores the account on the set. The login screen moves on as soon as that save lands. Opening the app again reads that saved account once and opens the group screen as soon as the saved live groups are ready. Dashboard warm-up and “New” card prep wait until after that first paint. The login screen is created only when no account is stored.
+- Browses with a remote: **Search, Live TV, Movies, Shows, Recordings, Admin, and About.** On Live TV, the top of the groups screen has Favorites setup, Queue, New / Just Added, Reminders, and Parental, plus the current date and 12-hour time on the right. There is no favorite-channel name strip across the top, no Settings item, and no Sign out.
 
 ---
 
@@ -112,7 +112,7 @@ It walks through enabling unknown sources on an Onn box, installing Downloader b
 
 </div>
 
-When an account is already saved, the app opens on two panes: the settings rail and the group cards. The login screen is not created. The rail is on screen while the group names load, and the cards fill in when those names are ready. The channel list and the hour-by-hour guide stay hidden until a card is opened. It does not start the last channel. The rail stays open, and its divider sits at the end of the longest label. The title on that rail is **Olympus IPTV** on one line. The launcher name under the icon stays on two lines.
+When an account is already saved, the app opens on two panes: the settings rail and the group cards. The login screen is not created. The rail is on screen while the group names load, and the cards fill in as soon as those names are ready from the local library. Heavy work (dashboard snapshot, image cleanup, Watchmode “New” cards) starts after that paint so a returning launch stays quick. The channel list and the hour-by-hour guide stay hidden until a card is opened. It does not start the last channel. The rail stays open, and its divider sits at the end of the longest label. The title on that rail is **Olympus IPTV** on one line. The launcher name under the icon stays on two lines. Above the group cards, Live TV shows the current date and time (`MM/DD/YYYY  hh:mm AM/PM`) instead of a row of favorite channel names.
 
 1. **TV, Movies, or Shows.** Group cards fill the space beside the rail, three smaller cards per row. Choosing one of those on the rail opens its cards and moves focus to the top-left card. A card shows the group name and, once counted, how many channels or titles it holds. Recently watched says Resume watching. Continue says Pick up where you left off. Moving across the cards does not load channels. The counts are read once and kept until the library changes.
 2. **OK on a card**, or Right from a card on the right edge, opens that group and loads it then. Focus leaves the group card. On TV it lands on the program that is on now for the first channel. Movies and Shows land on the first title. The other groups are not listed on that screen. Back from About or Admin returns focus to that same item on the left rail.
@@ -138,7 +138,7 @@ OK on a past program plays catch-up when the provider marked that channel for ar
 
 There is no preview window in the corner. The focused live channel can be warmed quietly so full-screen playback starts on that same player.
 
-**Continue** is the first group on Movies and Shows when a movie or episode was stopped in the middle. It lists that title and the minute you reached. OK on a movie resumes it. OK on a show resumes the episode. The group is hidden when nothing is in progress. **Recently watched** stays the first group on TV, and the next group on Movies and Shows, directly above Favorites, even before anything has been played. **Favorites** lists only the favorites for that section. Live TV also shows a favorites quick-zap strip under the group pills: OK on a chip plays that favorite and keeps the strip as the zap list. **Guide density** on EPG edits switches Comfortable or Compact row height.
+**Continue** is the first group on Movies and Shows when a movie or episode was stopped in the middle. It lists that title and the minute you reached. OK on a movie resumes it. OK on a show resumes the episode. The group is hidden when nothing is in progress. **Recently watched** stays the first group on TV, and the next group on Movies and Shows, directly above Favorites, even before anything has been played. **Favorites** lists only the favorites for that section. Live TV shows the current date and 12-hour clock above the group cards instead of a favorites quick-zap strip. **Guide density** on EPG edits switches Comfortable or Compact row height.
 
 That hold is one menu. Live TV includes move up and move down. Movies and Shows leave those two off and include Add to Queue. Record opens its own window. The star, record, up, and down buttons are not on the channel row, because Right opens the guide.
 
@@ -209,7 +209,7 @@ A favorite is a key.
 | Movies | `vod:<id>` | Movies favorites |
 | Shows | `series:<id>` | Shows favorites |
 
-Search uses the section the card is under. On the dashboard, the favorites you already have are listed above the search box. Up and Down move one row and save that order immediately. Search stars append one channel or remove that one channel. They do not replace the list. Movies and shows show up in dashboard search after the TV has opened once and published them.
+Search uses the section the card is under. On the dashboard, the favorites you already have are listed above the search box. Up and Down move one row and save that order immediately. Search stars append one channel or remove that one channel. They do not replace the list. Movies and shows show up in dashboard search once those categories are in the local SQLite library (after the TV has loaded them).
 
 Open the guide after a dashboard favorite change. The TV keeps favorites it still has, adds ones that exist only on the dashboard, and drops ones the dashboard removed. If both sides have the same favorites in a different order, the TV writes its order back.
 
@@ -305,7 +305,7 @@ Each section has its own gold **Save**. That button sends the lineup to the TV. 
 
 Leaving a page after a change, and before Save, opens a notice that those changes are not saved yet. OK continues to the other page. Save is what puts the lineup on the TV. A guide that is already open applies a hide, a rename, a strip, a password, or a favorite when that save lands. If the app is holding a newer lineup in memory, the newer revision wins. There is no minute timer for these edits. The 60-minute refresh downloads the provider catalog. It is not the lineup sync.
 
-Admin, then Error log, shows the log in a window you can scroll and resize. A− and A+ change the text size. Download saves the file that is open. Older log files are listed under that window.
+Admin, then Error log, shows the log in a window you can scroll and resize. Entries are shown newest first (by date and time). A− and A+ change the text size. Download saves the file that is open (file order on disk is still append-only). Older log files are listed under that window.
 
 `portal/` is an older Node copy of the page for work on a PC. The TV serves `app/src/main/assets/dashboard/`. A signed install does not need the Node server.
 
@@ -344,7 +344,7 @@ Admin, then Error log, shows the log in a window you can scroll and resize. A−
 - Recordings, Queue, and stamp maps keep a parsed copy in memory until the stored JSON changes.
 - The recording service skips remote sync and guide pickup when nothing is scheduled or recording, and only syncs again after a change or about two minutes.
 - Episode lists use short cache file names, a slim on-disk row, and an LRU memory map. Shows prefetch waits until scrolling settles.
-- Search catalog export for the dashboard is kept by library stamp in memory and on disk so a second publish does not rescan every channel.
+- The app does not load every channel into memory to publish a search catalog on launch. Dashboard search reads groups and channels from SQLite. That old full-catalog POST was discarded by `/api/catalog` and could OOM a ~192MB TV heap; it is gone. The process also requests a larger Java heap (`largeHeap`) and keeps Coil and SQLite caches smaller.
 - Changing the guide time window clears block math and rebinds rows without tearing the list down.
 - Logo prefetch skips URLs already in Coil memory or disk cache.
 - Dashboard country matching for live groups is reused until the library stamp changes.
@@ -356,7 +356,7 @@ Admin, then Error log, shows the log in a window you can scroll and resize. A−
 - The dashboard request reader uses `String(bytes, UTF-8)`. The older `ByteArrayOutputStream.toString(Charset)` call exists only on Android 13 and newer, and it left Android 12 and older with an empty response.
 - A connected VPN encrypts each packet in buffers it keeps, and the home-network routes are calculated once. Outgoing and incoming packets are handled at the same time. Refreshing the handshake keeps the current connection until the server answers. If that server drops, the tunnel stays up and tries the backup city when one is set, and new streams wait instead of using the home connection. The tunnel runs ahead of the guide so a stream is not waiting on the screen.
 - Live now/next EPG in the guide is capped with an LRU so a long session does not keep every channel forever.
-- The favorites quick-zap strip keeps its channel list until favorites change, and skips rebuilding chips when nothing moved.
+- Returning launches paint live groups before dashboard warm-up and “New” card prep so the spinner is not waiting on that background work.
 - Group counts skip a redraw when the stamp-cached map is unchanged.
 - Device prefs (hide empty, density, quiet hours, parental timeout, multi-view, picture, audio, subtitles) load once into memory and are reused until a save clears them.
 - Quiet hours on the reminder clock uses that in-memory snapshot instead of waking DataStore on every tick.
@@ -515,6 +515,10 @@ clearcast-tuner/
 
 - EPG titles that start before the visible window stay readable; narrow slices grow the row and wrap the name.
 - Fixes lag and freezes from 0.2.34 (safe EPG cache, bounded catalog ingest, no next-channel decoder preload, lighter scroll work).
+- Returning accounts paint Live TV groups as soon as the saved names are ready; dashboard warm-up and “New” prep wait until after that.
+- Groups header shows `MM/DD/YYYY  hh:mm AM/PM` instead of the favorites quick-zap channel-name strip.
+- Stops loading the full channel catalog into memory on launch to publish search data (that path could OOM ~192MB heaps). Dashboard search uses SQLite. `largeHeap` is on; Coil and SQLite caches are smaller.
+- Web Error log shows newest entries first by date and time.
 
 ### 0.2.34
 

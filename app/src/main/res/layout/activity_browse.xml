@@ -30,24 +30,17 @@
             android:orientation="horizontal" />
     </HorizontalScrollView>
 
-    <HorizontalScrollView
-        android:id="@+id/favoritesZap"
+    <TextView
+        android:id="@+id/groupClock"
         android:layout_width="match_parent"
         android:layout_height="48dp"
-        android:fillViewport="true"
         android:focusable="false"
-        android:paddingHorizontal="12dp"
+        android:gravity="center_vertical|end"
+        android:paddingHorizontal="20dp"
         android:paddingTop="4dp"
-        android:scrollbars="none"
-        android:visibility="gone">
-
-        <LinearLayout
-            android:id="@+id/favoritesZapRow"
-            android:layout_width="wrap_content"
-            android:layout_height="match_parent"
-            android:gravity="center_vertical"
-            android:orientation="horizontal" />
-    </HorizontalScrollView>
+        android:textColor="@color/text_primary"
+        android:textSize="16sp"
+        android:visibility="gone" />
 
     <LinearLayout
         android:id="@+id/guideRow"

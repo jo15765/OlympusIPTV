@@ -35,8 +35,9 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         applyPragma(db, "PRAGMA synchronous=NORMAL")
         applyPragma(db, "PRAGMA temp_store=MEMORY")
         applyPragma(db, "PRAGMA busy_timeout=3000")
-        applyPragma(db, "PRAGMA cache_size=-65536")
-        applyPragma(db, "PRAGMA mmap_size=268435456")
+        // Keep SQLite caches modest — large mmap/page caches were competing with the Java heap on TV.
+        applyPragma(db, "PRAGMA cache_size=-16384")
+        applyPragma(db, "PRAGMA mmap_size=33554432")
         db.setMaxSqlCacheSize(50)
         db.execSQL(
             "CREATE TABLE IF NOT EXISTS library_meta (playlist_id TEXT PRIMARY KEY, stamp INTEGER NOT NULL)"
@@ -608,13 +609,17 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         ParsedNames(parsed, examples)
     }
 
+    fun releaseSearchExport() {
+        searchExportHold = null
+    }
+
     fun exportSearchCatalog(playlistId: String): Pair<List<Map<String, String>>, List<Map<String, String>>> {
         val stamp = libraryStamp(playlistId)
         searchExportHold?.let {
             if (it.playlistId == playlistId && it.stamp == stamp) return it.groups to it.channels
         }
         readSearchExport(playlistId, stamp)?.let { saved ->
-            searchExportHold = SearchExportHold(playlistId, stamp, saved.first, saved.second)
+            // Disk cache only — do not keep the full catalog pinned in the Java heap.
             return saved
         }
         return read {
@@ -662,8 +667,8 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
                     )
                 }
             }
-            searchExportHold = SearchExportHold(playlistId, stamp, groups, channels)
             writeSearchExport(playlistId, stamp, groups, channels)
+            // Return without retaining searchExportHold — callers should not keep this forever.
             groups to channels
         }
     }

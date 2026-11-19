@@ -20,7 +20,6 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.SupervisorJob
 import java.io.File
@@ -158,24 +157,19 @@ class OlympusIptvApp : Application() {
         epgRepository.attach(catalogDb, appScope)
         DashboardHost.start(this)
         com.olympus.iptv.vpn.AppTunnel.restore(this)
-        appScope.launch {
-            val saved = runCatching { playlistStore.session.first() }.getOrNull() ?: return@launch
-            if (saved.id.isNotBlank()) {
-                launch { catalogDb.warmDashboard(saved.id) }
-                warmFresh(saved.id)
-            }
-        }
+        // Heavy catalog warm-up runs after Browse paints (see BrowseActivity.showCatalog).
+        // Starting it here contended with the first group load and made returning launches feel slow.
         Coil.setImageLoader(
             ImageLoader.Builder(this)
                 .crossfade(false)
                 .respectCacheHeaders(false)
                 .memoryCache {
-                    MemoryCache.Builder(this).maxSizePercent(0.25).build()
+                    MemoryCache.Builder(this).maxSizePercent(0.08).build()
                 }
                 .diskCache {
                     DiskCache.Builder()
                         .directory(cacheDir.resolve("logos"))
-                        .maxSizeBytes(128L * 1024 * 1024)
+                        .maxSizeBytes(48L * 1024 * 1024)
                         .build()
                 }
                 .build()

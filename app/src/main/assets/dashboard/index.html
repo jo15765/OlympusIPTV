@@ -1332,7 +1332,7 @@
             <button class="secondary" id="adminLogBack" type="button">Back</button>
             <h2>Error log</h2>
           </div>
-          <p class="hint">Drag the corner of the log to resize it. Older files stay under 400 KB.</p>
+          <p class="hint">Newest entries first. Drag the corner of the log to resize it. Older files stay under 400 KB.</p>
           <div class="log-tools">
             <button id="logSmaller" type="button">A−</button>
             <button id="logLarger" type="button">A+</button>
@@ -3614,6 +3614,15 @@
       if (next) openTab(next);
     });
     let logFont = 14;
+    function sortLogNewestFirst(text) {
+      if (!text) return text;
+      const trimmed = text.replace(/^\uFEFF/, "");
+      if (trimmed.indexOf("No errors have been recorded") === 0) return trimmed;
+      const parts = trimmed.split(/(?=^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} )/m).filter((part) => part.length);
+      if (parts.length <= 1) return trimmed;
+      parts.reverse();
+      return parts.join("").replace(/\n+$/, "\n");
+    }
     async function showLog(href, filename) {
       const view = document.querySelector("#logView");
       const download = document.querySelector("#logDownload");
@@ -3623,7 +3632,7 @@
       view.textContent = "Loading…";
       try {
         const response = await fetch(href);
-        view.textContent = await response.text();
+        view.textContent = sortLogNewestFirst(await response.text());
       } catch (failure) {
         view.textContent = failure.message || "The log could not be opened.";
       }
