@@ -130,6 +130,8 @@ class ChannelAdapter(
         scrolling = active
     }
 
+    fun isScrolling(): Boolean = scrolling
+
     fun prefetch(context: Context, start: Int, count: Int, sizeDp: Int) {
         if (start < 0 || count <= 0 || start >= items.size) return
         val urls = ArrayList<String>(count)

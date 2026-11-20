@@ -1,13 +1,17 @@
 package com.olympus.iptv.ui.player
 
+import android.app.PictureInPictureParams
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ActivityInfo
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.util.Rational
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
@@ -37,6 +41,7 @@ import androidx.media3.exoplayer.source.LoadEventInfo
 import androidx.media3.exoplayer.source.MediaLoadData
 import androidx.media3.ui.AspectRatioFrameLayout
 import coil.load
+import com.olympus.iptv.BuildConfig
 import com.olympus.iptv.OlympusIptvApp
 import com.olympus.iptv.R
 import java.io.IOException
@@ -45,6 +50,7 @@ import com.olympus.iptv.data.ChannelNames
 import com.olympus.iptv.data.ContentKind
 import com.olympus.iptv.data.EpgNowNext
 import com.olympus.iptv.data.LineupConfig
+import com.olympus.iptv.data.PlayerDecoder
 import com.olympus.iptv.data.PlaylistStore
 import com.olympus.iptv.data.SavedPlaylist
 import com.olympus.iptv.data.WatchEntry
@@ -52,12 +58,15 @@ import com.olympus.iptv.ui.DeviceForm
 import com.olympus.iptv.ui.Haptics
 import com.olympus.iptv.ui.InsetsPad
 import com.olympus.iptv.ui.browse.GuideFeel
+import com.olympus.iptv.ui.cast.CastBridge
 import com.olympus.iptv.ui.channelLogo
 import com.olympus.iptv.databinding.ActivityPlayerBinding
 import com.olympus.iptv.playlist.CatalogDb
 import com.olympus.iptv.playlist.EpisodeSequence
 import com.olympus.iptv.playlist.EpgRepository
+import com.olympus.iptv.playlist.Scrobbler
 import com.olympus.iptv.playlist.Subtitles
+import com.olympus.iptv.playlist.TitleRatings
 import com.olympus.iptv.playlist.LineupApplier
 import java.util.Locale
 import com.olympus.iptv.record.RecordPrompt
@@ -134,6 +143,23 @@ class PlayerActivity : AppCompatActivity() {
     private var overlayBaseTop = 0
     private var sleepMinutes = 0
     private var skipIntroSeries = emptySet<String>()
+    private var videoDecoder = PlayerDecoder.HARDWARE
+    private var playersDecoder = PlayerDecoder.HARDWARE
+    private var decoderDirty = false
+    private var pipSwipeHome = true
+    private var scrobble = PlaylistStore.ScrobbleConfig(
+        provider = Scrobbler.NONE,
+        simklToken = "",
+        simklClientId = "",
+        traktToken = "",
+        traktClientId = ""
+    )
+    private var scrobbleChannel: Channel? = null
+    private var scrobbleJob: Job? = null
+    private var scrobbleStarted = false
+    private var inPip = false
+    private var pipPending = false
+    private var enterPipOnReady = false
     private val sleepFire = Runnable {
         if (!isDestroyed) {
             player?.playWhenReady = false
@@ -208,9 +234,13 @@ class PlayerActivity : AppCompatActivity() {
         playlistId = intent.getStringExtra(EXTRA_PLAYLIST_ID)
         zapMode = intent.getStringExtra(EXTRA_ZAP) ?: ZAP_LIST
         categoryId = intent.getStringExtra(EXTRA_CATEGORY)
+        enterPipOnReady = intent.getBooleanExtra(EXTRA_ENTER_PIP, false)
         index = intent.getIntExtra(EXTRA_INDEX, 0).coerceIn(0, (queue.size - 1).coerceAtLeast(0))
         current = queue.getOrNull(index)
 
+        // Prefer warm in-memory decoder cache — never block the main thread with runBlocking.
+        videoDecoder = (application as OlympusIptvApp).playlistStore.videoDecoderCached()
+            ?: PlayerDecoder.HARDWARE
         player = newPlayer().also { exo ->
             binding.playerView.player = exo
         }
@@ -255,6 +285,18 @@ class PlayerActivity : AppCompatActivity() {
             hidePlaybackMenu()
             openSleepTimer()
         }
+        binding.btnCast.setOnClickListener {
+            hidePlaybackMenu()
+            CastBridge.showChooser(this, current)
+        }
+        binding.btnTrailer.setOnClickListener {
+            hidePlaybackMenu()
+            openTrailer()
+        }
+        binding.btnPip.setOnClickListener {
+            hidePlaybackMenu()
+            enterPip(manual = true)
+        }
         binding.btnSkipIntro.setOnClickListener { onSkipIntro() }
         binding.btnPlayNext.setOnClickListener { playPendingNext() }
         binding.btnNextMenu.setOnClickListener { escapeToMenu() }
@@ -289,6 +331,16 @@ class PlayerActivity : AppCompatActivity() {
                 withContext(Dispatchers.IO) { store.multiView() }
             }
             skipIntroSeries = withContext(Dispatchers.IO) { store.skipIntroSeries() }
+            pipSwipeHome = withContext(Dispatchers.IO) { store.pipSwipeHome() }
+            scrobble = withContext(Dispatchers.IO) { store.scrobbleConfig() }
+            val nextDecoder = withContext(Dispatchers.IO) { store.videoDecoder() }
+            if (isDestroyed) return@launch
+            if (nextDecoder != videoDecoder) {
+                videoDecoder = nextDecoder
+                decoderDirty = true
+                discardSparePlayers()
+            }
+            binding.btnPip.visibility = if (canEnterPip()) View.VISIBLE else View.GONE
         }
         } catch (error: Throwable) {
             com.olympus.iptv.AppLog.error("Player", "Player failed to open", error)
@@ -510,6 +562,9 @@ class PlayerActivity : AppCompatActivity() {
                 } else {
                     View.GONE
                 }
+            binding.btnTrailer.visibility =
+                if (channel.kind == ContentKind.VOD || !channel.seriesId.isNullOrBlank()) View.VISIBLE else View.GONE
+            binding.btnPip.visibility = if (canEnterPip()) View.VISIBLE else View.GONE
             binding.btnGoLive.visibility = View.GONE
             subtitleAppliedFor = null
             binding.channelName.text = alias
@@ -523,6 +578,10 @@ class PlayerActivity : AppCompatActivity() {
             flashOverlay()
             refreshEpgForCurrent()
             rememberCurrent()
+            scrobbleStart(channel)
+            if (channel.kind != ContentKind.LIVE || !channel.seriesId.isNullOrBlank()) {
+                enrichTmdb(channel, alias)
+            }
             val resumeAt = startAt ?: resumePosition(channel)
             val playAt = if (
                 startAt == null &&
@@ -617,6 +676,9 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun newPlayer(): ExoPlayer {
+        val mode = PlayerDecoder.normalize(videoDecoder)
+        playersDecoder = mode
+        decoderDirty = false
         val control = DefaultLoadControl.Builder()
             .setBufferDurationsMs(1_500, 8_000, 250, 500)
             .setTargetBufferBytes(6 * 1024 * 1024)
@@ -628,6 +690,7 @@ class PlayerActivity : AppCompatActivity() {
             .setReadTimeoutMs(20_000)
             .setAllowCrossProtocolRedirects(true)
         return ExoPlayer.Builder(this)
+            .setRenderersFactory(PlayerDecoder.renderersFactory(this, mode))
             .setLoadControl(control)
             .setMediaSourceFactory(DefaultMediaSourceFactory(this).setDataSourceFactory(http))
             .build()
@@ -635,6 +698,15 @@ class PlayerActivity : AppCompatActivity() {
                 exo.addListener(trackListener)
                 watchPlaybackEvents(exo)
             }
+    }
+
+    private fun discardSparePlayers() {
+        clearSpare(1)
+        clearSpare(-1)
+        idlePlayer?.release()
+        idlePlayer = null
+        secondaryPlayer?.release()
+        secondaryPlayer = null
     }
 
     private fun watchPlaybackEvents(exo: ExoPlayer) {
@@ -787,8 +859,10 @@ class PlayerActivity : AppCompatActivity() {
         bufferStartedAt = 0L
         bufferWatchToken += 1
         showConnectingBadge(false)
+        val firstReady = !hadPlaybackReady
         if (started <= 0L) {
             hadPlaybackReady = true
+            if (firstReady) maybeEnterPipOnReady()
             return
         }
         val waited = SystemClock.elapsedRealtime() - started
@@ -796,6 +870,13 @@ class PlayerActivity : AppCompatActivity() {
         hadPlaybackReady = true
         val minLog = if (initial) INITIAL_SPOOL_LOG_MS else REBUFFER_LOG_MS
         if (waited >= minLog) PlaybackTrace.spool(current, initial, waited)
+        if (firstReady) maybeEnterPipOnReady()
+    }
+
+    private fun maybeEnterPipOnReady() {
+        if (!enterPipOnReady) return
+        enterPipOnReady = false
+        binding.root.post { enterPip(manual = false) }
     }
 
     private fun showConnectingBadge(show: Boolean) {
@@ -978,6 +1059,10 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun obtainSpare(): ExoPlayer {
+        if (decoderDirty || playersDecoder != PlayerDecoder.normalize(videoDecoder)) {
+            discardSparePlayers()
+            decoderDirty = false
+        }
         val idle = idlePlayer
         if (idle != null) {
             idlePlayer = null
@@ -1556,6 +1641,9 @@ class PlayerActivity : AppCompatActivity() {
             binding.btnGoLive.isFocused ||
             binding.btnMultiView.isFocused ||
             binding.btnSleep.isFocused ||
+            binding.btnCast.isFocused ||
+            binding.btnTrailer.isFocused ||
+            binding.btnPip.isFocused ||
             binding.btnSkipIntro.isFocused
 
     private fun showPlaybackMenu() {
@@ -1582,7 +1670,10 @@ class PlayerActivity : AppCompatActivity() {
             binding.btnLast,
             binding.btnGoLive,
             binding.btnMultiView,
-            binding.btnSleep
+            binding.btnSleep,
+            binding.btnCast,
+            binding.btnTrailer,
+            binding.btnPip
         ).filter { it.visibility == View.VISIBLE }
         shown.forEachIndexed { index, button ->
             val previous = shown[if (index == 0) 0 else index - 1]
@@ -2423,20 +2514,158 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
+    private fun canEnterPip(): Boolean {
+        if (!touchPrimary) return false
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return false
+        return packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)
+    }
+
+    private fun enterPip(manual: Boolean) {
+        if (!canEnterPip()) {
+            if (manual) Toast.makeText(this, R.string.pip_unavailable, Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        hidePlaybackMenu()
+        binding.overlay.visibility = View.GONE
+        pipPending = true
+        val params = PictureInPictureParams.Builder()
+            .setAspectRatio(Rational(16, 9))
+            .build()
+        runCatching { enterPictureInPictureMode(params) }
+            .onFailure {
+                pipPending = false
+                if (manual) Toast.makeText(this, R.string.pip_unavailable, Toast.LENGTH_SHORT).show()
+            }
+    }
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (pipSwipeHome && canEnterPip() && player?.isPlaying == true) {
+            enterPip(manual = false)
+        }
+    }
+
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode)
+        inPip = isInPictureInPictureMode
+        pipPending = false
+        if (isInPictureInPictureMode) {
+            hidePlaybackMenu()
+            binding.overlay.visibility = View.GONE
+            binding.phoneDock.visibility = View.GONE
+            player?.playWhenReady = true
+        }
+    }
+
+    private fun openTrailer() {
+        val channel = current ?: return
+        if (BuildConfig.TMDB_API_KEY.isBlank()) {
+            Toast.makeText(this, R.string.tmdb_missing_key, Toast.LENGTH_LONG).show()
+            return
+        }
+        lifecycleScope.launch {
+            val preferTv = !channel.seriesId.isNullOrBlank() || channel.kind != ContentKind.VOD
+            val trailer = withContext(Dispatchers.IO) {
+                TitleRatings.trailerFor(channel.name, preferTv)
+            }
+            if (isDestroyed) return@launch
+            if (trailer == null) {
+                Toast.makeText(this@PlayerActivity, R.string.trailer_missing, Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+            val appIntent = Intent(
+                Intent.ACTION_VIEW,
+                Uri.parse("vnd.youtube:${trailer.key}")
+            )
+            val webIntent = Intent(
+                Intent.ACTION_VIEW,
+                Uri.parse("https://www.youtube.com/watch?v=${trailer.key}")
+            )
+            runCatching { startActivity(appIntent) }.recoverCatching { startActivity(webIntent) }
+                .onFailure {
+                    Toast.makeText(this@PlayerActivity, R.string.trailer_missing, Toast.LENGTH_SHORT).show()
+                }
+        }
+    }
+
+    private fun enrichTmdb(channel: Channel, alias: String) {
+        lifecycleScope.launch {
+            val preferTv = !channel.seriesId.isNullOrBlank()
+            val bundle = withContext(Dispatchers.IO) {
+                TitleRatings.peek(channel.name, preferTv)
+                    ?: TitleRatings.loadScores(channel.name, preferTv)
+            }
+            if (isDestroyed || current?.id != channel.id) return@launch
+            val line = bundle.scoreLine(2)
+            if (line.isBlank()) return@launch
+            val existing = binding.channelMeta.text?.toString().orEmpty()
+            if (!existing.contains(bundle.ratings.firstOrNull()?.scoreLabel.orEmpty())) {
+                binding.channelMeta.text =
+                    if (existing.isBlank() || existing == alias) line else "$existing · $line"
+            }
+        }
+    }
+
+    private fun scrobbleStart(channel: Channel) {
+        scrobbleJob?.cancel()
+        stopScrobbleIfStarted()
+        if (scrobble.provider == Scrobbler.NONE || scrobble.activeToken().isBlank()) return
+        scrobbleChannel = channel
+        scrobbleStarted = false
+        val config = scrobble
+        scrobbleJob = lifecycleScope.launch {
+            delay(1_500L)
+            if (!isActive || isDestroyed || current?.id != channel.id) return@launch
+            scrobbleStarted = true
+            withContext(Dispatchers.IO) {
+                runCatching {
+                    Scrobbler.start(config.provider, config.activeToken(), config.activeClientId(), channel)
+                }
+            }
+        }
+    }
+
+    private fun scrobbleStop() {
+        scrobbleJob?.cancel()
+        scrobbleJob = null
+        stopScrobbleIfStarted()
+    }
+
+    private fun stopScrobbleIfStarted() {
+        val channel = scrobbleChannel ?: return
+        val started = scrobbleStarted
+        scrobbleChannel = null
+        scrobbleStarted = false
+        if (!started) return
+        if (scrobble.provider == Scrobbler.NONE || scrobble.activeToken().isBlank()) return
+        val config = scrobble
+        lifecycleScope.launch(Dispatchers.IO) {
+            runCatching {
+                Scrobbler.stop(config.provider, config.activeToken(), config.activeClientId(), channel)
+            }
+        }
+    }
+
     override fun onStop() {
         cancelNext()
         current?.let { saveWatch(it) }
+        val keepPip = inPip || pipPending
+        if (!keepPip) scrobbleStop()
         progressJob?.cancel()
         seekJob?.cancel()
         hideHandler.removeCallbacks(seekTick)
         super.onStop()
-        player?.playWhenReady = false
-        nextPlayer?.playWhenReady = false
-        prevPlayer?.playWhenReady = false
-        secondaryPlayer?.playWhenReady = false
+        if (!keepPip) {
+            player?.playWhenReady = false
+            nextPlayer?.playWhenReady = false
+            prevPlayer?.playWhenReady = false
+            secondaryPlayer?.playWhenReady = false
+        }
     }
 
     override fun onDestroy() {
+        scrobbleStop()
         progressJob?.cancel()
         recoverJob?.cancel()
         countdownJob?.cancel()
@@ -2477,6 +2706,7 @@ class PlayerActivity : AppCompatActivity() {
         private const val EXTRA_PLAYLIST_ID = "playlist_id"
         private const val EXTRA_ZAP = "zap"
         private const val EXTRA_CATEGORY = "category"
+        private const val EXTRA_ENTER_PIP = "enter_pip"
 
         private var returnToChannels = false
         private var browseBackUntil = 0L
@@ -2513,7 +2743,8 @@ class PlayerActivity : AppCompatActivity() {
             startIndex: Int,
             playlistId: String?,
             zapMode: String = ZAP_LIST,
-            categoryId: String? = null
+            categoryId: String? = null,
+            enterPip: Boolean = false
         ): Intent {
             return Intent(context, PlayerActivity::class.java)
                 .putExtra(EXTRA_ID, channel.id)
@@ -2526,6 +2757,7 @@ class PlayerActivity : AppCompatActivity() {
                 .putExtra(EXTRA_PLAYLIST_ID, playlistId)
                 .putExtra(EXTRA_ZAP, zapMode)
                 .putExtra(EXTRA_CATEGORY, categoryId)
+                .putExtra(EXTRA_ENTER_PIP, enterPip)
         }
     }
 }

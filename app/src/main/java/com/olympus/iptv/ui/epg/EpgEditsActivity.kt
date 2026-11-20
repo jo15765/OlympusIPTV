@@ -3,6 +3,8 @@ package com.olympus.iptv.ui.epg
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.widget.EditText
+import android.widget.LinearLayout
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -12,7 +14,9 @@ import com.olympus.iptv.R
 import com.olympus.iptv.data.ContentKind
 import com.olympus.iptv.data.LineupConfig
 import com.olympus.iptv.data.NameImages
+import com.olympus.iptv.data.PlayerDecoder
 import com.olympus.iptv.data.PlaylistStore
+import com.olympus.iptv.data.ScrobblerIds
 import com.olympus.iptv.databinding.ActivityEpgEditsBinding
 import com.olympus.iptv.playlist.LineupClient
 import com.olympus.iptv.ui.countries.CountriesActivity
@@ -55,6 +59,10 @@ class EpgEditsActivity : AppCompatActivity() {
         binding.cardHideEmpty.setOnClickListener { toggleHideEmpty() }
         binding.cardDensity.setOnClickListener { toggleDensity() }
         binding.cardPinTimeout.setOnClickListener { cyclePinTimeout() }
+        binding.cardDecoder.setOnClickListener { cycleDecoder() }
+        binding.cardTmdb.setOnClickListener { cycleTmdbLimit() }
+        binding.cardScrobbler.setOnClickListener { cycleScrobbler() }
+        binding.cardPip.setOnClickListener { togglePip() }
         binding.btnBack.setOnClickListener { finish() }
         val details = listOf(
             binding.cardCountries to R.string.epg_card_countries_detail,
@@ -68,7 +76,11 @@ class EpgEditsActivity : AppCompatActivity() {
             binding.cardParental to R.string.epg_card_parental_detail,
             binding.cardHideEmpty to R.string.epg_card_hide_empty_detail,
             binding.cardDensity to R.string.epg_card_density_detail,
-            binding.cardPinTimeout to R.string.epg_card_pin_timeout_detail
+            binding.cardPinTimeout to R.string.epg_card_pin_timeout_detail,
+            binding.cardDecoder to R.string.epg_card_decoder_detail,
+            binding.cardTmdb to R.string.epg_card_tmdb_detail,
+            binding.cardScrobbler to R.string.epg_card_scrobbler_detail,
+            binding.cardPip to R.string.epg_card_pip_detail
         )
         details.forEach { (card, detail) ->
             card.setOnFocusChangeListener { _, focused ->
@@ -82,6 +94,10 @@ class EpgEditsActivity : AppCompatActivity() {
             showHideEmpty(store.hideEmptyGroups())
             showDensity(store.guideDensity())
             showPinTimeout(store.parentalTimeoutMinutes())
+            showDecoder(store.videoDecoder())
+            showTmdb(store.tmdbItemsLimit())
+            showScrobbler(store.scrobblerProvider())
+            showPip(store.pipSwipeHome())
         }
     }
 
@@ -151,6 +167,149 @@ class EpgEditsActivity : AppCompatActivity() {
 
     private fun showPinTimeout(minutes: Int) {
         binding.pinTimeoutState.text = getString(R.string.epg_short_pin_timeout_value, minutes)
+    }
+
+    private fun cycleDecoder() {
+        lifecycleScope.launch {
+            val store = (application as OlympusIptvApp).playlistStore
+            val options = PlayerDecoder.OPTIONS
+            val current = store.videoDecoder()
+            val index = options.indexOf(current).let { if (it < 0) 0 else (it + 1) % options.size }
+            val next = options[index]
+            store.saveVideoDecoder(next)
+            showDecoder(next)
+            Toast.makeText(this@EpgEditsActivity, decoderLabel(next), Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun showDecoder(type: String) {
+        binding.decoderState.text = decoderLabel(type)
+    }
+
+    private fun decoderLabel(type: String): String = when (PlayerDecoder.normalize(type)) {
+        PlayerDecoder.HARDWARE_ASYNC -> getString(R.string.decoder_hardware_async)
+        PlayerDecoder.HARDWARE_FAILSAFE -> getString(R.string.decoder_hardware_failsafe)
+        PlayerDecoder.SOFTWARE -> getString(R.string.decoder_software)
+        else -> getString(R.string.decoder_hardware)
+    }
+
+    private fun cycleTmdbLimit() {
+        lifecycleScope.launch {
+            val store = (application as OlympusIptvApp).playlistStore
+            val options = PlaylistStore.TMDB_ITEM_OPTIONS
+            val current = store.tmdbItemsLimit()
+            val index = options.indexOf(current).let { if (it < 0) 0 else (it + 1) % options.size }
+            val next = options[index]
+            store.saveTmdbItemsLimit(next)
+            showTmdb(next)
+            Toast.makeText(
+                this@EpgEditsActivity,
+                getString(R.string.epg_tmdb_set, next),
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
+    private fun showTmdb(limit: Int) {
+        binding.tmdbState.text = getString(R.string.epg_short_tmdb, limit)
+    }
+
+    private fun cycleScrobbler() {
+        lifecycleScope.launch {
+            val store = (application as OlympusIptvApp).playlistStore
+            val current = store.scrobblerProvider()
+            when (current) {
+                ScrobblerIds.NONE -> promptScrobbler(ScrobblerIds.SIMKL)
+                ScrobblerIds.SIMKL -> promptScrobbler(ScrobblerIds.TRAKT)
+                else -> {
+                    store.clearScrobbler()
+                    showScrobbler(ScrobblerIds.NONE)
+                    Toast.makeText(this@EpgEditsActivity, R.string.scrobbler_cleared, Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    private fun promptScrobbler(provider: String) {
+        val label = if (provider == ScrobblerIds.SIMKL) {
+            getString(R.string.scrobbler_simkl)
+        } else {
+            getString(R.string.scrobbler_trakt)
+        }
+        val pad = (16 * resources.displayMetrics.density).toInt()
+        val column = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(pad, pad / 2, pad, 0)
+        }
+        val token = EditText(this).apply {
+            hint = getString(R.string.scrobbler_token_hint)
+            setSingleLine()
+        }
+        val client = EditText(this).apply {
+            hint = getString(R.string.scrobbler_client_hint)
+            setSingleLine()
+        }
+        column.addView(token)
+        column.addView(client)
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.scrobbler_token_title, label))
+            .setView(column)
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                lifecycleScope.launch {
+                    val store = (application as OlympusIptvApp).playlistStore
+                    val tokenValue = token.text?.toString().orEmpty()
+                    val clientValue = client.text?.toString().orEmpty()
+                    if (tokenValue.isBlank()) {
+                        store.clearScrobbler()
+                        showScrobbler(ScrobblerIds.NONE)
+                        Toast.makeText(this@EpgEditsActivity, R.string.scrobbler_cleared, Toast.LENGTH_SHORT).show()
+                        return@launch
+                    }
+                    if (provider == ScrobblerIds.SIMKL) {
+                        store.saveSimklCredentials(tokenValue, clientValue)
+                    } else {
+                        store.saveTraktCredentials(tokenValue, clientValue)
+                    }
+                    showScrobbler(provider)
+                    Toast.makeText(
+                        this@EpgEditsActivity,
+                        getString(R.string.scrobbler_saved, label),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+            .show()
+    }
+
+    private fun showScrobbler(provider: String) {
+        binding.scrobblerState.setText(
+            when (provider) {
+                ScrobblerIds.SIMKL -> R.string.scrobbler_simkl
+                ScrobblerIds.TRAKT -> R.string.scrobbler_trakt
+                else -> R.string.scrobbler_none
+            }
+        )
+    }
+
+    private fun togglePip() {
+        lifecycleScope.launch {
+            val store = (application as OlympusIptvApp).playlistStore
+            val next = !store.pipSwipeHome()
+            store.savePipSwipeHome(next)
+            showPip(next)
+            Toast.makeText(
+                this@EpgEditsActivity,
+                if (next) R.string.pip_home_on else R.string.pip_home_off,
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
+    private fun showPip(enabled: Boolean) {
+        binding.pipState.setText(
+            if (enabled) R.string.epg_short_hide_empty_on else R.string.epg_short_hide_empty_off
+        )
     }
 
     private fun openCountries() {

@@ -63,8 +63,18 @@ class PlaylistStore(private val context: Context) {
     private val recordingsKey = stringPreferencesKey("recordings_json")
     private val watchKey = stringPreferencesKey("watch_json")
     private val queueKey = stringPreferencesKey("queue_json")
+    private val playlistOrderKey = stringPreferencesKey("playlist_order_json")
+    private val videoDecoderKey = stringPreferencesKey("video_decoder")
+    private val tmdbItemsLimitKey = intPreferencesKey("tmdb_items_limit")
+    private val scrobblerProviderKey = stringPreferencesKey("scrobbler_provider")
+    private val simklTokenKey = stringPreferencesKey("simkl_token")
+    private val simklClientIdKey = stringPreferencesKey("simkl_client_id")
+    private val traktTokenKey = stringPreferencesKey("trakt_token")
+    private val traktClientIdKey = stringPreferencesKey("trakt_client_id")
+    private val pipSwipeHomeKey = booleanPreferencesKey("pip_swipe_home")
     private val recordingsType = object : TypeToken<Map<String, RecordingBook>>() {}.type
     private val stringMapType = object : TypeToken<Map<String, String>>() {}.type
+    private val stringListType = object : TypeToken<List<String>>() {}.type
     private val listType = object : TypeToken<List<SavedPlaylist>>() {}.type
     private val favoritesType = object : TypeToken<Map<String, List<String>>>() {}.type
     private val lineupType = object : TypeToken<Map<String, LineupConfig>>() {}.type
@@ -655,6 +665,15 @@ class PlaylistStore(private val context: Context) {
             prefs.remove(recordingsKey)
             prefs.remove(watchKey)
             prefs.remove(queueKey)
+            prefs.remove(playlistOrderKey)
+            prefs.remove(videoDecoderKey)
+            prefs.remove(tmdbItemsLimitKey)
+            prefs.remove(scrobblerProviderKey)
+            prefs.remove(simklTokenKey)
+            prefs.remove(simklClientIdKey)
+            prefs.remove(traktTokenKey)
+            prefs.remove(traktClientIdKey)
+            prefs.remove(pipSwipeHomeKey)
         }
         lineupParsed = null
         favoritesParsed = null
@@ -664,13 +683,180 @@ class PlaylistStore(private val context: Context) {
         queueParsed = null
         stringMapParsed = null
         devicePrefsCache = null
+        videoDecoderCache = null
         QuietHoursBridge.clear()
     }
 
     val playlists: Flow<List<SavedPlaylist>> = context.dataStore.data.map { prefs ->
         val raw = prefs[key].orEmpty()
-        if (raw.isBlank()) emptyList()
+        val listed = if (raw.isBlank()) emptyList()
         else runCatching { gson.fromJson<List<SavedPlaylist>>(raw, listType) }.getOrDefault(emptyList())
+        orderPlaylists(listed, prefs[playlistOrderKey])
+    }
+
+    suspend fun playlistOrder(): List<String> {
+        val raw = context.dataStore.data.first()[playlistOrderKey]
+        return decodeStringList(raw)
+    }
+
+    suspend fun savePlaylistOrder(ids: List<String>) {
+        context.dataStore.edit { prefs ->
+            prefs[playlistOrderKey] = gson.toJson(ids)
+        }
+    }
+
+    suspend fun movePlaylist(id: String, direction: Int): Boolean {
+        val listed = playlists.first()
+        if (listed.size < 2) return false
+        val order = ListOrder.merge(playlistOrder(), listed.map { it.id })
+        if (!ListOrder.swap(order, id, direction)) return false
+        savePlaylistOrder(order)
+        return true
+    }
+
+    private fun orderPlaylists(listed: List<SavedPlaylist>, orderRaw: String?): List<SavedPlaylist> {
+        if (listed.isEmpty()) return listed
+        val order = decodeStringList(orderRaw)
+        if (order.isEmpty()) return listed
+        val byId = listed.associateBy { it.id }
+        return ListOrder.merge(order, listed.map { it.id }).mapNotNull { byId[it] }
+    }
+
+    private fun decodeStringList(raw: String?): MutableList<String> {
+        if (raw.isNullOrBlank()) return mutableListOf()
+        return runCatching {
+            gson.fromJson<List<String>>(raw, stringListType)
+        }.getOrNull()?.toMutableList() ?: mutableListOf()
+    }
+
+    @Volatile
+    private var videoDecoderCache: String? = null
+
+    fun videoDecoderCached(): String? = videoDecoderCache
+
+    suspend fun videoDecoder(): String {
+        videoDecoderCache?.let { return it }
+        val value = PlayerDecoder.normalize(context.dataStore.data.first()[videoDecoderKey])
+        videoDecoderCache = value
+        return value
+    }
+
+    suspend fun saveVideoDecoder(type: String) {
+        val chosen = PlayerDecoder.normalize(type)
+        context.dataStore.edit { prefs -> prefs[videoDecoderKey] = chosen }
+        videoDecoderCache = chosen
+    }
+
+    suspend fun tmdbItemsLimit(): Int {
+        val saved = context.dataStore.data.first()[tmdbItemsLimitKey] ?: DEFAULT_TMDB_ITEMS
+        return saved.coerceIn(1, MAX_TMDB_ITEMS)
+    }
+
+    suspend fun saveTmdbItemsLimit(limit: Int) {
+        val chosen = limit.coerceIn(1, MAX_TMDB_ITEMS)
+        context.dataStore.edit { prefs -> prefs[tmdbItemsLimitKey] = chosen }
+    }
+
+    suspend fun scrobblerProvider(): String {
+        val raw = context.dataStore.data.first()[scrobblerProviderKey].orEmpty()
+        return when (raw) {
+            ScrobblerIds.SIMKL, ScrobblerIds.TRAKT -> raw
+            else -> ScrobblerIds.NONE
+        }
+    }
+
+    suspend fun saveScrobblerProvider(provider: String) {
+        val chosen = when (provider) {
+            ScrobblerIds.SIMKL, ScrobblerIds.TRAKT -> provider
+            else -> ScrobblerIds.NONE
+        }
+        context.dataStore.edit { prefs ->
+            prefs[scrobblerProviderKey] = chosen
+            // Mutex: only one scrobbler active.
+            if (chosen == ScrobblerIds.SIMKL) {
+                prefs.remove(traktTokenKey)
+                prefs.remove(traktClientIdKey)
+            } else if (chosen == ScrobblerIds.TRAKT) {
+                prefs.remove(simklTokenKey)
+                prefs.remove(simklClientIdKey)
+            }
+        }
+    }
+
+    suspend fun simklToken(): String = context.dataStore.data.first()[simklTokenKey].orEmpty()
+    suspend fun simklClientId(): String = context.dataStore.data.first()[simklClientIdKey].orEmpty()
+    suspend fun traktToken(): String = context.dataStore.data.first()[traktTokenKey].orEmpty()
+    suspend fun traktClientId(): String = context.dataStore.data.first()[traktClientIdKey].orEmpty()
+
+    suspend fun saveSimklCredentials(token: String, clientId: String) {
+        context.dataStore.edit { prefs ->
+            prefs[simklTokenKey] = token.trim()
+            prefs[simklClientIdKey] = clientId.trim()
+            prefs[scrobblerProviderKey] = ScrobblerIds.SIMKL
+            prefs.remove(traktTokenKey)
+            prefs.remove(traktClientIdKey)
+        }
+    }
+
+    suspend fun saveTraktCredentials(token: String, clientId: String) {
+        context.dataStore.edit { prefs ->
+            prefs[traktTokenKey] = token.trim()
+            prefs[traktClientIdKey] = clientId.trim()
+            prefs[scrobblerProviderKey] = ScrobblerIds.TRAKT
+            prefs.remove(simklTokenKey)
+            prefs.remove(simklClientIdKey)
+        }
+    }
+
+    suspend fun clearScrobbler() {
+        context.dataStore.edit { prefs ->
+            prefs[scrobblerProviderKey] = ScrobblerIds.NONE
+            prefs.remove(simklTokenKey)
+            prefs.remove(simklClientIdKey)
+            prefs.remove(traktTokenKey)
+            prefs.remove(traktClientIdKey)
+        }
+    }
+
+    suspend fun pipSwipeHome(): Boolean = context.dataStore.data.first()[pipSwipeHomeKey] ?: true
+
+    suspend fun savePipSwipeHome(enabled: Boolean) {
+        context.dataStore.edit { prefs -> prefs[pipSwipeHomeKey] = enabled }
+    }
+
+    suspend fun scrobbleConfig(): ScrobbleConfig {
+        val prefs = context.dataStore.data.first()
+        val provider = when (prefs[scrobblerProviderKey].orEmpty()) {
+            ScrobblerIds.SIMKL, ScrobblerIds.TRAKT -> prefs[scrobblerProviderKey].orEmpty()
+            else -> ScrobblerIds.NONE
+        }
+        return ScrobbleConfig(
+            provider = provider,
+            simklToken = prefs[simklTokenKey].orEmpty(),
+            simklClientId = prefs[simklClientIdKey].orEmpty(),
+            traktToken = prefs[traktTokenKey].orEmpty(),
+            traktClientId = prefs[traktClientIdKey].orEmpty()
+        )
+    }
+
+    data class ScrobbleConfig(
+        val provider: String,
+        val simklToken: String,
+        val simklClientId: String,
+        val traktToken: String,
+        val traktClientId: String
+    ) {
+        fun activeToken(): String = when (provider) {
+            ScrobblerIds.SIMKL -> simklToken
+            ScrobblerIds.TRAKT -> traktToken
+            else -> ""
+        }
+
+        fun activeClientId(): String = when (provider) {
+            ScrobblerIds.SIMKL -> simklClientId
+            ScrobblerIds.TRAKT -> traktClientId
+            else -> ""
+        }
     }
 
     suspend fun queue(playlistId: String): List<QueueItem> {
@@ -748,6 +934,9 @@ class PlaylistStore(private val context: Context) {
         const val DEFAULT_QUIET_END = 7 * 60
         const val DEFAULT_PARENTAL_TIMEOUT = 15
         val PARENTAL_TIMEOUTS = intArrayOf(5, 15, 30, 60)
+        const val DEFAULT_TMDB_ITEMS = 10
+        const val MAX_TMDB_ITEMS = 40
+        val TMDB_ITEM_OPTIONS = intArrayOf(5, 10, 20, 40)
 
         fun newId(): String = UUID.randomUUID().toString()
 

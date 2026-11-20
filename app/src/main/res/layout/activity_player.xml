@@ -326,12 +326,59 @@
             android:background="@drawable/bg_button"
             android:focusable="true"
             android:nextFocusLeft="@id/btnMultiView"
-            android:nextFocusRight="@id/btnSleep"
+            android:nextFocusRight="@id/btnCast"
             android:nextFocusUp="@id/btnSleep"
             android:nextFocusDown="@id/btnSleep"
             android:text="@string/sleep_timer"
             android:textAllCaps="false"
             android:textColor="@color/bg" />
+
+        <Button
+            android:id="@+id/btnCast"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:layout_marginStart="12dp"
+            android:background="@drawable/bg_button"
+            android:focusable="true"
+            android:nextFocusLeft="@id/btnSleep"
+            android:nextFocusRight="@id/btnTrailer"
+            android:nextFocusUp="@id/btnCast"
+            android:nextFocusDown="@id/btnCast"
+            android:text="@string/cast"
+            android:textAllCaps="false"
+            android:textColor="@color/bg" />
+
+        <Button
+            android:id="@+id/btnTrailer"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:layout_marginStart="12dp"
+            android:background="@drawable/bg_button"
+            android:focusable="true"
+            android:nextFocusLeft="@id/btnCast"
+            android:nextFocusRight="@id/btnPip"
+            android:nextFocusUp="@id/btnTrailer"
+            android:nextFocusDown="@id/btnTrailer"
+            android:text="@string/trailer"
+            android:textAllCaps="false"
+            android:textColor="@color/bg"
+            android:visibility="gone" />
+
+        <Button
+            android:id="@+id/btnPip"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:layout_marginStart="12dp"
+            android:background="@drawable/bg_button"
+            android:focusable="true"
+            android:nextFocusLeft="@id/btnTrailer"
+            android:nextFocusRight="@id/btnPip"
+            android:nextFocusUp="@id/btnPip"
+            android:nextFocusDown="@id/btnPip"
+            android:text="@string/pip"
+            android:textAllCaps="false"
+            android:textColor="@color/bg"
+            android:visibility="gone" />
     </LinearLayout>
 
     <LinearLayout

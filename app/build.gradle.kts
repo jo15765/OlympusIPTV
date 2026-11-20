@@ -18,6 +18,7 @@ val watchmodeKey = localProperty("watchmode.apiKey")
 val opensubtitlesKey = localProperty("opensubtitles.apiKey")
 val sendgridKey = localProperty("sendgrid.apiKey")
 val sendgridFrom = localProperty("sendgrid.fromEmail")
+val tmdbKey = localProperty("tmdb.apiKey")
 
 android {
     namespace = "com.olympus.iptv"
@@ -27,18 +28,20 @@ android {
         applicationId = "com.olympus.iptv"
         minSdk = 24
         targetSdk = 35
-        versionCode = 57
-        versionName = "0.2.56"
+        versionCode = 63
+        versionName = "0.2.62"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "WATCHMODE_API_KEY", "\"$watchmodeKey\"")
         buildConfigField("String", "OPENSUBTITLES_API_KEY", "\"$opensubtitlesKey\"")
         buildConfigField("String", "SENDGRID_API_KEY", "\"$sendgridKey\"")
         buildConfigField("String", "SENDGRID_FROM_EMAIL", "\"$sendgridFrom\"")
+        buildConfigField("String", "TMDB_API_KEY", "\"$tmdbKey\"")
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -89,6 +92,8 @@ dependencies {
     implementation(libs.media3.ui)
     implementation(libs.media3.exoplayer.hls)
     implementation(libs.media3.exoplayer.dash)
+    implementation(libs.play.services.cast.framework)
+    implementation(libs.androidx.mediarouter)
     implementation(libs.okhttp)
     implementation(libs.gson)
     implementation(libs.kotlinx.coroutines.android)

@@ -519,6 +519,7 @@
         android:focusable="true"
         android:gravity="center_vertical"
         android:nextFocusUp="@id/cardDensity"
+        android:nextFocusDown="@id/cardDecoder"
         android:orientation="horizontal"
         android:paddingHorizontal="16dp">
 
@@ -536,6 +537,137 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/epg_short_pin_timeout"
+            android:textColor="@color/accent"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/cardDecoder"
+        android:layout_width="match_parent"
+        android:layout_height="64dp"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/bg_focusable"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center_vertical"
+        android:nextFocusUp="@id/cardPinTimeout"
+        android:nextFocusDown="@id/cardTmdb"
+        android:orientation="horizontal"
+        android:paddingHorizontal="16dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/epg_card_decoder"
+            android:textColor="@color/text_primary"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/decoderState"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/decoder_hardware"
+            android:textColor="@color/accent"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/cardTmdb"
+        android:layout_width="match_parent"
+        android:layout_height="64dp"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/bg_focusable"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center_vertical"
+        android:nextFocusUp="@id/cardDecoder"
+        android:nextFocusDown="@id/cardScrobbler"
+        android:orientation="horizontal"
+        android:paddingHorizontal="16dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/epg_card_tmdb"
+            android:textColor="@color/text_primary"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tmdbState"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/epg_short_tmdb"
+            android:textColor="@color/accent"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/cardScrobbler"
+        android:layout_width="match_parent"
+        android:layout_height="64dp"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/bg_focusable"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center_vertical"
+        android:nextFocusUp="@id/cardTmdb"
+        android:nextFocusDown="@id/cardPip"
+        android:orientation="horizontal"
+        android:paddingHorizontal="16dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/epg_card_scrobbler"
+            android:textColor="@color/text_primary"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/scrobblerState"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/scrobbler_none"
+            android:textColor="@color/accent"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/cardPip"
+        android:layout_width="match_parent"
+        android:layout_height="64dp"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/bg_focusable"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center_vertical"
+        android:nextFocusUp="@id/cardScrobbler"
+        android:orientation="horizontal"
+        android:paddingHorizontal="16dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/epg_card_pip"
+            android:textColor="@color/text_primary"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/pipState"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/epg_short_hide_empty_on"
             android:textColor="@color/accent"
             android:textSize="14sp"
             android:textStyle="bold" />

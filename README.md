@@ -6,7 +6,7 @@
 
 ### For the latest and greatest, build your own APK from this code.
 
-The latest signed file is **0.2.56** (versionCode 57). **One APK** installs on Android TV / set-top boxes and on phones and tablets. Mega Live folders (250+, e.g. 24/7) keep the guide pane with **hour blocks of the channel name** (no provider EPG fetch) and page channels 20 at a time. Normal groups still use real EPG. Connecting clears on first frame / ready / playing and stays off during live rebuffers. Live 401/403 denials hard-stop. Phones: smaller Live pages, group DiffUtil filter, now-playing strip, “Back to group” chip, search recent queries, empty CTAs, haptics on zap/retry. Player: Connecting badge shows wait / poor-network copy; error card with Retry / Next. Admin: quiet-hours toggle + schedule, Backup export shortcut, parental lock count on the chip. Web Favorites: Undo after remove. Optional SendGrid after two wrong PINs (`sendgrid.apiKey` + `sendgrid.fromEmail` in `local.properties`).
+The latest signed file is **0.2.62** (versionCode 63). **One APK** installs on Android TV / set-top boxes and on phones and tablets. Includes playlist reorder, Top 10 watched favorites, video decoder modes, phone PiP gestures, Chromecast (with IPTV caveat), multi-source VOD ratings/reviews (TMDB + Watchmode), YouTube trailers, Simkl/Trakt scrobble (mutex), plus performance caches and release R8 minify. Optional keys in `local.properties`: `tmdb.apiKey`, `watchmode.apiKey`, `opensubtitles.apiKey`, `sendgrid.apiKey` + `sendgrid.fromEmail`.
 
 **This is a player only. You must provide your own streams.**
 
@@ -66,14 +66,28 @@ Olympus-IPTV is one APK for Android TV / set-top boxes and for phones and tablet
 
 | | |
 | --- | --- |
-| Signed file | `C:\Users\chalu\Downloads\olympus-iptv-0.2.56.apk` |
-| What that file is | versionName **0.2.56**, versionCode **57** |
-| Source in this tree | versionName **0.2.56**, versionCode **57** |
-| What to run | Install the signed 0.2.56 APK, or build this source |
+| Signed file | `C:\Users\chalu\Downloads\olympus-iptv-0.2.62.apk` |
+| What that file is | versionName **0.2.62**, versionCode **63** |
+| Source in this tree | versionName **0.2.62**, versionCode **63** |
+| What to run | Install the signed 0.2.62 APK, or build this source |
 | Install | Over the existing copy (TV or phone). Uninstalling wipes the saved account, playlist, and favorites. Downloader works with the same file. |
 | Launcher name | Two centered lines: Olympus over IPTV |
 
-**0.2.56** gives mega Live folders a scrollable guide of hour-long channel-name blocks (no EPG network calls) while still paging the channel column 20 at a time. Normal groups keep provider EPG. Connecting no longer sits on a working live picture. Denied Live streams (HTTP 401/403) hard-stop. A device that already has an account opens with focus on the Live TV Favorites group card on TV; the left rail stays available with Left on the remote. Group cards fill in as soon as the saved group names are ready. The login screen is created only when no account is stored. Live TV shows Favorites setup, Queue (with a count when the queue is not empty), New / Just Added, Reminders, and Parental above the groups. The top of that groups screen shows today’s date and a 12-hour clock (`MM/DD/YYYY  hh:mm AM/PM`), updated each minute. Movies and Shows (and Recent on Live TV) also show a one-tap **Continue watching** strip above the group cards when something is in progress; Continue and Recently watched cards show how many titles they hold.
+**0.2.62** is the current release: same features as 0.2.61 with TMDB ratings/trailers enabled in the signed build, plus shared OkHttp pooling, ratings/title-line caches, and R8 minify (~12.5 MB signed APK).
+
+### What’s new since 0.2.56 (enhancements)
+
+| Feature | Where |
+| --- | --- |
+| Reorder playlists | Home account list — ▲/▼ or Left/Right |
+| Top 10 watched favorites | Group card on Live / Movies / Shows (favorites you watch most) |
+| Video decoder | EPG edits — Hardware / Hardware+extensions / Failsafe / Software prefer |
+| Phone PiP | Player **PiP**, long-press **Open in PiP**, swipe up on a title, leave player for Home (Admin **PiP gestures**) |
+| Chromecast | Player **Cast** — shows a format/codec disclaimer first; many IPTV HLS links still fail on the default receiver |
+| Ratings & reviews | Long-press Movies/Shows → **Ratings & reviews** (TMDB + Watchmode scores + TMDB review snippets) |
+| TMDB items limit | EPG edits — how many TMDB search hits to keep (5 / 10 / 20 / 40) |
+| YouTube trailers | Player **Trailer**, or from the ratings sheet (needs `tmdb.apiKey`) |
+| Simkl / Trakt | EPG edits **Scrobbler** — only one provider at a time; paste token (+ optional client id) |
 
 ---
 
@@ -83,7 +97,7 @@ Olympus-IPTV is one APK for Android TV / set-top boxes and for phones and tablet
 
 </div>
 
-There is **no separate mobile APK**. The same `olympus-iptv-0.2.56.apk` detects whether it is running on a television (Leanback / UI mode) or a touch-first phone or tablet.
+There is **no separate mobile APK**. The same `olympus-iptv-0.2.62.apk` detects whether it is running on a television (Leanback / UI mode) or a touch-first phone or tablet.
 
 | On phones and tablets | What changed |
 | --- | --- |
@@ -95,19 +109,20 @@ There is **no separate mobile APK**. The same `olympus-iptv-0.2.56.apk` detects 
 | Pull to refresh | Swipe down on the groups list to refresh the catalog quietly |
 | Haptics | Light feedback on Play, group open, PIN set / unlock / wrong PIN |
 | Live play | Opening a Live group shows a full-width channel list (not the TV EPG split); tap a row to play |
-| Long-press | Bottom sheet for Favorite / Record / Remind / Queue (TV still uses the dialog menu) |
+| Long-press | Bottom sheet for Favorite / Record / Remind / Queue / **Ratings & reviews** (Movies/Shows) / **Open in PiP** (TV still uses the dialog menu) |
+| PiP | Picture-in-picture while you browse: Open in PiP, swipe up on a title, or leave the player for Home when **PiP gestures** is on |
 | Skeletons | Placeholder rows while the first page of a group loads |
 | Scroll / memory | Remembers position per group; return from player lands on the same row; leaving a huge group drops the in-memory page over ~400 rows |
 | Look | Soft charcoal gradient background; raised Continue strip and bottom tabs; honey focus rings (TV also scales the focused card slightly) |
-| Lighter open | No AutoTransition when columns change; no side-by-side EPG pane; cold start skips dashboard/Watchmode warm (New / web still trigger it); smaller Coil memory/disk logo cache; Coil dispose on recycle; phone EPG prefetch waits ~220 ms after focus settles |
+| Lighter open | No AutoTransition when columns change; no side-by-side EPG pane; cold start skips dashboard/Watchmode warm (New / web still trigger it); no Live auto-preview on focus (saves a second decoder); smaller Coil caches; phone EPG prefetch waits ~220 ms after focus settles |
 | Visible Back | Guide (opened group / PIN / Admin / About), Fresh, Parental, Favorites setup, Search, and the player all show an on-screen Back |
 | Touch scroll | Favorites setup, Episodes, Queue, Search, and Admin/Refresh cards scroll without focus traps |
-| Player | Portrait dock; soft top overlay scrim; **Connecting…** only while truly waiting (clears on first frame / ready / playing; live rebuffers stay quiet); error card with Retry / Next / close; sleep timer; one ExoPlayer only |
+| Player | Portrait dock; soft top overlay scrim; **Connecting…** only while truly waiting; error card with Retry / Next / close; sleep timer; Cast / Trailer / PiP on the menu; one ExoPlayer only |
 | System navigation bar | Player and main screens pad for system bars so the 3-button or gesture bar does not cover play controls or key chrome |
 | Touch | Tap the video to show or hide controls; orientation is unlocked by default |
 | Immersive watch | While controls are hidden, system bars hide; swipe shows them briefly; when the menu is open, bars stay visible and controls sit above them |
 
-TV remotes and landscape-first layouts are unchanged on set-top boxes.
+TV remotes and landscape-first layouts are unchanged on set-top boxes. Phone PiP is not used on Leanback TV.
 
 ---
 
@@ -139,7 +154,7 @@ It walks through enabling unknown sources on an Onn box, installing Downloader b
 - Creates a device id shaped `OI-XXXX-XXXX-XXXX`. One email can have more than one device. Each device keeps its own lineup, favorites, catalog, and recordings.
 - Pulls the provider catalog once per list (live, movies, shows), shows a percent in steps of 5, then the counts, then the auto-add cards. Later opens skip the favorites splash when the catalog is already on the device. Favorites setup, at the top of Live TV, can open that screen again without Continue. Back from there returns focus to that chip.
 - Lets the first account be saved from the dashboard address on the login screen. The page shows **Set up this device** until an account exists. Saving it stores the account on the device and opens the full dashboard so favorites and filters can finish in the browser and sync back. The login screen on the player moves on as soon as that save lands. Opening the app again reads that saved account once and opens the group screen as soon as the saved live groups are ready. Dashboard warm-up and “New” card prep wait until after that first paint. The login screen is created only when no account is stored.
-- Browses with a remote: **Search, Live TV, Movies, Shows, Recordings, Admin, and About.** On Live TV, the top of the groups screen has Favorites setup, Queue, New / Just Added, Reminders, and Parental, plus the current date and 12-hour time on the right. There is no favorite-channel name strip across the top, no Settings item, and no Sign out.
+- Browses with a remote: **Search, Live TV, Movies, Shows, Recordings, Admin, and About.** On Live TV, the top of the groups screen has Favorites setup, Queue, New / Just Added, Reminders, and Parental, plus the current date and 12-hour time on the right. There is no favorite-channel name strip across the top, no Settings item, and no Sign out. Home can reorder saved playlists. Movies/Shows can show ratings and trailers when `tmdb.apiKey` is built in.
 
 ---
 
@@ -173,9 +188,9 @@ Empty stretches are filled. A channel whose listings are only its own name, or t
 
 OK on a past program plays catch-up when the provider marked that channel for archive or catch-up (Xtream `tv_archive`, or M3U `catchup` / `catchup-source` / `catchup-days`). Channels without that mark leave past slots as guide only.
 
-There is no preview window in the corner. The focused live channel can be warmed quietly so full-screen playback starts on that same player.
+There is no preview window in the corner on phones. On TV, the focused live channel can be warmed quietly so full-screen playback starts on that same player.
 
-**Continue** is the first group on Movies and Shows when a movie or episode was stopped in the middle. It lists that title and the minute you reached. OK on a movie resumes it. OK on a show resumes the episode. The group is hidden when nothing is in progress. **Recently watched** stays the first group on TV, and the next group on Movies and Shows, directly above Favorites, even before anything has been played. **Favorites** lists only the favorites for that section. Live TV shows the current date and 12-hour clock above the group cards instead of a favorites quick-zap strip. **Guide density** on EPG edits switches Comfortable or Compact row height.
+**Continue** is the first group on Movies and Shows when a movie or episode was stopped in the middle. It lists that title and the minute you reached. OK on a movie resumes it. OK on a show resumes the episode. The group is hidden when nothing is in progress. **Recently watched** stays the first group on TV, and the next group on Movies and Shows, directly above Favorites, even before anything has been played. **Top 10 watched** appears when you have favorites and watch history — it ranks those favorites by how often they show up in Recently watched. **Favorites** lists only the favorites for that section. Live TV shows the current date and 12-hour clock above the group cards instead of a favorites quick-zap strip. **Guide density** on EPG edits switches Comfortable or Compact row height.
 
 That hold is one menu. Live TV includes move up and move down. Movies and Shows leave those two off and include Add to Queue. Record opens its own window. The star, record, up, and down buttons are not on the channel row, because Right opens the guide.
 
@@ -191,7 +206,7 @@ Movies are video-on-demand titles that are not part of a series. Shows are serie
 
 Opening a show keeps seasons as a horizontal strip across the top and that season’s episodes listed underneath. It does not start playing on its own. A season chip is checked when every episode in it has been watched. Changing the season refreshes the episode list under it. Each episode shows its description and length when the provider sends them. An episode title is the season and episode code plus the episode name, such as `S02-E01 - Episode Name`. The series name is not repeated. An episode is checked when playback passes 95 percent. Hold the center button on an episode to check or clear that episode. **Mark this season watched** checks every episode in the open season. Hold the center button on a season chip to do the same thing. When that season is already checked, the control clears the checks. Back from the show returns to the previous screen.
 
-When the provider sends them, a movie or episode shows a short line with plot, year, and length before it plays.
+When the provider sends them, a movie or episode shows a short line with plot, year, and length before it plays. With a TMDB key built in, focusing a title can also show a short rating chip (scores only while you browse). Long-press → **Ratings & reviews** opens the full sheet: TMDB and Watchmode scores, overview, and up to three TMDB review snippets, plus **Trailer** and **Play**. **TMDB items limit** on EPG edits controls how many search hits to keep for that lookup.
 
 When an episode ends, the player counts down from 10. At 0 it plays the next episode in that season, then the first episode of the next season. **Skip intro** starts that episode about one minute in, or jumps a minute ahead if the theme is already playing. The last episode of a show does not loop back to the first. Back during the countdown leaves the player. Up or Down also leaves the countdown and changes episode.
 
@@ -207,7 +222,7 @@ When an episode ends, the player counts down from 10. At 0 it plays the next epi
 | The grid | Four posters per row. Each card shows the whole poster, the title, and the service underneath. The artwork is the same poster used in Movies or Shows. The list scrolls. |
 | Select a poster | Opens the poster, service, day, and description on one detail card. A movie keeps Play there. A series keeps that card and adds seasons in a horizontal strip under it; choosing a season lists that season’s episodes underneath with a thumbnail, description, length, and Play. Back from that page returns to the grid. Back from the grid returns to Live TV. Hold the center button to add it to Queue. |
 | Refresh | The week is prepared in the background when the app opens and again after the catalog is on the device, so the grid is ready when you open New. A same-week copy is shown immediately and refreshed about once a day. |
-| Key | `watchmode.apiKey` in `local.properties`. It is copied in when you build. It is not written into the repository. Without it, the screen says the releases cannot load. |
+| Key | `watchmode.apiKey` in `local.properties` (see [Build and run](#build-and-run)). Without it, the screen says the releases cannot load. Watchmode ratings in the VOD sheet use the same key. |
 
 A movie or episode you left in the middle shows Continue and the minute you reached, both on its poster and in the Continue group. A spot under 15 seconds, or within 20 seconds of the end, starts from the beginning and is left out of Continue. Live TV does not resume a minute mark, and opening the app does not start the last channel. It opens on the group cards.
 
@@ -282,7 +297,9 @@ The player is Media3 ExoPlayer on its own HTTP stack. Logos use Coil. Catalog an
 
 On a phone or tablet, tap the picture to show or hide the control row. That row sits above the system navigation bar. Portrait adds a dock with scrubber, Back, Play/Pause, and Menu. An on-screen **Back** closes the menu; another Back (or the system gesture) leaves the player. While the menu is hidden, the system bars hide for immersive watching. A first-run tip explains tap-for-controls. Sleep → Lock rotation remembers portrait or landscape for the next open.
 
-The top caption shows the lineup name, the current program, and the next program. Up and Down change channel inside the group, through the live list, or along the list that was on screen, depending on how you opened it. Live neighbors are prepared in the background so channel changes feel quicker. OK while the program is playing (or tap on a phone) opens Audio, Subtitles, Record, Picture, **Last**, **Go live**, **Multi-view**, and **Sleep** along the bottom. Audio picks a language carried in the stream. The player prefers **English (US)** when that track exists, remembers the language you last chose for a channel, and reuses that choice the next time the channel opens. Subtitles picks a track in the stream or an English file, and the language you last chose is remembered the same way. Record asks what to record. Picture picks Fit, Fill, or Stretch and keeps that choice for the next stream. **Sleep** offers Off / 30 / 60 / 90 minutes, then pauses and leaves the player. If reconnect fails repeatedly, an on-screen **Playback stopped** card offers **Retry**, **Next** (live zap), or close, with the same provider-vs-app wording. **Last** is for live TV. It returns to the live channel you were on before this one. The remote’s Last Channel key does the same. You need at least two live channels in that trail before Last has somewhere to go. Pause on live keeps you in the timeshift window; Left and Right step about ten seconds inside that window when the stream allows it. **Go live** jumps back to the live edge. **Multi-view** shows the previous live channel beside the current one, muted, and keeps that preference. Catch-up and other non-live titles show a seek bar at the bottom. Back closes that row. The caption hides itself.
+The top caption shows the lineup name, the current program, and the next program. On Movies/Shows it can also show a cached rating line when TMDB data is available. Up and Down change channel inside the group, through the live list, or along the list that was on screen, depending on how you opened it. Live neighbors are prepared in the background so channel changes feel quicker. OK while the program is playing (or tap on a phone) opens Audio, Subtitles, Record, Picture, **Last**, **Go live**, **Multi-view**, **Sleep**, **Cast**, **Trailer**, and **PiP** along the bottom. Audio picks a language carried in the stream. The player prefers **English (US)** when that track exists, remembers the language you last chose for a channel, and reuses that choice the next time the channel opens. Subtitles picks a track in the stream or an English file, and the language you last chose is remembered the same way. Record asks what to record. Picture picks Fit, Fill, or Stretch and keeps that choice for the next stream. **Sleep** offers Off / 30 / 60 / 90 minutes, then pauses and leaves the player. **Cast** opens a Chromecast picker after a disclaimer that IPTV/HLS formats often fail on the default Cast receiver. **Trailer** opens YouTube for the current VOD/series title when TMDB finds one. **PiP** (phones) shrinks playback into a system picture-in-picture window so you can keep watching while browsing. If reconnect fails repeatedly, an on-screen **Playback stopped** card offers **Retry**, **Next** (live zap), or close, with the same provider-vs-app wording. **Last** is for live TV. It returns to the live channel you were on before this one. The remote’s Last Channel key does the same. You need at least two live channels in that trail before Last has somewhere to go. Pause on live keeps you in the timeshift window; Left and Right step about ten seconds inside that window when the stream allows it. **Go live** jumps back to the live edge. **Multi-view** shows the previous live channel beside the current one, muted, and keeps that preference (TV only). Catch-up and other non-live titles show a seek bar at the bottom. Back closes that row. The caption hides itself.
+
+With **Scrobbler** set on EPG edits, Simkl or Trakt receives a start after about 1.5 seconds on a title (so rapid zaps do not spam the API) and a stop when you leave. Only one of Simkl or Trakt can be active. The **video decoder** chosen on EPG edits is applied when the player opens; spare players rebuild lazily if you change it.
 
 When a movie or episode ends, a countdown offers the next title. For a series that is the next episode, with **Skip intro**. For Queue or a favorites list that still has titles after this one, that is the next item, with **Play next**. **Back to menu** leaves the player and returns to the guide. If you do nothing, the next title starts when the countdown reaches 0.
 
@@ -364,7 +381,7 @@ Admin, then Error log, shows the log in a window you can scroll and resize. Entr
 | --- | --- |
 | Refresh Options | Checks the provider and saves channels that are not already on this TV. The interval can be 30, 60, 120, 360, 720, or 1440 minutes. The default is 60. |
 | Web-UI | Shows the email, the device id, and the dashboard address. Remove playlist clears this TV’s account, library, favorites, lineup edits, recordings list, watch history, queue, and reminders, keeps the device id, and opens sign-in. |
-| EPG edits | On the TV and on the web page: countries, groups and channels, show everything again, the bulk stripper, the bulk group renamer, Sanitize Group & Channel Names, image removal, and the optional switch that fills an empty guide from channel names. The TV also has Parental controls, which lists visible Live TV groups as multi-select cards and sets a numeric PIN from an on-screen pad; **Hide empty groups** (on by default), which removes group cards that have no visible channels after your country and hide rules; **Guide density** (Comfortable or Compact); and **Parental unlock time** (5–60 minutes). |
+| EPG edits | On the TV and on the web page: countries, groups and channels, show everything again, the bulk stripper, the bulk group renamer, Sanitize Group & Channel Names, image removal, and the optional switch that fills an empty guide from channel names. The TV also has Parental controls (multi-select PIN locks); **Hide empty groups** (on by default); **Guide density** (Comfortable or Compact); **Parental unlock time** (5–60 minutes); **Video decoder** (Hardware / Hardware+extensions / Failsafe / Software prefer); **TMDB items limit** (5–40); **PiP gestures** (phones — swipe up / leave for Home → PiP); and **Scrobbler** (Simkl or Trakt — one at a time, paste token). |
 | VPN | On the TV and on the web dashboard. The five providers are large cards, two across, in the same style as the Admin cards. PIA VPN, Proton VPN, Surfshark, and NordVPN take the account username and password, then a city, then Connect. Nord can use the access token from its manual setup page in the password box. WireGuard takes a profile instead of a password. The last city stays at the top of the list, and typing filters the rest. Backup city stores a second city. If the first city does not answer, that backup is tried. After a successful connection, a drop keeps the tunnel up and switches to the other city. New streams wait until one answers. Connect sends this app’s internet through that tunnel. The Admin card and the guide show the connected city. The VPN notification includes Disconnect. Home-network addresses, including the dashboard on port 8765, stay on the LAN. The first connection has to be allowed on the TV. |
 | Favorites setup | A chip at the top of Live TV. Opens the auto-add screen again. When the catalog is already loaded it skips the pulling-channels splash. Continue stays on the first-time setup only. Back from that chip returns focus to Favorites setup. |
 | About | Says the app is a player only, credits @bobgoblin, and links https://buymeacoffee.com/avocadopeaches. A square QR code opens that page. |
@@ -415,6 +432,13 @@ Admin, then Error log, shows the log in a window you can scroll and resize. Entr
 - Watch history JSON reuses a parsed map until the stored string changes.
 - Large catalog inserts run a passive WAL checkpoint and `ANALYZE channels` afterward.
 - Dashboard sanitize token lists build only when Sanitize opens, and long group/channel lists render an 80-row window.
+- TMDB / Watchmode title ratings share one disk + memory cache (`TitleRatings`); browse focus requests scores only, and the full reviews sheet reuses that cache.
+- Xtream VOD/series `titleLine` lookups are cached about six hours per playlist+id.
+- Watchmode, Scrobbler, and Xtream HTTP share the same OkHttp connection pool as other app clients.
+- Release builds use R8 minify and resource shrink (signed APK ~12.5 MB).
+- Phone Live groups do not auto-preview on focus (avoids a second decoder while scrolling).
+- Scrobbler start is delayed ~1.5 s so rapid channel changes do not spam Simkl/Trakt.
+- Decoder preference changes rebuild spare ExoPlayers lazily, not on every settings save.
 
 ---
 
@@ -428,7 +452,7 @@ Admin, then Error log, shows the log in a window you can scroll and resize. Entr
 - Left and Right move across the group cards. On the program guide, Right moves later in time and Left moves back, until the first slot, which returns to the channel list.
 - Left during full-screen playback returns to the channel list, or steps live timeshift when the stream allows it. Right steps timeshift forward on live. Back from live playback returns to the channel and guide. Back from that screen returns to the group cards.
 - OK or Enter activates the focused control. OK on a group card opens it. OK on a program plays it. OK on a New poster opens its description. OK on a queued title plays it or opens its episodes.
-- Hold OK on live TV for favorites, move up, move down, record, and Remind me. That is one menu. Remind me can be 15, 30, 45, or 60 minutes before the program. The card offers Ignore, a 5-minute snooze, or Tune to channel. The Reminders chip at the top of Live TV lists those reminders, and Edit or Delete changes one. Hold OK on a movie or a show for favorites, record, and Add to Queue. Move up and move down are not on that menu. Hold OK on a season chip to check or clear that season. Hold OK on an episode to check or clear that episode. The Parental chip on Live TV, and Parental controls on EPG edits, list visible Live TV groups as multi-select cards. Select groups, then Set PIN (on-screen numeric pad, auto-closes at four digits) or Remove lock. Hold OK on a locked group card, before the group is open, asks for the unlock PIN.
+- Hold OK on live TV for favorites, move up, move down, record, and Remind me. That is one menu. Remind me can be 15, 30, 45, or 60 minutes before the program. The card offers Ignore, a 5-minute snooze, or Tune to channel. The Reminders chip at the top of Live TV lists those reminders, and Edit or Delete changes one. Hold OK on a movie or a show for favorites, record, Add to Queue, and **Ratings & reviews**. Move up and move down are not on that menu. Hold OK on a season chip to check or clear that season. Hold OK on an episode to check or clear that episode. The Parental chip on Live TV, and Parental controls on EPG edits, list visible Live TV groups as multi-select cards. Select groups, then Set PIN (on-screen numeric pad, auto-closes at four digits) or Remove lock. Hold OK on a locked group card, before the group is open, asks for the unlock PIN.
 - On the channel list or the program guide, number keys open a Channel dial. A short pause, or OK, jumps to that row. Back clears the digits first.
 - Back steps one screen, including out of full-screen playback, out of a show’s seasons and episodes, out of a New description, and out of the next-episode countdown.
 - When an episode ends, Next episode counts down from 10. Skip intro jumps about one minute into the next episode.
@@ -443,15 +467,15 @@ Admin, then Error log, shows the log in a window you can scroll and resize. Entr
 
 </div>
 
-On the TV, DataStore `olympus_iptv` holds the playlist, the session, favorites and their revision, the Queue, the device id, lineup edits, the last live channel, watch history (up to 60 rows per playlist, including resume points), whether favorites setup is done, recordings plus SMB settings, the Picture mode (Fit, Fill, or Stretch), the preferred audio language (default `en-US`) plus per-channel audio picks, subtitle language memory, guide density, quiet hours, parental unlock minutes, multi-view, and whether empty groups are hidden. Program reminders are kept in `reminders.json` under the app’s files. A reminder stores the channel and the program time, not the stream address. Admin → Web-UI → Remove playlist clears that account data and the SQLite library on this TV, keeps the device id, and returns to sign-in.
+On the TV, DataStore `olympus_iptv` holds the playlist (order included), the session, favorites and their revision, the Queue, the device id, lineup edits, the last live channel, watch history (up to 60 rows per playlist, including resume points), whether favorites setup is done, recordings plus SMB settings, the Picture mode (Fit, Fill, or Stretch), the preferred audio language (default `en-US`) plus per-channel audio picks, subtitle language memory, guide density, quiet hours, parental unlock minutes, multi-view, empty-group hide, video decoder preference, TMDB items limit, PiP gesture preference, and Scrobbler provider/tokens. Program reminders are kept in `reminders.json` under the app’s files. A reminder stores the channel and the program time, not the stream address. Admin → Web-UI → Remove playlist clears that account data and the SQLite library on this TV, keeps the device id, and returns to sign-in.
 
 The library is SQLite `olympus-iptv.db` (schema version 8): categories, channels, a disk cache of guide rows, and watched episodes. Stream addresses stay in that database. They are not published to the dashboard.
 
 Lineup edits cover hidden countries, groups, and channels, custom group and channel names, group and channel order, strip prefixes and suffixes, the bulk group find and replace text, the name-to-guide flag, Include International, and a revision.
 
-The week’s premiere list is cached on the device for about a day. The Watchmode key is not stored in that cache. It is baked in at build time from `local.properties`.
+The week’s premiere list is cached on the device for about a day. Title ratings (TMDB/Watchmode) also keep a short disk cache. API keys themselves are not stored in those caches — they are baked in at build time from `local.properties` (`tmdb.apiKey`, `watchmode.apiKey`, and the others below).
 
-The SMB password and the playlist password stay on the device. Do not commit a copy of the DataStore file, `local.properties`, or a dashboard settings export that still has secrets.
+The SMB password, playlist password, and Scrobbler tokens stay on the device. Do not commit a copy of the DataStore file, `local.properties`, or a dashboard settings export that still has secrets.
 
 ---
 
@@ -476,11 +500,33 @@ $env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
 .\gradlew.bat :app:assembleDebug
 ```
 
-The debug APK is `app/build/outputs/apk/debug/app-debug.apk`. Put a Watchmode key in `local.properties` as `watchmode.apiKey` before that build if you want **New** to load. Put an OpenSubtitles key there as `opensubtitles.apiKey` if you want that source in **Subtitles**. For optional parental PIN-fail email, also set `sendgrid.apiKey` and `sendgrid.fromEmail`. Keys are not written into the repository. The latest signed release is `C:\Users\chalu\Downloads\olympus-iptv-0.2.56.apk`.
+The debug APK is `app/build/outputs/apk/debug/app-debug.apk`. Optional keys go in **`local.properties`** at the project root (`clearcast-tuner/local.properties`). They are read by `app/build.gradle.kts` via `localProperty(...)` and copied into `BuildConfig` at compile time. They are **not** committed to the repository.
+
+| Property in `local.properties` | What it enables | Where it lands in code |
+| --- | --- | --- |
+| `tmdb.apiKey` | VOD ratings, review snippets, YouTube trailer lookup | `BuildConfig.TMDB_API_KEY` → `TitleRatings` / `TmdbClient` |
+| `watchmode.apiKey` | **New this week** + Watchmode score on ratings sheet | `BuildConfig.WATCHMODE_API_KEY` |
+| `opensubtitles.apiKey` | OpenSubtitles source under player **Subtitles** | `BuildConfig.OPENSUBTITLES_API_KEY` |
+| `sendgrid.apiKey` + `sendgrid.fromEmail` | Email after two wrong parental PINs | `BuildConfig.SENDGRID_*` |
+
+### TMDB API key
+
+1. Create a free account at [themoviedb.org](https://www.themoviedb.org/).
+2. Open **[Account → Settings → API](https://www.themoviedb.org/settings/api)** (or follow [TMDB Getting Started](https://developer.themoviedb.org/docs/getting-started)).
+3. Request a **Developer** API key, accept the terms, and copy the **API Key** (v3). For **Application URL**, TMDB requires a non-empty URL even for personal apps that are not publicly hosted — use your GitHub profile or repo (e.g. `https://github.com/your-username`), not a LAN/dashboard address.
+4. Add it to `local.properties`:
+
+```properties
+tmdb.apiKey=YOUR_TMDB_V3_API_KEY
+```
+
+5. Rebuild the app. `app/build.gradle.kts` maps that property to `buildConfigField("String", "TMDB_API_KEY", ...)`. Without the key, ratings chips, the reviews sheet, and **Trailer** stay empty or unavailable; the rest of the player still works.
+
+The latest signed release is `C:\Users\chalu\Downloads\olympus-iptv-0.2.62.apk`.
 
 Android Studio: use a 1920×1080 Google TV emulator. Apply Changes does not pick up new screens. Stop the app, then Debug. Click the emulator window before the arrow keys. The emulator is a different device from a Shield or an Onn box, so it does not have that box’s account, playlist, or favorites.
 
-Libraries: Kotlin, AndroidX, ViewBinding, Media3 ExoPlayer 1.5.1 (HLS and DASH), OkHttp, Gson, DataStore, Coil, and SMBJ for the network share. The TV dashboard is a page in the APK, not a separate package.
+Libraries: Kotlin, AndroidX, ViewBinding, Media3 ExoPlayer (HLS and DASH), OkHttp, Gson, DataStore, Coil, Google Cast / MediaRouter, and SMBJ for the network share. The TV dashboard is a page in the APK, not a separate package.
 
 ---
 
@@ -544,11 +590,12 @@ clearcast-tuner/
 | Queue | Movies and series you held the center button on |
 | Episodes | Seasons across the top, episodes underneath with descriptions and length. Check one episode or the whole season. |
 | Parental | Visible Live TV groups as multi-select cards; Set PIN and Remove lock both use the on-screen numeric pad |
+| Home | Account / playlist list with ▲▼ reorder |
 | Admin | Refresh Options, Web-UI, EPG edits, and VPN, in two rows of two. The web dashboard has the same VPN card |
 | About | Player-only notice, credits, coffee QR |
 | Search | Find a channel, movie, or show and star it |
-| Player | Play a channel, movie, episode, or recording |
-| EPG edits | Countries, groups, stripper, group renamer, Sanitize Group & Channel Names, Parental controls, images, name-to-guide |
+| Player | Play a channel, movie, episode, or recording; Cast, Trailer, PiP (phone), Audio/Subtitles, sleep |
+| EPG edits | Countries, groups, stripper, group renamer, Sanitize, Parental, images, name-to-guide, video decoder, TMDB items limit, PiP gestures, Scrobbler |
 | Favorites setup | Auto-add, skipped when the catalog is already loaded |
 | Record | View, schedule, or set the share |
 | Reminders | Every set reminder, with Edit and Delete |
@@ -561,12 +608,30 @@ clearcast-tuner/
 
 </div>
 
+### 0.2.62
+
+- Signed release ships with TMDB v3 API key baked from `local.properties` so ratings, reviews, and trailers work out of the box.
+- Signed APK: `C:\Users\chalu\Downloads\olympus-iptv-0.2.62.apk` (versionCode 63). Install over the existing release — same signing key, account/playlist data kept.
+
+### 0.2.61
+
+- Shared OkHttp pool for Watchmode / Scrobbler / Xtream; Xtream title-line cache (~6 h); release R8 minify + resource shrink (~12.5 MB APK).
+- Signed APK: `C:\Users\chalu\Downloads\olympus-iptv-0.2.61.apk` (versionCode 62).
+
+### 0.2.57 – 0.2.60 (enhancement set)
+
+- Playlist reorder on Home; **Top 10 watched** favorites group; video decoder modes on EPG edits.
+- Phone PiP (menu, long-press Open in PiP, swipe up, leave-for-Home when PiP gestures on).
+- Chromecast with IPTV format disclaimer; YouTube trailers via TMDB; multi-source ratings/reviews sheet (TMDB + Watchmode).
+- TMDB items limit; Simkl / Trakt scrobble with one-provider mutex; ratings score-only on focus + disk/memory cache.
+- Signed progression through `olympus-iptv-0.2.60.apk`; superseded by **0.2.61**.
+
 ### 0.2.56
 
 - Mega Live groups (250+, e.g. 24/7 Shows) keep the side-by-side guide filled with hour increments of each channel name; provider EPG is not fetched for those folders.
 - Channel column for those groups still pages **20** at a time with prefetch near the end so you can scroll and select.
 - Connecting clears on first video frame / READY / playing; live rebuffers no longer keep the badge over a working stream.
-- Signed APK: `C:\Users\chalu\Downloads\olympus-iptv-0.2.56.apk` (versionCode 57). Install over the existing release — same signing key, account/playlist data kept.
+- Signed APK: `C:\Users\chalu\Downloads\olympus-iptv-0.2.56.apk` (versionCode 57).
 
 ### 0.2.55
 
@@ -883,7 +948,9 @@ clearcast-tuner/
 
 - This is a player only. You must provide your own streams. The app does not ship channels, movies, shows, or playlist credentials.
 - It is a beta. Feedback is greatly appreciated.
-- **0.2.56** is the latest signed file in Downloads (`olympus-iptv-0.2.56.apk`, versionCode 57).
+- **0.2.62** is the latest signed file in Downloads (`olympus-iptv-0.2.62.apk`, versionCode 63).
+- Chromecast often cannot play provider IPTV/HLS the way the in-app player can; the Cast button warns before connecting.
+- Ratings, trailers, and New this week need the matching keys in `local.properties` at build time (`tmdb.apiKey`, `watchmode.apiKey`).
 - Live groups follow the provider’s category ids. Olympus does not split or merge folders by display name; a huge 24/7 card is usually one panel category.
 - Live groups with 250+ channels keep the guide as hour blocks of each channel name (no provider EPG for that folder) and page channels 20 at a time.
 - Opening a group shows that group’s channels; Include International does not empty an opened folder that already had a card count.

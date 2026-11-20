@@ -621,26 +621,37 @@ class XtreamClient(
     }
 
     suspend fun titleLine(playlist: SavedPlaylist, series: Boolean, id: String): String = withContext(Dispatchers.IO) {
+        val cacheKey = "${playlist.id}:${if (series) "s" else "v"}:$id"
+        titleLineCache[cacheKey]?.let { (savedAt, line) ->
+            if (System.currentTimeMillis() - savedAt < TITLE_LINE_TTL_MS) return@withContext line
+        }
         val action = if (series) "get_series_info" else "get_vod_info"
         val key = if (series) "series_id" else "vod_id"
         val request = Request.Builder()
             .url(buildApiUrl(playlist, action, mapOf(key to id)))
             .get()
             .build()
-        http.newCall(request).execute().use { response ->
+        val line = http.newCall(request).execute().use { response ->
             if (!response.isSuccessful) return@withContext ""
             val body = response.body ?: return@withContext ""
             JsonReader(InputStreamReader(body.byteStream(), Charsets.UTF_8)).use { reader ->
                 if (reader.peek() != JsonToken.BEGIN_OBJECT) return@withContext ""
                 reader.beginObject()
-                var line = ""
+                var parsed = ""
                 while (reader.hasNext()) {
-                    if (reader.nextName() == "info") line = readTitleLine(reader) else reader.skipValue()
+                    if (reader.nextName() == "info") parsed = readTitleLine(reader) else reader.skipValue()
                 }
                 reader.endObject()
-                line
+                parsed
             }
         }
+        if (line.isNotBlank()) {
+            if (titleLineCache.size >= TITLE_LINE_CACHE_CAP) {
+                titleLineCache.keys.take(40).forEach { titleLineCache.remove(it) }
+            }
+            titleLineCache[cacheKey] = System.currentTimeMillis() to line
+        }
+        line
     }
 
     private fun readTitleLine(reader: JsonReader): String {
@@ -1293,13 +1304,10 @@ class XtreamClient(
             return host
         }
 
-        val sharedHttp: OkHttpClient by lazy {
-            OkHttpClient.Builder()
-                .connectTimeout(20, TimeUnit.SECONDS)
-                .readTimeout(180, TimeUnit.SECONDS)
-                .followRedirects(true)
-                .dispatcher(okhttp3.Dispatcher().apply { maxRequestsPerHost = 8 })
-                .build()
-        }
+        val sharedHttp: OkHttpClient get() = HttpClients.xtream
+
+        private val titleLineCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, String>>()
+        private const val TITLE_LINE_CACHE_CAP = 200
+        private val TITLE_LINE_TTL_MS = java.util.concurrent.TimeUnit.HOURS.toMillis(6)
     }
 }

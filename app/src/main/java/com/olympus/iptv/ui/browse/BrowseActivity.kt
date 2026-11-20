@@ -11,14 +11,18 @@ import android.os.Process
 import android.os.SystemClock
 import android.text.Editable
 import android.text.TextWatcher
+import android.net.Uri
+import android.view.GestureDetector
 import android.view.Gravity
 import android.view.KeyEvent
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import com.olympus.iptv.BuildConfig
 import androidx.transition.AutoTransition
 import androidx.transition.TransitionManager
 import androidx.activity.result.contract.ActivityResultContracts
@@ -65,6 +69,7 @@ import com.olympus.iptv.playlist.LineupClient
 import com.olympus.iptv.playlist.LoadedPlaylist
 import com.olympus.iptv.playlist.PinAlert
 import com.olympus.iptv.playlist.PlaylistLoader
+import com.olympus.iptv.playlist.TitleRatings
 import com.olympus.iptv.playlist.XtreamClient
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.olympus.iptv.record.RecordActivity
@@ -111,6 +116,7 @@ class BrowseActivity : AppCompatActivity() {
     private var selectedCategoryId: String? = PlaylistLoader.FAVORITES_ID
     private var touchPrimary = false
     private var openingPlayer = false
+    private var pipGestures = true
     private var returnMenu = GuideMenu.GROUPS
     private var returnChannelId: String? = null
     private var returnOnProgram = false
@@ -292,6 +298,12 @@ class BrowseActivity : AppCompatActivity() {
             if (touchPrimary) 4 else 8
         binding.channelList.recycledViewPool.setMaxRecycledViews(0, if (touchPrimary) 16 else 32)
         binding.channelList.recycledViewPool.setMaxRecycledViews(1, if (touchPrimary) 8 else 16)
+        setupPipSwipeOpen()
+        lifecycleScope.launch {
+            pipGestures = withContext(Dispatchers.IO) {
+                (application as OlympusIptvApp).playlistStore.pipSwipeHome()
+            }
+        }
         binding.channelList.addOnScrollListener(object : androidx.recyclerview.widget.RecyclerView.OnScrollListener() {
             override fun onScrollStateChanged(recyclerView: androidx.recyclerview.widget.RecyclerView, newState: Int) {
                 val idle = newState == androidx.recyclerview.widget.RecyclerView.SCROLL_STATE_IDLE
@@ -693,6 +705,7 @@ class BrowseActivity : AppCompatActivity() {
     }
 
     private fun applyFavorites(ids: List<String>) {
+        invalidateTopWatchedCache()
         favoriteOrder.clear()
         favoriteOrder.addAll(ids)
         favoriteIds.clear()
@@ -1279,7 +1292,8 @@ class BrowseActivity : AppCompatActivity() {
         val categoryId = selectedCategoryId ?: return
         if (categoryId == PlaylistLoader.FAVORITES_ID ||
             categoryId == PlaylistLoader.RECENT_ID ||
-            categoryId == PlaylistLoader.CONTINUE_ID
+            categoryId == PlaylistLoader.CONTINUE_ID ||
+            categoryId == PlaylistLoader.TOP_WATCHED_ID
         ) return
         val incoming = when (section) {
             GuideSection.TV -> {
@@ -2363,9 +2377,9 @@ class BrowseActivity : AppCompatActivity() {
         GroupLock.purgeExpired()
         paintNowPlayingBar()
         lifecycleScope.launch {
-            val prefs = withContext(Dispatchers.IO) {
-                (application as OlympusIptvApp).playlistStore.devicePrefs()
-            }
+            val store = (application as OlympusIptvApp).playlistStore
+            val prefs = withContext(Dispatchers.IO) { store.devicePrefs() }
+            pipGestures = withContext(Dispatchers.IO) { store.pipSwipeHome() }
             if (isDestroyed) return@launch
             var redraw = false
             if (prefs.hideEmptyGroups != hideEmptyGroups) {
@@ -2451,10 +2465,12 @@ class BrowseActivity : AppCompatActivity() {
             if (stamp == recentStamp) return@launch
             recentStamp = stamp
             recentEntries = next
+            invalidateTopWatchedCache()
             warmFavoriteAndRecentEpg()
             if (source != null) {
                 val groupsOpen = binding.groupColumn.visibility == View.VISIBLE
                 val keepRecent = selectedCategoryId == PlaylistLoader.RECENT_ID ||
+                    selectedCategoryId == PlaylistLoader.TOP_WATCHED_ID ||
                     selectedCategoryId == PlaylistLoader.CONTINUE_ID
                 render(restoreFocus = false, reloadChannels = groupsOpen || keepRecent)
                 if (keepRecent && binding.contentColumn.visibility == View.VISIBLE) showChannels()
@@ -2470,7 +2486,13 @@ class BrowseActivity : AppCompatActivity() {
 
     private fun withRecent(rest: List<Category>): List<Category> {
         val recent = Category(PlaylistLoader.RECENT_ID, getString(R.string.recent_watched), kind)
-        return listOf(recent) + rest
+        return listOf(recent) + withTopWatched(rest)
+    }
+
+    private fun withTopWatched(rest: List<Category>): List<Category> {
+        if (favoriteIds.isEmpty() || recentEntries.isEmpty()) return rest
+        val top = Category(PlaylistLoader.TOP_WATCHED_ID, getString(R.string.top_watched), kind)
+        return listOf(top) + rest
     }
 
     private fun hasContinue(sectionNow: GuideSection): Boolean {
@@ -2815,7 +2837,8 @@ class BrowseActivity : AppCompatActivity() {
         if (category.id == PlaylistLoader.ALL_ID ||
             category.id == PlaylistLoader.FAVORITES_ID ||
             category.id == PlaylistLoader.RECENT_ID ||
-            category.id == PlaylistLoader.CONTINUE_ID
+            category.id == PlaylistLoader.CONTINUE_ID ||
+            category.id == PlaylistLoader.TOP_WATCHED_ID
         ) return
         showGroupPin(category, open = false)
     }
@@ -3956,6 +3979,8 @@ class BrowseActivity : AppCompatActivity() {
     private fun queuePreview(channel: Channel) {
         if (section != GuideSection.TV || channel.kind != ContentKind.LIVE || channel.streamUrl.isBlank()) return
         updatePreviewCaption(channel)
+        // Phones: skip auto-preview on focus — saves a second decoder/RAM. TV guide still previews.
+        if (touchPrimary) return
         if (channel.id == previewChannelId && previewPlayer != null) return
         previewJob?.cancel()
         previewJob = lifecycleScope.launch {
@@ -4259,6 +4284,14 @@ class BrowseActivity : AppCompatActivity() {
                 labels += getString(if (queued) R.string.queue_remove else R.string.queue_add)
                 actions += 5
             }
+            if (section != GuideSection.TV) {
+                labels += getString(R.string.vod_ratings_reviews)
+                actions += 6
+            }
+            if (touchPrimary) {
+                labels += getString(R.string.open_in_pip)
+                actions += 7
+            }
             val runAction: (Int) -> Unit = { action ->
                 when (action) {
                     0 -> toggleGuideFavorite(channel)
@@ -4272,6 +4305,8 @@ class BrowseActivity : AppCompatActivity() {
                             else app.playlistStore.addQueue(saved.id, queueItem)
                         }
                     }
+                    6 -> openVodRatings(channel)
+                    7 -> play(channel, enterPip = true)
                 }
             }
             if (touchPrimary) {
@@ -4851,7 +4886,8 @@ class BrowseActivity : AppCompatActivity() {
     }
 
     private fun cardIcon(category: Category): Int = when (category.id) {
-        PlaylistLoader.RECENT_ID, PlaylistLoader.CONTINUE_ID -> R.drawable.ic_card_play
+        PlaylistLoader.RECENT_ID, PlaylistLoader.CONTINUE_ID, PlaylistLoader.TOP_WATCHED_ID ->
+            R.drawable.ic_card_play
         PlaylistLoader.FAVORITES_ID -> R.drawable.ic_star
         PlaylistLoader.ALL_ID -> R.drawable.ic_nav_tv
         else -> R.drawable.ic_card_layers
@@ -4870,6 +4906,7 @@ class BrowseActivity : AppCompatActivity() {
                 val count = recentEntries.count { entrySection(it) == wanted && it.canResume() }
                 if (count > 0) getString(R.string.continue_count, count) else getString(R.string.continue_card)
             }
+            PlaylistLoader.TOP_WATCHED_ID -> getString(R.string.top_watched_card)
             PlaylistLoader.FAVORITES_ID -> {
                 val prefix = favoriteSection(section) + ":"
                 val label = if (titles) R.string.group_titles else R.string.group_channels
@@ -4986,13 +5023,19 @@ class BrowseActivity : AppCompatActivity() {
             showChannelWait(if (sectionNow == GuideSection.SHOWS) showStatus() else movieStatus())
             return
         }
-        if (categoryId == PlaylistLoader.RECENT_ID || categoryId == PlaylistLoader.CONTINUE_ID) {
+        if (categoryId == PlaylistLoader.RECENT_ID ||
+            categoryId == PlaylistLoader.CONTINUE_ID ||
+            categoryId == PlaylistLoader.TOP_WATCHED_ID
+        ) {
             // Keep prior rows visible; swap when the list is ready so open feels instant.
             binding.libraryStatus.visibility = View.GONE
             channelJob = lifecycleScope.launch {
                 val channels = withContext(Dispatchers.IO) {
-                    if (categoryId == PlaylistLoader.CONTINUE_ID) continueChannels(sectionNow, config)
-                    else recentChannels(sectionNow, config)
+                    when (categoryId) {
+                        PlaylistLoader.CONTINUE_ID -> continueChannels(sectionNow, config)
+                        PlaylistLoader.TOP_WATCHED_ID -> topWatchedFavorites(sectionNow, config)
+                        else -> recentChannels(sectionNow, config)
+                    }
                 }
                 if (!stillShowing(query, sectionNow, categoryId)) return@launch
                 publishChannels(channels, scrollTop = true)
@@ -5057,6 +5100,49 @@ class BrowseActivity : AppCompatActivity() {
             if (section == Favorites.SERIES && channel.seriesId.isNullOrBlank()) channel.copy(seriesId = channel.id) else channel
         }
         return prepareGroup(Favorites.ordered(keys, rows.associateBy { it.id }, favoriteIds), config)
+    }
+
+    private var topWatchedIdsBySection: Map<String, List<String>> = emptyMap()
+    private var topWatchedCacheKey: String = ""
+
+    private fun invalidateTopWatchedCache() {
+        topWatchedIdsBySection = emptyMap()
+        topWatchedCacheKey = ""
+    }
+
+    private fun ensureTopWatchedCache() {
+        val key = "${recentStamp}|${favoriteOrder.joinToString()}"
+        if (key == topWatchedCacheKey && topWatchedIdsBySection.isNotEmpty()) return
+        val countsBySection = HashMap<String, LinkedHashMap<String, Int>>()
+        for (entry in recentEntries) {
+            val id = entry.channelId?.takeIf { it.isNotBlank() } ?: continue
+            val section = entrySection(entry)
+            val counts = countsBySection.getOrPut(section) { LinkedHashMap() }
+            counts[id] = (counts[id] ?: 0) + 1
+        }
+        val favIds = favoriteIds.map { it.substringAfter(':') }.toSet()
+        val built = HashMap<String, List<String>>(3)
+        for ((section, counts) in countsBySection) {
+            built[section] = counts.entries
+                .filter { it.key in favIds }
+                .sortedByDescending { it.value }
+                .map { it.key }
+                .take(10)
+        }
+        topWatchedIdsBySection = built
+        topWatchedCacheKey = key
+    }
+
+    private fun topWatchedFavorites(sectionNow: GuideSection, config: LineupConfig): List<Channel> {
+        ensureTopWatchedCache()
+        val wanted = sectionKey(sectionNow)
+        val orderedIds = topWatchedIdsBySection[wanted].orEmpty()
+        val favorites = libraryFavorites(sectionNow, config)
+        if (favorites.isEmpty()) return emptyList()
+        if (orderedIds.isEmpty()) return favorites.take(10)
+        val byId = favorites.associateBy { it.id }
+        val ranked = orderedIds.mapNotNull { byId[it] }
+        return ranked.ifEmpty { favorites.take(10) }
     }
 
     private fun favoriteSection(sectionNow: GuideSection): String = when (sectionNow) {
@@ -5441,6 +5527,7 @@ class BrowseActivity : AppCompatActivity() {
                 category.id == PlaylistLoader.FAVORITES_ID ||
                 category.id == PlaylistLoader.RECENT_ID ||
                 category.id == PlaylistLoader.CONTINUE_ID ||
+                category.id == PlaylistLoader.TOP_WATCHED_ID ||
                 (groupCounts[category.id] ?: 0) > 0
         }
     }
@@ -5497,6 +5584,7 @@ class BrowseActivity : AppCompatActivity() {
         if (category.id != PlaylistLoader.FAVORITES_ID &&
             category.id != PlaylistLoader.CONTINUE_ID &&
             category.id != PlaylistLoader.RECENT_ID &&
+            category.id != PlaylistLoader.TOP_WATCHED_ID &&
             category.id != PlaylistLoader.ALL_ID
         ) {
             lastGroupId = category.id
@@ -5663,16 +5751,118 @@ class BrowseActivity : AppCompatActivity() {
     private fun loadTitleLine(channel: Channel) {
         val saved = playlist ?: return
         detailJob?.cancel()
-        val run = Runnable {
-            if (focusedChannel?.id != channel.id) return@Runnable
-            detailJob = lifecycleScope.launch {
-                val series = section == GuideSection.SHOWS || !channel.seriesId.isNullOrBlank()
-                val id = channel.seriesId?.takeIf { it.isNotBlank() } ?: channel.id
-                val line = runCatching { XtreamClient().titleLine(saved, series, id) }.getOrDefault("")
-                if (focusedChannel?.id == channel.id && line.isNotBlank()) channelAdapter.setDetail(channel.id, line)
+        val run = object : Runnable {
+            override fun run() {
+                if (focusedChannel?.id != channel.id) return
+                // Wait until the list is idle so rapid scrolling doesn't spam TMDB.
+                if (channelAdapter.isScrolling()) {
+                    focusHandler.postDelayed(this, FOCUS_SETTLE_MS)
+                    return
+                }
+                detailJob = lifecycleScope.launch {
+                    val series = section == GuideSection.SHOWS || !channel.seriesId.isNullOrBlank()
+                    val id = channel.seriesId?.takeIf { it.isNotBlank() } ?: channel.id
+                    val xtream = withContext(Dispatchers.IO) {
+                        runCatching { XtreamClient().titleLine(saved, series, id) }.getOrDefault("")
+                    }
+                    if (focusedChannel?.id != channel.id) return@launch
+                    val cached = TitleRatings.peek(channel.name, series)
+                    if (cached != null) {
+                        val line = listOf(xtream, cached.scoreLine(2)).filter { it.isNotBlank() }.joinToString(" · ")
+                        if (line.isNotBlank()) channelAdapter.setDetail(channel.id, line)
+                        return@launch
+                    }
+                    if (channelAdapter.isScrolling() || focusedChannel?.id != channel.id) {
+                        if (xtream.isNotBlank()) channelAdapter.setDetail(channel.id, xtream)
+                        return@launch
+                    }
+                    val scores = withContext(Dispatchers.IO) {
+                        TitleRatings.loadScores(channel.name, preferTv = series)
+                    }
+                    if (focusedChannel?.id != channel.id) return@launch
+                    val line = listOf(xtream, scores.scoreLine(2)).filter { it.isNotBlank() }.joinToString(" · ")
+                    if (line.isNotBlank()) channelAdapter.setDetail(channel.id, line)
+                }
             }
         }
-        focusHandler.postDelayed(run, FOCUS_SETTLE_MS)
+        focusHandler.postDelayed(run, if (touchPrimary) 280L else FOCUS_SETTLE_MS)
+    }
+
+    private fun openVodRatings(channel: Channel) {
+        VodDetailSheet.showLoading(this)
+        lifecycleScope.launch {
+            val preferTv = section == GuideSection.SHOWS || !channel.seriesId.isNullOrBlank()
+            val limit = withContext(Dispatchers.IO) {
+                (application as OlympusIptvApp).playlistStore.tmdbItemsLimit()
+            }
+            val bundle = withContext(Dispatchers.IO) {
+                TitleRatings.loadFull(channel.name, preferTv = preferTv, tmdbLimit = limit)
+            }
+            if (isDestroyed) return@launch
+            VodDetailSheet.show(
+                context = this@BrowseActivity,
+                bundle = bundle,
+                onTrailer = {
+                    openYoutubeTrailer(channel.name, preferTv)
+                },
+                onPlay = { play(channel) }
+            )
+        }
+    }
+
+    private fun openYoutubeTrailer(name: String, preferTv: Boolean) {
+        if (BuildConfig.TMDB_API_KEY.isBlank()) {
+            Toast.makeText(this, R.string.tmdb_missing_key, Toast.LENGTH_LONG).show()
+            return
+        }
+        lifecycleScope.launch {
+            val trailer = withContext(Dispatchers.IO) {
+                TitleRatings.trailerFor(name, preferTv)
+            }
+            if (isDestroyed) return@launch
+            if (trailer == null) {
+                Toast.makeText(this@BrowseActivity, R.string.trailer_missing, Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+            val appIntent = Intent(Intent.ACTION_VIEW, Uri.parse("vnd.youtube:${trailer.key}"))
+            val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/watch?v=${trailer.key}"))
+            runCatching { startActivity(appIntent) }.recoverCatching { startActivity(webIntent) }
+                .onFailure {
+                    Toast.makeText(this@BrowseActivity, R.string.trailer_missing, Toast.LENGTH_SHORT).show()
+                }
+        }
+    }
+
+    private fun setupPipSwipeOpen() {
+        if (!touchPrimary) return
+        val detector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onFling(
+                e1: MotionEvent?,
+                e2: MotionEvent,
+                velocityX: Float,
+                velocityY: Float
+            ): Boolean {
+                if (!pipGestures) return false
+                val start = e1 ?: return false
+                val dy = start.y - e2.y
+                if (dy < 120f || kotlin.math.abs(velocityY) < 800f) return false
+                if (kotlin.math.abs(velocityY) < kotlin.math.abs(velocityX)) return false
+                val channel = focusedChannel ?: visibleChannels.firstOrNull() ?: return false
+                Haptics.tick(binding.channelList)
+                play(channel, enterPip = true)
+                return true
+            }
+        })
+        binding.channelList.addOnItemTouchListener(object :
+            androidx.recyclerview.widget.RecyclerView.SimpleOnItemTouchListener() {
+            override fun onInterceptTouchEvent(
+                rv: androidx.recyclerview.widget.RecyclerView,
+                e: MotionEvent
+            ): Boolean {
+                detector.onTouchEvent(e)
+                return false
+            }
+        })
     }
 
     private fun toggleGuideFavorite(channel: Channel) {
@@ -5691,6 +5881,7 @@ class BrowseActivity : AppCompatActivity() {
                 favoriteOrder.remove(channel.id)
             }
         }
+        invalidateTopWatchedCache()
         if (!adding && selectedCategoryId == PlaylistLoader.FAVORITES_ID) {
             visibleChannels = visibleChannels.filter { it.id != channel.id }
             channelAdapter.remove(channel.id)
@@ -5833,7 +6024,8 @@ class BrowseActivity : AppCompatActivity() {
         channel: Channel,
         queueOverride: List<Channel>? = null,
         zapMode: String? = null,
-        rememberReturn: Boolean = true
+        rememberReturn: Boolean = true,
+        enterPip: Boolean = false
     ) {
         if (rememberReturn) {
             returnMenu = guideMenu
@@ -5859,7 +6051,10 @@ class BrowseActivity : AppCompatActivity() {
         handOffPreview(channel)
         val mode = zapMode ?: when (selectedCategoryId) {
             PlaylistLoader.ALL_ID -> PlayerActivity.ZAP_ALL
-            PlaylistLoader.FAVORITES_ID -> PlayerActivity.ZAP_LIST
+            PlaylistLoader.FAVORITES_ID,
+            PlaylistLoader.TOP_WATCHED_ID,
+            PlaylistLoader.RECENT_ID,
+            PlaylistLoader.CONTINUE_ID -> PlayerActivity.ZAP_LIST
             else -> PlayerActivity.ZAP_GROUP
         }
         val sourceQueue = queueOverride ?: visibleChannels
@@ -5883,7 +6078,8 @@ class BrowseActivity : AppCompatActivity() {
                 startIndex = startIndex,
                 playlistId = playlist?.id,
                 zapMode = mode,
-                categoryId = selectedCategoryId
+                categoryId = selectedCategoryId,
+                enterPip = enterPip && touchPrimary
             )
         )
     }

@@ -29,7 +29,8 @@ class HomeActivity : AppCompatActivity() {
 
         adapter = PlaylistAdapter(
             onOpen = { openPlaylist(it) },
-            onDelete = { deletePlaylist(it) }
+            onDelete = { deletePlaylist(it) },
+            onMove = { item, direction -> movePlaylist(item, direction) }
         )
         binding.playlistList.layoutManager = LinearLayoutManager(this)
         binding.playlistList.adapter = adapter
@@ -59,6 +60,18 @@ class HomeActivity : AppCompatActivity() {
         lifecycleScope.launch {
             store.remove(playlist.id)
             Toast.makeText(this@HomeActivity, "Removed ${playlist.name}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun movePlaylist(playlist: SavedPlaylist, direction: Int) {
+        lifecycleScope.launch {
+            if (store.movePlaylist(playlist.id, direction)) {
+                Toast.makeText(
+                    this@HomeActivity,
+                    if (direction < 0) R.string.playlist_moved_up else R.string.playlist_moved_down,
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
         }
     }
 }

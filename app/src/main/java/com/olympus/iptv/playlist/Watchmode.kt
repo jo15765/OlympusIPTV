@@ -5,7 +5,6 @@ import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import com.olympus.iptv.BuildConfig
 import com.olympus.iptv.data.NameImages
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
 import java.time.LocalDate
@@ -14,10 +13,7 @@ import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 object Watchmode {
-    private val http = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(25, TimeUnit.SECONDS)
-        .build()
+    private val http get() = HttpClients.shared
     private val dayLabel = DateTimeFormatter.ofPattern("EEEE", Locale.US)
     private val stamp = DateTimeFormatter.BASIC_ISO_DATE
     private val services = mapOf(

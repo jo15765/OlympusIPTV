@@ -264,6 +264,7 @@ class PlaylistLoader(
         const val FAVORITES_ID = "__favorites__"
         const val RECENT_ID = "__recent__"
         const val CONTINUE_ID = "__continue__"
+        const val TOP_WATCHED_ID = "__top_watched__"
 
         fun isSeriesName(name: String?): Boolean {
             if (name.isNullOrBlank()) return false

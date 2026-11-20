@@ -1,0 +1,26 @@
+package com.olympus.iptv.ui.cast
+
+import android.content.Context
+import com.google.android.gms.cast.framework.CastOptions
+import com.google.android.gms.cast.framework.OptionsProvider
+import com.google.android.gms.cast.framework.SessionProvider
+import com.google.android.gms.cast.framework.media.CastMediaOptions
+
+/**
+ * Default Cast receiver. IPTV HLS often fails on Chromecast — UI shows a disclaimer.
+ */
+class CastOptionsProvider : OptionsProvider {
+    override fun getCastOptions(context: Context): CastOptions {
+        return CastOptions.Builder()
+            .setReceiverApplicationId(com.google.android.gms.cast.CastMediaControlIntent.DEFAULT_MEDIA_RECEIVER_APPLICATION_ID)
+            .setCastMediaOptions(
+                CastMediaOptions.Builder()
+                    .setNotificationOptions(null)
+                    .setMediaSessionEnabled(false)
+                    .build()
+            )
+            .build()
+    }
+
+    override fun getAdditionalSessionProviders(context: Context): List<SessionProvider>? = null
+}
