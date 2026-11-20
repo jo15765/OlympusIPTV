@@ -2,19 +2,19 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginBottom="8dp"
+    android:layout_marginBottom="4dp"
     android:background="@drawable/bg_fresh_focusable"
     android:clickable="true"
     android:focusable="true"
     android:focusableInTouchMode="true"
     android:gravity="center_vertical"
     android:orientation="horizontal"
-    android:padding="10dp">
+    android:padding="6dp">
 
     <ImageView
         android:id="@+id/episodeArt"
-        android:layout_width="168dp"
-        android:layout_height="94dp"
+        android:layout_width="128dp"
+        android:layout_height="72dp"
         android:background="@color/bg_elevated"
         android:contentDescription="@null"
         android:scaleType="fitCenter"
@@ -54,7 +54,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
             android:ellipsize="end"
-            android:maxLines="3"
+            android:maxLines="2"
             android:textColor="@color/text_secondary"
             android:textSize="14sp"
             android:visibility="gone" />

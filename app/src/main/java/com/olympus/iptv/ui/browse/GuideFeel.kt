@@ -4,6 +4,10 @@ package com.olympus.iptv.ui.browse
  * Pure helpers for guide UX decisions that should stay unit-testable.
  */
 object GuideFeel {
+    fun onFocus(view: android.view.View) {
+        view.playSoundEffect(android.view.SoundEffectConstants.CLICK)
+    }
+
     fun landOnContinueStrip(sectionIsLive: Boolean, stripVisible: Boolean): Boolean =
         !sectionIsLive && stripVisible
 

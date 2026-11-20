@@ -30,7 +30,9 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.media3.common.MediaItem
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
@@ -478,6 +480,8 @@ class BrowseActivity : AppCompatActivity(), ToolHost {
 
     internal var dialDigits = ""
 
+    internal val lowRamDevice = com.olympus.iptv.ui.DeviceForm.isLowRam(this)
+
     internal val dialJump = Runnable { jumpDial() }
 
     internal val letterJumpHold = Runnable {
@@ -608,11 +612,14 @@ class BrowseActivity : AppCompatActivity(), ToolHost {
         adapter.continueProgress = { continueProgress(it) }
         adapter.posterRating = { posterRatingLabel(it) }
         adapter.posterMeta = { posterMetaLine(it) }
+        adapter.unhealthy = { it.id in unhealthyIds }
     }
 
     internal lateinit var programAdapter: ProgramGuideAdapter
 
     internal var guideJob: Job? = null
+    internal val guideEpgBusy = HashSet<String>()
+    internal val unhealthyIds = HashSet<String>()
 
     internal var guideScrollSync = false
 
@@ -678,6 +685,57 @@ class BrowseActivity : AppCompatActivity(), ToolHost {
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         super.onCreate(savedInstanceState)
         hostOnCreate(savedInstanceState)
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                com.olympus.iptv.portal.RemotePad.commands.collect { command ->
+                    runOnUiThread { applyDashboardRemote(command) }
+                }
+            }
+        }
+    }
+
+    private fun applyDashboardRemote(command: com.olympus.iptv.portal.RemotePad.Command) {
+        val code = when (command.action) {
+            "up" -> android.view.KeyEvent.KEYCODE_DPAD_UP
+            "down" -> android.view.KeyEvent.KEYCODE_DPAD_DOWN
+            "left" -> android.view.KeyEvent.KEYCODE_DPAD_LEFT
+            "right" -> android.view.KeyEvent.KEYCODE_DPAD_RIGHT
+            "ok" -> android.view.KeyEvent.KEYCODE_DPAD_CENTER
+            "back" -> android.view.KeyEvent.KEYCODE_BACK
+            "text" -> {
+                val typed = command.text.trim()
+                if (typed.startsWith("http://") || typed.startsWith("https://")) {
+                    val channel = com.olympus.iptv.data.Channel(
+                        id = "pasted",
+                        name = "Pasted stream",
+                        streamUrl = typed,
+                        kind = com.olympus.iptv.data.ContentKind.LIVE
+                    )
+                    startActivity(
+                        com.olympus.iptv.ui.player.PlayerActivity.intent(
+                            this,
+                            channel,
+                            "",
+                            "",
+                            0,
+                            playlist?.id
+                        )
+                    )
+                    return
+                }
+                if (typed.isBlank()) return
+                startActivity(android.content.Intent(this, com.olympus.iptv.ui.search.SearchActivity::class.java).apply {
+                    putExtra(EXTRA_PLAYLIST_ID, playlist?.id)
+                    putExtra("query", typed)
+                })
+                return
+            }
+            else -> return
+        }
+        val down = android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, code)
+        val up = android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, code)
+        dispatchKeyEvent(down)
+        dispatchKeyEvent(up)
     }
 
     override fun onStart() {

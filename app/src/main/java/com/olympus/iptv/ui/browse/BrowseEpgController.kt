@@ -22,9 +22,7 @@ class BrowseEpgController(
     private val binding: ActivityBrowseBinding,
     private val programAdapter: ProgramGuideAdapter,
     private val halfHourMs: Long,
-    private val epgCache: () -> Map<String, EpgNowNext>,
-    private val onRecord: (Channel) -> Unit,
-    private val onRemind: (Channel) -> Unit
+    private val epgCache: () -> Map<String, EpgNowNext>
 ) {
     var synopsisChannel: Channel? = null
         private set
@@ -97,41 +95,38 @@ class BrowseEpgController(
     }
 
     fun paintSynopsis(channel: Channel, program: EpgProgram?) {
-        val pane = binding.programSynopsis
         if (binding.programPane.visibility != View.VISIBLE) {
-            pane.visibility = View.GONE
+            synopsisChannel = null
+            synopsisProgram = null
             return
         }
         val now = EpgUtils.now()
-        val epg = program ?: epgCache()[channel.id]?.now
-            ?: programAdapter.programsFor(channel.id)?.firstOrNull { now >= it.startMillis && now < it.endMillis }
         synopsisChannel = channel
-        synopsisProgram = epg
-        if (epg == null) {
-            pane.visibility = View.GONE
+        synopsisProgram = program ?: epgCache()[channel.id]?.now
+            ?: programAdapter.programsFor(channel.id)?.firstOrNull { now >= it.startMillis && now < it.endMillis }
+    }
+
+    fun syncChannelOffset() {
+        val spacer = binding.channelGuideSpacer
+        if (binding.programPane.visibility != View.VISIBLE) {
+            setSpacer(0)
             return
         }
-        pane.visibility = View.VISIBLE
-        binding.synopsisTitle.text = epg.title
-        val kind = EpgProgramStyle.kind(epg, channel, now)
-        val pill = EpgProgramStyle.pill(kind)
-        val badge = EpgProgramStyle.episodeBadge(epg.title)
-        binding.synopsisMeta.text = buildString {
-            append(epg.timeRangeLabel())
-            if (badge != null) {
-                append(" · ")
-                append(badge)
+        binding.programPane.post {
+            if (binding.programPane.visibility != View.VISIBLE) {
+                setSpacer(0)
+                return@post
             }
-            if (pill != null) {
-                append(" · ")
-                append(pill)
-            }
+            val delta = binding.programHeaderScroll.height - binding.channelHeader.height
+            setSpacer(delta.coerceAtLeast(0))
         }
-        val plot = epg.description?.trim().orEmpty()
-        binding.synopsisPlot.text = plot
-        binding.synopsisPlot.visibility = if (plot.isBlank()) View.GONE else View.VISIBLE
-        binding.synopsisRecord.setOnClickListener { onRecord(channel) }
-        binding.synopsisRemind.setOnClickListener { onRemind(channel) }
+    }
+
+    private fun setSpacer(height: Int) {
+        val params = binding.channelGuideSpacer.layoutParams ?: return
+        if (params.height == height) return
+        params.height = height
+        binding.channelGuideSpacer.layoutParams = params
     }
 
     fun restoreScrolls(model: BrowseViewModel, playlistId: String?) {

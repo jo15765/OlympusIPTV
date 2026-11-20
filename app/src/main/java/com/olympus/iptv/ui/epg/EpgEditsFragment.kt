@@ -54,6 +54,17 @@ class EpgEditsFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        val note = android.widget.TextView(requireContext())
+        note.setTextColor(0xFF9A948A.toInt())
+        note.textSize = 14f
+        (binding.root as? ViewGroup)?.addView(note, 0)
+        viewLifecycleOwner.lifecycleScope.launch {
+            val count = withContext(Dispatchers.IO) {
+                (requireActivity().application as OlympusIptvApp).catalogDb.deadChannelIds(playlistId).size
+            }
+            if (!isAdded) return@launch
+            note.text = getString(R.string.dead_feeds, count)
+        }
         if (playlistId.isBlank()) {
             closeEdits()
             return
@@ -535,9 +546,9 @@ class EpgEditsFragment : Fragment() {
 
     companion object {
         const val RESULT_KEY = "epg_edits_result"
-        const val EXTRA_PLAYLIST_ID = EpgEditsActivity.EXTRA_PLAYLIST_ID
-        const val EXTRA_KIND = EpgEditsActivity.EXTRA_KIND
-        const val EXTRA_INCLUDE_VOD = EpgEditsActivity.EXTRA_INCLUDE_VOD
+        const val EXTRA_PLAYLIST_ID = "playlist_id"
+        const val EXTRA_KIND = "kind"
+        const val EXTRA_INCLUDE_VOD = "include_vod"
 
         fun newInstance(playlistId: String, kind: ContentKind, includeVod: Boolean): EpgEditsFragment =
             EpgEditsFragment().apply {

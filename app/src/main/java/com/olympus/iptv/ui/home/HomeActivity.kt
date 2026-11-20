@@ -3,7 +3,10 @@ package com.olympus.iptv.ui.home
 import android.content.Intent
 import android.os.Bundle
 import android.view.View
+import android.widget.LinearLayout
+import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -45,6 +48,7 @@ class HomeActivity : AppCompatActivity() {
             startActivity(Intent(this, AddPlaylistActivity::class.java))
         }
         binding.btnAdd.requestFocus()
+        paintProfiles()
 
         lifecycleScope.launch {
             store.playlists.collectLatest { list ->
@@ -108,6 +112,88 @@ class HomeActivity : AppCompatActivity() {
                     Toast.LENGTH_SHORT
                 ).show()
             }
+        }
+    }
+
+    private fun paintProfiles() {
+        val names = listOf("Main", "Kids", "Sports")
+        lifecycleScope.launch {
+            val active = withContext(Dispatchers.IO) { store.activeProfile() }
+            binding.profileChips.removeAllViews()
+            names.forEach { name ->
+                val chip = TextView(this@HomeActivity)
+                chip.text = name
+                chip.textSize = 16f
+                chip.setPadding(28, 16, 28, 16)
+                chip.isFocusable = true
+                chip.setTextColor(if (name == active) 0xFF101018.toInt() else 0xFFE8E4DC.toInt())
+                chip.setBackgroundColor(if (name == active) 0xFFE0B15A.toInt() else 0xFF2A2A34.toInt())
+                val params = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+                params.marginEnd = 16
+                chip.layoutParams = params
+                chip.setOnClickListener { chooseProfile(name) }
+                chip.setOnLongClickListener {
+                    setProfilePin(name)
+                    true
+                }
+                binding.profileChips.addView(chip)
+            }
+        }
+    }
+
+    private fun setProfilePin(name: String) {
+        val input = android.widget.EditText(this)
+        input.inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD
+        AlertDialog.Builder(this)
+            .setTitle(R.string.profile_pin_title)
+            .setView(input)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                lifecycleScope.launch {
+                    withContext(Dispatchers.IO) { store.saveProfilePin(name, input.text?.toString()?.ifBlank { null }) }
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun chooseProfile(name: String) {
+        lifecycleScope.launch {
+            val pin = withContext(Dispatchers.IO) { store.profilePin(name) }
+            if (pin.isNullOrBlank()) {
+                withContext(Dispatchers.IO) { store.saveActiveProfile(name) }
+                paintProfiles()
+                return@launch
+            }
+            val input = android.widget.EditText(this@HomeActivity)
+            input.inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD
+            AlertDialog.Builder(this@HomeActivity)
+                .setTitle(R.string.profile_pin_title)
+                .setView(input)
+                .setPositiveButton(android.R.string.ok) { _, _ ->
+                    if (input.text?.toString() == pin) {
+                        lifecycleScope.launch {
+                            withContext(Dispatchers.IO) { store.saveActiveProfile(name) }
+                            paintProfiles()
+                        }
+                    } else {
+                        Toast.makeText(this@HomeActivity, R.string.profile_locked, Toast.LENGTH_SHORT).show()
+                    }
+                }
+                .setNeutralButton("Set PIN") { _, _ ->
+                    val next = input.text?.toString().orEmpty()
+                    lifecycleScope.launch {
+                        withContext(Dispatchers.IO) {
+                            store.saveProfilePin(name, next.ifBlank { null })
+                            store.saveActiveProfile(name)
+                        }
+                        paintProfiles()
+                    }
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
         }
     }
 }

@@ -9,10 +9,23 @@ import java.io.InputStream
  * Lightweight XMLTV parser. Keeps programmes overlapping [windowStart, windowEnd].
  */
 object XmltvParser {
+    const val PAST_MS = 2L * 60L * 60L * 1000L
+    const val FUTURE_MS = 48L * 60L * 60L * 1000L
+
+    fun window(now: Long = System.currentTimeMillis()): Pair<Long, Long> =
+        (now - PAST_MS) to (now + FUTURE_MS)
+
+    fun keep(start: Long?, stop: Long?, windowStart: Long, windowEnd: Long): Boolean {
+        if (start == null || stop == null) return false
+        if (stop <= windowStart) return false
+        if (start >= windowEnd) return false
+        return true
+    }
+
     fun parse(
         input: InputStream,
-        windowStart: Long = System.currentTimeMillis() - 60 * 60 * 1000L,
-        windowEnd: Long = System.currentTimeMillis() + 12 * 60 * 60 * 1000L
+        windowStart: Long = window().first,
+        windowEnd: Long = window().second
     ): Map<String, List<EpgProgram>> {
         val parser = Xml.newPullParser()
         parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false)
@@ -25,6 +38,11 @@ object XmltvParser {
                 val channelId = parser.getAttributeValue(null, "channel").orEmpty()
                 val start = EpgUtils.parseTimeToMillis(parser.getAttributeValue(null, "start"))
                 val stop = EpgUtils.parseTimeToMillis(parser.getAttributeValue(null, "stop"))
+                if (!keep(start, stop, windowStart, windowEnd)) {
+                    skip(parser)
+                    event = parser.next()
+                    continue
+                }
                 var title = ""
                 var description: String? = null
 
@@ -40,9 +58,7 @@ object XmltvParser {
                     inner = parser.next()
                 }
 
-                if (channelId.isNotBlank() && start != null && stop != null &&
-                    stop > windowStart && start < windowEnd && title.isNotBlank()
-                ) {
+                if (channelId.isNotBlank() && title.isNotBlank() && start != null && stop != null) {
                     result.getOrPut(channelId) { mutableListOf() }.add(
                         EpgProgram(
                             title = title.trim(),

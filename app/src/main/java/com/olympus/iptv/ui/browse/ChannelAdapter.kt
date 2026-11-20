@@ -18,7 +18,6 @@ import com.olympus.iptv.ui.channelLogo
 import com.olympus.iptv.ui.prefetchLogos
 import com.olympus.iptv.data.Channel
 import com.olympus.iptv.data.ContentKind
-import com.olympus.iptv.data.Titles
 import com.olympus.iptv.data.EpgNowNext
 import com.olympus.iptv.databinding.ItemChannelBinding
 import com.olympus.iptv.databinding.ItemPosterBinding
@@ -35,7 +34,6 @@ class ChannelAdapter(
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     private val items = mutableListOf<Channel>()
-    private val cleanedNames = HashMap<String, Pair<String, String>>()
     private var accentTint: android.content.res.ColorStateList? = null
     private var mutedTint: android.content.res.ColorStateList? = null
 
@@ -47,6 +45,8 @@ class ChannelAdapter(
     private var sequentialNumbers = false
     private var scrolling = false
     var continueLabel: (Channel) -> String? = { null }
+    var playingId: String? = null
+        private set
     /** 0..1000 watch progress for poster gold bar; null hides. */
     var continueProgress: (Channel) -> Int? = { null }
     var posterRating: (Channel) -> String? = { null }
@@ -59,6 +59,7 @@ class ChannelAdapter(
         }
     var guideRowsFocusable = true
     var guideRowHeight = 0
+    var unhealthy: (Channel) -> Boolean = { false }
 
     fun paintRowFocus(list: RecyclerView) {
         for (index in 0 until list.childCount) {
@@ -67,6 +68,12 @@ class ChannelAdapter(
             target.isFocusable = allow
             target.isFocusableInTouchMode = allow
         }
+    }
+
+    fun setPlaying(id: String?) {
+        if (playingId == id) return
+        playingId = id
+        if (items.isNotEmpty() && !posterMode) notifyItemRangeChanged(0, items.size)
     }
 
     fun submit(list: List<Channel>, groupLabel: String? = null, sequentialNumbers: Boolean = false) {
@@ -280,18 +287,22 @@ class ChannelAdapter(
                 binding.number.text = (position + 1).toString()
                 binding.logo.background = null
                 binding.logo.setPadding(0, 0, 0, 0)
-                binding.name.text = item.name
+                binding.name.text = com.olympus.iptv.data.NameStrip.shown(item.name)
+                binding.name.maxLines = if (guideRowHeight > 0) 2 else 1
+                binding.name.textSize = if (guideRowHeight > 0) 13f else 15f
+                binding.root.alpha = if (unhealthy(item)) 0.45f else 1f
                 binding.group.visibility = View.GONE
                 binding.country.visibility = View.GONE
                 hideActions()
                 val density = binding.root.resources.displayMetrics.density
                 val padH = (6 * density).toInt()
                 binding.playTarget.setPadding(padH, 0, padH, 0)
-                val logo = (24 * density).toInt()
+                val logo = ((if (guideRowHeight > 0) 18 else 24) * density).toInt()
                 binding.logo.layoutParams.width = logo
                 binding.logo.layoutParams.height = logo
                 bindLogo(item)
                 bindEpg(item)
+                com.olympus.iptv.ui.LiveBars.show(binding.liveBars, item.id == playingId)
                 binding.playTarget.isFocusable = guideRowsFocusable
                 binding.playTarget.isFocusableInTouchMode = guideRowsFocusable
                 val touch = DeviceForm.isTouchPrimary(binding.root.context)
@@ -400,12 +411,5 @@ class ChannelAdapter(
         }
     }
 
-    private fun displayName(item: Channel): String {
-        if (item.kind != ContentKind.VOD && item.seriesId.isNullOrBlank()) return item.name
-        val cached = cleanedNames[item.id]
-        if (cached != null && cached.first == item.name) return cached.second
-        val cleaned = Titles.clean(item.name)
-        cleanedNames[item.id] = item.name to cleaned
-        return cleaned
-    }
+    private fun displayName(item: Channel): String = com.olympus.iptv.data.NameStrip.shown(item.name)
 }

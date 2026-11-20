@@ -84,6 +84,25 @@ object PlaybackTrace {
         }
     }
 
+    const val ACCOUNT = "account"
+    const val BACKUP = "backup"
+
+    fun advice(http: Int?, code: Int): String {
+        if (http == 401 || http == 403 || http == 458) return ACCOUNT
+        if (http == 502 || http == 504) return BACKUP
+        if (code == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT ||
+            code == PlaybackException.ERROR_CODE_TIMEOUT
+        ) return BACKUP
+        return ""
+    }
+
+    fun httpStatus(error: PlaybackException?): Int? {
+        val cause = error?.cause
+        val nested = cause?.cause
+        return (cause as? androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException)?.responseCode
+            ?: (nested as? androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException)?.responseCode
+    }
+
     fun streamHint(raw: String?): String {
         val value = raw?.trim().orEmpty()
         if (value.isEmpty()) return "url=-"

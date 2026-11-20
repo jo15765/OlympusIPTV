@@ -229,14 +229,20 @@ class OlympusIptvApp : Application() {
         DashboardHost.start(this)
         com.olympus.iptv.vpn.AppTunnel.restore(this)
         val touch = com.olympus.iptv.ui.DeviceForm.isTouchPrimary(this)
+        val lowRam = com.olympus.iptv.ui.DeviceForm.isLowRam(this)
+        com.olympus.iptv.ui.BackdropGlow.motion = true
+        val imageBytes = if (lowRam) 16L * 1024 * 1024 else 64L * 1024 * 1024
         Coil.setImageLoader(
             ImageLoader.Builder(this)
                 .crossfade(false)
+                .bitmapConfig(
+                    if (lowRam) android.graphics.Bitmap.Config.RGB_565
+                    else android.graphics.Bitmap.Config.ARGB_8888
+                )
                 .respectCacheHeaders(false)
                 .memoryCache {
-                    // Phones keep a smaller in-memory logo cache so guide scroll stays smooth.
                     MemoryCache.Builder(this)
-                        .maxSizePercent(if (touch) 0.04 else 0.08)
+                        .maxSizeBytes(imageBytes.toInt())
                         .build()
                 }
                 .diskCache {

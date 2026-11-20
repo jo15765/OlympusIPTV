@@ -12,6 +12,7 @@ import com.olympus.iptv.R
 import com.olympus.iptv.data.Channel
 import com.olympus.iptv.data.ContentKind
 import com.olympus.iptv.databinding.ActivityBrowseBinding
+import com.olympus.iptv.ui.player.StreamSessions
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -69,6 +70,9 @@ class BrowsePreviewController(
                 previewPlayer = created
                 binding.previewPlayer.player = created
             }
+        previewChannelId?.let { previous ->
+            if (previous != channel.id) StreamSessions.remove("preview:$previous")
+        }
         previewChannelId = channel.id
         player.setMediaItem(
             MediaItem.Builder()
@@ -84,6 +88,7 @@ class BrowsePreviewController(
         )
         player.prepare()
         player.playWhenReady = true
+        StreamSessions.set("preview:${channel.id}", channel.name, "Guide preview")
         updateCaption(channel)
     }
 
@@ -95,6 +100,7 @@ class BrowsePreviewController(
             app.warmChannelId = channel.id
             previewPlayer = null
             previewChannelId = null
+            StreamSessions.remove("preview:${channel.id}")
             previewJob?.cancel()
             binding.previewPlayer.player = null
         } else {
@@ -104,6 +110,7 @@ class BrowsePreviewController(
 
     fun stop() {
         previewJob?.cancel()
+        previewChannelId?.let { StreamSessions.remove("preview:$it") }
         previewChannelId = null
         previewPlayer?.stop()
         previewPlayer?.clearMediaItems()
@@ -115,6 +122,7 @@ class BrowsePreviewController(
 
     fun release() {
         previewJob?.cancel()
+        previewChannelId?.let { StreamSessions.remove("preview:$it") }
         previewPlayer?.release()
         previewPlayer = null
         previewChannelId = null

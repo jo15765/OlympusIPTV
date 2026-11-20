@@ -62,6 +62,58 @@ class XtreamClient(
         auth == "1" || userInfo.get("status")?.asString.equals("Active", ignoreCase = true)
     }
 
+    data class AccountStatus(
+        val status: String,
+        val expires: String,
+        val activeConnections: String,
+        val maxConnections: String,
+        val connections: List<Pair<String, String>> = emptyList()
+    )
+
+    suspend fun accountStatus(playlist: SavedPlaylist): AccountStatus? = withContext(Dispatchers.IO) {
+        val root = getJson(playlist) as? JsonObject ?: return@withContext null
+        val info = root.getAsJsonObject("user_info") ?: return@withContext null
+        val rawExp = info.get("exp_date")?.asString
+        val expires = rawExp?.toLongOrNull()?.let { seconds ->
+            java.text.SimpleDateFormat("MMM d, yyyy", java.util.Locale.US).format(java.util.Date(seconds * 1000L))
+        } ?: rawExp ?: "—"
+        AccountStatus(
+            status = info.get("status")?.asString ?: "—",
+            expires = expires,
+            activeConnections = info.get("active_cons")?.asString ?: "—",
+            maxConnections = info.get("max_connections")?.asString ?: "—",
+            connections = connectionRows(root)
+        )
+    }
+
+    private fun connectionRows(root: JsonObject): List<Pair<String, String>> {
+        val found = ArrayList<Pair<String, String>>()
+        fun walk(element: com.google.gson.JsonElement?) {
+            when (element) {
+                is com.google.gson.JsonArray -> element.forEach { walk(it) }
+                is com.google.gson.JsonObject -> {
+                    val ip = listOf("ip", "user_ip", "client_ip", "stream_ip", "ip_address")
+                        .firstNotNullOfOrNull { key ->
+                            element.get(key)?.takeIf { it.isJsonPrimitive }?.asString
+                                ?.trim()?.takeIf { it.count { ch -> ch == '.' } == 3 }
+                        }
+                    if (ip != null) {
+                        val detail = listOf("stream_display_name", "name", "channel", "title", "stream")
+                            .firstNotNullOfOrNull { key ->
+                                element.get(key)?.takeIf { it.isJsonPrimitive }?.asString?.trim()?.takeIf { it.isNotEmpty() }
+                            }.orEmpty()
+                        found.add(ip to detail)
+                    } else {
+                        element.entrySet().forEach { walk(it.value) }
+                    }
+                }
+                else -> Unit
+            }
+        }
+        walk(root)
+        return found.distinct().take(40)
+    }
+
     suspend fun loadCatalog(playlist: SavedPlaylist): Catalog = coroutineScope {
         val host = normalizeHost(playlist.xtreamHost.orEmpty())
         val user = playlist.xtreamUsername ?: playlist.username.orEmpty()

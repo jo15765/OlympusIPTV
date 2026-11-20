@@ -962,24 +962,12 @@ internal fun BrowseActivity.openLastGroup() {
     }
 
 internal fun BrowseActivity.showLetterJump() {
-        val letters = ('A'..'Z').map { it.toString() } + "#"
-        val dialog = AlertDialog.Builder(this)
-            .setTitle(R.string.letter_jump_title)
-            .setItems(letters.toTypedArray()) { _, which ->
-                val letter = letters[which]
-                val index = visibleChannels.indexOfFirst { channel ->
-                    val mark = channel.name.trim().firstOrNull()?.uppercaseChar()
-                    if (letter == "#") mark == null || !mark.isLetter() else mark.toString() == letter
-                }
-                if (index < 0) return@setItems
-                binding.channelList.scrollToPosition(index)
-                binding.channelList.post {
-                    if (!isDestroyed) focusRowAt(binding.channelList, index, R.id.playTarget)
-                }
+        LetterJump.show(this, visibleChannels) { index ->
+            binding.channelList.scrollToPosition(index)
+            binding.channelList.post {
+                if (!isDestroyed) focusRowAt(binding.channelList, index, R.id.playTarget)
             }
-            .create()
-        com.olympus.iptv.ui.DialogChrome.dress(dialog)
-        dialog.show()
+        }
     }
 
 internal fun BrowseActivity.paintNowPlayingBar() {
@@ -1010,6 +998,7 @@ internal fun BrowseActivity.paintNowPlayingBar() {
             binding.previewCard.visibility == View.VISIBLE || binding.groupColumn.visibility == View.VISIBLE
         }
         binding.nowPlayingBar.visibility = if (show) View.VISIBLE else View.GONE
+        channelAdapter.setPlaying(if (match && channel.kind == ContentKind.LIVE) channel.id else null)
     }
 
 internal fun BrowseActivity.resumeNowPlaying() {
@@ -1018,6 +1007,16 @@ internal fun BrowseActivity.resumeNowPlaying() {
         if (app.lastPlayedPlaylistId != playlist?.id) return
         Haptics.tick(binding.nowPlayingResume)
         play(channel, queueOverride = listOf(channel), zapMode = PlayerActivity.ZAP_LIST, rememberReturn = true)
+    }
+
+internal fun BrowseActivity.paintFreshCount() {
+        if (!viewReady()) return
+        val saved = playlist?.id
+        val count = if (saved.isNullOrBlank()) 0 else {
+            (application as com.olympus.iptv.OlympusIptvApp).freshCards(saved)?.size ?: 0
+        }
+        binding.freshCount.text = count.toString()
+        binding.freshCount.visibility = if (count > 0) android.view.View.VISIBLE else android.view.View.GONE
     }
 
 internal fun BrowseActivity.maybeShowBackupTip() {
@@ -1245,6 +1244,7 @@ internal fun BrowseActivity.reloadFavorites() {
         val app = application as OlympusIptvApp
         lifecycleScope.launch {
             val ids = withContext(Dispatchers.IO) { app.playlistStore.favorites(saved.id) }
+            com.olympus.iptv.playlist.HostWarmup.launch(app, saved.id, ids)
             if (ids == favoriteOrder) return@launch
             applyFavorites(ids)
             if (selectedCategoryId == PlaylistLoader.FAVORITES_ID &&
@@ -1521,10 +1521,11 @@ internal fun BrowseActivity.fitChannelColumn() {
         val density = metrics.density
         val number = if (section == GuideSection.TV) (32f + 6f) * density else 0f
         val around = (6f + 6f + 24f + 8f + 4f) * density + number
-        val wanted = (widestNamePx() + around).toInt().coerceAtLeast((120 * density).toInt())
+        val twoLines = widestNamePx() * 0.55f + around
         val parent = binding.guideRow.width.takeIf { it > 0 } ?: metrics.widthPixels
-        val guideFloor = (148 * density).toInt()
-        val capped = wanted.coerceAtMost((parent - guideFloor).coerceAtLeast((120 * density).toInt()))
+        val floor = (300 * density).toInt()
+        val ceiling = (380 * density).toInt().coerceAtMost((parent * 0.42f).toInt().coerceAtLeast(floor))
+        val capped = twoLines.toInt().coerceIn(floor, ceiling)
         val params = binding.contentColumn.layoutParams as LinearLayout.LayoutParams
         if (params.width == capped) return
         params.width = capped
@@ -1543,77 +1544,6 @@ internal fun BrowseActivity.rowSelectKey(keyCode: Int): Boolean =
             keyCode == KeyEvent.KEYCODE_ENTER ||
             keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER ||
             keyCode == KeyEvent.KEYCODE_BUTTON_A
-
-internal fun BrowseActivity.showRowOptions(seed: Channel? = null) {
-        val now = android.os.SystemClock.uptimeMillis()
-        if (now - rowMenuAt < 400L) return
-        rowMenuAt = now
-        val channel = seed
-            ?: (currentFocus?.tag as? ProgramGuideAdapter.Slot)?.let { visibleChannels.getOrNull(it.row) }
-            ?: focusedChannel
-            ?: return
-        val saved = playlist ?: return
-        val queueItem = WatchQueue.itemFor(channel, section == GuideSection.SHOWS)
-        val app = application as OlympusIptvApp
-        lifecycleScope.launch {
-            val queued = queueItem != null && withContext(Dispatchers.IO) {
-                app.playlistStore.queue(saved.id).any { it.bucket == queueItem.bucket && it.id == queueItem.id }
-            }
-            if (isDestroyed) return@launch
-            val favorite = Favorites.matches(channel, favoriteIds)
-            val labels = ArrayList<String>()
-            val actions = ArrayList<Int>()
-            labels += getString(R.string.fresh_play)
-            actions += 8
-            labels += getString(if (favorite) R.string.guide_remove_favorite else R.string.guide_add_favorite)
-            actions += 0
-            if (section == GuideSection.TV && !touchPrimary) {
-                labels += getString(R.string.guide_move_up)
-                actions += 1
-                labels += getString(R.string.guide_move_down)
-                actions += 2
-            }
-            labels += getString(R.string.record)
-            actions += 3
-            if (channel.kind == ContentKind.LIVE && channel.seriesId.isNullOrBlank()) {
-                labels += getString(R.string.remind_me)
-                actions += 4
-            }
-            if (queueItem != null) {
-                labels += getString(if (queued) R.string.queue_remove else R.string.queue_add)
-                actions += 5
-            }
-            if (section != GuideSection.TV) {
-                labels += getString(R.string.vod_ratings_reviews)
-                actions += 6
-            }
-            if (touchPrimary) {
-                labels += getString(R.string.open_in_pip)
-                actions += 7
-            }
-            val runAction: (Int) -> Unit = { action ->
-                when (action) {
-                    0 -> toggleGuideFavorite(channel)
-                    1 -> moveFavorite(channel, -1)
-                    2 -> moveFavorite(channel, 1)
-                    3 -> offerRecording(channel)
-                    4 -> offerReminder(channel)
-                    5 -> if (queueItem != null) {
-                        app.appScope.launch {
-                            if (queued) app.playlistStore.removeQueue(saved.id, queueItem.bucket, queueItem.id)
-                            else app.playlistStore.addQueue(saved.id, queueItem)
-                        }
-                    }
-                    6 -> openVodRatings(channel)
-                    7 -> play(channel, enterPip = true)
-                    8 -> play(channel)
-                }
-            }
-            com.olympus.iptv.ui.GuideActionSheet.show(screen(), channel.name, labels) { which ->
-                runAction(actions[which])
-            }
-        }
-    }
 
 internal fun BrowseActivity.showPhoneRowSheet(
         title: String,
@@ -1820,7 +1750,8 @@ internal fun BrowseActivity.render(restoreFocus: Boolean = false, reloadChannels
                 } else {
                     base
                 }
-                withRecent(listOf(favorites) + withAll)
+                val spotlight = Category(PlaylistLoader.FOR_YOU_ID, getString(R.string.for_you), kind)
+                listOf(spotlight) + withRecent(listOf(favorites) + withAll)
             }
             GuideSection.MOVIES -> withContinue(
                 listOf(favorites) + withoutEmptyGroups(visibleGroups(data.vodCategories, config))
@@ -1865,6 +1796,16 @@ internal fun BrowseActivity.showChannels() {
         }
         if (waiting) {
             showChannelWait(if (sectionNow == GuideSection.SHOWS) showStatus() else movieStatus())
+            return
+        }
+        if (categoryId == PlaylistLoader.FOR_YOU_ID) {
+            binding.libraryStatus.visibility = View.GONE
+            channelJob = lifecycleScope.launch {
+                val channels = withContext(Dispatchers.IO) { forYouChannels(config) }
+                if (!stillShowing(query, sectionNow, categoryId)) return@launch
+                channels.firstOrNull()?.logoUrl?.let { glowFrom(it) }
+                publishChannels(channels, scrollTop = true)
+            }
             return
         }
         if (categoryId == PlaylistLoader.RECENT_ID ||
@@ -1931,6 +1872,20 @@ internal fun BrowseActivity.libraryGroup(sectionNow: GuideSection, categoryId: S
         return prepareGroup(rows, config)
     }
 
+internal fun BrowseActivity.forYouChannels(config: LineupConfig): List<Channel> {
+        val recent = recentChannels(GuideSection.TV, config)
+        val favorites = libraryFavorites(GuideSection.TV, config)
+        val sports = (recent + favorites).filter { channel ->
+            val title = epgCache[channel.id]?.now?.title ?: channel.name
+            com.olympus.iptv.ui.browse.SportsEvent.isMatchup(title)
+        }
+        val ordered = LinkedHashSet<Channel>()
+        sports.forEach { ordered.add(it) }
+        recent.take(8).forEach { ordered.add(it) }
+        favorites.take(16).forEach { ordered.add(it) }
+        return ordered.toList()
+    }
+
 internal fun BrowseActivity.libraryFavorites(sectionNow: GuideSection, config: LineupConfig): List<Channel> {
         val saved = playlist ?: return emptyList()
         val section = favoriteSection(sectionNow)
@@ -1972,6 +1927,9 @@ internal fun BrowseActivity.showChannelWait(text: String) {
     }
 
 internal fun BrowseActivity.publishChannels(channels: List<Channel>, scrollTop: Boolean) {
+        (application as OlympusIptvApp).appScope.launch(kotlinx.coroutines.Dispatchers.Default) {
+            com.olympus.iptv.data.NameStrip.prepare(channels.map { it.name })
+        }
         visibleChannels.clear()
         visibleChannels.addAll(channels)
         channelAdapter.submit(
@@ -2132,6 +2090,7 @@ internal fun BrowseActivity.loadGroupPage(reset: Boolean) {
                 visibleChannels.addAll(named)
                 showChannelSkeleton(false)
                 channelAdapter.submit(named, groupLabel(categoryId), sequentialNumbers = false)
+                refreshUnhealthy()
                 val restoreId = returnChannelId ?: holdChannelId
                 val restoreRow = if (!restoreId.isNullOrBlank()) {
                     named.indexOfFirst { it.id == restoreId }
@@ -2321,6 +2280,7 @@ internal fun BrowseActivity.withoutEmptyGroups(categories: List<Category>): List
             category.id == PlaylistLoader.ALL_ID ||
                 category.id == PlaylistLoader.FAVORITES_ID ||
                 category.id == PlaylistLoader.RECENT_ID ||
+                category.id == PlaylistLoader.FOR_YOU_ID ||
                 category.id == PlaylistLoader.CONTINUE_ID ||
                 category.id == PlaylistLoader.TOP_WATCHED_ID ||
                 (groupCounts[category.id] ?: 0) > 0
@@ -2359,6 +2319,7 @@ internal fun BrowseActivity.selectCategory(category: Category, immediate: Boolea
         if (category.id != PlaylistLoader.FAVORITES_ID &&
             category.id != PlaylistLoader.CONTINUE_ID &&
             category.id != PlaylistLoader.RECENT_ID &&
+            category.id != PlaylistLoader.FOR_YOU_ID &&
             category.id != PlaylistLoader.TOP_WATCHED_ID &&
             category.id != PlaylistLoader.ALL_ID
         ) {
@@ -2468,6 +2429,19 @@ internal fun BrowseActivity.schedulePrefetch(channels: List<Channel>) {
         focusHandler.postDelayed(run, if (touchPrimary) 220L else FOCUS_SETTLE_MS)
     }
 
+internal fun BrowseActivity.glowFrom(url: String?) {
+        if (url.isNullOrBlank()) return
+        val request = coil.request.ImageRequest.Builder(this)
+            .data(url)
+            .size(com.olympus.iptv.ui.BackdropGlow.THUMB_W, com.olympus.iptv.ui.BackdropGlow.THUMB_H)
+            .target { drawable ->
+                val bitmap = (drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap ?: return@target
+                com.olympus.iptv.ui.BackdropGlow.apply(bitmap, binding.guideShell)
+            }
+            .build()
+        coil.Coil.imageLoader(this).enqueue(request)
+    }
+
 internal fun BrowseActivity.showChannelDetail(channel: Channel) {
         focusedChannel = channel
         queuePreview(channel)
@@ -2475,6 +2449,7 @@ internal fun BrowseActivity.showChannelDetail(channel: Channel) {
         epgWait = null
         if (channel.kind != ContentKind.LIVE) {
             loadTitleLine(channel)
+            glowFrom(channel.logoUrl)
             return
         }
         if (epgCache.containsKey(channel.id)) {

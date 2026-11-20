@@ -118,7 +118,7 @@
         android:id="@+id/cardAdminEpg"
         android:layout_width="0dp"
         android:layout_height="match_parent"
-        android:layout_marginStart="14dp"
+        android:layout_marginEnd="14dp"
         android:layout_weight="1"
         android:background="@drawable/bg_focusable"
         android:clickable="true"
@@ -355,4 +355,28 @@
         android:textColor="@color/bg"
         android:textSize="14sp"
         android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/adminHealth"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:gravity="center"
+        android:textColor="@color/text_secondary"
+        android:textSize="13sp" />
+
+    <TextView
+        android:id="@+id/btnMagicCleanup"
+        android:layout_width="wrap_content"
+        android:layout_height="44dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/bg_nav"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center"
+        android:paddingHorizontal="18dp"
+        android:text="@string/magic_cleanup"
+        android:textColor="@color/text_primary"
+        android:textSize="14sp" />
 </LinearLayout>

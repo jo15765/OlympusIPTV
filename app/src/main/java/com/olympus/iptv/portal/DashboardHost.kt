@@ -23,6 +23,7 @@ import com.olympus.iptv.playlist.CatalogIngest
 import com.olympus.iptv.playlist.GroupLock
 import com.olympus.iptv.playlist.PlaylistLoader
 import com.olympus.iptv.playlist.XtreamClient
+import com.olympus.iptv.ui.player.StreamSessions
 import com.olympus.iptv.record.RecordingFiles
 import java.io.BufferedOutputStream
 import java.io.ByteArrayOutputStream
@@ -403,8 +404,40 @@ object DashboardHost {
             method == "POST" && path == "/api/vpn/session" -> vpnSignIn(app, socket, json(body))
             method == "POST" && path == "/api/vpn/connect" -> vpnConnect(app, socket, json(body))
             method == "POST" && path == "/api/vpn/disconnect" -> vpnDisconnect(app, socket, json(body))
+            method == "POST" && path == "/api/remote" -> {
+                val payload = json(body)
+                val action = payload.get("action")?.asString.orEmpty()
+                val text = payload.get("text")?.asString.orEmpty()
+                RemotePad.post(action, text)
+                writeJson(socket, 200, mapOf("ok" to true))
+            }
+            method == "GET" && path == "/api/remote/favorites" -> remoteFavorites(app, socket)
+            method == "POST" && path == "/api/remote/favorites" -> saveRemoteFavorites(app, socket, json(body))
+            method == "GET" && path == "/api/streams" -> activeStreams(app, socket)
             else -> writeJson(socket, 404, mapOf("error" to "Not found"))
         }
+    }
+
+    private fun activeStreams(app: OlympusIptvApp, socket: Socket) {
+        val playlist = runBlocking { app.playlistStore.playlists.first().firstOrNull() }
+        val status = playlist?.let { saved ->
+            runCatching { runBlocking { XtreamClient().accountStatus(saved) } }.getOrNull()
+        }
+        val ip = linkAddress().orEmpty()
+        val local = StreamSessions.list().map { row ->
+            mapOf("ip" to ip, "name" to row.name, "role" to row.role, "source" to "This TV")
+        }
+        val remote = status?.connections.orEmpty().map { (address, name) ->
+            mapOf("ip" to address, "name" to name, "role" to "", "source" to "Provider")
+        }
+        writeJson(socket, 200, mapOf(
+            "deviceIp" to ip,
+            "providerActive" to (status?.activeConnections ?: "—"),
+            "providerMax" to (status?.maxConnections ?: "—"),
+            "streams" to (remote.ifEmpty { local }),
+            "local" to local,
+            "providerListedIps" to remote.isNotEmpty()
+        ))
     }
 
     private fun vpnSignIn(app: OlympusIptvApp, socket: Socket, body: JsonObject) {
@@ -574,6 +607,33 @@ object DashboardHost {
                 "recordings" to page.recordings
             )
         )
+    }
+
+    private fun remoteFavorites(app: OlympusIptvApp, socket: Socket) {
+        val playlist = runBlocking { app.playlistStore.playlists.first().firstOrNull() }
+        if (playlist == null) {
+            writeJson(socket, 404, mapOf("error" to "No playlist"))
+            return
+        }
+        val ids = runBlocking { app.playlistStore.favorites(playlist.id) }
+        val rows = ids.map { id ->
+            val bare = id.substringAfter(':')
+            val channel = app.catalogDb.readChannel(playlist.id, com.olympus.iptv.playlist.CatalogDb.LIVE, bare)
+                ?: app.catalogDb.readChannel(playlist.id, com.olympus.iptv.playlist.CatalogDb.VOD, bare)
+            mapOf("id" to id, "name" to (channel?.name ?: bare))
+        }
+        writeJson(socket, 200, mapOf("favorites" to rows))
+    }
+
+    private fun saveRemoteFavorites(app: OlympusIptvApp, socket: Socket, body: JsonObject) {
+        val playlist = runBlocking { app.playlistStore.playlists.first().firstOrNull() }
+        if (playlist == null) {
+            writeJson(socket, 404, mapOf("error" to "No playlist"))
+            return
+        }
+        val ids = body.getAsJsonArray("ids")?.map { it.asString }?.filter { it.isNotBlank() }.orEmpty()
+        runBlocking { app.playlistStore.saveFavorites(playlist.id, ids, System.currentTimeMillis()) }
+        writeJson(socket, 200, mapOf("ok" to true))
     }
 
     private fun favorites(app: OlympusIptvApp, socket: Socket, email: String?, deviceId: String?) {

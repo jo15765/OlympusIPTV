@@ -44,6 +44,9 @@ class PlaylistStore(private val context: Context) {
     private val refreshIntervalKey = intPreferencesKey("refresh_interval_minutes")
     private val refreshLastKey = stringPreferencesKey("refresh_last_json")
     private val pictureModeKey = stringPreferencesKey("picture_mode")
+    private val autoFrameKey = booleanPreferencesKey("auto_frame_rate")
+    private val profileKey = stringPreferencesKey("viewer_profile")
+    private val profilePinKey = stringPreferencesKey("viewer_pins_json")
     private val audioLanguageKey = stringPreferencesKey("audio_language")
     private val audioByChannelKey = stringPreferencesKey("audio_by_channel_json")
     private val hideEmptyGroupsKey = booleanPreferencesKey("hide_empty_groups")
@@ -189,6 +192,48 @@ class PlaylistStore(private val context: Context) {
     }
 
     suspend fun pictureMode(): String = devicePrefs().pictureMode
+
+    suspend fun autoFrameRate(): Boolean =
+        context.dataStore.data.first()[autoFrameKey] != false
+
+    suspend fun saveAutoFrameRate(enabled: Boolean) {
+        context.dataStore.edit { prefs -> prefs[autoFrameKey] = enabled }
+    }
+
+    suspend fun activeProfile(): String =
+        context.dataStore.data.first()[profileKey]?.takeIf { it.isNotBlank() } ?: "Main"
+
+    suspend fun saveActiveProfile(name: String) {
+        val chosen = name.ifBlank { "Main" }
+        context.dataStore.edit { prefs -> prefs[profileKey] = chosen }
+    }
+
+    suspend fun profilePin(name: String): String? {
+        val raw = context.dataStore.data.first()[profilePinKey] ?: return null
+        val map = runCatching {
+            gson.fromJson<Map<String, String>>(raw, object : com.google.gson.reflect.TypeToken<Map<String, String>>() {}.type)
+        }.getOrNull() ?: return null
+        return map[name]?.takeIf { it.isNotBlank() }
+    }
+
+    suspend fun saveProfilePin(name: String, pin: String?) {
+        context.dataStore.edit { prefs ->
+            val raw = prefs[profilePinKey]
+            val map = runCatching {
+                gson.fromJson<MutableMap<String, String>>(
+                    raw,
+                    object : com.google.gson.reflect.TypeToken<MutableMap<String, String>>() {}.type
+                )
+            }.getOrNull() ?: mutableMapOf()
+            if (pin.isNullOrBlank()) map.remove(name) else map[name] = pin
+            prefs[profilePinKey] = gson.toJson(map)
+        }
+    }
+
+    private suspend fun profileScope(playlistId: String): String {
+        val profile = activeProfile()
+        return if (profile == "Main") playlistId else "$playlistId#$profile"
+    }
 
     suspend fun savePictureMode(mode: String) {
         val chosen = if (mode in PICTURE_MODES) mode else PICTURE_FIT
@@ -413,8 +458,9 @@ class PlaylistStore(private val context: Context) {
     }
 
     suspend fun recent(playlistId: String): List<WatchEntry> {
+        val key = profileScope(playlistId)
         val raw = context.dataStore.data.first()[watchKey]
-        return parsedWatch(raw)[playlistId].orEmpty().sortedByDescending { it.updatedAt ?: 0L }
+        return parsedWatch(raw)[key].orEmpty().sortedByDescending { it.updatedAt ?: 0L }
     }
 
     private fun parsedWatch(raw: String?): Map<String, List<WatchEntry>> {
@@ -428,9 +474,10 @@ class PlaylistStore(private val context: Context) {
     suspend fun rememberWatch(playlistId: String, entry: WatchEntry) {
         val channelId = entry.channelId?.takeIf { it.isNotBlank() } ?: return
         if (playlistId.isBlank()) return
+        val key = profileScope(playlistId)
         context.dataStore.edit { prefs ->
             val map = decodeWatch(prefs[watchKey])
-            val prior = map[playlistId].orEmpty().firstOrNull { it.channelId == channelId }
+            val prior = map[key].orEmpty().firstOrNull { it.channelId == channelId }
             val nextPos = entry.positionMs ?: 0L
             val priorPos = prior?.positionMs ?: -1L
             if (prior != null &&
@@ -440,9 +487,9 @@ class PlaylistStore(private val context: Context) {
             ) {
                 return@edit
             }
-            val kept = map[playlistId].orEmpty().filter { it.channelId != channelId }
-            map[playlistId] = listOf(entry.copy(channelId = channelId)) + kept
-            if ((map[playlistId]?.size ?: 0) > 60) map[playlistId] = map[playlistId].orEmpty().take(60)
+            val kept = map[key].orEmpty().filter { it.channelId != channelId }
+            map[key] = listOf(entry.copy(channelId = channelId)) + kept
+            if ((map[key]?.size ?: 0) > 60) map[key] = map[key].orEmpty().take(60)
             val encoded = gson.toJson(map)
             prefs[watchKey] = encoded
             watchParsed = encoded to map
@@ -495,8 +542,9 @@ class PlaylistStore(private val context: Context) {
     }
 
     suspend fun favorites(playlistId: String): List<String> {
+        val key = profileScope(playlistId)
         val raw = context.dataStore.data.first()[favoritesKey]
-        return parsedFavorites(raw)[playlistId].orEmpty()
+        return parsedFavorites(raw)[key].orEmpty()
     }
 
     private fun parsedFavorites(raw: String?): Map<String, List<String>> {
@@ -567,7 +615,12 @@ class PlaylistStore(private val context: Context) {
     }
 
     suspend fun favoritePage(playlistId: String): FavoritePage {
-        return favoritePage(playlistId, context.dataStore.data.first())
+        val prefs = context.dataStore.data.first()
+        val page = favoritePage(playlistId, prefs)
+        val key = profileScope(playlistId)
+        if (key == playlistId) return page
+        val ids = parsedFavorites(prefs[favoritesKey])[key].orEmpty()
+        return FavoritePage(ids, page.revision, page.lineup)
     }
 
     private fun favoritePage(playlistId: String, prefs: Preferences): FavoritePage {
@@ -578,9 +631,10 @@ class PlaylistStore(private val context: Context) {
     }
 
     suspend fun saveFavorites(playlistId: String, ids: List<String>, revision: Long) {
+        val key = profileScope(playlistId)
         context.dataStore.edit { prefs ->
             val map = decodeFavorites(prefs[favoritesKey])
-            map[playlistId] = ids
+            map[key] = ids
             prefs[favoritesKey] = gson.toJson(map)
             prefs.writeRevision(playlistId, revision)
         }
@@ -595,15 +649,16 @@ class PlaylistStore(private val context: Context) {
 
     suspend fun setFavorite(playlistId: String, channelId: String, favorite: Boolean): Long {
         val revision = System.currentTimeMillis()
+        val key = profileScope(playlistId)
         context.dataStore.edit { prefs ->
             val map = decodeFavorites(prefs[favoritesKey])
-            val ids = map[playlistId]?.toMutableList() ?: mutableListOf()
+            val ids = map[key]?.toMutableList() ?: mutableListOf()
             if (favorite) {
                 if (!ids.contains(channelId)) ids.add(channelId)
             } else {
                 ids.remove(channelId)
             }
-            map[playlistId] = ids
+            map[key] = ids
             prefs[favoritesKey] = gson.toJson(map)
             prefs.writeRevision(playlistId, revision)
         }
@@ -860,26 +915,29 @@ class PlaylistStore(private val context: Context) {
     }
 
     suspend fun queue(playlistId: String): List<QueueItem> {
+        val key = profileScope(playlistId)
         val raw = context.dataStore.data.first()[queueKey]
-        return parsedQueue(raw)[playlistId].orEmpty()
+        return parsedQueue(raw)[key].orEmpty()
     }
 
     suspend fun addQueue(playlistId: String, item: QueueItem) {
         if (playlistId.isBlank() || item.id.isBlank()) return
+        val key = profileScope(playlistId)
         context.dataStore.edit { prefs ->
             val map = decodeQueue(prefs[queueKey])
-            val list = map[playlistId]?.toMutableList() ?: mutableListOf()
+            val list = map[key]?.toMutableList() ?: mutableListOf()
             if (list.none { it.bucket == item.bucket && it.id == item.id }) list.add(item)
-            map[playlistId] = list
+            map[key] = list
             prefs[queueKey] = gson.toJson(map)
             queueParsed = null
         }
     }
 
     suspend fun removeQueue(playlistId: String, bucket: String, id: String) {
+        val key = profileScope(playlistId)
         context.dataStore.edit { prefs ->
             val map = decodeQueue(prefs[queueKey])
-            map[playlistId] = map[playlistId].orEmpty().filterNot { it.bucket == bucket && it.id == id }
+            map[key] = map[key].orEmpty().filterNot { it.bucket == bucket && it.id == id }
             prefs[queueKey] = gson.toJson(map)
             queueParsed = null
         }

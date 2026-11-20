@@ -39,6 +39,43 @@ class CatalogCache(context: Context) {
         }
     }
 
+    fun readHashes(playlistId: String, bucket: String): Map<String, Int> {
+        val file = hashFile(playlistId, bucket)
+        if (!file.isFile) return emptyMap()
+        val map = HashMap<String, Int>()
+        file.forEachLine { line ->
+            val split = line.indexOf('\t')
+            if (split <= 0) return@forEachLine
+            val hash = line.substring(split + 1).toIntOrNull() ?: return@forEachLine
+            map[line.substring(0, split)] = hash
+        }
+        return map
+    }
+
+    fun writeHashes(playlistId: String, bucket: String, hashes: Map<String, Int>) {
+        val file = hashFile(playlistId, bucket)
+        val tmp = File(dir, file.name + ".tmp")
+        tmp.bufferedWriter().use { writer ->
+            hashes.forEach { (id, hash) ->
+                writer.append(id)
+                writer.append('\t')
+                writer.append(hash.toString())
+                writer.append('\n')
+            }
+        }
+        if (file.exists() && !file.delete()) return
+        if (!tmp.renameTo(file)) {
+            tmp.copyTo(file, overwrite = true)
+            tmp.delete()
+        }
+    }
+
+    private fun hashFile(playlistId: String, bucket: String): File {
+        val safe = playlistId.filter { it.isLetterOrDigit() || it == '-' }
+        val bucketSafe = bucket.filter { it.isLetterOrDigit() }
+        return File(dir, "$safe-$bucketSafe.hashes")
+    }
+
     private fun file(playlistId: String, includeVod: Boolean): File {
         val safe = playlistId.filter { it.isLetterOrDigit() || it == '-' }
         return File(dir, "$safe-${if (includeVod) "vod" else "live"}.json.gz")

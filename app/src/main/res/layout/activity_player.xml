@@ -54,9 +54,23 @@
             android:background="@drawable/bg_nav"
             android:focusable="true"
             android:gravity="center"
-            android:nextFocusDown="@id/miniGuideList"
+            android:nextFocusDown="@id/miniGuideSplit"
             android:text="@string/last_channel"
             android:textColor="@color/text_primary"
+            android:textSize="15sp" />
+
+        <TextView
+            android:id="@+id/miniGuideSplit"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:layout_marginBottom="8dp"
+            android:background="@drawable/bg_search_pill"
+            android:focusable="true"
+            android:gravity="center"
+            android:nextFocusUp="@id/miniGuideLast"
+            android:nextFocusDown="@id/miniGuideList"
+            android:text="@string/split_screen"
+            android:textColor="@color/accent"
             android:textSize="15sp" />
 
         <androidx.recyclerview.widget.RecyclerView
@@ -224,6 +238,22 @@
         android:paddingVertical="10dp"
         android:text="@string/playback_connecting"
         android:textColor="@color/accent"
+        android:textSize="15sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/catchupStart"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|start"
+        android:layout_marginStart="28dp"
+        android:layout_marginBottom="36dp"
+        android:background="@drawable/bg_status_chip"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="10dp"
+        android:text="@string/catchup_from_start"
+        android:textColor="#FFE0B15A"
         android:textSize="15sp"
         android:textStyle="bold"
         android:visibility="gone" />
@@ -580,6 +610,16 @@
             android:textSize="18sp"
             android:textStyle="bold" />
 
+        <ImageView
+            android:id="@+id/nextArt"
+            android:layout_width="match_parent"
+            android:layout_height="72dp"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/bg_logo"
+            android:contentDescription="@null"
+            android:scaleType="centerCrop"
+            android:visibility="gone" />
+
         <TextView
             android:id="@+id/nextName"
             android:layout_width="match_parent"
@@ -609,9 +649,21 @@
             android:layout_marginTop="12dp"
             android:background="@drawable/bg_button"
             android:focusable="true"
-            android:text="@string/play_next"
+            android:text="@string/play_now"
             android:textAllCaps="false"
             android:textColor="@color/bg"
+            android:visibility="gone" />
+
+        <Button
+            android:id="@+id/btnCancelNext"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/bg_button_secondary"
+            android:focusable="true"
+            android:text="@string/up_next_cancel"
+            android:textAllCaps="false"
+            android:textColor="@color/text_primary"
             android:visibility="gone" />
 
         <Button

@@ -119,6 +119,21 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.text.NumberFormat
 
+internal fun BrowseActivity.refreshUnhealthy() {
+        val savedId = playlist?.id ?: return
+        lifecycleScope.launch {
+            val ids = withContext(Dispatchers.IO) {
+                (application as OlympusIptvApp).catalogDb.deadChannelIds(savedId)
+            }
+            if (isDestroyed) return@launch
+            unhealthyIds.clear()
+            unhealthyIds.addAll(ids)
+            if (channelAdapter.itemCount > 0) {
+                channelAdapter.notifyItemRangeChanged(0, channelAdapter.itemCount)
+            }
+        }
+    }
+
 internal fun BrowseActivity.rememberEpg(channelId: String, epg: EpgNowNext) {
         epgCache[channelId] = epg
         if (epgCache.size <= EPG_CACHE_CAP) return
@@ -151,6 +166,8 @@ internal fun BrowseActivity.wireLazyPanes() {
             admin.cardAdminVpn.setOnClickListener { showVpnPane() }
             admin.cardAdminAbout.setOnClickListener { showAboutPane() }
             admin.cardAdminFavorites.setOnClickListener { openFavoritesSetup() }
+            admin.btnMagicCleanup.setOnClickListener { runMagicCleanup() }
+            paintProviderHealth()
             admin.adminQuietToggle.setOnClickListener { toggleAdminQuietHours() }
             admin.adminQuietSchedule.setOnClickListener { cycleAdminQuietSchedule() }
             admin.adminBackupLink.setOnClickListener { openBackupShortcut() }
@@ -252,9 +269,7 @@ internal fun BrowseActivity.hostOnCreate(savedInstanceState: Bundle?) {
             binding = binding,
             programAdapter = programAdapter,
             halfHourMs = halfHourMs,
-            epgCache = { epgCache },
-            onRecord = { offerRecording(it) },
-            onRemind = { offerReminder(it) }
+            epgCache = { epgCache }
         )
 
         binding.categoryList.layoutManager = if (touchPrimary) {
@@ -953,11 +968,12 @@ internal fun BrowseActivity.hostOnStop() {
         if (vpnReady()) vpnUi.stop()
         focusHandler.removeCallbacks(clockTick)
         runCatching { unregisterReceiver(systemClock) }
-        if (previewReady()) previewCtl.pause()
+        if (previewReady()) previewCtl.release()
     }
 
 internal fun BrowseActivity.hostOnDestroy() {
         com.olympus.iptv.portal.DashboardHost.removeUrlListener(dashboardUrls)
+        runCatching { browseToolHost.release() }
         if (previewReady()) previewCtl.release()
         refreshLoop?.cancel()
         refreshLoop = null
@@ -1027,6 +1043,8 @@ internal fun BrowseActivity.hostOnResume() {
         flushGroupRefresh()
         GroupLock.purgeExpired()
         paintNowPlayingBar()
+        paintFreshCount()
+        GuideCoach.maybe(this)
         lifecycleScope.launch {
             val store = (application as OlympusIptvApp).playlistStore
             val prefs = withContext(Dispatchers.IO) { store.devicePrefs() }
@@ -1095,6 +1113,9 @@ internal fun BrowseActivity.hostDispatchKey(event: KeyEvent): Boolean {
             focusIsIn(binding.channelList) &&
             visibleChannels.size > 40
         ) {
+            if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount > 0 && lowRamDevice) {
+                com.olympus.iptv.ui.BackdropGlow.noteScroll()
+            }
             if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
                 focusHandler.removeCallbacks(letterJumpHold)
                 focusHandler.postDelayed(letterJumpHold, 1_200L)
@@ -1506,6 +1527,9 @@ internal fun BrowseActivity.applyGuideColumns() {
         if (showPrograms) {
             if (full) fitChannelColumn()
             ensureProgramGuide()
+            if (epgReady()) epgCtl.syncChannelOffset()
+        } else if (epgReady()) {
+            epgCtl.syncChannelOffset()
         }
     }
 
@@ -1603,8 +1627,8 @@ internal fun BrowseActivity.jumpGuideToNow() {
         if (binding.programPane.visibility != View.VISIBLE || section != GuideSection.TV) return
         ensureProgramGuide()
         val now = com.olympus.iptv.playlist.EpgUtils.now()
-        val start = now / halfHourMs * halfHourMs
-        val end = start + 8L * 60L * 60L * 1000L
+        val start = GuideMetrics.start(now, halfHourMs)
+        val end = GuideMetrics.end(start)
         if (programAdapter.setWindow(start, end)) {
             buildProgramHeader()
         }
@@ -1708,8 +1732,8 @@ internal fun BrowseActivity.ensureProgramGuide() {
         if (!guideReady()) return
         if (programAdapter.windowEnd <= programAdapter.windowStart) {
             val now = com.olympus.iptv.playlist.EpgUtils.now()
-            val start = now / halfHourMs * halfHourMs
-            programAdapter.setWindow(start, start + 8L * 60L * 60L * 1000L)
+            val start = GuideMetrics.start(now, halfHourMs)
+            programAdapter.setWindow(start, GuideMetrics.end(start))
             programAdapter.scrollX = 0
         }
         if (binding.programHeader.childCount == 0) buildProgramHeader()
@@ -1735,9 +1759,10 @@ internal fun BrowseActivity.loadVisibleGuidePrograms() {
             ?: binding.channelList.layoutManager as? LinearLayoutManager
             ?: return
         val first = layout.findFirstVisibleItemPosition().coerceAtLeast(0)
-        val last = layout.findLastVisibleItemPosition().let { if (it < 0) first + 11 else it }
+        val lastVisible = layout.findLastVisibleItemPosition()
+        val last = if (lastVisible < first + 12) first + 23 else lastVisible
         val from = (first - 4).coerceAtLeast(0)
-        val to = (last + 8).coerceAtMost(visibleChannels.lastIndex)
+        val to = (last + 12).coerceAtMost(visibleChannels.lastIndex)
         if (to < from) return
         loadGuidePrograms(visibleChannels.subList(from, to + 1))
     }
@@ -1749,7 +1774,11 @@ internal fun BrowseActivity.nameOnlyGuideGroup(): Boolean {
     }
 
 internal fun BrowseActivity.loadGuidePrograms(channels: List<Channel>) {
-        val missing = channels.filter { it.kind == ContentKind.LIVE && programAdapter.programsFor(it.id) == null }
+        val missing = channels.filter { channel ->
+            channel.kind == ContentKind.LIVE &&
+                programAdapter.programsFor(channel.id) == null &&
+                guideEpgBusy.add(channel.id)
+        }
         if (missing.isEmpty()) {
             binding.programList.post {
                 lastLabelShiftScroll = programAdapter.scrollX
@@ -1761,6 +1790,7 @@ internal fun BrowseActivity.loadGuidePrograms(channels: List<Channel>) {
         if (nameOnlyGuideGroup()) {
             for (channel in missing) {
                 programAdapter.put(channel.id, emptyList())
+                guideEpgBusy.remove(channel.id)
             }
             binding.programList.post {
                 lastLabelShiftScroll = programAdapter.scrollX
@@ -1768,11 +1798,17 @@ internal fun BrowseActivity.loadGuidePrograms(channels: List<Channel>) {
             }
             return
         }
-        val saved = playlist ?: return
-        guideJob?.cancel()
+        val saved = playlist ?: run {
+            missing.forEach { guideEpgBusy.remove(it.id) }
+            return
+        }
         guideJob = lifecycleScope.launch {
-            fetchGuidePrograms(saved, missing.take(8), 8)
-            fetchGuidePrograms(saved, missing.drop(8), 4)
+            try {
+                fetchGuidePrograms(saved, missing.take(12), 6)
+                fetchGuidePrograms(saved, missing.drop(12), 4)
+            } finally {
+                missing.forEach { guideEpgBusy.remove(it.id) }
+            }
             if (isDestroyed) return@launch
             binding.programList.post {
                 lastLabelShiftScroll = programAdapter.scrollX
@@ -1886,10 +1922,10 @@ internal fun BrowseActivity.restoreGuideUiIfPossible() {
 
 
 internal fun BrowseActivity.baseGuideRowDp(): Int =
-        if (guideDensity == PlaylistStore.GUIDE_COMPACT) 40 else 52
+        if (guideDensity == PlaylistStore.GUIDE_COMPACT) 32 else 40
 
 internal fun BrowseActivity.tallGuideRowDp(): Int =
-        if (guideDensity == PlaylistStore.GUIDE_COMPACT) 56 else 72
+        if (guideDensity == PlaylistStore.GUIDE_COMPACT) 36 else 44
 
 internal fun BrowseActivity.syncProgramRowHeight() {
         applyGuideRowHeight(guideRowsTall)

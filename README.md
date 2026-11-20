@@ -6,7 +6,7 @@
 
 ### For the latest and greatest, build your own APK from this code.
 
-The latest signed file is **0.2.75** (versionCode 76). **One APK** installs on Android TV / set-top boxes and on phones and tablets. It includes the 0.2.71 guide work, Live TV groups from the category table, and the 0.2.75 player, search, and first-run work below. Optional keys in `local.properties`: `tmdb.apiKey`, `watchmode.apiKey`, `opensubtitles.apiKey`, `sendgrid.apiKey` + `sendgrid.fromEmail`.
+The latest signed file is **0.2.80** (versionCode 81). **One APK** installs on Android TV / set-top boxes and on phones and tablets. It keeps the 0.2.79 device tiers and guide, restores the Admin cards, closes provider connections when you leave the app, and adds an Active Streams card on the phone dashboard. Optional keys in `local.properties`: `tmdb.apiKey`, `watchmode.apiKey`, `opensubtitles.apiKey`, `sendgrid.apiKey` + `sendgrid.fromEmail`.
 
 **This is a player only. You must provide your own streams.**
 
@@ -66,14 +66,14 @@ Olympus-IPTV is one APK for Android TV / set-top boxes and for phones and tablet
 
 | | |
 | --- | --- |
-| Signed file | `C:\Users\chalu\Downloads\olympus-iptv-0.2.75.apk` |
-| What that file is | versionName **0.2.75**, versionCode **76** |
-| Source in this tree | versionName **0.2.75**, versionCode **76** |
-| What to run | Install the signed 0.2.75 APK, or build this source |
+| Signed file | `C:\Users\chalu\Downloads\olympus-iptv-0.2.80.apk` |
+| What that file is | versionName **0.2.80**, versionCode **81** |
+| Source in this tree | versionName **0.2.80**, versionCode **81** |
+| What to run | Install the signed 0.2.80 APK, or build this source |
 | Install | Over the existing copy (TV or phone). Uninstalling wipes the saved account, playlist, and favorites. Downloader works with the same file. |
 | Launcher name | Two centered lines: Olympus over IPTV |
 
-**0.2.75** is the current release. The guide screen is a thin host: movies and shows, the left rail, and the program grid each have their own coordinator. A stalled stream reconnects, then can fall back to the software decoder. Search uses FTS5, or FTS4 when the device has no FTS5. First run is playlist, phone QR, then favorites.
+**0.2.80** is the current release. The Admin screen is the original two-across card grid again. Account status and Magic Cleanup sit under those cards. Leaving the app stops the player, the next-channel player, and the guide preview so the provider connection closes. Picture-in-picture keeps playing. The phone Admin page has an Active Streams card. Sticks with a small heap still use the 16 MB image cache, RGB_565 posters, and a 10 second buffer. Larger boxes pre-warm only the next channel.
 
 ### What’s new since 0.2.56 (enhancements)
 
@@ -126,7 +126,7 @@ Olympus-IPTV is one APK for Android TV / set-top boxes and for phones and tablet
 
 </div>
 
-There is **no separate mobile APK**. The same `olympus-iptv-0.2.75.apk` detects whether it is running on a television (Leanback / UI mode) or a touch-first phone or tablet.
+There is **no separate mobile APK**. The same `olympus-iptv-0.2.80.apk` detects whether it is running on a television (Leanback / UI mode) or a touch-first phone or tablet.
 
 | On phones and tablets | What changed |
 | --- | --- |
@@ -426,6 +426,7 @@ Admin, then Error log, shows the log in a window you can scroll and resize. Entr
 | VPN | On the TV and on the web dashboard. The five providers are large cards, two across, in the same style as the Admin cards. PIA VPN, Proton VPN, Surfshark, and NordVPN take the account username and password, then a city, then Connect. Nord can use the access token from its manual setup page in the password box. WireGuard takes a profile instead of a password. The last city stays at the top of the list, and typing filters the rest. Backup city stores a second city. If the first city does not answer, that backup is tried. After a successful connection, a drop keeps the tunnel up and switches to the other city. New streams wait until one answers. Connect sends this app’s internet through that tunnel. The Admin card and the guide show the connected city. The VPN notification includes Disconnect. Home-network addresses, including the dashboard on port 8765, stay on the LAN. The first connection has to be allowed on the TV. |
 | Favorites setup | A chip at the top of Live TV. Opens the auto-add screen again. When the catalog is already loaded it skips the pulling-channels splash. Continue stays on the first-time setup only. Back from that chip returns focus to Favorites setup. |
 | About | Says the app is a player only, credits @bobgoblin, and links https://buymeacoffee.com/avocadopeaches. A square QR code opens that page. |
+| Active Streams | Web Admin only. Shows the provider’s active and max connection count. If that login response includes an IP for each connection, those addresses are listed. If it does not, the card says so and lists streams this TV still has open, with this TV’s address on the home network. |
 
 ---
 
@@ -563,7 +564,7 @@ tmdb.apiKey=YOUR_TMDB_V3_API_KEY
 
 5. Rebuild the app. `app/build.gradle.kts` maps that property to `buildConfigField("String", "TMDB_API_KEY", ...)`. Without the key, the browse score chip, ratings sheet, player caption scores, and **Trailer** stay empty or unavailable; the rest of the player still works. See [Where ratings appear](#where-ratings-appear).
 
-The latest signed release is `C:\Users\chalu\Downloads\olympus-iptv-0.2.75.apk`.
+The latest signed release is `C:\Users\chalu\Downloads\olympus-iptv-0.2.80.apk`.
 
 Android Studio: use a 1920×1080 Google TV emulator. Apply Changes does not pick up new screens. Stop the app, then Debug. Click the emulator window before the arrow keys. The emulator is a different device from a Shield or an Onn box, so it does not have that box’s account, playlist, or favorites.
 
@@ -650,6 +651,70 @@ clearcast-tuner/
 ## Version history
 
 </div>
+
+### 0.2.80
+
+- The Admin cards are the original two-across grid again. The Xtream status line and Magic Cleanup sit under the cards instead of above them.
+- Leaving the app closes the playing stream, the next-channel stream, and the guide preview, unless playback is in picture-in-picture. Coming back starts the channel again. While you watch, only the next channel is held ready, so the previous channel is not a second extra connection.
+- The “3 of 5” line on Admin is the provider’s active and max connection count. Other devices on the same login are included. The provider can take a few seconds to drop a count after the socket closes.
+- Web Admin has an Active Streams card. Addresses are shown when the provider login includes them. Otherwise the page shows the total and the streams this TV still has open, with this TV’s home-network address.
+- After the guide opens, the app resolves and sends a short request to the hosts of the first three favorite live channels.
+- Channel titles and guide clocks are prepared before a row is drawn. XMLTV programmes that ended more than two hours ago, or that start more than 48 hours ahead, are skipped before the title is read.
+- The first time the guide opens on a TV, three short tips walk through the screen. Favorites setup can add a news, sports, movies, or kids pack of up to 25 channels.
+- A rejected stream (401, 403, or 458) offers Check account. A timeout or 502 offers Switch to backup. New shows a gold count. The channel that is playing has three gold bars in the guide and in the channel-surf list. On a TV, Search focuses the microphone and reads “Say a channel, movie, or show…”.
+- Signed APK: `C:\Users\chalu\Downloads\olympus-iptv-0.2.80.apk` (versionCode 81). Install over 0.2.79 — same signing key, account and playlist data kept.
+
+### 0.2.79
+
+- The app checks `isLowRamDevice` and the process heap. At or under 256 MB of heap, posters use a 16 MB cache and RGB_565, the player back-buffer stays at 10 seconds, and backdrop crossfades pause while Up or Down is held. Larger heaps get a 64 MB image cache, a 150 ms head start on the next channel, glow crossfades, and a spring focus scale.
+- Guide programs are kept in a memory window keyed by channel and a 4-hour block, so scrolling back over rows that were already loaded does not open another database cursor.
+- The A–Z jump, the guide time window, and the letter grid live in their own helpers. Holding Up or Down for 1.2 seconds, or pressing Right past a long movie list, opens a gold A–Z / # grid.
+- Group cards still show the top two programs on now. The channel number badge sits at the top right and tunes after 1.2 seconds. Main, Kids, and Sports keep separate favorites, continue watching, and PIN locks.
+- In the last 25 seconds of a movie or episode, a bottom-right card shows the art, the title, Play now, and Cancel.
+- The channel-surf list has Split screen (2 channels). Left and Right still move the gold border and the audio.
+- The phone backup file now includes favorite ids as well as groups, renames, and parental PINs. Paste URL to play on the TV is still on that page.
+- Signed APK: `C:\Users\chalu\Downloads\olympus-iptv-0.2.79.apk` (versionCode 80). Install over 0.2.78 — same signing key, account and playlist data kept.
+
+### 0.2.78
+
+- Backdrop colors are taken from a 64×36 thumbnail so the glow does not keep a full-size poster in memory. The admin and library tool overlay does not keep the screen after the guide is destroyed.
+- Search uses an FTS prefix query (`word*`) and shows the last 8 searches as gold pills under the box.
+- The old one-screen wrappers for countries, EPG tools, parental controls, cleanup, Fresh, Queue, and Reminders are gone. Those screens stay inside the guide or the library.
+- Live TV has a For You group: recent channels, sports that are on, and favorites. Focusing a poster still tints the background from its art.
+- The channel-surf list shows the logo, the current program, a progress bar, and an HD / 4K / 60fps badge when the name has one.
+- Guide tiles say Ending in 6m when a show has under 10 minutes left, and Up Next when the following show is about to start.
+- Dialogs use the same dark card, focus scale, gold stroke, and click sound.
+- Admin has Magic Cleanup. It strips the usual name tags and adds a short favorite list, keeping one feed per channel name.
+- After 3 hours with no remote input, playback asks if you are still watching. Sleep in 30, 60, or 90 minutes is still in the player picture menu.
+- Admin shows Xtream status, active and max connections, expiration, and the last catalog sync.
+- The phone dashboard can paste a stream URL to play on the TV and move favorites up or down.
+- Signed APK: `C:\Users\chalu\Downloads\olympus-iptv-0.2.78.apk` (versionCode 79). Install over 0.2.77 — same signing key, account and playlist data kept.
+
+### 0.2.77
+
+- After 3 seconds of stable live playback, the next channel is prepared on a second player with the volume at zero. Channel Up takes that player instead of opening a new stream from scratch.
+- Picture settings include Auto frame rate. On Android 11 and newer, a playing video can ask the display for 23.976, 24, 25, 50, or 59.94 Hz.
+- A catalog refresh stores a hash for each channel and writes a database row only when that hash changed.
+- Movie and series artwork tints the screen behind the hero. The color is sampled from the poster itself.
+- Sports and event titles (vs, @, NFL, NBA, UFC, Premier League, ESPN+, DAZN) show a LIVE EVENT label and the minutes remaining.
+- Multi-view keeps two live pictures. Left and Right move the sound to that side, and the side with sound has a gold border.
+- A live group card can show `Now:` plus up to two programs already in the guide cache.
+- Tuning into a catch-up channel more than 5 minutes after the program started shows Watch from start for 6 seconds. OK plays that program from the beginning.
+- A live stream that fails twice switches to another feed in the same group with the same name (for example ESPN HD [1] to ESPN FHD [2]). Those channels are dimmed in the guide, and EPG tools show how many dead feeds are recorded.
+- Home has Main, Kids, and Sports. Main keeps the current favorites, queue, and continue-watching. The other profiles keep their own. Hold a profile to set a PIN.
+- The phone dashboard (`http://<tv-address>:8766`) has a D-pad, Back, OK, and a box for a channel name or a stream URL.
+- New / Just Added keeps the poster grid, hides the back label on a remote, and uses a shorter season row so the episode list can scroll.
+- The Record / Remind bar is gone from the top of Live TV, and guide rows are shorter so more channels fit.
+- Signed APK: `C:\Users\chalu\Downloads\olympus-iptv-0.2.77.apk` (versionCode 78). Install over 0.2.76 — same signing key, account and playlist data kept.
+
+### 0.2.76
+
+- New / Just Added opens on the poster grid. The focused-title banner is not shown on first load.
+- Opening a card shows the artwork and description. Down moves to the seasons and scrolls that header off so several episodes fit. Up from the season row brings the artwork and description back.
+- A live picture that is already on screen no longer keeps the Connecting badge. Guide rows keep requesting EPG instead of staying on Loading EPG when you move through the list.
+- The program description stays at the top of Live TV, and the channel list and program grid start below it so the first channel in the group stays visible.
+- Channel names use a wider column and wrap to two lines.
+- Signed APK: `C:\Users\chalu\Downloads\olympus-iptv-0.2.76.apk` (versionCode 77). Install over 0.2.75 — same signing key, account and playlist data kept.
 
 ### 0.2.75
 
@@ -1085,7 +1150,7 @@ clearcast-tuner/
 
 - This is a player only. You must provide your own streams. The app does not ship channels, movies, shows, or playlist credentials.
 - It is a beta. Feedback is greatly appreciated.
-- **0.2.75** is the latest signed file in Downloads (`olympus-iptv-0.2.75.apk`, versionCode 76).
+- **0.2.80** is the latest signed file in Downloads (`olympus-iptv-0.2.80.apk`, versionCode 81).
 - `portal/data/store.json` is for the Node portal on a PC only — it is not packaged in the APK.
 - Chromecast often cannot play provider IPTV/HLS the way the in-app player can; the Cast button warns before connecting.
 - Ratings, trailers, and New this week need the matching keys in `local.properties` at build time (`tmdb.apiKey`, `watchmode.apiKey`).

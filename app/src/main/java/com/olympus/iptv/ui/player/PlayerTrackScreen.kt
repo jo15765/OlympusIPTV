@@ -167,6 +167,19 @@ internal fun PlayerActivity.openPicture() {
                 closeSubtitlePanel()
             }
         }
+        val frameLabel = if (autoFrameRate) {
+            getString(R.string.track_on, getString(R.string.auto_frame_rate))
+        } else {
+            getString(R.string.auto_frame_rate)
+        }
+        addSubtitleRow(frameLabel) {
+            autoFrameRate = !autoFrameRate
+            lifecycleScope.launch(Dispatchers.IO) {
+                (application as OlympusIptvApp).playlistStore.saveAutoFrameRate(autoFrameRate)
+            }
+            if (autoFrameRate) matchFrameRate()
+            closeSubtitlePanel()
+        }
         binding.subtitleRows.getChildAt(focusIndex)?.requestFocus()
     }
 

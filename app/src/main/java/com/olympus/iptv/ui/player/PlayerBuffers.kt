@@ -9,9 +9,14 @@ object PlayerBuffers {
     const val PLAYBACK_MS = 1_000
     const val REBUFFER_MS = 2_000
 
-    fun live(): DefaultLoadControl = DefaultLoadControl.Builder()
-        .setBufferDurationsMs(MIN_MS, MAX_MS, PLAYBACK_MS, REBUFFER_MS)
-        .setTargetBufferBytes(6 * 1024 * 1024)
-        .setPrioritizeTimeOverSizeThresholds(true)
-        .build()
+    fun live(lowRam: Boolean = false): DefaultLoadControl {
+        val max = if (lowRam) 10_000 else MAX_MS
+        val bytes = if (lowRam) 4 * 1024 * 1024 else 8 * 1024 * 1024
+        val builder = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(MIN_MS, max, PLAYBACK_MS, REBUFFER_MS)
+            .setTargetBufferBytes(bytes)
+            .setPrioritizeTimeOverSizeThresholds(true)
+        if (lowRam) builder.setBackBuffer(10_000, true)
+        return builder.build()
+    }
 }

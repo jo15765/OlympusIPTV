@@ -99,6 +99,7 @@ class FavoritesSetupActivity : AppCompatActivity() {
         binding.cardHulu.setOnClickListener { choose(binding.cardHulu); addPackage("hulu") }
         binding.btnAddTeams.setOnClickListener { addTeams() }
         binding.btnNext.setOnClickListener { openGuide() }
+        addStarterPacks()
         AutoFavorites.sports.forEach { sport -> binding.sportRow.addView(sportChip(sport)) }
         val catalogReadyOnOpen = intent.getBooleanExtra(EXTRA_CATALOG_READY, false)
         if (catalogReadyOnOpen) {
@@ -583,6 +584,57 @@ class FavoritesSetupActivity : AppCompatActivity() {
         dialog.setOnCancelListener { if (cont.isActive) cont.resume(null) }
         cont.invokeOnCancellation { dialog.dismiss() }
         dialog.show()
+    }
+
+    private fun addStarterPacks() {
+        val row = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.HORIZONTAL
+        }
+        listOf(
+            "news" to R.string.pack_news,
+            "sports" to R.string.pack_sports,
+            "movies" to R.string.pack_movies,
+            "kids" to R.string.pack_kids
+        ).forEach { (pack, label) ->
+            row.addView(android.widget.TextView(this).apply {
+                text = getString(label)
+                setTextColor(getColor(R.color.accent))
+                textSize = 14f
+                gravity = android.view.Gravity.CENTER
+                setBackgroundResource(R.drawable.bg_search_pill)
+                setPadding(dp(12), dp(8), dp(12), dp(8))
+                isFocusable = true
+                isClickable = true
+                layoutParams = android.widget.LinearLayout.LayoutParams(
+                    0,
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                    1f
+                ).apply { marginEnd = dp(8) }
+                setOnClickListener { applyStarter(pack) }
+            })
+        }
+        (binding.root as android.view.ViewGroup).addView(row, 1)
+    }
+
+    private fun applyStarter(pack: String) {
+        if (busy) return
+        val rows = channels
+        if (rows.isNullOrEmpty()) {
+            android.widget.Toast.makeText(this, R.string.pack_wait, android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
+        busy = true
+        lifecycleScope.launch {
+            val picks = AutoFavorites.starterPack(rows, pack).take(25)
+            val added = withContext(Dispatchers.IO) { savePicks(picks).first }
+            busy = false
+            if (isFinishing) return@launch
+            android.widget.Toast.makeText(
+                this@FavoritesSetupActivity,
+                getString(R.string.pack_added, added),
+                android.widget.Toast.LENGTH_SHORT
+            ).show()
+        }
     }
 
     private suspend fun savePicks(picks: List<AutoFavorites.ChannelPick>): Pair<Int, Int> {

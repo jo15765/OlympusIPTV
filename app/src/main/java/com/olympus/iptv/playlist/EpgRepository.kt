@@ -6,11 +6,13 @@ import com.olympus.iptv.data.EpgNowNext
 import com.olympus.iptv.data.EpgProgram
 import com.olympus.iptv.data.PlaylistType
 import com.olympus.iptv.data.SavedPlaylist
+import com.olympus.iptv.ui.browse.EpgTiming
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import android.util.LruCache
 import java.util.concurrent.ConcurrentHashMap
 
 class EpgRepository(
@@ -20,6 +22,7 @@ class EpgRepository(
     private var xmltv = xmltvByChannel
     private var xmltvFolded = foldXmltv(xmltvByChannel)
     private val cache = ConcurrentHashMap<String, List<EpgProgram>>()
+    private val windows = LruCache<String, List<EpgProgram>>(512)
     private val parsedNames = ConcurrentHashMap<String, List<EpgProgram>>()
     private val inflight = ConcurrentHashMap<String, Mutex>()
     private var disk: CatalogDb? = null
@@ -45,6 +48,7 @@ class EpgRepository(
         } else {
             parsedNames.clear()
             cache.clear()
+            windows.evictAll()
         }
         return true
     }
@@ -75,11 +79,25 @@ class EpgRepository(
     suspend fun upcoming(playlist: SavedPlaylist?, channel: Channel): List<EpgProgram> =
         withContext(Dispatchers.IO) {
             val now = System.currentTimeMillis()
-            loadPrograms(playlist, channel)
-                .filter { it.endMillis > now }
-                .sortedBy { it.startMillis }
-                .take(48)
+            val id = channel.epgChannelId ?: channel.id
+            val cachedWindow = windows.get(EpgWindow.key(id, now))
+            val programs = if (cachedWindow != null) {
+                cachedWindow
+            } else {
+                val loaded = loadPrograms(playlist, channel)
+                rememberWindows(id, loaded, now)
+                windows.get(EpgWindow.key(id, now)) ?: EpgWindow.slice(loaded, now)
+            }
+            programs.filter { it.endMillis > now }.sortedBy { it.startMillis }.take(48)
         }
+
+    private fun rememberWindows(channelId: String, programs: List<EpgProgram>, now: Long) {
+        val start = now / EpgWindow.BUCKET_MS * EpgWindow.BUCKET_MS
+        for (step in 0L..2L) {
+            val at = start + step * EpgWindow.BUCKET_MS
+            windows.put(EpgWindow.key(channelId, at), EpgWindow.slice(programs, at))
+        }
+    }
 
     suspend fun sameShow(playlist: SavedPlaylist?, channel: Channel, title: String): List<EpgProgram> =
         withContext(Dispatchers.IO) {
@@ -139,7 +157,8 @@ class EpgRepository(
     }
 
     private fun putCache(key: String, programs: List<EpgProgram>) {
-        cache[key] = programs
+        val now = System.currentTimeMillis()
+        cache[key] = programs.map { EpgTiming.dress(it, now) }
         trimCache()
     }
 

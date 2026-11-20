@@ -168,7 +168,7 @@ class GroupRenameFragment : Fragment() {
     }
 
     companion object {
-        const val EXTRA_PLAYLIST_ID = GroupRenameActivity.EXTRA_PLAYLIST_ID
+        const val EXTRA_PLAYLIST_ID = "playlist_id"
 
         fun newInstance(playlistId: String): GroupRenameFragment =
             GroupRenameFragment().apply {

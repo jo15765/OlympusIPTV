@@ -6,8 +6,10 @@ import okhttp3.ConnectionPool
 import okhttp3.Dispatcher
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
+import okhttp3.Request
 import java.io.File
 import java.io.IOException
+import java.net.InetAddress
 import java.util.concurrent.TimeUnit
 
 /**
@@ -22,6 +24,23 @@ object HttpClients {
 
     fun install(context: Context) {
         cacheDir = File(context.applicationContext.cacheDir, "http-shared")
+    }
+
+    /** Resolve DNS and open a keep-alive socket for a few stream hosts before the first tune. */
+    fun warm(hosts: List<String>) {
+        val unique = hosts.map { it.trim() }.filter { it.isNotEmpty() }.distinct().take(3)
+        if (unique.isEmpty()) return
+        Thread {
+            val client = shared
+            for (host in unique) {
+                runCatching { InetAddress.getAllByName(host) }
+                runCatching {
+                    client.newCall(
+                        Request.Builder().url("https://$host/").head().build()
+                    ).execute().close()
+                }
+            }
+        }.start()
     }
 
     val shared: OkHttpClient by lazy { buildShared() }

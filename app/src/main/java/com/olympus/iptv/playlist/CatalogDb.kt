@@ -52,6 +52,77 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
             "CREATE TABLE IF NOT EXISTS library_meta (playlist_id TEXT PRIMARY KEY, stamp INTEGER NOT NULL)"
         )
         ensureMetaMissTable(db)
+        ensureStreamHealthTable(db)
+    }
+
+    private fun ensureStreamHealthTable(db: SQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS stream_health (
+                playlist_id TEXT NOT NULL,
+                channel_id TEXT NOT NULL,
+                failures INTEGER NOT NULL,
+                PRIMARY KEY (playlist_id, channel_id)
+            )
+            """.trimIndent()
+        )
+    }
+
+    fun recordStreamFailure(playlistId: String, channelId: String): Int = write {
+        val db = writableDatabase
+        val current = db.rawQuery(
+            "SELECT failures FROM stream_health WHERE playlist_id=? AND channel_id=?",
+            arrayOf(playlistId, channelId)
+        ).use { cursor -> if (cursor.moveToFirst()) cursor.getInt(0) else 0 }
+        val next = current + 1
+        if (current == 0) {
+            db.execSQL(
+                "INSERT INTO stream_health (playlist_id, channel_id, failures) VALUES (?, ?, ?)",
+                arrayOf(playlistId, channelId, next.toString())
+            )
+        } else {
+            db.execSQL(
+                "UPDATE stream_health SET failures=? WHERE playlist_id=? AND channel_id=?",
+                arrayOf(next.toString(), playlistId, channelId)
+            )
+        }
+        next
+    }
+
+    fun deadChannelIds(playlistId: String, minimum: Int = 2): Set<String> = read {
+        val ids = HashSet<String>()
+        readableDatabase.rawQuery(
+            "SELECT channel_id FROM stream_health WHERE playlist_id=? AND failures>=?",
+            arrayOf(playlistId, minimum.toString())
+        ).use { cursor ->
+            while (cursor.moveToNext()) ids.add(cursor.getString(0))
+        }
+        ids
+    }
+
+    fun sampleChannelIds(playlistId: String, group: String, limit: Int = 8): List<String> = read {
+        val ids = ArrayList<String>(limit)
+        readableDatabase.rawQuery(
+            """
+            SELECT id FROM channels
+            WHERE playlist_id=? AND bucket=? AND (category_id=? OR group_title=?)
+            LIMIT $limit
+            """.trimIndent(),
+            arrayOf(playlistId, LIVE, group, group)
+        ).use { cursor ->
+            while (cursor.moveToNext()) ids.add(cursor.getString(0))
+        }
+        ids
+    }
+
+    fun clearStreamFailure(playlistId: String, channelId: String) {
+        write {
+            writableDatabase.delete(
+                "stream_health",
+                "playlist_id=? AND channel_id=?",
+                arrayOf(playlistId, channelId)
+            )
+        }
     }
 
     private fun ensureMetaMissTable(db: SQLiteDatabase) {
@@ -1087,11 +1158,7 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         else statement.bindLong(start + 4, channel.tvArchiveDuration.toLong())
     }
 
-    private fun ftsMatch(text: String): String? {
-        val tokens = text.split(TOKEN_SPLIT).filter { it.isNotEmpty() }
-        if (tokens.isEmpty()) return null
-        return tokens.joinToString(" ") { "\"${it.lowercase()}\"*" }
-    }
+    private fun ftsMatch(text: String): String? = FtsQuery.match(text)
 
     private fun likePattern(text: String): String = "%${escapeLike(text)}%"
 

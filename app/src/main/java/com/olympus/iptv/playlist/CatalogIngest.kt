@@ -70,16 +70,18 @@ object CatalogIngest {
                     liveReady.complete(false)
                     return
                 }
-                db.insertMissing(scoped.id, CatalogDb.LIVE, fresh.liveCategories, fresh.liveChannels)
+                store(app, db, scoped.id, CatalogDb.LIVE, fresh.liveChannels, true, db.knownChannelIds(scoped.id, CatalogDb.LIVE))
+                db.insertMissing(scoped.id, CatalogDb.LIVE, fresh.liveCategories, emptyList())
                 reached = true
                 liveReady.complete(true)
-                db.insertMissing(scoped.id, CatalogDb.VOD, fresh.vodCategories, fresh.vodChannels)
+                store(app, db, scoped.id, CatalogDb.VOD, fresh.vodChannels, true, db.knownChannelIds(scoped.id, CatalogDb.VOD))
+                db.insertMissing(scoped.id, CatalogDb.VOD, fresh.vodCategories, emptyList())
                 return
             }
             coroutineScope {
-                val liveJob = async { pullLive(db, scoped) }
-                val showJob = async { pullShows(db, scoped) }
-                val movieJob = async { pullMovies(db, scoped) }
+                val liveJob = async { pullLive(app, db, scoped) }
+                val showJob = async { pullShows(app, db, scoped) }
+                val movieJob = async { pullMovies(app, db, scoped) }
                 val live = liveJob.await()
                 reached = live || reached
                 if (!liveReady.isCompleted) liveReady.complete(live)
@@ -95,26 +97,26 @@ object CatalogIngest {
         }
     }
 
-    private suspend fun pullLive(db: CatalogDb, playlist: SavedPlaylist): Boolean {
+    private suspend fun pullLive(app: OlympusIptvApp, db: CatalogDb, playlist: SavedPlaylist): Boolean {
         val known = db.knownChannelIds(playlist.id, CatalogDb.LIVE)
         val loaded = runCatching {
             pipeBatches(
-                write = { batch -> store(db, playlist.id, CatalogDb.LIVE, batch, true, known) }
+                write = { batch -> store(app, db, playlist.id, CatalogDb.LIVE, batch, true, known) }
             ) { send ->
                 loader.loadLive(playlist, onPercent = { progress.live = it.coerceIn(0, 99) }) { batch -> send(batch) }
             }
         }.getOrNull() ?: return false
         progress.live = 100
         db.insertMissing(playlist.id, CatalogDb.LIVE, loaded.liveCategories, emptyList())
-        store(db, playlist.id, CatalogDb.LIVE, loaded.liveChannels, true, known)
+        store(app, db, playlist.id, CatalogDb.LIVE, loaded.liveChannels, true, known)
         return true
     }
 
-    private suspend fun pullShows(db: CatalogDb, playlist: SavedPlaylist): Boolean {
+    private suspend fun pullShows(app: OlympusIptvApp, db: CatalogDb, playlist: SavedPlaylist): Boolean {
         val known = db.knownChannelIds(playlist.id, CatalogDb.SERIES)
         val loaded = runCatching {
             pipeBatches(
-                write = { batch -> store(db, playlist.id, CatalogDb.SERIES, batch, false, known) }
+                write = { batch -> store(app, db, playlist.id, CatalogDb.SERIES, batch, false, known) }
             ) { send ->
                 loader.loadShows(playlist, onPercent = { progress.shows = it.coerceIn(0, 99) }) { batch -> send(batch) }
             }
@@ -122,15 +124,15 @@ object CatalogIngest {
         progress.shows = 100
         if (loaded.seriesLoadFailed) return false
         db.insertMissing(playlist.id, CatalogDb.SERIES, loaded.seriesCategories.orEmpty(), emptyList())
-        store(db, playlist.id, CatalogDb.SERIES, loaded.seriesChannels.orEmpty(), false, known)
+        store(app, db, playlist.id, CatalogDb.SERIES, loaded.seriesChannels.orEmpty(), false, known)
         return true
     }
 
-    private suspend fun pullMovies(db: CatalogDb, playlist: SavedPlaylist): Boolean {
+    private suspend fun pullMovies(app: OlympusIptvApp, db: CatalogDb, playlist: SavedPlaylist): Boolean {
         val known = db.knownChannelIds(playlist.id, CatalogDb.VOD)
         var loaded = runCatching {
             pipeBatches(
-                write = { batch -> store(db, playlist.id, CatalogDb.VOD, batch, true, known) }
+                write = { batch -> store(app, db, playlist.id, CatalogDb.VOD, batch, true, known) }
             ) { send ->
                 CountryIndex.annotate(
                     loader.loadMovies(playlist, onPercent = { progress.movies = it.coerceIn(0, 99) }) { batch ->
@@ -142,7 +144,7 @@ object CatalogIngest {
         if (loaded != null && loaded.vodLoadFailed && loaded.vodChannels.isEmpty()) {
             loaded = runCatching {
                 pipeBatches(
-                    write = { batch -> store(db, playlist.id, CatalogDb.VOD, batch, true, known) }
+                    write = { batch -> store(app, db, playlist.id, CatalogDb.VOD, batch, true, known) }
                 ) { send ->
                     CountryIndex.annotate(
                         loader.loadMovies(playlist, onPercent = { progress.movies = it.coerceIn(0, 99) }) { batch ->
@@ -155,11 +157,12 @@ object CatalogIngest {
         if (loaded == null || loaded.vodLoadFailed) return false
         progress.movies = 100
         db.insertMissing(playlist.id, CatalogDb.VOD, loaded.vodCategories, emptyList())
-        store(db, playlist.id, CatalogDb.VOD, loaded.vodChannels, true, known)
+        store(app, db, playlist.id, CatalogDb.VOD, loaded.vodChannels, true, known)
         return true
     }
 
     private fun store(
+        app: OlympusIptvApp,
         db: CatalogDb,
         playlistId: String,
         bucket: String,
@@ -168,13 +171,17 @@ object CatalogIngest {
         known: MutableSet<String>
     ) {
         if (channels.isEmpty()) return
-        val fresh = ArrayList<Channel>(channels.size)
-        for (channel in channels) {
-            if (known.add(channel.id)) fresh.add(channel)
+        val cache = CatalogCache(app)
+        val previous = cache.readHashes(playlistId, bucket)
+        val changed = CatalogDelta.writes(previous, channels, known)
+        if (changed.isNotEmpty()) {
+            val rows = if (tag) CountryIndex.tagChannels(changed) else changed
+            db.insertMissing(playlistId, bucket, emptyList(), rows)
+            for (channel in changed) known.add(channel.id)
         }
-        if (fresh.isEmpty()) return
-        val rows = if (tag) CountryIndex.tagChannels(fresh) else fresh
-        db.insertMissing(playlistId, bucket, emptyList(), rows)
+        val next = HashMap(previous)
+        for (channel in channels) next[channel.id] = CatalogDelta.rowHash(channel)
+        cache.writeHashes(playlistId, bucket, next)
     }
 
     private suspend fun <T> pipeBatches(

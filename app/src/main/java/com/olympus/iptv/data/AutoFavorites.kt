@@ -491,4 +491,23 @@ object AutoFavorites {
         val a = sin(halfLat) * sin(halfLat) + cos(lat1 * scale) * cos(lat2 * scale) * sin(halfLon) * sin(halfLon)
         return 6371.0 * 2 * asin(sqrt(a.coerceAtMost(1.0)))
     }
+
+    fun starterPack(channels: List<GuideChannel>, pack: String): List<ChannelPick> {
+        val words = when (pack) {
+            "news" -> listOf("news", "cnn", "msnbc", "fox news", "abc", "nbc", "cbs", "local")
+            "sports" -> listOf("espn", "fox sport", "nfl", "nba", "mlb", "nhl", "bein", "sky sport")
+            "movies" -> listOf("hbo", "starz", "showtime", "cinemax", "movie", "tcm")
+            else -> listOf("nick", "disney", "cartoon", "pbs kids", "boomerang", "kids")
+        }
+        val picks = ArrayList<ChannelPick>(25)
+        val seen = HashSet<String>()
+        for (channel in channels) {
+            val hay = (channel.name + " " + channel.group).lowercase()
+            if (words.none { hay.contains(it) }) continue
+            if (!seen.add(channel.id)) continue
+            picks.add(ChannelPick(channel.id, channel.name))
+            if (picks.size == 25) break
+        }
+        return picks
+    }
 }

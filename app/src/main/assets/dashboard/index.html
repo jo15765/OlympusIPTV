@@ -1330,6 +1330,11 @@
               <em id="adminVpnCard">Not Connected • Secure your traffic</em>
               <span>The dashboard stays on your Wi-Fi.</span>
             </button>
+            <button class="admin-card" id="adminStreams" type="button">
+              <span class="admin-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 7h16M4 12h16M4 17h10"/><circle cx="18" cy="17" r="2"/></svg></span>
+              <strong>Active Streams</strong>
+              <span>See which address is using each open stream.</span>
+            </button>
           </div>
         </div>
         <div id="adminRefreshPage" hidden>
@@ -1359,6 +1364,14 @@
           </div>
           <pre id="logView">Open a log to read it here.</pre>
           <div id="logList"></div>
+        </div>
+        <div id="adminStreamsPage" hidden>
+          <div class="panel-head">
+            <button class="secondary" id="adminStreamsBack" type="button">Back</button>
+            <h2>Active Streams</h2>
+          </div>
+          <p class="hint" id="adminStreamsLead">Checking the provider…</p>
+          <div id="adminStreamsList"></div>
         </div>
         <div id="adminVpnPage" hidden>
           <div class="panel-head">
@@ -1715,6 +1728,23 @@
           <article class="clean-card">
             <h3>Export</h3>
             <p class="hint">Download this device's settings as a file you can keep.</p>
+            <div class="clean-apply" id="remotePad" style="margin:16px 0;padding:12px;border:1px solid #3a3428;border-radius:12px">
+              <div style="font-weight:700;margin-bottom:8px">TV remote</div>
+              <div style="display:grid;grid-template-columns:repeat(3,72px);gap:8px;justify-content:start">
+                <span></span>
+                <button type="button" data-remote="up">Up</button>
+                <span></span>
+                <button type="button" data-remote="left">Left</button>
+                <button type="button" data-remote="ok">OK</button>
+                <button type="button" data-remote="right">Right</button>
+                <span></span>
+                <button type="button" data-remote="down">Down</button>
+                <button type="button" data-remote="back">Back</button>
+              </div>
+              <input id="remoteText" type="text" placeholder="Paste a stream, movie, or M3U URL — or type a channel" style="margin-top:10px;width:min(420px,100%)" />
+              <button type="button" id="remoteSend">Play on TV</button>
+              <div id="remoteFavorites" style="margin-top:12px"></div>
+            </div>
             <button class="clean-apply" id="exportSettings" type="button">Export backup (.json)</button>
           </article>
           <article class="clean-card">
@@ -3660,8 +3690,52 @@
       document.querySelector("#adminWebPage").hidden = which !== "web";
       document.querySelector("#adminLogPage").hidden = which !== "logs";
       document.querySelector("#adminVpnPage").hidden = which !== "vpn";
+      document.querySelector("#adminStreamsPage").hidden = which !== "streams";
       if (which === "vpn") refreshVpn();
       else stopVpnPoll();
+      if (which === "streams") refreshStreams();
+      else stopStreamsPoll();
+    }
+    document.querySelector("#adminStreams").addEventListener("click", () => showAdminPage("streams"));
+    document.querySelector("#adminStreamsBack").addEventListener("click", () => showAdminPage("home"));
+    let streamsPoll = 0;
+    function stopStreamsPoll() {
+      if (streamsPoll) clearInterval(streamsPoll);
+      streamsPoll = 0;
+    }
+    function streamLine(row) {
+      const ip = row.ip || "No IP reported";
+      const name = row.name || "Unnamed stream";
+      const role = row.role ? " · " + row.role : "";
+      const source = row.source ? " · " + row.source : "";
+      return "<p><strong>" + ip + "</strong> · " + name + role + source + "</p>";
+    }
+    async function refreshStreams() {
+      const lead = document.querySelector("#adminStreamsLead");
+      const list = document.querySelector("#adminStreamsList");
+      if (!lead || !list) return;
+      try {
+        const data = await fetch("/api/streams").then((res) => res.json());
+        const active = data.providerActive || "—";
+        const max = data.providerMax || "—";
+        const remote = !!data.providerListedIps;
+        lead.textContent = "Provider reports " + active + " of " + max + " connections in use.";
+        const rows = Array.isArray(data.streams) ? data.streams : [];
+        const local = Array.isArray(data.local) ? data.local : [];
+        const parts = [];
+        if (remote) {
+          parts.push("<p class=\"hint\">Addresses returned by the provider.</p>");
+          rows.forEach((row) => parts.push(streamLine(row)));
+        } else {
+          parts.push("<p class=\"hint\">This provider login does not include the IP of each connection. The addresses below are streams this TV still has open.</p>");
+          if (!local.length) parts.push("<p>None. Leaving the app closes the streams on this TV.</p>");
+          local.forEach((row) => parts.push(streamLine(row)));
+        }
+        list.innerHTML = parts.join("");
+      } catch (err) {
+        lead.textContent = "Could not read active streams.";
+      }
+      if (!streamsPoll) streamsPoll = setInterval(refreshStreams, 4000);
     }
     document.querySelector("#adminRefresh").addEventListener("click", () => showAdminPage("refresh"));
     document.querySelector("#adminWeb").addEventListener("click", () => showAdminPage("web"));
@@ -4603,12 +4677,71 @@
     document.querySelector("#includeInternational").addEventListener("change", () => {
       applyInternational(document.querySelector("#includeInternational").checked, true);
     });
+    async function sendRemote(action, text) {
+      try {
+        await fetch("/api/remote", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action, text: text || "" })
+        });
+      } catch (err) {}
+    }
+    document.querySelectorAll("[data-remote]").forEach((button) => {
+      button.addEventListener("click", () => sendRemote(button.getAttribute("data-remote")));
+    });
+    const remoteSend = document.querySelector("#remoteSend");
+    if (remoteSend) {
+      remoteSend.addEventListener("click", () => {
+        const field = document.querySelector("#remoteText");
+        sendRemote("text", field ? field.value : "");
+      });
+    }
+    async function loadRemoteFavorites() {
+      const box = document.querySelector("#remoteFavorites");
+      if (!box) return;
+      const response = await fetch("/api/remote/favorites");
+      if (!response.ok) return;
+      const payload = await response.json();
+      const rows = payload.favorites || [];
+      box.innerHTML = "";
+      rows.forEach((row, index) => {
+        const line = document.createElement("div");
+        line.style.margin = "4px 0";
+        const up = document.createElement("button");
+        up.type = "button";
+        up.textContent = "Up";
+        const down = document.createElement("button");
+        down.type = "button";
+        down.textContent = "Down";
+        const name = document.createElement("span");
+        name.textContent = " " + (row.name || row.id);
+        up.addEventListener("click", () => moveFavorite(rows, index, -1));
+        down.addEventListener("click", () => moveFavorite(rows, index, 1));
+        line.append(up, down, name);
+        box.appendChild(line);
+      });
+    }
+    async function moveFavorite(rows, index, delta) {
+      const next = index + delta;
+      if (next < 0 || next >= rows.length) return;
+      const copy = rows.slice();
+      const moved = copy.splice(index, 1)[0];
+      copy.splice(next, 0, moved);
+      await fetch("/api/remote/favorites", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: copy.map((row) => row.id) })
+      });
+      loadRemoteFavorites();
+    }
+    loadRemoteFavorites();
     document.querySelector("#exportSettings").addEventListener("click", () => {
       const file = {
         "olympus-iptv": "lineup",
         deviceId: session.deviceId,
         exportedAt: new Date().toISOString(),
-        lineup: session.lineup
+        lineup: session.lineup,
+        favorites: (session.favorites && session.favorites.ids) || []
       };
       const blob = new Blob([JSON.stringify(file, null, 2)], { type: "application/json" });
       const link = document.createElement("a");
@@ -4637,6 +4770,18 @@
         paintStrip();
         openTab(tab || "countries");
         await saveLineup();
+        if (Array.isArray(parsed.favorites)) {
+          await fetch("/api/favorites", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email: session.email,
+              deviceId: session.deviceId,
+              ids: parsed.favorites,
+              baseRevision: Date.now()
+            })
+          });
+        }
         if (!status.textContent.startsWith("Updated")) return;
         status.textContent = "Imported onto " + session.deviceId + ". The TV guide updates now.";
       } catch (failure) {

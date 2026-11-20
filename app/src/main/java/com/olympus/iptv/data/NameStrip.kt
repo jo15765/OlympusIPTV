@@ -25,6 +25,7 @@ object NameStrip {
 
     private const val MARKS = ":|-–—[]()"
     private val spaces = Regex("\\s{2,}")
+    private val shown = java.util.concurrent.ConcurrentHashMap<String, String>()
     private var cachedPlan: Plan? = null
 
     private data class Plan(
@@ -35,6 +36,19 @@ object NameStrip {
         val prefixWords: List<String>,
         val suffixWords: List<String>
     )
+
+    fun prepare(names: Collection<String>) {
+        for (name in names) shown(name)
+    }
+
+    fun shown(name: String): String {
+        if (name.isBlank()) return name
+        shown[name]?.let { return it }
+        val clean = apply(name, sanitizeStreams, emptyList())
+        if (shown.size > 8_000) shown.clear()
+        shown[name] = clean
+        return clean
+    }
 
     fun tokens(raw: String): List<String> {
         val pieces = raw.split(',')

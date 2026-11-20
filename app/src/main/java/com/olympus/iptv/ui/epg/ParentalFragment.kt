@@ -493,7 +493,7 @@ class ParentalFragment : Fragment() {
     private class Holder(val binding: ItemParentalBinding) : RecyclerView.ViewHolder(binding.root)
 
     companion object {
-        const val EXTRA_PLAYLIST_ID = ParentalActivity.EXTRA_PLAYLIST_ID
+        const val EXTRA_PLAYLIST_ID = "playlist_id"
 
         fun newInstance(playlistId: String): ParentalFragment =
             ParentalFragment().apply {

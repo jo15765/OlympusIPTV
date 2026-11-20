@@ -139,7 +139,7 @@ class StripNamesFragment : Fragment() {
     }
 
     companion object {
-        const val EXTRA_PLAYLIST_ID = StripNamesActivity.EXTRA_PLAYLIST_ID
+        const val EXTRA_PLAYLIST_ID = "playlist_id"
 
         fun newInstance(playlistId: String): StripNamesFragment =
             StripNamesFragment().apply {

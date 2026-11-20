@@ -88,6 +88,13 @@ class SearchActivity : AppCompatActivity() {
         }
         binding = ActivitySearchBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        binding.root.post {
+            val seeded = intent.getStringExtra("query")?.trim().orEmpty()
+            if (seeded.isNotBlank()) {
+                binding.inputSearch.setText(seeded)
+                submitSearch()
+            }
+        }
         val touchPrimary = com.olympus.iptv.ui.DeviceForm.isTouchPrimary(this)
         if (touchPrimary) {
             androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -157,6 +164,10 @@ class SearchActivity : AppCompatActivity() {
         SoftKeyboard.keepOffUntilAsked(this, binding.inputSearch)
         binding.btnSearch.setOnClickListener { submitSearch() }
         binding.btnVoice.setOnClickListener { startVoiceSearch() }
+        if (!touchPrimary && voiceReady()) {
+            binding.inputSearch.hint = getString(R.string.search_say)
+            binding.btnVoice.requestFocus()
+        }
         binding.btnHideKeyboard.setOnClickListener { hideKeyboard() }
         paintRecentSearches()
         binding.inputSearch.setOnEditorActionListener { _, actionId, _ ->
@@ -371,9 +382,9 @@ class SearchActivity : AppCompatActivity() {
         queries.forEach { query ->
             val chip = TextView(this).apply {
                 text = query
-                setTextColor(getColor(R.color.text_primary))
+                setTextColor(0xFFE0B15A.toInt())
                 textSize = 14f
-                background = getDrawable(R.drawable.bg_nav)
+                background = getDrawable(R.drawable.bg_search_pill)
                 setPadding((12 * density).toInt(), (8 * density).toInt(), (12 * density).toInt(), (8 * density).toInt())
                 isFocusable = true
                 isClickable = true
@@ -428,6 +439,11 @@ class SearchActivity : AppCompatActivity() {
                 base
             )
         }
+    }
+
+    private fun voiceReady(): Boolean {
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+        return intent.resolveActivity(packageManager) != null
     }
 
     private fun startVoiceSearch() {

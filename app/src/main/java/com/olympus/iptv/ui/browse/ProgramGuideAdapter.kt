@@ -315,8 +315,8 @@ class ProgramGuideAdapter(
                         view = track.getChildAt(index) as TextView,
                         channel = channel,
                         program = block.program,
-                        title = block.program.title,
-                        time = null,
+                        title = block.program.guideTitle.ifEmpty { block.program.title },
+                        time = block.program.guideClock.takeIf { it.isNotEmpty() },
                         left = block.left,
                         width = block.width,
                         slot = Slot(position, index)
@@ -334,7 +334,7 @@ class ProgramGuideAdapter(
                 maxLines = 1
                 ellipsize = android.text.TextUtils.TruncateAt.END
                 setPadding(labelPad, 0, labelPad, 0)
-                textSize = 14f
+                textSize = 13f
                 isFocusable = true
                 isClickable = true
             }
@@ -392,7 +392,7 @@ class ProgramGuideAdapter(
             val catchupPast = program != null &&
                 program.endMillis < System.currentTimeMillis() &&
                 channel.supportsCatchup()
-            view.text = label(title, time, kind, false, catchupPast)
+            view.text = label(sportsTitle(title, program), time, kind, false, catchupPast, plain = !time.isNullOrBlank())
             val layout = view.layoutParams as? FrameLayout.LayoutParams
                 ?: FrameLayout.LayoutParams(width, ViewGroup.LayoutParams.MATCH_PARENT)
             layout.width = width
@@ -410,7 +410,7 @@ class ProgramGuideAdapter(
             view.setOnFocusChangeListener { _, hasFocus ->
                 view.background = backgroundFor(kind, hasFocus)
                 view.setTextColor(if (hasFocus) ink else primary)
-                view.text = label(title, time, kind, hasFocus, catchupPast)
+                view.text = label(sportsTitle(title, program), time, kind, hasFocus, catchupPast, plain = !time.isNullOrBlank())
                 if (hasFocus) {
                     reveal(view)
                     onFocus(channel, program)
@@ -419,8 +419,19 @@ class ProgramGuideAdapter(
             if (hadFocus) {
                 view.background = backgroundFor(kind, true)
                 view.setTextColor(ink)
-                view.text = label(title, time, kind, true, catchupPast)
+                view.text = label(sportsTitle(title, program), time, kind, true, catchupPast, plain = !time.isNullOrBlank())
             }
+        }
+
+        private fun sportsTitle(title: String, program: EpgProgram?): String {
+            if (program == null) return title
+            if (program.guideTitle.isNotEmpty()) return program.guideTitle
+            val now = System.currentTimeMillis()
+            val badge = SportsEvent.badge(title, now, program.startMillis, program.endMillis)
+            val timing = EpgTiming.tag(now, program.startMillis, program.endMillis)
+            val marked = listOfNotNull(badge, timing).joinToString(" · ")
+            if (marked.isBlank()) return title
+            return "$marked  $title"
         }
 
         private fun label(
@@ -428,11 +439,13 @@ class ProgramGuideAdapter(
             time: String?,
             kind: EpgKind,
             focused: Boolean,
-            catchupPast: Boolean = false
+            catchupPast: Boolean = false,
+            plain: Boolean = false
         ): CharSequence {
             val pill = EpgProgramStyle.pill(kind)
             val headline = (if (catchupPast) "↺ " else "") + if (pill == null) title else "[$pill] $title"
             if (time.isNullOrBlank()) return headline
+            if (plain) return "$headline\n$time"
             val text = SpannableString("$headline\n$time")
             val start = headline.length + 1
             text.setSpan(AbsoluteSizeSpan(12, true), start, text.length, 0)

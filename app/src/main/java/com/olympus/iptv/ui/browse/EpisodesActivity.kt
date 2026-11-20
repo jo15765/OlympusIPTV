@@ -290,6 +290,12 @@ class EpisodesActivity : AppCompatActivity() {
             scale(Scale.FIT)
             placeholder(R.drawable.ic_channel_placeholder)
             error(R.drawable.ic_channel_placeholder)
+            if (view === binding.showArt) {
+                listener(onSuccess = { _, result ->
+                    val bitmap = (result.drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap ?: return@listener
+                    com.olympus.iptv.ui.BackdropGlow.apply(bitmap, binding.root)
+                })
+            }
         }
     }
 

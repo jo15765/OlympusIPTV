@@ -31,9 +31,17 @@ object EpgUtils {
 
     fun formatWhen(millis: Long): String = formatLocal(millis, "EEE, d MMM yyyy | h:mm a")
 
+    private val localFormats = object : ThreadLocal<HashMap<String, SimpleDateFormat>>() {
+        override fun initialValue(): HashMap<String, SimpleDateFormat> = HashMap()
+    }
+
     private fun formatLocal(millis: Long, pattern: String): String {
-        val format = SimpleDateFormat(pattern, Locale.getDefault())
-        format.timeZone = TimeZone.getDefault()
+        val map = localFormats.get() ?: HashMap()
+        val format = map.getOrPut(pattern) {
+            SimpleDateFormat(pattern, Locale.getDefault()).apply {
+                timeZone = TimeZone.getDefault()
+            }
+        }
         return format.format(Date(millis))
     }
 

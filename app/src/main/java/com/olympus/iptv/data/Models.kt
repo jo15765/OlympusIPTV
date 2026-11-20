@@ -104,7 +104,9 @@ data class EpgProgram(
     val title: String,
     val startMillis: Long,
     val endMillis: Long,
-    val description: String? = null
+    val description: String? = null,
+    val guideTitle: String = "",
+    val guideClock: String = ""
 ) {
     fun contains(now: Long = System.currentTimeMillis()): Boolean =
         now in startMillis until endMillis

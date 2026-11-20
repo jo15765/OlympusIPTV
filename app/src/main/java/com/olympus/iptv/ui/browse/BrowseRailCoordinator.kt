@@ -354,6 +354,7 @@ internal fun BrowseActivity.showAdminPane(focus: View = panes.cardAdminRefresh) 
         hidePreviewChrome()
         updateGroupClock()
         paintAdminParentalSummary()
+        paintProviderHealth()
         paintBreadcrumb(getString(R.string.nav_admin))
         if (touchPrimary) {
             binding.mobileTopBar.visibility = View.VISIBLE
@@ -393,6 +394,60 @@ internal fun BrowseActivity.paintAdminParentalSummary() {
             paintParentalChip(locked)
             paintLastGroupChip()
             maybeShowBackupTip()
+        }
+    }
+
+internal fun BrowseActivity.paintProviderHealth() {
+        val saved = playlist ?: return
+        if (saved.type != com.olympus.iptv.data.PlaylistType.XTREAM) {
+            panes.adminOrNull?.adminHealth?.text = ""
+            return
+        }
+        lifecycleScope.launch {
+            val app = application as OlympusIptvApp
+            val status = withContext(Dispatchers.IO) {
+                runCatching { com.olympus.iptv.playlist.XtreamClient().accountStatus(saved) }.getOrNull()
+            }
+            val synced = withContext(Dispatchers.IO) { app.playlistStore.lastRefreshAt(saved.id) }
+            if (isDestroyed) return@launch
+            val whenText = if (synced <= 0L) getString(R.string.health_never) else
+                android.text.format.DateUtils.getRelativeTimeSpanString(synced).toString()
+            val line = if (status == null) {
+                getString(R.string.health_epg_only, whenText)
+            } else {
+                getString(
+                    R.string.health_status,
+                    status.status,
+                    status.activeConnections,
+                    status.maxConnections,
+                    status.expires,
+                    whenText
+                )
+            }
+            panes.adminOrNull?.adminHealth?.text = line
+        }
+    }
+
+internal fun BrowseActivity.runMagicCleanup() {
+        val saved = playlist ?: return
+        val dialog = android.app.ProgressDialog(this)
+        dialog.setMessage(getString(R.string.magic_cleanup_running))
+        dialog.setCancelable(false)
+        dialog.show()
+        lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching { com.olympus.iptv.data.MagicCleanup.run(application as OlympusIptvApp, saved.id) }.getOrNull()
+            }
+            if (!isDestroyed) dialog.dismiss()
+            if (result == null) return@launch
+            activeConfig = withContext(Dispatchers.IO) {
+                (application as OlympusIptvApp).playlistStore.lineup(saved.id)
+            }
+            android.widget.Toast.makeText(
+                this@runMagicCleanup,
+                getString(R.string.magic_cleanup_done, result.renamed, result.favorites),
+                android.widget.Toast.LENGTH_LONG
+            ).show()
         }
     }
 
@@ -474,8 +529,8 @@ internal fun BrowseActivity.alignGuideToSystemClock() {
             return
         }
         val now = com.olympus.iptv.playlist.EpgUtils.now()
-        val start = now / halfHourMs * halfHourMs
-        programAdapter.setWindow(start, start + 8L * 60L * 60L * 1000L)
+        val start = GuideMetrics.start(now, halfHourMs)
+        programAdapter.setWindow(start, GuideMetrics.end(start))
         programAdapter.scrollX = 0
         if (visibleChannels.isNotEmpty()) programAdapter.submit(visibleChannels)
         binding.programHeader.removeAllViews()
@@ -914,7 +969,8 @@ internal fun BrowseActivity.sectionButton(): View = when (section) {
 
 
 internal fun BrowseActivity.cardIcon(category: Category): Int = when (category.id) {
-        PlaylistLoader.RECENT_ID, PlaylistLoader.CONTINUE_ID, PlaylistLoader.TOP_WATCHED_ID ->
+        PlaylistLoader.RECENT_ID, PlaylistLoader.CONTINUE_ID, PlaylistLoader.TOP_WATCHED_ID,
+        PlaylistLoader.FOR_YOU_ID ->
             R.drawable.ic_card_play
         PlaylistLoader.FAVORITES_ID -> R.drawable.ic_star
         PlaylistLoader.ALL_ID -> R.drawable.ic_nav_tv
@@ -958,6 +1014,7 @@ internal fun BrowseActivity.cardDetail(category: Category): String {
                 if (count > 0) getString(R.string.continue_count, count) else getString(R.string.continue_card)
             }
             PlaylistLoader.TOP_WATCHED_ID -> getString(R.string.top_watched_card)
+            PlaylistLoader.FOR_YOU_ID -> getString(R.string.for_you_detail)
             PlaylistLoader.FAVORITES_ID -> {
                 val prefix = favoriteSection(section) + ":"
                 val label = if (titles) R.string.group_titles else R.string.group_channels
@@ -972,36 +1029,34 @@ internal fun BrowseActivity.cardDetail(category: Category): String {
                 }
             }
         }
-        if (!GroupLock.locked(activeConfig, category.id)) return base
+        val now = nowPlayingLine(category)
+        val withNow = if (now.isBlank()) base else if (base.isBlank()) now else "$base\n$now"
+        if (!GroupLock.locked(activeConfig, category.id)) return withNow
         val locked = getString(R.string.group_locked)
-        return if (base.isBlank()) locked else "$base · $locked"
+        return if (withNow.isBlank()) locked else "$withNow · $locked"
+    }
+
+internal fun BrowseActivity.nowPlayingLine(category: Category): String {
+        if (section != GuideSection.TV) return ""
+        val savedId = playlist?.id ?: return ""
+        val ids = if (category.id == PlaylistLoader.FAVORITES_ID) {
+            favoriteIds.map { it.substringAfter(':') }.take(8)
+        } else {
+            val db = (application as com.olympus.iptv.OlympusIptvApp).catalogDb
+            runCatching { db.sampleChannelIds(savedId, category.id) }.getOrDefault(emptyList())
+        }
+        val titles = ArrayList<String>(2)
+        for (channelId in ids) {
+            val title = epgCache[channelId]?.now?.title?.takeIf { it.isNotBlank() } ?: continue
+            if (title !in titles) titles.add(title)
+            if (titles.size == 2) break
+        }
+        if (titles.isEmpty()) return ""
+        return "Now: " + titles.joinToString(" • ")
     }
 
 internal fun BrowseActivity.favoriteSection(sectionNow: GuideSection): String = when (sectionNow) {
         GuideSection.TV -> Favorites.LIVE
         GuideSection.MOVIES -> Favorites.VOD
         GuideSection.SHOWS -> Favorites.SERIES
-    }
-
-internal fun BrowseActivity.openYoutubeTrailer(name: String, preferTv: Boolean) {
-        if (BuildConfig.TMDB_API_KEY.isBlank()) {
-            Toast.makeText(this, R.string.tmdb_missing_key, Toast.LENGTH_LONG).show()
-            return
-        }
-        lifecycleScope.launch {
-            val trailer = withContext(Dispatchers.IO) {
-                TitleRatings.trailerFor(name, preferTv)
-            }
-            if (isDestroyed) return@launch
-            if (trailer == null) {
-                Toast.makeText(screen(), R.string.trailer_missing, Toast.LENGTH_SHORT).show()
-                return@launch
-            }
-            val appIntent = Intent(Intent.ACTION_VIEW, Uri.parse("vnd.youtube:${trailer.key}"))
-            val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/watch?v=${trailer.key}"))
-            runCatching { startActivity(appIntent) }.recoverCatching { startActivity(webIntent) }
-                .onFailure {
-                    Toast.makeText(screen(), R.string.trailer_missing, Toast.LENGTH_SHORT).show()
-                }
-        }
     }

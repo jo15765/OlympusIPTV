@@ -2,6 +2,7 @@ package com.olympus.iptv.ui
 
 import android.view.View
 import android.view.animation.DecelerateInterpolator
+import android.view.animation.OvershootInterpolator
 
 object FocusMotion {
     private val ease = DecelerateInterpolator()
@@ -30,16 +31,24 @@ object FocusMotion {
 
     fun animate(view: View, focused: Boolean) {
         val scale = if (focused) FOCUSED else NORMAL
+        val lively = !DeviceForm.isLowRam(view.context)
         view.animate()
             .scaleX(scale)
             .scaleY(scale)
-            .setDuration(MS)
-            .setInterpolator(ease)
+            .setDuration(if (lively) 180L else MS)
+            .setInterpolator(if (lively) OvershootInterpolator(1.35f) else ease)
             .start()
         if (focused) {
             view.elevation = 6f * view.resources.displayMetrics.density
+            val stroke = android.graphics.drawable.GradientDrawable()
+            stroke.setColor(android.graphics.Color.TRANSPARENT)
+            stroke.cornerRadius = 12f * view.resources.displayMetrics.density
+            stroke.setStroke((2 * view.resources.displayMetrics.density).toInt(), 0xFFE0B15A.toInt())
+            view.foreground = stroke
+            com.olympus.iptv.ui.browse.GuideFeel.onFocus(view)
         } else {
             view.elevation = 0f
+            view.foreground = null
         }
     }
 }

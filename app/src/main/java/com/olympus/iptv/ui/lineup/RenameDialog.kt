@@ -117,6 +117,7 @@ object RenameDialog {
 
         dialog.setOnShowListener { binding.nameField.requestFocus() }
         dialog.show()
+        com.olympus.iptv.ui.DialogChrome.dress(dialog)
     }
 
     private fun insert(binding: DialogRenameBinding, text: String) {

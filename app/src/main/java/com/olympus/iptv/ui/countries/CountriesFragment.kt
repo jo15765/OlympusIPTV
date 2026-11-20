@@ -212,7 +212,7 @@ class CountriesFragment : Fragment() {
     private enum class ListFilter { BOTH, VISIBLE, HIDDEN }
 
     companion object {
-        const val EXTRA_PLAYLIST_ID = CountriesActivity.EXTRA_PLAYLIST_ID
+        const val EXTRA_PLAYLIST_ID = "playlist_id"
         const val REQUEST_SAVED = "countries_saved"
 
         fun newInstance(playlistId: String): CountriesFragment =
