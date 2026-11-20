@@ -22,6 +22,14 @@ class GuideFeelTest {
     }
 
     @Test
+    fun columnHugsTheLongestName() {
+        assertEquals(180, GuideFeel.columnWidth(textPx = 100f, chromePx = 80f, parentPx = 1000))
+        assertEquals(90, GuideFeel.columnWidth(textPx = 10f, chromePx = 80f, parentPx = 1000))
+        assertEquals(80, GuideFeel.columnWidth(textPx = 0f, chromePx = 80f, parentPx = 1000))
+        assertEquals(400, GuideFeel.columnWidth(textPx = 900f, chromePx = 80f, parentPx = 1000))
+    }
+
+    @Test
     fun autoSkipRemembersSeries() {
         assertTrue(GuideFeel.autoSkipIntro("show-1", setOf("show-1", "show-2")))
         assertFalse(GuideFeel.autoSkipIntro("show-3", setOf("show-1")))

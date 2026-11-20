@@ -1140,11 +1140,7 @@ internal fun BrowseActivity.hasContinue(sectionNow: GuideSection): Boolean {
         return recentEntries.any { entrySection(it) == wanted && it.canResume() }
     }
 
-internal fun BrowseActivity.withContinue(rest: List<Category>): List<Category> {
-        if (!hasContinue(section)) return withRecent(rest)
-        val head = Category(PlaylistLoader.CONTINUE_ID, getString(R.string.continue_group), kind)
-        return listOf(head) + withRecent(rest)
-    }
+internal fun BrowseActivity.withContinue(rest: List<Category>): List<Category> = withRecent(rest)
 
 internal fun BrowseActivity.continueText(channel: Channel): String? {
         val spot = resumeEntry(channel) ?: return null
@@ -1407,40 +1403,9 @@ internal fun BrowseActivity.wireHomeContinueFocusChain() {
 
 internal fun BrowseActivity.paintHomeContinue() {
         if (!viewReady()) return
-        if (binding.groupColumn.visibility != View.VISIBLE) {
-            binding.homeContinue.visibility = View.GONE
-            wireHomeContinueFocusChain()
-            return
-        }
-        val config = activeConfig
-        when (section) {
-            GuideSection.TV -> {
-                val rows = recentChannels(GuideSection.TV, config)
-                val first = rows.firstOrNull()
-                if (first == null) {
-                    binding.homeContinue.visibility = View.GONE
-                    wireHomeContinueFocusChain()
-                    return
-                }
-                binding.homeContinueTitle.text = first.name
-                binding.homeContinueMeta.text = getString(R.string.recent_card)
-                binding.homeContinue.visibility = View.VISIBLE
-                binding.homeContinue.tag = first
-            }
-            GuideSection.MOVIES, GuideSection.SHOWS -> {
-                val rows = continueChannels(section, config)
-                val first = rows.firstOrNull()
-                if (first == null) {
-                    binding.homeContinue.visibility = View.GONE
-                    wireHomeContinueFocusChain()
-                    return
-                }
-                binding.homeContinueTitle.text = first.name
-                binding.homeContinueMeta.text = continueText(first) ?: getString(R.string.continue_card)
-                binding.homeContinue.visibility = View.VISIBLE
-                binding.homeContinue.tag = first
-            }
-        }
+        binding.homeContinue.visibility = View.GONE
+        binding.homeContinue.tag = null
+        landOnContinue = false
         wireHomeContinueFocusChain()
         if (GuideFeel.landOnContinueStrip(section == GuideSection.TV, binding.homeContinue.visibility == View.VISIBLE) &&
             landOnContinue
@@ -1517,20 +1482,18 @@ internal fun BrowseActivity.focusFirstTitle() {
 internal fun BrowseActivity.fitChannelColumn() {
         if (guideMenu != GuideMenu.CHANNELS && guideMenu != GuideMenu.PROGRAMS) return
         if (binding.programPane.visibility != View.VISIBLE) return
-        val metrics = resources.displayMetrics
-        val density = metrics.density
+        val density = resources.displayMetrics.density
         val number = if (section == GuideSection.TV) (32f + 6f) * density else 0f
-        val around = (6f + 6f + 24f + 8f + 4f) * density + number
-        val twoLines = widestNamePx() * 0.55f + around
-        val parent = binding.guideRow.width.takeIf { it > 0 } ?: metrics.widthPixels
-        val floor = (300 * density).toInt()
-        val ceiling = (380 * density).toInt().coerceAtMost((parent * 0.42f).toInt().coerceAtLeast(floor))
-        val capped = twoLines.toInt().coerceIn(floor, ceiling)
+        val chrome = number + (6f + 6f + 18f + 8f + 8f) * density
+        val parent = binding.guideRow.width.takeIf { it > 0 } ?: resources.displayMetrics.widthPixels
+        val capped = GuideFeel.columnWidth(widestNamePx(), chrome, parent)
         val params = binding.contentColumn.layoutParams as LinearLayout.LayoutParams
-        if (params.width == capped) return
-        params.width = capped
-        params.weight = 0f
-        binding.contentColumn.layoutParams = params
+        if (params.width != capped || params.weight != 0f) {
+            params.width = capped
+            params.weight = 0f
+            binding.contentColumn.layoutParams = params
+        }
+        if (epgReady()) epgCtl.syncChannelOffset()
     }
 
 internal fun BrowseActivity.focusChannelPane() {

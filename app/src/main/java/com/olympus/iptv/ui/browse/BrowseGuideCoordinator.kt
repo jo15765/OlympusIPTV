@@ -151,7 +151,7 @@ internal fun BrowseActivity.wireLazyPanes() {
             if (touchPrimary) {
                 listOf(
                     admin.cardAdminRefresh, admin.cardAdminWeb, admin.cardAdminEpg, admin.cardAdminVpn,
-                    admin.cardAdminAbout, admin.cardAdminFavorites
+                    admin.cardAdminAbout, admin.cardAdminFavorites, admin.cardAdminSetup
                 ).forEach { card -> card.isFocusableInTouchMode = false }
             }
             admin.cardAdminRefresh.setOnClickListener {
@@ -166,6 +166,8 @@ internal fun BrowseActivity.wireLazyPanes() {
             admin.cardAdminVpn.setOnClickListener { showVpnPane() }
             admin.cardAdminAbout.setOnClickListener { showAboutPane() }
             admin.cardAdminFavorites.setOnClickListener { openFavoritesSetup() }
+            admin.cardAdminSetup.setOnClickListener { showAdminTools() }
+            admin.adminToolsBack.setOnClickListener { showAdminPane(admin.cardAdminSetup) }
             admin.btnMagicCleanup.setOnClickListener { runMagicCleanup() }
             paintProviderHealth()
             admin.adminQuietToggle.setOnClickListener { toggleAdminQuietHours() }
@@ -912,6 +914,10 @@ internal fun BrowseActivity.goBackOneScreen() {
             showAdminPane(panes.cardAdminWeb)
             return
         }
+        if (panes.adminOrNull?.adminTools?.visibility == View.VISIBLE) {
+            showAdminPane(panes.ensureAdmin().cardAdminSetup)
+            return
+        }
         if (panes.isAdminVisible() ||
             panes.isAboutVisible() ||
             binding.blankPane.visibility == View.VISIBLE
@@ -1101,6 +1107,7 @@ internal fun BrowseActivity.resumeEntry(channel: Channel): WatchEntry? =
         }
 
 internal fun BrowseActivity.hostDispatchKey(event: KeyEvent): Boolean {
+        if (GuideCoach.onKey(this, event)) return true
         if (browseToolHost.isToolVisible()) {
             when (val tool = supportFragmentManager.findFragmentById(R.id.toolHost)) {
                 is ParentalFragment -> if (tool.dispatchKeyEvent(event)) return true
@@ -1643,29 +1650,22 @@ internal fun BrowseActivity.jumpGuideToNow() {
     }
 
 internal fun BrowseActivity.widestNamePx(): Float {
-        if (!namePaintReady) {
-            namePaint.textSize = android.util.TypedValue.applyDimension(
-                android.util.TypedValue.COMPLEX_UNIT_SP,
-                15f,
-                resources.displayMetrics
-            )
+        val size = android.util.TypedValue.applyDimension(
+            android.util.TypedValue.COMPLEX_UNIT_SP,
+            13f,
+            resources.displayMetrics
+        )
+        if (!namePaintReady || namePaint.textSize != size) {
+            namePaint.textSize = size
             namePaint.typeface = android.graphics.Typeface.DEFAULT
             namePaintReady = true
+            fittedList = null
         }
-        val channels = visibleChannels
-        val previous = fittedList
-        if (previous === channels) return fittedTextPx
-        var start = 0
         var widest = 0f
-        if (previous != null && channels.size >= previous.size && sameNames(previous, channels)) {
-            start = previous.size
-            widest = fittedTextPx
-        }
-        for (index in start until channels.size) {
-            val measured = namePaint.measureText(channels[index].name)
+        for (channel in visibleChannels) {
+            val measured = namePaint.measureText(com.olympus.iptv.data.NameStrip.shown(channel.name))
             if (measured > widest) widest = measured
         }
-        fittedList = channels
         fittedTextPx = widest
         return widest
     }
@@ -1737,6 +1737,7 @@ internal fun BrowseActivity.ensureProgramGuide() {
             programAdapter.scrollX = 0
         }
         if (binding.programHeader.childCount == 0) buildProgramHeader()
+        syncProgramRowHeight()
         programAdapter.submit(visibleChannels)
         loadVisibleGuidePrograms()
         binding.programList.post {
@@ -1945,6 +1946,11 @@ internal fun BrowseActivity.applyGuideRowHeight(tall: Boolean) {
         }
         if (channelAdapter.itemCount > 0 && binding.programPane.visibility == View.VISIBLE) {
             channelAdapter.notifyItemRangeChanged(0, channelAdapter.itemCount)
+        }
+        if (binding.programPane.visibility == View.VISIBLE) {
+            binding.programList.post {
+                alignGuide(binding.channelList, binding.programList)
+            }
         }
     }
 

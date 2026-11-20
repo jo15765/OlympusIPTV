@@ -6,7 +6,7 @@
 
 ### For the latest and greatest, build your own APK from this code.
 
-The latest signed file is **0.2.80** (versionCode 81). **One APK** installs on Android TV / set-top boxes and on phones and tablets. It keeps the 0.2.79 device tiers and guide, restores the Admin cards, closes provider connections when you leave the app, and adds an Active Streams card on the phone dashboard. Optional keys in `local.properties`: `tmdb.apiKey`, `watchmode.apiKey`, `opensubtitles.apiKey`, `sendgrid.apiKey` + `sendgrid.fromEmail`.
+The latest signed file is **0.2.82** (versionCode 83). **One APK** installs on Android TV / set-top boxes and on phones and tablets. It keeps the 0.2.79 device tiers and guide, restores the Admin cards, closes provider connections when you leave the app, and adds an Active Streams card on the phone dashboard. Optional keys in `local.properties`: `tmdb.apiKey`, `watchmode.apiKey`, `opensubtitles.apiKey`, `sendgrid.apiKey` + `sendgrid.fromEmail`.
 
 **This is a player only. You must provide your own streams.**
 
@@ -66,14 +66,14 @@ Olympus-IPTV is one APK for Android TV / set-top boxes and for phones and tablet
 
 | | |
 | --- | --- |
-| Signed file | `C:\Users\chalu\Downloads\olympus-iptv-0.2.80.apk` |
-| What that file is | versionName **0.2.80**, versionCode **81** |
-| Source in this tree | versionName **0.2.80**, versionCode **81** |
-| What to run | Install the signed 0.2.80 APK, or build this source |
+| Signed file | `C:\Users\chalu\Downloads\olympus-iptv-0.2.82.apk` |
+| What that file is | versionName **0.2.82**, versionCode **83** |
+| Source in this tree | versionName **0.2.82**, versionCode **83** |
+| What to run | Install the signed 0.2.82 APK, or build this source |
 | Install | Over the existing copy (TV or phone). Uninstalling wipes the saved account, playlist, and favorites. Downloader works with the same file. |
 | Launcher name | Two centered lines: Olympus over IPTV |
 
-**0.2.80** is the current release. The Admin screen is the original two-across card grid again. Account status and Magic Cleanup sit under those cards. Leaving the app stops the player, the next-channel player, and the guide preview so the provider connection closes. Picture-in-picture keeps playing. The phone Admin page has an Active Streams card. Sticks with a small heap still use the 16 MB image cache, RGB_565 posters, and a 10 second buffer. Larger boxes pre-warm only the next channel.
+**0.2.82** is the current signed release. The first-run tips put the remote on Got it, and the Continue watching strip is gone. In this source, Admin is the original image cards again, and account status, quiet hours, backup, and Magic Cleanup open from a Setup card. Leaving the app stops the player, the next-channel player, and the guide preview so the provider connection closes. Picture-in-picture keeps playing. The phone Admin page has an Active Streams card. Sticks with a small heap still use the 16 MB image cache, RGB_565 posters, and a 10 second buffer. Larger boxes pre-warm only the next channel.
 
 ### What’s new since 0.2.56 (enhancements)
 
@@ -126,7 +126,7 @@ Olympus-IPTV is one APK for Android TV / set-top boxes and for phones and tablet
 
 </div>
 
-There is **no separate mobile APK**. The same `olympus-iptv-0.2.80.apk` detects whether it is running on a television (Leanback / UI mode) or a touch-first phone or tablet.
+There is **no separate mobile APK**. The same `olympus-iptv-0.2.82.apk` detects whether it is running on a television (Leanback / UI mode) or a touch-first phone or tablet.
 
 | On phones and tablets | What changed |
 | --- | --- |
@@ -394,7 +394,7 @@ While the app process is running it serves the dashboard on the home network. It
 
 Sign in with the email and the device id from Admin, then Web-UI. Opening a device loads groups, countries, a channel count, the lineup, favorites, and recordings from one saved copy. The group list, including each group’s country and the country numbers, is reused until the library changes. Checking a country updates that card. Checking or hiding one group or one channel updates that row. A group you have not reordered shows its first 400 channels. A group you have reordered keeps that order. Search, rename, and drag redraw the list they changed. Stream addresses are not sent to the page.
 
-The sign-in page shows the Olympus-IPTV mark, the address for this Wi-Fi, and the current log. The page can edit countries, groups, channels, strip rules, bulk group rename, image removal, favorites, recordings, reminders, and a JSON export or import of the lineup. Backup export and import is how the same lineup moves to another device on the account. Import first shows a short preview of hidden countries, groups, channels, renames, and parental PINs, then asks before it writes. The groups list uses the same rules as the TV, so a group that is off the guide is off the web. On the TV, Admin is two rows of two cards: Refresh Options, Web-UI, EPG edits, and VPN. The web Admin page uses the same large cards, plus the error log, each with a short status. Each card opens its own page. Back returns to the cards. Each log stays one file. At 400 KB the current log is renamed with the date and time and a new file starts. Older files are kept. Passwords and stream credentials are not written into the log.
+The sign-in page shows the Olympus-IPTV mark, the address for this Wi-Fi, and the current log. The page can edit countries, groups, channels, strip rules, bulk group rename, image removal, favorites, recordings, reminders, and a JSON export or import of the lineup. Backup export and import is how the same lineup moves to another device on the account. Import first shows a short preview of hidden countries, groups, channels, renames, and parental PINs, then asks before it writes. The groups list uses the same rules as the TV, so a group that is off the guide is off the web. On the TV, Admin is the image cards, two across: Refresh Options, Web-UI, EPG edits, VPN, About, and Favorites. A Setup card under that grid opens the provider status line, quiet hours, backup export, and Magic Cleanup. The web Admin page uses the same large cards, plus the error log, each with a short status. Each card opens its own page. Back returns to the cards. Each log stays one file. At 400 KB the current log is renamed with the date and time and a new file starts. Older files are kept. Passwords and stream credentials are not written into the log.
 
 Parental controls are the **Parental** chip at the top of Live TV, and the **Parental controls** card on EPG edits. That screen lists only the Live TV groups that are visible on the guide (same hide and country rules as the group cards). Groups are multi-select cards. Select one or more, then **Set PIN** or **Remove lock**. Set PIN opens an on-screen 0–9 keypad; digits are numeric only, and the dialog closes when the fourth digit is entered. A lock then sits on those groups here and in the top right of their Live TV cards. Hold OK on a locked group card still asks for the unlock PIN. The web Groups row has Lock for the same password. Opening a locked group shows **Enter PIN** with the on-screen number pad (focus stays on the pad on TV; tap works on phones). After a correct PIN, that group opens and stays unlocked for the parental unlock time on EPG edits (5, 15, 30, or 60 minutes; default 15), then locks again. Cancel returns to the groups. A wrong PIN shows an **Incorrect PIN** modal; OK closes every PIN dialog and returns to the group cards. The PIN is stored as a code in the lineup, shared by the TV and the web. After web setup, Favorites polls until the device catalog is ready and shows a clear “catalog still loading” state so auto-add is not empty or confusing.
 
@@ -424,8 +424,9 @@ Admin, then Error log, shows the log in a window you can scroll and resize. Entr
 | Web-UI | Shows the email, the device id, and the dashboard address. Remove playlist clears this TV’s account, library, favorites, lineup edits, recordings list, watch history, queue, and reminders, keeps the device id, and opens sign-in. |
 | EPG edits | On the TV and on the web page: countries, groups and channels, show everything again, the bulk stripper, the bulk group renamer, Sanitize Group & Channel Names, image removal, and the optional switch that fills an empty guide from channel names. The TV also has Parental controls (multi-select PIN locks); **Hide empty groups** (on by default); **Guide density** (Comfortable or Compact); **Parental unlock time** (5–60 minutes); **Video decoder** (Hardware / Hardware+extensions / Failsafe / Software prefer); **TMDB items limit** (5–40); **PiP gestures** (phones — swipe up / leave for Home → PiP); and **Scrobbler** (Simkl or Trakt — one at a time, paste token). |
 | VPN | On the TV and on the web dashboard. The five providers are large cards, two across, in the same style as the Admin cards. PIA VPN, Proton VPN, Surfshark, and NordVPN take the account username and password, then a city, then Connect. Nord can use the access token from its manual setup page in the password box. WireGuard takes a profile instead of a password. The last city stays at the top of the list, and typing filters the rest. Backup city stores a second city. If the first city does not answer, that backup is tried. After a successful connection, a drop keeps the tunnel up and switches to the other city. New streams wait until one answers. Connect sends this app’s internet through that tunnel. The Admin card and the guide show the connected city. The VPN notification includes Disconnect. Home-network addresses, including the dashboard on port 8765, stay on the LAN. The first connection has to be allowed on the TV. |
-| Favorites setup | A chip at the top of Live TV. Opens the auto-add screen again. When the catalog is already loaded it skips the pulling-channels splash. Continue stays on the first-time setup only. Back from that chip returns focus to Favorites setup. |
+| Favorites setup | A chip at the top of Live TV, and an Admin card. Opens the auto-add screen again. When the catalog is already loaded it skips the pulling-channels splash. Continue stays on the first-time setup only. Back from that chip returns focus to Favorites setup. |
 | About | Says the app is a player only, credits @bobgoblin, and links https://buymeacoffee.com/avocadopeaches. A square QR code opens that page. |
+| Setup | The card under the Admin grid. Opens the provider status line (active and max connections, expiration, last sync), the parental and quiet-hours summary, the quiet-hours toggle and schedule, Backup export, and Magic Cleanup. Back returns to the cards. |
 | Active Streams | Web Admin only. Shows the provider’s active and max connection count. If that login response includes an IP for each connection, those addresses are listed. If it does not, the card says so and lists streams this TV still has open, with this TV’s address on the home network. |
 
 ---
@@ -564,7 +565,7 @@ tmdb.apiKey=YOUR_TMDB_V3_API_KEY
 
 5. Rebuild the app. `app/build.gradle.kts` maps that property to `buildConfigField("String", "TMDB_API_KEY", ...)`. Without the key, the browse score chip, ratings sheet, player caption scores, and **Trailer** stay empty or unavailable; the rest of the player still works. See [Where ratings appear](#where-ratings-appear).
 
-The latest signed release is `C:\Users\chalu\Downloads\olympus-iptv-0.2.80.apk`.
+The latest signed release is `C:\Users\chalu\Downloads\olympus-iptv-0.2.82.apk`.
 
 Android Studio: use a 1920×1080 Google TV emulator. Apply Changes does not pick up new screens. Stop the app, then Debug. Click the emulator window before the arrow keys. The emulator is a different device from a Shield or an Onn box, so it does not have that box’s account, playlist, or favorites.
 
@@ -597,7 +598,7 @@ The UI is warm charcoal and honey. From **0.2.48–0.2.50** the main shell uses 
 
 The dashboard uses the same palette.
 
-Admin shows a one-line parental summary (`N locked · unlock M min · quiet hours on/off`). Parental **Remove lock** requires entering a PIN that matches every selected lock. Optional PIN-fail email: put `sendgrid.apiKey` and `sendgrid.fromEmail` in `local.properties` (verified SendGrid sender). Two wrong unlock PINs trigger one alert, rate-limited to about 15 minutes. After setup, phones may show a one-time tip to use Web-UI Backup export.
+Admin → Setup shows a one-line parental summary (`N locked · unlock M min · quiet hours on/off`), plus the provider status line and Magic Cleanup. Parental **Remove lock** requires entering a PIN that matches every selected lock. Optional PIN-fail email: put `sendgrid.apiKey` and `sendgrid.fromEmail` in `local.properties` (verified SendGrid sender). Two wrong unlock PINs trigger one alert, rate-limited to about 15 minutes. After setup, phones may show a one-time tip to use Web-UI Backup export.
 
 Web Favorites: while the device catalog is still loading, auto-add cards and search stay disabled, a banner explains why, and the favorites board shows a waiting empty state; when ready, the header shows the favorite count.
 
@@ -633,7 +634,7 @@ clearcast-tuner/
 | Episodes | Season chips with unwatched counts; landscape episode stills, runtime, 2-line plot, resume progress. Check one episode or the whole season. |
 | Parental | Visible Live TV groups as multi-select cards; Set PIN and Remove lock both use the on-screen numeric pad |
 | Home | Playlist cards: type, host, live / movie / show counts, last sync, **Sync Now**, ▲▼ reorder |
-| Admin | Refresh, Web-UI, EPG edits, VPN, About, and Favorites setup (lazy-inflated). The web dashboard has the same VPN card |
+| Admin | Image cards, two across: Refresh, Web-UI, EPG edits, VPN, About, and Favorites (lazy-inflated). Setup opens account status, quiet hours, backup, and Magic Cleanup. The web dashboard has the same VPN card |
 | About | Player-only notice, credits, coffee QR (opened from Admin) |
 | My Library | Queue, New, and Reminders stay on one screen; pills switch them in place |
 | Search | Find a channel, movie, or show and star it. Tiles show a rating and watch progress when those are known. A muted live dock appears after you leave the player |
@@ -651,6 +652,22 @@ clearcast-tuner/
 ## Version history
 
 </div>
+
+### 0.2.82
+
+- The first-run tip card takes the remote. Up, Down, Left, and Right stay on Got it. OK, Enter, or Back dismisses that tip. After the third tip, the cards stay gone.
+- The Continue watching strip above the groups is hidden, and Movies and Shows no longer add a Continue group card.
+- Signed APK: `C:\Users\chalu\Downloads\olympus-iptv-0.2.82.apk` (versionCode 83). Install over 0.2.81 — same signing key, account and playlist data kept.
+
+In this source, after that signed file:
+
+- Admin is the six image cards again: Refresh, Web-UI, EPG edits, VPN, About, and Favorites. The provider status line, parental and quiet-hours summary, quiet-hours controls, Backup export, and Magic Cleanup are not under the grid. They open from the Setup card. Back returns to the cards.
+- On the full guide, the channel column is as wide as the longest name on screen, plus the channel number and logo. It stops at 40% of the screen so a long name wraps. Each episode row uses the same height as its channel and the two lists start on the same line.
+
+### 0.2.81
+
+- Opening the guide no longer force-closes. The low-memory check was running while the screen was still being created, before Android allows system services. It now runs the first time the guide actually needs it.
+- Signed APK: `C:\Users\chalu\Downloads\olympus-iptv-0.2.81.apk` (versionCode 82). Install over 0.2.80 — same signing key, account and playlist data kept.
 
 ### 0.2.80
 
@@ -904,7 +921,7 @@ clearcast-tuner/
 
 ### 0.2.45
 
-- Continue watching strip is on the remote focus path; OK/Play resumes; hold OK opens Continue/Recent. Movies/Shows land focus on the strip when it is visible.
+- The Continue watching strip and the Continue group card are gone. Resume still works when you open a title you already started.
 - Remembers the last Live / Movies / Shows section across opens.
 - Skip intro is remembered per series and applied on the next episode / auto-play.
 - Unit tests cover Continue focus rules, resume thresholds, and parental unlock.
@@ -922,7 +939,7 @@ clearcast-tuner/
 - Locked group unlock: **Enter PIN** with on-screen 0–9 pad (TV focus + phone tap). Wrong PIN → **Incorrect PIN** modal; OK closes all PIN UI and returns to groups.
 - Phone guide: top Back/title, Live/Movies/Shows chips, hidden TV rail, two-column group cards; Back on Fresh, Favorites setup, opened groups, and PIN.
 - Portrait player dock (scrubber + Back / Play-Pause / Menu) and a one-time “tap for controls” tip.
-- Continue watching strip above group cards; cold start defers dashboard warm and Watchmode after Favorites/groups paint.
+- Group cards paint first. The Continue watching strip is not shown. Cold start defers dashboard warm and Watchmode after Favorites/groups paint.
 - Web Favorites: catalog-still-loading banner and poll until groups arrive.
 
 ### 0.2.42
@@ -1150,7 +1167,7 @@ clearcast-tuner/
 
 - This is a player only. You must provide your own streams. The app does not ship channels, movies, shows, or playlist credentials.
 - It is a beta. Feedback is greatly appreciated.
-- **0.2.80** is the latest signed file in Downloads (`olympus-iptv-0.2.80.apk`, versionCode 81).
+- **0.2.82** is the latest signed file in Downloads (`olympus-iptv-0.2.82.apk`, versionCode 83).
 - `portal/data/store.json` is for the Node portal on a PC only — it is not packaged in the APK.
 - Chromecast often cannot play provider IPTV/HLS the way the in-app player can; the Cast button warns before connecting.
 - Ratings, trailers, and New this week need the matching keys in `local.properties` at build time (`tmdb.apiKey`, `watchmode.apiKey`).

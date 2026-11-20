@@ -480,7 +480,7 @@ class BrowseActivity : AppCompatActivity(), ToolHost {
 
     internal var dialDigits = ""
 
-    internal val lowRamDevice = com.olympus.iptv.ui.DeviceForm.isLowRam(this)
+    internal val lowRamDevice by lazy { com.olympus.iptv.ui.DeviceForm.isLowRam(this) }
 
     internal val dialJump = Runnable { jumpDial() }
 

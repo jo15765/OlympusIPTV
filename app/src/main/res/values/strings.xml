@@ -73,6 +73,8 @@
     <string name="nav_library">My Library</string>
     <string name="admin_about_detail">Credits, coffee, and the player-only notice</string>
     <string name="admin_favorites_detail">Auto-add or rebuild your favorites list</string>
+    <string name="admin_setup">Setup</string>
+    <string name="admin_setup_detail">Account status, quiet hours, and cleanup</string>
     <string name="library_title">My Library</string>
     <string name="library_queue_hint">Movies and shows you saved for later</string>
     <string name="library_fresh_hint">This week’s premieres you can already play</string>

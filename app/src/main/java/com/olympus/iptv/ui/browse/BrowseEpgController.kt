@@ -107,18 +107,30 @@ class BrowseEpgController(
     }
 
     fun syncChannelOffset() {
-        val spacer = binding.channelGuideSpacer
         if (binding.programPane.visibility != View.VISIBLE) {
             setSpacer(0)
+            binding.programList.setPadding(0, 0, 0, binding.programList.paddingBottom)
             return
         }
-        binding.programPane.post {
-            if (binding.programPane.visibility != View.VISIBLE) {
-                setSpacer(0)
-                return@post
+        setSpacer(0)
+        binding.programList.setPadding(0, 0, 0, binding.programList.paddingBottom)
+        binding.guideRow.post {
+            if (binding.programPane.visibility != View.VISIBLE) return@post
+            val channelAt = IntArray(2)
+            val programAt = IntArray(2)
+            binding.channelList.getLocationInWindow(channelAt)
+            binding.programList.getLocationInWindow(programAt)
+            val delta = programAt[1] - channelAt[1]
+            if (delta > 1) setSpacer(delta)
+            else if (delta < -1) {
+                binding.programList.setPadding(0, -delta, 0, binding.programList.paddingBottom)
             }
-            val delta = binding.programHeaderScroll.height - binding.channelHeader.height
-            setSpacer(delta.coerceAtLeast(0))
+            val browse = activity as? BrowseActivity ?: return@post
+            binding.programList.post {
+                if (binding.programPane.visibility == View.VISIBLE) {
+                    browse.alignGuide(binding.channelList, binding.programList)
+                }
+            }
         }
     }
 

@@ -350,7 +350,10 @@ internal fun BrowseActivity.showAdminPane(focus: View = panes.cardAdminRefresh) 
         binding.programPane.visibility = View.GONE
         binding.blankPane.visibility = View.GONE
         panes.hideAllSettingPanes()
-        panes.ensureAdmin().root.visibility = View.VISIBLE
+        val admin = panes.ensureAdmin()
+        admin.adminCards.visibility = View.VISIBLE
+        admin.adminTools.visibility = View.GONE
+        admin.root.visibility = View.VISIBLE
         hidePreviewChrome()
         updateGroupClock()
         paintAdminParentalSummary()
@@ -364,6 +367,16 @@ internal fun BrowseActivity.showAdminPane(focus: View = panes.cardAdminRefresh) 
             paintMobileSettingsChips()
         }
         focus.post { if (focus.isShown) focus.requestFocus() }
+    }
+
+internal fun BrowseActivity.showAdminTools() {
+        val admin = panes.ensureAdmin()
+        admin.root.visibility = View.VISIBLE
+        admin.adminCards.visibility = View.GONE
+        admin.adminTools.visibility = View.VISIBLE
+        paintAdminParentalSummary()
+        paintProviderHealth()
+        admin.adminToolsBack.post { admin.adminToolsBack.requestFocus() }
     }
 
 internal fun BrowseActivity.paintAdminParentalSummary() {

@@ -14,6 +14,13 @@
     android:visibility="gone">
 
     <LinearLayout
+        android:id="@+id/adminCards"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
@@ -224,6 +231,7 @@
             android:nextFocusLeft="@id/btnAdmin"
             android:nextFocusRight="@id/cardAdminFavorites"
             android:nextFocusUp="@id/cardAdminEpg"
+            android:nextFocusDown="@id/cardAdminSetup"
             android:orientation="vertical"
             android:paddingHorizontal="18dp"
             android:paddingVertical="16dp">
@@ -267,6 +275,7 @@
             android:gravity="center"
             android:nextFocusLeft="@id/cardAdminAbout"
             android:nextFocusUp="@id/cardAdminVpn"
+            android:nextFocusDown="@id/cardAdminSetup"
             android:orientation="vertical"
             android:paddingHorizontal="18dp"
             android:paddingVertical="16dp">
@@ -299,84 +308,183 @@
         </LinearLayout>
     </LinearLayout>
 
-    <TextView
-        android:id="@+id/adminParentalSummary"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="14dp"
-        android:gravity="center"
-        android:textColor="@color/text_secondary"
-        android:textSize="14sp" />
-
     <LinearLayout
-        android:id="@+id/adminQuietRow"
+        android:id="@+id/cardAdminSetup"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:gravity="center"
-        android:orientation="horizontal">
-
-        <TextView
-            android:id="@+id/adminQuietToggle"
-            android:layout_width="wrap_content"
-            android:layout_height="44dp"
-            android:background="@drawable/bg_nav"
-            android:focusable="true"
-            android:gravity="center"
-            android:paddingHorizontal="14dp"
-            android:text="@string/quiet_hours_off"
-            android:textColor="@color/text_primary"
-            android:textSize="14sp" />
-
-        <TextView
-            android:id="@+id/adminQuietSchedule"
-            android:layout_width="wrap_content"
-            android:layout_height="44dp"
-            android:layout_marginStart="10dp"
-            android:background="@drawable/bg_nav"
-            android:focusable="true"
-            android:gravity="center"
-            android:paddingHorizontal="14dp"
-            android:textColor="@color/text_secondary"
-            android:textSize="14sp" />
-    </LinearLayout>
-
-    <TextView
-        android:id="@+id/adminBackupLink"
-        android:layout_width="wrap_content"
-        android:layout_height="44dp"
-        android:layout_gravity="center_horizontal"
-        android:layout_marginTop="10dp"
-        android:background="@drawable/bg_button"
-        android:focusable="true"
-        android:gravity="center"
-        android:paddingHorizontal="18dp"
-        android:text="@string/admin_backup"
-        android:textColor="@color/bg"
-        android:textSize="14sp"
-        android:textStyle="bold" />
-
-    <TextView
-        android:id="@+id/adminHealth"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:gravity="center"
-        android:textColor="@color/text_secondary"
-        android:textSize="13sp" />
-
-    <TextView
-        android:id="@+id/btnMagicCleanup"
-        android:layout_width="wrap_content"
-        android:layout_height="44dp"
-        android:layout_gravity="center_horizontal"
-        android:layout_marginTop="8dp"
-        android:background="@drawable/bg_nav"
+        android:layout_marginTop="12dp"
+        android:background="@drawable/bg_focusable"
         android:clickable="true"
         android:focusable="true"
         android:gravity="center"
+        android:minHeight="120dp"
+        android:nextFocusLeft="@id/btnAdmin"
+        android:nextFocusUp="@id/cardAdminFavorites"
+        android:orientation="vertical"
         android:paddingHorizontal="18dp"
-        android:text="@string/magic_cleanup"
-        android:textColor="@color/text_primary"
-        android:textSize="14sp" />
+        android:paddingVertical="16dp">
+
+        <ImageView
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:contentDescription="@null"
+            android:src="@drawable/ic_settings"
+            android:tint="@color/accent" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:gravity="center"
+            android:text="@string/admin_setup"
+            android:textColor="@color/text_primary"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:gravity="center"
+            android:text="@string/admin_setup_detail"
+            android:textColor="@color/text_secondary"
+            android:textSize="14sp" />
+    </LinearLayout>
+    </LinearLayout>
+
+    <ScrollView
+        android:id="@+id/adminTools"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true"
+        android:focusable="false"
+        android:scrollbars="none"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_horizontal"
+            android:orientation="vertical"
+            android:paddingTop="8dp"
+            android:paddingBottom="18dp">
+
+            <TextView
+                android:id="@+id/adminToolsBack"
+                android:layout_width="wrap_content"
+                android:layout_height="44dp"
+                android:layout_gravity="start"
+                android:background="@drawable/bg_nav"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:nextFocusDown="@id/adminQuietToggle"
+                android:nextFocusLeft="@id/btnAdmin"
+                android:paddingHorizontal="16dp"
+                android:text="@string/back"
+                android:textColor="@color/text_primary"
+                android:textSize="15sp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:gravity="center"
+                android:text="@string/admin_setup"
+                android:textColor="@color/text_primary"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/adminHealth"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:gravity="center"
+                android:textColor="@color/text_secondary"
+                android:textSize="15sp" />
+
+            <TextView
+                android:id="@+id/adminParentalSummary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:gravity="center"
+                android:textColor="@color/text_secondary"
+                android:textSize="14sp" />
+
+            <LinearLayout
+                android:id="@+id/adminQuietRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:gravity="center"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/adminQuietToggle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="44dp"
+                    android:background="@drawable/bg_nav"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:nextFocusLeft="@id/btnAdmin"
+                    android:nextFocusRight="@id/adminQuietSchedule"
+                    android:nextFocusUp="@id/adminToolsBack"
+                    android:paddingHorizontal="14dp"
+                    android:text="@string/quiet_hours_off"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp" />
+
+                <TextView
+                    android:id="@+id/adminQuietSchedule"
+                    android:layout_width="wrap_content"
+                    android:layout_height="44dp"
+                    android:layout_marginStart="10dp"
+                    android:background="@drawable/bg_nav"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:nextFocusDown="@id/adminBackupLink"
+                    android:nextFocusLeft="@id/adminQuietToggle"
+                    android:paddingHorizontal="14dp"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="14sp" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/adminBackupLink"
+                android:layout_width="wrap_content"
+                android:layout_height="44dp"
+                android:layout_marginTop="16dp"
+                android:background="@drawable/bg_button"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:nextFocusDown="@id/btnMagicCleanup"
+                android:nextFocusUp="@id/adminQuietSchedule"
+                android:paddingHorizontal="18dp"
+                android:text="@string/admin_backup"
+                android:textColor="@color/bg"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/btnMagicCleanup"
+                android:layout_width="wrap_content"
+                android:layout_height="44dp"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/bg_nav"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:nextFocusUp="@id/adminBackupLink"
+                android:paddingHorizontal="18dp"
+                android:text="@string/magic_cleanup"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp" />
+        </LinearLayout>
+    </ScrollView>
 </LinearLayout>

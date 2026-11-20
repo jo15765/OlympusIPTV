@@ -14,6 +14,13 @@ object GuideFeel {
     fun chipDownTarget(continueVisible: Boolean): String =
         if (continueVisible) "homeContinue" else "categoryList"
 
+    /** Channel column width: longest name plus the number and logo, capped so the grid keeps the rest. */
+    fun columnWidth(textPx: Float, chromePx: Float, parentPx: Int): Int {
+        val floor = chromePx.toInt().coerceAtLeast(1)
+        val ceiling = (parentPx * 0.40f).toInt().coerceAtLeast(floor)
+        return (textPx + chromePx).toInt().coerceIn(floor, ceiling)
+    }
+
     fun autoSkipIntro(seriesId: String?, remembered: Set<String>): Boolean {
         val id = seriesId?.trim().orEmpty()
         return id.isNotEmpty() && id in remembered
