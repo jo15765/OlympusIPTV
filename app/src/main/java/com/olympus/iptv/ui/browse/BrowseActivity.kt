@@ -27,6 +27,7 @@ import androidx.transition.AutoTransition
 import androidx.transition.TransitionManager
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.MediaItem
@@ -79,7 +80,9 @@ import com.olympus.iptv.record.RecordPrompt
 import com.olympus.iptv.record.RecordingService
 import com.olympus.iptv.ui.FocusMotion
 import com.olympus.iptv.ui.Haptics
-import com.olympus.iptv.ui.epg.EpgEditsActivity
+import com.olympus.iptv.ui.epg.EpgEditsFragment
+import com.olympus.iptv.ui.epg.ParentalFragment
+import com.olympus.iptv.ui.epg.SanitizeFragment
 import com.olympus.iptv.ui.login.LoginActivity
 import com.olympus.iptv.ui.player.PlayerActivity
 import com.olympus.iptv.ui.player.SeriesPlay
@@ -103,7 +106,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.text.NumberFormat
 
-class BrowseActivity : AppCompatActivity() {
+class BrowseActivity : AppCompatActivity(), ToolHost {
     private lateinit var binding: ActivityBrowseBinding
     private val browseModel by lazy { ViewModelProvider(this)[BrowseViewModel::class.java] }
     private val loader = PlaylistLoader()
@@ -193,10 +196,7 @@ class BrowseActivity : AppCompatActivity() {
         for (key in keys) epgCache.remove(key)
     }
 
-    private val lineupLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-        showBlank()
-        applySavedLineup()
-    }
+    private lateinit var browseToolHost: BrowseToolHost
 
     private lateinit var vpnUi: VpnUi
     private lateinit var panes: BrowseLazyPanes
@@ -290,6 +290,9 @@ class BrowseActivity : AppCompatActivity() {
         epgProvider = { epgCache[it.id] }
     ).also { adapter ->
         adapter.continueLabel = { continueText(it) }
+        adapter.continueProgress = { continueProgress(it) }
+        adapter.posterRating = { posterRatingLabel(it) }
+        adapter.posterMeta = { posterMetaLine(it) }
     }
     private lateinit var programAdapter: ProgramGuideAdapter
     private var guideJob: Job? = null
@@ -316,6 +319,19 @@ class BrowseActivity : AppCompatActivity() {
         panes = BrowseLazyPanes(binding)
         wireLazyPanes()
         setContentView(binding.root)
+        binding.root.post {
+            com.olympus.iptv.ui.RemoteTip.show(this, getString(R.string.remote_tip_browse), binding.root as? android.view.ViewGroup)
+        }
+        browseToolHost = BrowseToolHost(this, binding.toolOverlay)
+        supportFragmentManager.setFragmentResultListener(EpgEditsFragment.RESULT_KEY, this) { _, _ ->
+            showBlank()
+            applySavedLineup()
+        }
+        supportFragmentManager.addOnBackStackChangedListener {
+            if (supportFragmentManager.findFragmentById(R.id.toolHost) == null) {
+                binding.toolOverlay.visibility = View.GONE
+            }
+        }
         touchPrimary = com.olympus.iptv.ui.DeviceForm.isTouchPrimary(this)
         if (touchPrimary) {
             requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
@@ -459,7 +475,7 @@ class BrowseActivity : AppCompatActivity() {
         binding.guideNow.setOnClickListener { jumpGuideToNow() }
         binding.btnParental.setOnClickListener {
             val saved = playlist ?: return@setOnClickListener
-            startActivity(com.olympus.iptv.ui.epg.ParentalActivity.intent(this, saved.id))
+            showTool(ParentalFragment.newInstance(saved.id))
         }
         binding.btnAdmin.setOnClickListener {
             if (panes.isAdminVisible()) showBlank() else showAdminPane()
@@ -1794,8 +1810,14 @@ class BrowseActivity : AppCompatActivity() {
 
     private fun openEpgEdits() {
         val saved = playlist ?: return
-        lineupLauncher.launch(EpgEditsActivity.intent(this, saved.id, kind, saved.includeVod))
+        showTool(EpgEditsFragment.newInstance(saved.id, kind, saved.includeVod))
     }
+
+    override fun showTool(fragment: Fragment) = browseToolHost.showTool(fragment)
+
+    override fun hideTool() = browseToolHost.hideTool()
+
+    override fun isToolVisible(): Boolean = browseToolHost.isToolVisible()
 
     private enum class GuideSection { TV, MOVIES, SHOWS }
 
@@ -1819,6 +1841,21 @@ class BrowseActivity : AppCompatActivity() {
     }
 
     private fun goBackOneScreen() {
+        if (browseToolHost.isToolVisible()) {
+            when (val tool = supportFragmentManager.findFragmentById(R.id.toolHost)) {
+                is EpgEditsFragment -> tool.closeFromBrowseBack()
+                is ParentalFragment, is SanitizeFragment -> {
+                    val back = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_BACK)
+                    if (tool is ParentalFragment) {
+                        if (!tool.dispatchKeyEvent(back)) browseToolHost.hideTool()
+                    } else if (tool is SanitizeFragment) {
+                        if (!tool.dispatchKeyEvent(back)) browseToolHost.hideTool()
+                    }
+                }
+                else -> browseToolHost.hideTool()
+            }
+            return
+        }
         if (panes.isVpnVisible()) {
             showAdminPane(panes.cardAdminVpn)
             return
@@ -2208,7 +2245,7 @@ class BrowseActivity : AppCompatActivity() {
     }
 
     private fun paintNowPlayingBar() {
-        if (!touchPrimary || !::binding.isInitialized) return
+        if (!::binding.isInitialized) return
         val app = application as OlympusIptvApp
         val channel = app.lastPlayed
         val match = channel != null && app.lastPlayedPlaylistId == playlist?.id
@@ -2216,9 +2253,25 @@ class BrowseActivity : AppCompatActivity() {
             binding.nowPlayingBar.visibility = View.GONE
             return
         }
+        val live = channel.kind == ContentKind.LIVE && channel.seriesId.isNullOrBlank()
+        binding.nowPlayingLabel.text = if (live) {
+            getString(R.string.now_playing_live_badge)
+        } else {
+            getString(R.string.now_playing)
+        }
         binding.nowPlayingTitle.text = channel.name
-        binding.nowPlayingBar.visibility =
-            if (binding.groupColumn.visibility == View.VISIBLE) View.VISIBLE else View.GONE
+        binding.nowPlayingResume.text = if (live) {
+            getString(R.string.now_playing_fullscreen)
+        } else {
+            getString(R.string.now_playing_resume)
+        }
+        // Phone strip always; TV also shows when corner PiP is active so users can return.
+        val show = if (touchPrimary) {
+            binding.groupColumn.visibility == View.VISIBLE
+        } else {
+            binding.previewCard.visibility == View.VISIBLE || binding.groupColumn.visibility == View.VISIBLE
+        }
+        binding.nowPlayingBar.visibility = if (show) View.VISIBLE else View.GONE
     }
 
     private fun resumeNowPlaying() {
@@ -2456,6 +2509,7 @@ class BrowseActivity : AppCompatActivity() {
                 restoreAfterPlayer()
                 restoreGuideUiIfPossible()
                 maybeShowGuidePip()
+                paintNowPlayingBar()
                 adoptRemoteLineup()
             }
             return
@@ -2570,11 +2624,7 @@ class BrowseActivity : AppCompatActivity() {
     }
 
     private fun continueText(channel: Channel): String? {
-        val spot = if (!channel.seriesId.isNullOrBlank() && channel.streamUrl.isBlank()) {
-            recentEntries.firstOrNull { it.seriesId == channel.seriesId && it.canResume() }
-        } else {
-            recentEntries.firstOrNull { it.channelId == channel.id && it.canResume() }
-        } ?: return null
+        val spot = resumeEntry(channel) ?: return null
         val minutes = ((spot.positionMs ?: 0L) / 60_000L).toInt().coerceAtLeast(1)
         val episode = spot.name?.takeIf {
             it.isNotBlank() && it != channel.name && channel.streamUrl.isBlank()
@@ -2584,6 +2634,37 @@ class BrowseActivity : AppCompatActivity() {
         } else {
             getString(R.string.continue_episode, episode, minutes)
         }
+    }
+
+    private fun resumeEntry(channel: Channel): WatchEntry? =
+        if (!channel.seriesId.isNullOrBlank() && channel.streamUrl.isBlank()) {
+            recentEntries.firstOrNull { it.seriesId == channel.seriesId && it.canResume() }
+        } else {
+            recentEntries.firstOrNull { it.channelId == channel.id && it.canResume() }
+        }
+
+    private fun continueProgress(channel: Channel): Int? {
+        val spot = resumeEntry(channel) ?: return null
+        val position = spot.positionMs ?: return null
+        val duration = spot.durationMs ?: return null
+        if (duration <= 0L) return null
+        return ((position * 1000L) / duration).toInt().coerceIn(1, 1000)
+    }
+
+    private fun posterRatingLabel(channel: Channel): String? {
+        if (channel.kind == ContentKind.LIVE && channel.seriesId.isNullOrBlank()) return null
+        val preferTv = !channel.seriesId.isNullOrBlank()
+        val peek = com.olympus.iptv.playlist.TitleRatings.peek(channel.name, preferTv) ?: return null
+        val score = peek.ratings.firstOrNull()?.scoreLabel ?: return null
+        val number = score.substringBefore('/').substringBefore('%').trim()
+        if (number.isBlank()) return null
+        return "★ $number"
+    }
+
+    private fun posterMetaLine(channel: Channel): String? {
+        val year = Regex("""\b(19|20)\d{2}\b""").find(channel.name)?.value
+        val resume = continueText(channel)
+        return listOfNotNull(year, resume).joinToString(" · ").ifBlank { null }
     }
 
     private fun recentChannels(sectionNow: GuideSection, config: LineupConfig): List<Channel> {
@@ -3084,6 +3165,12 @@ class BrowseActivity : AppCompatActivity() {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (browseToolHost.isToolVisible()) {
+            when (val tool = supportFragmentManager.findFragmentById(R.id.toolHost)) {
+                is ParentalFragment -> if (tool.dispatchKeyEvent(event)) return true
+                is SanitizeFragment -> if (tool.dispatchKeyEvent(event)) return true
+            }
+        }
         if (onGroupPinKey(event)) return true
         if (onDialKey(event)) return true
         if (event.action == KeyEvent.ACTION_DOWN &&
@@ -5985,6 +6072,7 @@ class BrowseActivity : AppCompatActivity() {
         } ?: return
         if (app.lastPlayedPlaylistId != playlist?.id) return
         previewCtl.showGuidePip(channel) { play(it) }
+        paintNowPlayingBar()
     }
 
     private fun focusReturnChannel(row: Int) {

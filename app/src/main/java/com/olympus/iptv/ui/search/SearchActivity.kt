@@ -17,6 +17,8 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import androidx.media3.common.MediaItem
+import androidx.media3.exoplayer.ExoPlayer
 import androidx.recyclerview.widget.GridLayoutManager
 import com.olympus.iptv.OlympusIptvApp
 import com.olympus.iptv.R
@@ -25,6 +27,7 @@ import com.olympus.iptv.data.ChannelNames
 import com.olympus.iptv.data.ContentKind
 import com.olympus.iptv.data.Favorites
 import com.olympus.iptv.data.LineupConfig
+import com.olympus.iptv.data.WatchEntry
 import com.olympus.iptv.databinding.ActivitySearchBinding
 import com.olympus.iptv.playlist.CatalogDb
 import com.olympus.iptv.playlist.CountryIndex
@@ -54,6 +57,9 @@ class SearchActivity : AppCompatActivity() {
     private var groupNames = emptyMap<String, String>()
     private var lineupConfig = LineupConfig()
     private var playlistId: String? = null
+    private var recentEntries: List<WatchEntry> = emptyList()
+    private var searchPreview: ExoPlayer? = null
+    private var searchPreviewId: String? = null
     private var searchJob: Job? = null
     private val searchHandler = Handler(Looper.getMainLooper())
     private var searchWait: Runnable? = null
@@ -122,7 +128,8 @@ class SearchActivity : AppCompatActivity() {
                 if (savedId != null && item != null) {
                     com.olympus.iptv.ui.browse.WatchQueue.offer(this, savedId, item)
                 }
-            }
+            },
+            watchProgress = { channel -> watchProgressOf(channel) }
         )
         layout.spanSizeLookup = object : GridLayoutManager.SpanSizeLookup() {
             override fun getSpanSize(position: Int): Int =
@@ -188,6 +195,99 @@ class SearchActivity : AppCompatActivity() {
             if (!isFinishing) showMatches(binding.inputSearch.text?.toString().orEmpty())
         }
         binding.inputSearch.requestFocus()
+        paintSearchNowPlaying()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        val id = playlistId
+        if (id != null) {
+            lifecycleScope.launch {
+                recentEntries = kotlinx.coroutines.withContext(Dispatchers.IO) {
+                    (application as OlympusIptvApp).playlistStore.recent(id)
+                }
+                if (!isFinishing) adapter.notifyDataSetChanged()
+            }
+        }
+        paintSearchNowPlaying()
+    }
+
+    override fun onPause() {
+        searchPreview?.playWhenReady = false
+        super.onPause()
+    }
+
+    override fun onDestroy() {
+        searchPreview?.release()
+        searchPreview = null
+        searchPreviewId = null
+        super.onDestroy()
+    }
+
+    private fun watchProgressOf(channel: Channel): Int? {
+        val spot = if (!channel.seriesId.isNullOrBlank() && channel.streamUrl.isBlank()) {
+            recentEntries.firstOrNull { it.seriesId == channel.seriesId && it.canResume() }
+        } else {
+            recentEntries.firstOrNull { it.channelId == channel.id && it.canResume() }
+        } ?: return null
+        val position = spot.positionMs ?: return null
+        val duration = spot.durationMs ?: return null
+        if (duration <= 0L) return null
+        return ((position * 1000L) / duration).toInt().coerceIn(1, 1000)
+    }
+
+    private fun paintSearchNowPlaying() {
+        if (!::binding.isInitialized) return
+        val app = application as OlympusIptvApp
+        val channel = app.lastPlayed
+        val match = channel != null && !channel.streamUrl.isBlank() &&
+            (app.lastPlayedPlaylistId == null || app.lastPlayedPlaylistId == app.guidePlaylistId)
+        if (!match || channel == null) {
+            binding.nowPlayingBar.visibility = View.GONE
+            return
+        }
+        val live = channel.kind == ContentKind.LIVE && channel.seriesId.isNullOrBlank()
+        binding.nowPlayingLabel.text = if (live) {
+            getString(R.string.preview_live_return, channel.name)
+        } else {
+            getString(R.string.now_playing) + " · " + channel.name
+        }
+        binding.nowPlayingBar.visibility = View.VISIBLE
+        if (live && !com.olympus.iptv.ui.DeviceForm.isTouchPrimary(this)) {
+            startSearchPreview(channel)
+        } else {
+            stopSearchPreview()
+        }
+        val open = View.OnClickListener {
+            openPlayer(channel, 0, listOf(channel))
+        }
+        binding.nowPlayingBar.setOnClickListener(open)
+        binding.nowPlayingResume.setOnClickListener(open)
+    }
+
+    private fun startSearchPreview(channel: Channel) {
+        if (channel.streamUrl.isBlank()) return
+        binding.searchPreview.visibility = View.VISIBLE
+        if (searchPreviewId == channel.id && searchPreview != null) {
+            searchPreview?.playWhenReady = true
+            return
+        }
+        val player = searchPreview ?: ExoPlayer.Builder(this).build().also {
+            it.volume = 0f
+            searchPreview = it
+            binding.searchPreview.player = it
+        }
+        searchPreviewId = channel.id
+        player.setMediaItem(MediaItem.fromUri(channel.streamUrl))
+        player.prepare()
+        player.playWhenReady = true
+    }
+
+    private fun stopSearchPreview() {
+        searchPreviewId = null
+        searchPreview?.stop()
+        searchPreview?.clearMediaItems()
+        if (::binding.isInitialized) binding.searchPreview.visibility = View.GONE
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {

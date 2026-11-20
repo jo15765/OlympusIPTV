@@ -26,7 +26,8 @@ class SearchTileAdapter(
     private val isFavorite: (Channel, String) -> Boolean,
     private val onFavorite: (Channel, String) -> Unit,
     private val onClick: (Channel, Int, List<Channel>) -> Unit,
-    private val onLongClick: (Channel, String) -> Unit = { _, _ -> }
+    private val onLongClick: (Channel, String) -> Unit = { _, _ -> },
+    private val watchProgress: (Channel) -> Int? = { null }
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     private val items = mutableListOf<SearchEntry>()
@@ -110,6 +111,7 @@ class SearchTileAdapter(
                 item.name
             }
             binding.group.text = item.groupTitle.orEmpty()
+            paintTileChrome(item)
             val saved = isFavorite(item, entry.sectionKey)
             binding.favorite.setImageResource(if (saved) R.drawable.ic_star else R.drawable.ic_star_outline)
             binding.favorite.imageTintList = android.content.res.ColorStateList.valueOf(
@@ -128,6 +130,35 @@ class SearchTileAdapter(
             binding.favorite.setOnClickListener {
                 val channel = entry.channel ?: return@setOnClickListener
                 onFavorite(channel, entry.sectionKey)
+            }
+        }
+
+        private fun paintTileChrome(item: Channel) {
+            val vod = item.kind == ContentKind.VOD || !item.seriesId.isNullOrBlank()
+            val rating = if (!vod) null else {
+                com.olympus.iptv.playlist.TitleRatings.peek(item.name, !item.seriesId.isNullOrBlank())
+                    ?.ratings?.firstOrNull()?.scoreLabel
+            }
+            if (rating.isNullOrBlank()) {
+                binding.ratingBadge.visibility = android.view.View.GONE
+            } else {
+                val number = rating.substringBefore('/').substringBefore('%').trim()
+                binding.ratingBadge.text = "★ $number"
+                binding.ratingBadge.visibility = android.view.View.VISIBLE
+            }
+            val year = Regex("""\b(19|20)\d{2}\b""").find(item.name)?.value
+            if (year.isNullOrBlank()) {
+                binding.tileMeta.visibility = android.view.View.GONE
+            } else {
+                binding.tileMeta.text = year
+                binding.tileMeta.visibility = android.view.View.VISIBLE
+            }
+            val progress = watchProgress(item)
+            if (progress == null || progress <= 0) {
+                binding.watchProgress.visibility = android.view.View.GONE
+            } else {
+                binding.watchProgress.progress = progress.coerceIn(1, 1000)
+                binding.watchProgress.visibility = android.view.View.VISIBLE
             }
         }
 

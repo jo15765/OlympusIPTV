@@ -47,6 +47,10 @@ class ChannelAdapter(
     private var sequentialNumbers = false
     private var scrolling = false
     var continueLabel: (Channel) -> String? = { null }
+    /** 0..1000 watch progress for poster gold bar; null hides. */
+    var continueProgress: (Channel) -> Int? = { null }
+    var posterRating: (Channel) -> String? = { null }
+    var posterMeta: (Channel) -> String? = { null }
     var posterMode = false
         set(value) {
             if (field == value) return
@@ -197,6 +201,7 @@ class ChannelAdapter(
                 detailOf(item.id) ?: groupLabel ?: item.groupTitle.orEmpty()
             )
             bindLogo(item)
+            bindPosterChrome(item)
             binding.playTarget.isFocusable = true
             binding.playTarget.isFocusableInTouchMode = true
             val touch = DeviceForm.isTouchPrimary(binding.root.context)
@@ -208,6 +213,30 @@ class ChannelAdapter(
             binding.playTarget.setOnFocusChangeListener { _, hasFocus ->
                 if (!touch) FocusMotion.animate(binding.playTarget, hasFocus)
                 if (hasFocus) onFocused(item)
+            }
+        }
+
+        private fun bindPosterChrome(item: Channel) {
+            val rating = posterRating(item)
+            if (rating.isNullOrBlank()) {
+                binding.ratingBadge.visibility = View.GONE
+            } else {
+                binding.ratingBadge.text = rating
+                binding.ratingBadge.visibility = View.VISIBLE
+            }
+            val meta = posterMeta(item)
+            if (meta.isNullOrBlank()) {
+                binding.posterMeta.visibility = View.GONE
+            } else {
+                binding.posterMeta.text = meta
+                binding.posterMeta.visibility = View.VISIBLE
+            }
+            val progress = continueProgress(item)
+            if (progress == null || progress <= 0) {
+                binding.watchProgress.visibility = View.GONE
+            } else {
+                binding.watchProgress.progress = progress.coerceIn(1, 1000)
+                binding.watchProgress.visibility = View.VISIBLE
             }
         }
 
@@ -225,6 +254,7 @@ class ChannelAdapter(
             val detail = detailOf(item.id)
             val group = com.olympus.iptv.data.NameImages.strip(groupLabel ?: item.groupTitle.orEmpty())
             binding.group.text = listOfNotNull(resume, detail).joinToString(" · ").ifBlank { group }
+            bindPosterChrome(item)
         }
     }
 

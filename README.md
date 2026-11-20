@@ -6,7 +6,7 @@
 
 ### For the latest and greatest, build your own APK from this code.
 
-The latest signed file is **0.2.70** (versionCode 71). **One APK** installs on Android TV / set-top boxes and on phones and tablets. Current stack: leaner rail + My Library, lazy Admin panes, Browse EPG/preview controllers, EPG color pills + synopsis dock, instant zap OSD, FTS/voice search, guide mini-PiP, dashboard GZIP, Emby-style episodes, TMDB ratings/trailers. Optional keys in `local.properties`: `tmdb.apiKey`, `watchmode.apiKey`, `opensubtitles.apiKey`, `sendgrid.apiKey` + `sendgrid.fromEmail`.
+The latest signed file is **0.2.70** (versionCode 71). **One APK** installs on Android TV / set-top boxes and on phones and tablets. This source is ahead of that APK: in-place Admin/EPG tools, My Library tabs that stay loaded, zap that drops the previous channel’s network work, a 7-day “not found” cache for TMDB/Watchmode, richer posters, playlist sync cards, and a short remote tip. Rebuild to get those. Optional keys in `local.properties`: `tmdb.apiKey`, `watchmode.apiKey`, `opensubtitles.apiKey`, `sendgrid.apiKey` + `sendgrid.fromEmail`.
 
 **This is a player only. You must provide your own streams.**
 
@@ -68,18 +68,18 @@ Olympus-IPTV is one APK for Android TV / set-top boxes and for phones and tablet
 | --- | --- |
 | Signed file | `C:\Users\chalu\Downloads\olympus-iptv-0.2.70.apk` |
 | What that file is | versionName **0.2.70**, versionCode **71** |
-| Source in this tree | versionName **0.2.70**, versionCode **71** |
-| What to run | Install the signed 0.2.70 APK, or build this source |
+| Source in this tree | versionName **0.2.70**, versionCode **71**, plus the source changes below (no newer APK yet) |
+| What to run | Install the signed 0.2.70 APK, or build this source for the newer navigation and playback behavior |
 | Install | Over the existing copy (TV or phone). Uninstalling wipes the saved account, playlist, and favorites. Downloader works with the same file. |
 | Launcher name | Two centered lines: Olympus over IPTV |
 
-**0.2.70** is the current release: docs refreshed for the full 0.2.67–0.2.69 feature set (rail, zap OSD, FTS/voice search, EPG pills/synopsis, Browse controllers, guide mini-PiP, dashboard GZIP).
+**0.2.70** is the latest signed release. The tree since that build keeps Admin and EPG tools inside Browse, hosts Queue / New / Reminders as resident Library tabs, cancels the previous channel’s EPG and subtitle work on zap, and adds poster chrome, playlist sync cards, and a fading remote tip.
 
 ### What’s new since 0.2.56 (enhancements)
 
 | Feature | Where |
 | --- | --- |
-| Reorder playlists | Home account list — ▲/▼ or Left/Right |
+| Playlist cards | Home — last sync time, live / movie / show counts, **Sync Now**, plus ▲/▼ or Left/Right to reorder |
 | Top 10 watched favorites | Group card on Live / Movies / Shows (favorites you watch most) |
 | Video decoder | EPG edits — Hardware / Hardware+extensions / Failsafe / Software prefer |
 | Phone PiP | Player **PiP**, long-press **Open in PiP**, swipe up on a title, leave player for Home (Admin **PiP gestures**) |
@@ -93,19 +93,24 @@ Olympus-IPTV is one APK for Android TV / set-top boxes and for phones and tablet
 | Player chrome | Play/Pause + progress show briefly, then hide after **3 seconds**; center/tap shows them again; **Info** / phone **Menu** opens the full row |
 | Faster Fresh open | New opens from cache without waiting on warm; playable re-check skipped when the library stamp is unchanged |
 | Leaner left rail | Search, Live TV, Movies, Shows, **My Library**, Recordings, Admin — About + Favorites setup live under Admin |
-| My Library | One screen with Queue / New / Reminders pills |
+| My Library | Queue, New, and Reminders stay loaded; pills or D-pad Left/Right on the pills switch them without a new window |
 | Lazy Admin panes | Admin / Web-UI / VPN / About inflate on demand (lighter cold start on Fire Stick / Onn) |
 | Warmer focus | Group/channel/poster cards scale to 1.04× with a soft gold focus stroke |
 | Group logo stack | Group cards show up to three channel logos; sports/events groups get a Live badge |
 | Emby-style episodes | Season chips with unwatched counts; landscape episode stills, 2-line plot, resume progress bar |
 | Copy TV URL | Login QR card + web dashboard one-click copy for the home Wi-Fi address |
-| Instant zap OSD | Channel Up/Down shows logo + now/next + progress before the stream is ready; last frame stays (no black flash) |
+| Instant zap OSD | Channel Up/Down cancels the previous channel’s EPG, catch-up, and subtitle requests, paints now/next from the local EPG cache on that press, and prefetches the neighbors |
 | Voice + FTS search | Search Mic button; catalog FTS with 150 ms debounce |
 | EPG synopsis dock | Focus a program → title, time, SxxExx, plot, Record / Remind without a dialog |
-| Guide mini-PiP | After Back from live playback, stream continues in the corner preview; OK expands full screen |
+| Guide mini-PiP | After Back from live playback, the stream keeps playing in the Browse corner and in a muted Search dock, with a gold **LIVE • Return to Fullscreen** badge |
 | Dashboard GZIP | Local Web-UI serves gzip when the browser asks; `portal/data/store.json` is never in the APK |
 | Browse controllers | EPG + preview logic live in `BrowseEpgController` / `BrowsePreviewController`; ViewModel restores focus + window |
 | EPG color pills | Program blocks tint + `[Live]` / `[New]` / `[Sports]` / `[Movie]` labels |
+| In-place tools | Parental, EPG edits, countries, group rename, sanitize, and strip names open over Browse instead of a new Activity |
+| Poster chrome | Movies, shows, Fresh, and search tiles: ★ rating when cached, bottom year / continue line, gold progress on a partial watch |
+| Remote tip | TV Browse and player show a translucent OK / Hold OK / Menu footer that fades after 4 seconds |
+| Metadata throttle | At most three TMDB/Watchmode lookups at once; a miss is remembered for 7 days so missing titles are not requested again every visit |
+| Catalog batches | Xtream live, movie, and series JSON is streamed and written in batches of 500 rows |
 
 ---
 
@@ -121,7 +126,7 @@ There is **no separate mobile APK**. The same `olympus-iptv-0.2.70.apk` detects 
 | --- | --- |
 | Guide chrome | Top **Back** + title + **Admin** / **About** / **Search**; bottom Live / Movies / Shows tabs; sticky Groups header with Search; left TV rail hidden; groups are a single tall list |
 | Group filter | Typeahead field under Groups — jump to a group by name without leaving Live |
-| Now playing | After leaving the player, a resume strip shows the last title; tap Resume to open it again |
+| Now playing | After leaving the player, a resume strip shows the last title. Live shows **LIVE • Return to Fullscreen**; tap it to open the player again |
 | Live “now” | Channel rows show one line of what’s on (no TV EPG grid) |
 | Empty CTAs | Empty Favorites opens Favorites setup; empty Continue points you to Movies/Shows |
 | Pull to refresh | Swipe down on the groups list to refresh the catalog quietly |
@@ -206,7 +211,7 @@ Empty stretches are filled. A channel whose listings are only its own name, or t
 
 OK on a past program plays catch-up when the provider marked that channel for archive or catch-up (Xtream `tv_archive`, or M3U `catchup` / `catchup-source` / `catchup-days`). Channels without that mark leave past slots as guide only.
 
-There is no auto-preview on phones. On TV, the focused live channel can warm quietly for faster full-screen start. After **Back** from live playback, that stream can keep running in the bottom-right guide mini-PiP; select it to expand full screen again. Section, group, and scroll position are restored from `BrowseViewModel` when you return from the player or My Library.
+There is no auto-preview on phones. On TV, the focused live channel can warm quietly for faster full-screen start. After **Back** from live playback, that stream keeps running in the bottom-right guide mini-PiP with a gold **LIVE • Return to Fullscreen** caption; select it to expand full screen again. Search shows the same live stream in a muted dock. Section, group, and scroll position are restored from `BrowseViewModel` when you return from the player or My Library.
 
 **Continue** is the first group on Movies and Shows when a movie or episode was stopped in the middle. It lists that title and the minute you reached. OK on a movie resumes it. OK on a show resumes the episode. The group is hidden when nothing is in progress. **Recently watched** stays the first group on TV, and the next group on Movies and Shows, directly above Favorites, even before anything has been played. **Top 10 watched** appears when you have favorites and watch history — it ranks those favorites by how often they show up in Recently watched. **Favorites** lists only the favorites for that section. Live TV shows the current date and 12-hour clock above the group cards instead of a favorites quick-zap strip. **Guide density** on EPG edits switches Comfortable or Compact row height.
 
@@ -620,11 +625,11 @@ clearcast-tuner/
 | Queue | Movies and series you held the center button on |
 | Episodes | Season chips with unwatched counts; landscape episode stills, runtime, 2-line plot, resume progress. Check one episode or the whole season. |
 | Parental | Visible Live TV groups as multi-select cards; Set PIN and Remove lock both use the on-screen numeric pad |
-| Home | Account / playlist list with ▲▼ reorder |
+| Home | Playlist cards: type, host, live / movie / show counts, last sync, **Sync Now**, ▲▼ reorder |
 | Admin | Refresh, Web-UI, EPG edits, VPN, About, and Favorites setup (lazy-inflated). The web dashboard has the same VPN card |
 | About | Player-only notice, credits, coffee QR (opened from Admin) |
-| My Library | Queue / New / Reminders pills that open those screens |
-| Search | Find a channel, movie, or show and star it |
+| My Library | Queue, New, and Reminders stay on one screen; pills switch them in place |
+| Search | Find a channel, movie, or show and star it. Tiles show a rating and watch progress when those are known. A muted live dock appears after you leave the player |
 | Player | Play a channel, movie, episode, or recording; auto-hiding play/pause + progress; Cast, Trailer, PiP (phone), Audio/Subtitles, sleep |
 | New / Just Added | Playable premieres only; series seasons/episodes; D-pad focus trapped until Back |
 | EPG edits | Countries, groups, stripper, group renamer, Sanitize, Parental, images, name-to-guide, video decoder, TMDB items limit, PiP gestures, Scrobbler |
@@ -639,6 +644,19 @@ clearcast-tuner/
 ## Version history
 
 </div>
+
+### Source after 0.2.70 (no new APK yet)
+
+Still versionName **0.2.70** / versionCode **71**. Build this tree to get:
+
+- Parental, EPG edits, countries, group rename, sanitize, and strip names open over Browse. Schedule and SMB stay their own screens (they open from recordings).
+- My Library keeps Queue, New, and Reminders attached. Pills, or D-pad Left/Right while a pill is focused, switch them without starting another Activity.
+- Zap cancels the previous channel’s EPG, catch-up, and subtitle work, paints the banner from the local EPG cache, and prefetches the next and previous titles.
+- TMDB and Watchmode lookups are limited to three at a time. A title that is not found is stored for 7 days. Xtream catalog rows flush in batches of 500.
+- Live playback stays visible after Back: Browse corner preview and a muted Search dock, both with **LIVE • Return to Fullscreen**.
+- Movie, show, Fresh, and search cards can show a ★ rating, a year or continue line, and a gold progress bar.
+- Home playlist cards show counts, last sync time, and **Sync Now**.
+- On TV, Browse and the player show a D-pad tip that fades after 4 seconds.
 
 ### 0.2.70
 
@@ -1037,7 +1055,7 @@ clearcast-tuner/
 
 - This is a player only. You must provide your own streams. The app does not ship channels, movies, shows, or playlist credentials.
 - It is a beta. Feedback is greatly appreciated.
-- **0.2.70** is the latest signed file in Downloads (`olympus-iptv-0.2.70.apk`, versionCode 71).
+- **0.2.70** is the latest signed file in Downloads (`olympus-iptv-0.2.70.apk`, versionCode 71). That file does not include the source changes listed under **Source after 0.2.70**. Build this tree for those.
 - `portal/data/store.json` is for the Node portal on a PC only — it is not packaged in the APK.
 - Chromecast often cannot play provider IPTV/HLS the way the in-app player can; the Cast button warns before connecting.
 - Ratings, trailers, and New this week need the matching keys in `local.properties` at build time (`tmdb.apiKey`, `watchmode.apiKey`).

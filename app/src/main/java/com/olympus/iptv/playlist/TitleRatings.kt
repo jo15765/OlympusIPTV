@@ -60,6 +60,7 @@ object TitleRatings {
     @Volatile private var diskFile: File? = null
     @Volatile private var diskDirty = false
     @Volatile private var lastPersistAt = 0L
+    @Volatile private var catalogDb: CatalogDb? = null
 
     private data class CacheEntry(
         val savedAt: Long,
@@ -76,7 +77,8 @@ object TitleRatings {
         val bundle: TitleRatingsBundle
     )
 
-    fun init(context: Context) {
+    fun init(context: Context, db: CatalogDb? = null) {
+        catalogDb = db
         val file = File(context.cacheDir, "title_ratings_cache.json")
         diskFile = file
         if (!file.exists()) return
@@ -92,6 +94,20 @@ object TitleRatings {
                 }
             }
         }
+    }
+
+    private fun emptyBundle(name: String) =
+        TitleRatingsBundle(title = name, overview = "", ratings = emptyList(), reviews = emptyList())
+
+    private fun isNegativeMiss(key: String): Boolean =
+        catalogDb?.isMetaMiss(key) == true
+
+    private fun rememberNegativeMiss(key: String, bundle: TitleRatingsBundle) {
+        if (bundle.tmdbId != null || bundle.ratings.isNotEmpty()) {
+            catalogDb?.clearMetaMiss(key)
+            return
+        }
+        catalogDb?.putMetaMiss(key)
     }
 
     // Android ICU requires `}` escaped outside character classes; an unescaped `}` crashed playback.
@@ -137,61 +153,75 @@ object TitleRatings {
     /** Cheap path for poster/focus lines — TMDB only, no reviews. */
     fun loadScores(name: String, preferTv: Boolean): TitleRatingsBundle {
         val clean = cleanTitle(name)
-        if (clean.isBlank()) {
-            return TitleRatingsBundle(title = name, overview = "", ratings = emptyList(), reviews = emptyList())
-        }
+        if (clean.isBlank()) return emptyBundle(name)
         peek(clean, preferTv)?.let { return it.copy(reviews = emptyList()) }
 
         val key = cacheKey(clean, preferTv)
-        val tmdbKey = BuildConfig.TMDB_API_KEY.trim()
-        val tmdb = if (tmdbKey.isNotBlank()) {
-            runCatching {
-                TmdbClient(tmdbKey, http).searchTitle(clean, preferTv, limit = 1).firstOrNull()
-            }.getOrNull()
-        } else null
-        val bundle = assemble(clean, tmdb, watch = null, reviews = emptyList(), hasReviews = false)
-        putScore(key, bundle)
-        return bundle
+        if (isNegativeMiss(key)) return emptyBundle(clean)
+
+        return MetaLookupGate.withPermit {
+            peek(clean, preferTv)?.let { return@withPermit it.copy(reviews = emptyList()) }
+            if (isNegativeMiss(key)) return@withPermit emptyBundle(clean)
+            val tmdbKey = BuildConfig.TMDB_API_KEY.trim()
+            val tmdb = if (tmdbKey.isNotBlank()) {
+                runCatching {
+                    TmdbClient(tmdbKey, http).searchTitle(clean, preferTv, limit = 1).firstOrNull()
+                }.getOrNull()
+            } else null
+            val bundle = assemble(clean, tmdb, watch = null, reviews = emptyList(), hasReviews = false)
+            putScore(key, bundle)
+            rememberNegativeMiss(key, bundle)
+            bundle
+        }
     }
 
     /** Full sheet path — parallel TMDB + Watchmode, reviews on demand. */
     suspend fun loadFull(name: String, preferTv: Boolean, tmdbLimit: Int = 10): TitleRatingsBundle {
         val clean = cleanTitle(name)
-        if (clean.isBlank()) {
-            return TitleRatingsBundle(title = name, overview = "", ratings = emptyList(), reviews = emptyList())
-        }
+        if (clean.isBlank()) return emptyBundle(name)
         val key = cacheKey(clean, preferTv)
         val now = System.currentTimeMillis()
         synchronized(lock) {
             fullCache[key]?.takeIf { now - it.savedAt <= TTL_MS && (it.bundle.hasReviews || it.bundle.tmdbId == null) }
                 ?.let { return it.bundle }
         }
+        if (isNegativeMiss(key)) return emptyBundle(clean)
 
-        return coroutineScope {
-            val tmdbKey = BuildConfig.TMDB_API_KEY.trim()
-            val watchKey = BuildConfig.WATCHMODE_API_KEY.trim()
-            val client = if (tmdbKey.isNotBlank()) TmdbClient(tmdbKey, http) else null
-            val tmdbDef = async(Dispatchers.IO) {
-                if (client == null) null
-                else runCatching {
-                    client.searchTitle(clean, preferTv, tmdbLimit.coerceIn(1, 50)).firstOrNull()
-                }.getOrNull()
+        return MetaLookupGate.withPermitAsync {
+            synchronized(lock) {
+                fullCache[key]?.takeIf {
+                    System.currentTimeMillis() - it.savedAt <= TTL_MS &&
+                        (it.bundle.hasReviews || it.bundle.tmdbId == null)
+                }?.let { return@withPermitAsync it.bundle }
             }
-            val watchDef = async(Dispatchers.IO) {
-                if (watchKey.isBlank()) null
-                else runCatching { watchmodeMeta(watchKey, clean, preferTv) }.getOrNull()
-            }
-            val tmdb = tmdbDef.await()
-            val watch = watchDef.await()
-            val reviews = if (tmdb != null && client != null) {
-                withContext(Dispatchers.IO) {
-                    runCatching { tmdbReviews(tmdbKey, tmdb.tmdbId, tmdb.mediaType) }.getOrDefault(emptyList())
+            if (isNegativeMiss(key)) return@withPermitAsync emptyBundle(clean)
+            coroutineScope {
+                val tmdbKey = BuildConfig.TMDB_API_KEY.trim()
+                val watchKey = BuildConfig.WATCHMODE_API_KEY.trim()
+                val client = if (tmdbKey.isNotBlank()) TmdbClient(tmdbKey, http) else null
+                val tmdbDef = async(Dispatchers.IO) {
+                    if (client == null) null
+                    else runCatching {
+                        client.searchTitle(clean, preferTv, tmdbLimit.coerceIn(1, 50)).firstOrNull()
+                    }.getOrNull()
                 }
-            } else emptyList()
-            val bundle = assemble(clean, tmdb, watch, reviews, hasReviews = true)
-            putFull(key, bundle)
-            putScore(key, bundle.copy(reviews = emptyList(), hasReviews = false))
-            bundle
+                val watchDef = async(Dispatchers.IO) {
+                    if (watchKey.isBlank()) null
+                    else runCatching { watchmodeMeta(watchKey, clean, preferTv) }.getOrNull()
+                }
+                val tmdb = tmdbDef.await()
+                val watch = watchDef.await()
+                val reviews = if (tmdb != null && client != null) {
+                    withContext(Dispatchers.IO) {
+                        runCatching { tmdbReviews(tmdbKey, tmdb.tmdbId, tmdb.mediaType) }.getOrDefault(emptyList())
+                    }
+                } else emptyList()
+                val bundle = assemble(clean, tmdb, watch, reviews, hasReviews = true)
+                putFull(key, bundle)
+                putScore(key, bundle.copy(reviews = emptyList(), hasReviews = false))
+                rememberNegativeMiss(key, bundle)
+                bundle
+            }
         }
     }
 

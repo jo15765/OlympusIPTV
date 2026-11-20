@@ -3,18 +3,21 @@ package com.olympus.iptv.ui.browse
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.view.KeyEvent
 import androidx.appcompat.app.AppCompatActivity
 import com.olympus.iptv.R
 import com.olympus.iptv.databinding.ActivityLibraryBinding
-import com.olympus.iptv.remind.RemindersActivity
+import com.olympus.iptv.remind.RemindersFragment
 import com.olympus.iptv.ui.FocusMotion
 
-class LibraryActivity : AppCompatActivity() {
+/**
+ * Queue, Fresh, and Reminders stay attached and are shown or hidden in place.
+ * D-pad Left/Right on the pills switches tabs without starting a new Activity.
+ */
+class LibraryActivity : AppCompatActivity(), LibraryHost {
     private lateinit var binding: ActivityLibraryBinding
     private val playlistId by lazy { intent.getStringExtra(EXTRA_PLAYLIST_ID).orEmpty() }
-    private var tab = Tab.QUEUE
-
-    private enum class Tab { QUEUE, FRESH, REMINDERS }
+    private var tab = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -34,50 +37,95 @@ class LibraryActivity : AppCompatActivity() {
                 right = true
             )
         }
+        if (savedInstanceState == null) {
+            val queue = QueueFragment.newInstance(playlistId)
+            val fresh = FreshFragment.newInstance(playlistId)
+            val reminders = RemindersFragment.newInstance()
+            supportFragmentManager.beginTransaction()
+                .add(R.id.libraryHost, queue, TAGS[0])
+                .add(R.id.libraryHost, fresh, TAGS[1])
+                .hide(fresh)
+                .add(R.id.libraryHost, reminders, TAGS[2])
+                .hide(reminders)
+                .commitNow()
+        }
         binding.libraryBack.setOnClickListener { finish() }
-        binding.pillQueue.setOnClickListener { select(Tab.QUEUE) }
-        binding.pillFresh.setOnClickListener { select(Tab.FRESH) }
-        binding.pillReminders.setOnClickListener { select(Tab.REMINDERS) }
-        binding.libraryOpen.setOnClickListener { openSelected() }
-        binding.libraryCard.setOnClickListener { openSelected() }
-        listOf(binding.pillQueue, binding.pillFresh, binding.pillReminders, binding.libraryOpen, binding.libraryCard)
+        binding.pillQueue.setOnClickListener { showTab(0) }
+        binding.pillFresh.setOnClickListener { showTab(1) }
+        binding.pillReminders.setOnClickListener { showTab(2) }
+        listOf(binding.pillQueue, binding.pillFresh, binding.pillReminders, binding.libraryBack)
             .forEach { FocusMotion.bind(it, enabled = !com.olympus.iptv.ui.DeviceForm.isTouchPrimary(this)) }
-        select(Tab.QUEUE)
+        showTab(savedInstanceState?.getInt(STATE_TAB, 0) ?: 0)
         binding.pillQueue.post { binding.pillQueue.requestFocus() }
     }
 
-    private fun select(next: Tab) {
-        tab = next
-        binding.pillQueue.isSelected = next == Tab.QUEUE
-        binding.pillFresh.isSelected = next == Tab.FRESH
-        binding.pillReminders.isSelected = next == Tab.REMINDERS
-        when (next) {
-            Tab.QUEUE -> {
-                binding.libraryHeading.setText(R.string.nav_queue)
-                binding.libraryHint.setText(R.string.library_queue_hint)
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putInt(STATE_TAB, tab)
+    }
+
+    override fun onFreshExit() {
+        finish()
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (tab == 1) {
+            val fresh = supportFragmentManager.findFragmentByTag(TAGS[1]) as? FreshFragment
+            if (fresh?.dispatchKeyEvent(event) == true) return true
+        }
+        if (event.action == KeyEvent.ACTION_DOWN) {
+            val focused = currentFocus
+            val onChrome = focused === binding.pillQueue || focused === binding.pillFresh ||
+                focused === binding.pillReminders || focused === binding.libraryBack
+            if (onChrome) {
+                when (event.keyCode) {
+                    KeyEvent.KEYCODE_DPAD_LEFT -> {
+                        showTab((tab - 1).floorMod(3))
+                        focusPill()
+                        return true
+                    }
+                    KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                        showTab((tab + 1).floorMod(3))
+                        focusPill()
+                        return true
+                    }
+                }
             }
-            Tab.FRESH -> {
-                binding.libraryHeading.setText(R.string.nav_fresh)
-                binding.libraryHint.setText(R.string.library_fresh_hint)
-            }
-            Tab.REMINDERS -> {
-                binding.libraryHeading.setText(R.string.nav_reminders)
-                binding.libraryHint.setText(R.string.library_reminders_hint)
-            }
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
+    private fun Int.floorMod(m: Int): Int = ((this % m) + m) % m
+
+    private fun showTab(index: Int) {
+        tab = index
+        val transaction = supportFragmentManager.beginTransaction()
+        TAGS.forEachIndexed { i, tag ->
+            val fragment = supportFragmentManager.findFragmentByTag(tag) ?: return@forEachIndexed
+            if (i == index) transaction.show(fragment) else transaction.hide(fragment)
+        }
+        transaction.commitNowAllowingStateLoss()
+        paintPills(index)
+    }
+
+    private fun focusPill() {
+        when (tab) {
+            0 -> binding.pillQueue.requestFocus()
+            1 -> binding.pillFresh.requestFocus()
+            else -> binding.pillReminders.requestFocus()
         }
     }
 
-    private fun openSelected() {
-        val intent = when (tab) {
-            Tab.QUEUE -> QueueActivity.intent(this, playlistId)
-            Tab.FRESH -> FreshActivity.intent(this, playlistId)
-            Tab.REMINDERS -> RemindersActivity.intent(this)
-        }
-        startActivity(intent)
+    private fun paintPills(index: Int) {
+        binding.pillQueue.isSelected = index == 0
+        binding.pillFresh.isSelected = index == 1
+        binding.pillReminders.isSelected = index == 2
     }
 
     companion object {
         private const val EXTRA_PLAYLIST_ID = "playlist_id"
+        private const val STATE_TAB = "library_tab"
+        private val TAGS = arrayOf("library_queue", "library_fresh", "library_reminders")
 
         fun intent(context: Context, playlistId: String): Intent =
             Intent(context, LibraryActivity::class.java).putExtra(EXTRA_PLAYLIST_ID, playlistId)

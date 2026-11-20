@@ -71,56 +71,9 @@
     </LinearLayout>
 
     <FrameLayout
-        android:id="@+id/libraryCard"
+        android:id="@+id/libraryHost"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_marginTop="18dp"
-        android:layout_weight="1"
-        android:background="@drawable/bg_focusable"
-        android:clickable="true"
-        android:focusable="true"
-        android:padding="28dp">
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:gravity="center_horizontal"
-            android:orientation="vertical">
-
-            <TextView
-                android:id="@+id/libraryHeading"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/nav_queue"
-                android:textColor="@color/text_primary"
-                android:textSize="28sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/libraryHint"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:gravity="center"
-                android:text="@string/library_queue_hint"
-                android:textColor="@color/text_secondary"
-                android:textSize="16sp" />
-
-            <TextView
-                android:id="@+id/libraryOpen"
-                android:layout_width="wrap_content"
-                android:layout_height="48dp"
-                android:layout_marginTop="22dp"
-                android:background="@drawable/bg_nav"
-                android:clickable="true"
-                android:focusable="true"
-                android:gravity="center"
-                android:paddingHorizontal="24dp"
-                android:text="@string/library_open"
-                android:textColor="@color/text_primary"
-                android:textSize="16sp"
-                android:textStyle="bold" />
-        </LinearLayout>
-    </FrameLayout>
+        android:layout_marginTop="14dp"
+        android:layout_weight="1" />
 </LinearLayout>

@@ -11,16 +11,65 @@
     android:orientation="vertical"
     android:padding="6dp">
 
-    <ImageView
-        android:id="@+id/logo"
+    <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="132dp"
-        android:background="@drawable/bg_poster_image"
-        android:clipToOutline="true"
-        android:contentDescription="@null"
-        android:padding="2dp"
-        android:scaleType="fitCenter"
-        android:src="@drawable/ic_channel_placeholder" />
+        android:layout_height="132dp">
+
+        <ImageView
+            android:id="@+id/logo"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/bg_poster_image"
+            android:clipToOutline="true"
+            android:contentDescription="@null"
+            android:padding="2dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_channel_placeholder" />
+
+        <TextView
+            android:id="@+id/ratingBadge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|end"
+            android:layout_margin="6dp"
+            android:background="@drawable/bg_panel"
+            android:paddingHorizontal="7dp"
+            android:paddingVertical="3dp"
+            android:textColor="@color/accent"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_gravity="bottom"
+            android:background="@drawable/bg_player_scrim" />
+
+        <TextView
+            android:id="@+id/posterMeta"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:paddingHorizontal="8dp"
+            android:paddingBottom="8dp"
+            android:textColor="@color/text_primary"
+            android:textSize="11sp"
+            android:visibility="gone" />
+
+        <ProgressBar
+            android:id="@+id/watchProgress"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="3dp"
+            android:layout_gravity="bottom"
+            android:max="1000"
+            android:progress="0"
+            android:progressDrawable="@drawable/bg_episode_progress"
+            android:visibility="gone" />
+    </FrameLayout>
 
     <TextView
         android:id="@+id/name"

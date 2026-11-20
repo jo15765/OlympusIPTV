@@ -1035,7 +1035,7 @@ class XtreamClient(
             channels.add(channel)
             seen++
             if (seen % 200 == 0) onCount(seen)
-            if (onBatch != null && channels.size >= 1200) flush()
+            if (onBatch != null && channels.size >= 500) flush()
         }
 
         fun finish() {

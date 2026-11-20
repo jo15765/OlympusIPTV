@@ -70,13 +70,16 @@ import com.olympus.iptv.playlist.TitleRatings
 import com.olympus.iptv.playlist.LineupApplier
 import java.util.Locale
 import com.olympus.iptv.record.RecordPrompt
+import com.olympus.iptv.playlist.EpgUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.plus
 import kotlinx.coroutines.withContext
 
 class PlayerActivity : AppCompatActivity() {
@@ -103,6 +106,11 @@ class PlayerActivity : AppCompatActivity() {
     private var nextLookup: Job? = null
     private var introJob: Job? = null
     private var subtitleJob: Job? = null
+    /** Cancels in-flight EPG / catch-up / subtitle work when the user zaps away. */
+    private var channelJob = SupervisorJob()
+    private val zapEpgPrefetch = object : LinkedHashMap<String, EpgNowNext>(8, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, EpgNowNext>?): Boolean = size > 8
+    }
     private var sidecar: MediaItem.SubtitleConfiguration? = null
     private var pendingLanguage: String? = null
     private var preferredAudio: String = PlaylistStore.DEFAULT_AUDIO_LANGUAGE
@@ -200,6 +208,9 @@ class PlayerActivity : AppCompatActivity() {
         }
         binding = ActivityPlayerBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        binding.root.post {
+            com.olympus.iptv.ui.RemoteTip.show(this, getString(R.string.remote_tip_player), binding.root as? android.view.ViewGroup)
+        }
         binding.playerView.useController = false
         binding.playerView.setKeepContentOnPlayerReset(true)
         binding.playerViewB.setKeepContentOnPlayerReset(true)
@@ -595,12 +606,27 @@ class PlayerActivity : AppCompatActivity() {
         finish()
     }
 
+    private fun resetChannelScopedWork() {
+        channelJob.cancel()
+        channelJob = SupervisorJob()
+        subtitleJob?.cancel()
+        subtitleJob = null
+        preloadJob?.cancel()
+        nextLookup?.cancel()
+        countdownJob?.cancel()
+        introJob?.cancel()
+        recoverJob?.cancel()
+    }
+
+    private fun channelScope() = lifecycleScope + channelJob
+
     private fun playCurrent(seedMeta: String? = null, seedNext: String? = null, startAt: Long? = null) {
         val seed = current ?: queue.getOrNull(index)
         if (seed == null) {
             finish()
             return
         }
+        resetChannelScopedWork()
         playJob?.cancel()
         recoverJob?.cancel()
         advancing = true
@@ -1735,9 +1761,8 @@ class PlayerActivity : AppCompatActivity() {
         val alias = lineupName(channel, channel).ifBlank { channel.name }
         binding.zapBanner.visibility = View.VISIBLE
         binding.zapTitle.text = alias
-        binding.zapNow.text = "…"
-        binding.zapNext.text = ""
-        binding.zapProgress.progress = 0
+        val cached = zapEpgPrefetch[channel.id]
+        paintZapEpg(channel, alias, cached)
         binding.zapLogo.load(channel.logoUrl) {
             channelLogo((48 * resources.displayMetrics.density).toInt().coerceAtLeast(1))
             placeholder(R.drawable.ic_channel_placeholder)
@@ -1748,22 +1773,60 @@ class PlayerActivity : AppCompatActivity() {
         flashOverlay()
         if (channel.kind != ContentKind.LIVE) return
         val savedId = playlistId ?: return
-        lifecycleScope.launch {
+        channelScope().launch {
+            val fromDisk = withContext(Dispatchers.IO) {
+                val epgId = channel.epgChannelId ?: channel.id
+                val programs = (application as OlympusIptvApp).catalogDb.readEpg(savedId, epgId)?.second.orEmpty()
+                if (programs.isEmpty()) null else EpgUtils.nowNext(programs)
+            }
+            if (token != zapToken || isDestroyed) return@launch
+            if (fromDisk != null) {
+                zapEpgPrefetch[channel.id] = fromDisk
+                paintZapEpg(channel, alias, fromDisk)
+            }
             val playlist = savedPlaylist(savedId) ?: return@launch
             val lookup = channel.copy(epgChannelId = channel.epgChannelId ?: channel.id)
-            val epg = runCatching { epgRepo.nowNext(playlist, lookup) }.getOrDefault(EpgNowNext())
+            val epg = runCatching { epgRepo.nowNext(playlist, lookup) }.getOrDefault(fromDisk ?: EpgNowNext())
             if (token != zapToken || isDestroyed) return@launch
-            val raw = channel.name
-            val now = epg.now
-            binding.zapNow.text = now?.let { aliasProgram(it.title, raw, alias) } ?: "…"
-            binding.zapNext.text = epg.next
-                ?.let { getString(R.string.zap_up_next, aliasProgram(it.title, raw, alias)) }
-                .orEmpty()
-            val span = (now?.endMillis ?: 0L) - (now?.startMillis ?: 0L)
-            binding.zapProgress.progress = if (now != null && span > 0L) {
-                (((System.currentTimeMillis() - now.startMillis) * 1000L) / span).toInt().coerceIn(0, 1000)
-            } else {
-                0
+            zapEpgPrefetch[channel.id] = epg
+            paintZapEpg(channel, alias, epg)
+            prefetchNeighborZapEpg(channel)
+        }
+    }
+
+    private fun paintZapEpg(channel: Channel, alias: String, epg: EpgNowNext?) {
+        if (!::binding.isInitialized || isDestroyed) return
+        val raw = channel.name
+        val now = epg?.now
+        binding.zapNow.text = now?.let { aliasProgram(it.title, raw, alias) } ?: if (epg == null) "…" else getString(R.string.epg_none)
+        binding.zapNext.text = epg?.next
+            ?.let { getString(R.string.zap_up_next, aliasProgram(it.title, raw, alias)) }
+            .orEmpty()
+        val span = (now?.endMillis ?: 0L) - (now?.startMillis ?: 0L)
+        binding.zapProgress.progress = if (now != null && span > 0L) {
+            (((System.currentTimeMillis() - now.startMillis) * 1000L) / span).toInt().coerceIn(0, 1000)
+        } else {
+            0
+        }
+    }
+
+    private fun prefetchNeighborZapEpg(channel: Channel) {
+        val savedId = playlistId ?: return
+        if (channel.kind != ContentKind.LIVE) return
+        channelScope().launch {
+            val neighbors = listOfNotNull(
+                runCatching { neighbor(channel, -1) }.getOrNull(),
+                runCatching { neighbor(channel, 1) }.getOrNull()
+            )
+            withContext(Dispatchers.IO) {
+                for (next in neighbors) {
+                    if (zapEpgPrefetch.containsKey(next.id)) continue
+                    val epgId = next.epgChannelId ?: next.id
+                    val programs = (application as OlympusIptvApp).catalogDb.readEpg(savedId, epgId)?.second.orEmpty()
+                    if (programs.isNotEmpty()) {
+                        zapEpgPrefetch[next.id] = EpgUtils.nowNext(programs)
+                    }
+                }
             }
         }
     }
@@ -2030,7 +2093,7 @@ class PlayerActivity : AppCompatActivity() {
         binding.subtitleStatus.text = getString(R.string.subtitles_searching)
         showSubtitleHits(emptyList(), waiting = true)
         subtitleJob?.cancel()
-        subtitleJob = lifecycleScope.launch {
+        subtitleJob = channelScope().launch {
             val savedId = playlistId
             val seriesId = channel.seriesId
             val show = withContext(Dispatchers.IO) {
@@ -2268,7 +2331,7 @@ class PlayerActivity : AppCompatActivity() {
     private fun chooseSubtitle(hit: Subtitles.Hit) {
         binding.subtitleStatus.text = getString(R.string.subtitles_saving)
         subtitleJob?.cancel()
-        subtitleJob = lifecycleScope.launch {
+        subtitleJob = channelScope().launch {
             val saved = withContext(Dispatchers.IO) { Subtitles.download(filesDir, hit) }
             if (!isActive) return@launch
             if (saved == null) {
@@ -2812,6 +2875,8 @@ class PlayerActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         scrobbleStop()
+        resetChannelScopedWork()
+        channelJob.cancel()
         progressJob?.cancel()
         recoverJob?.cancel()
         countdownJob?.cancel()

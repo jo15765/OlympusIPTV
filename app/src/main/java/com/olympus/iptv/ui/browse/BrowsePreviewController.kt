@@ -137,6 +137,6 @@ class BrowsePreviewController(
 
     private fun updateCaption(channel: Channel) {
         val title = epgNowTitle(channel.id)?.takeIf { it.isNotBlank() } ?: channel.name
-        binding.previewCaption.text = activity.getString(R.string.preview_on_now, title)
+        binding.previewCaption.text = activity.getString(R.string.preview_live_return, title)
     }
 }

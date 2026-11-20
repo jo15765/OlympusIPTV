@@ -14,7 +14,7 @@ import java.io.File
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
-class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext, "olympus-iptv.db", null, 10) {
+class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext, "olympus-iptv.db", null, 11) {
     private val filesDir = context.applicationContext.filesDir
     private val writer = ReentrantLock()
     private val dashLock = Any()
@@ -48,6 +48,54 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         db.execSQL(
             "CREATE TABLE IF NOT EXISTS library_meta (playlist_id TEXT PRIMARY KEY, stamp INTEGER NOT NULL)"
         )
+        ensureMetaMissTable(db)
+    }
+
+    private fun ensureMetaMissTable(db: SQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS meta_miss (
+                cache_key TEXT PRIMARY KEY NOT NULL,
+                saved_at INTEGER NOT NULL
+            )
+            """.trimIndent()
+        )
+    }
+
+    /** True when a prior TMDB/Watchmode lookup failed and the 7-day negative TTL still holds. */
+    fun isMetaMiss(cacheKey: String, ttlMs: Long = META_MISS_TTL_MS): Boolean {
+        if (cacheKey.isBlank()) return false
+        val savedAt = read {
+            readableDatabase.rawQuery(
+                "SELECT saved_at FROM meta_miss WHERE cache_key=?",
+                arrayOf(cacheKey)
+            ).use { cursor ->
+                if (cursor.moveToFirst()) cursor.getLong(0) else null
+            }
+        } ?: return false
+        if (System.currentTimeMillis() - savedAt > ttlMs) {
+            clearMetaMiss(cacheKey)
+            return false
+        }
+        return true
+    }
+
+    fun putMetaMiss(cacheKey: String) {
+        if (cacheKey.isBlank()) return
+        write {
+            val values = ContentValues().apply {
+                put("cache_key", cacheKey)
+                put("saved_at", System.currentTimeMillis())
+            }
+            writableDatabase.insertWithOnConflict("meta_miss", null, values, SQLiteDatabase.CONFLICT_REPLACE)
+        }
+    }
+
+    fun clearMetaMiss(cacheKey: String) {
+        if (cacheKey.isBlank()) return
+        write {
+            writableDatabase.delete("meta_miss", "cache_key=?", arrayOf(cacheKey))
+        }
     }
 
     private fun applyPragma(db: SQLiteDatabase, sql: String) {
@@ -1110,6 +1158,7 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         if (oldVersion < 8) ensureGuideTables(db)
         if (oldVersion < 9) ensureCatchupColumns(db)
         if (oldVersion < 10) ensureIndexes(db)
+        if (oldVersion < 11) ensureMetaMissTable(db)
     }
 
     private fun ensureCatchupColumns(db: SQLiteDatabase) {
@@ -2114,6 +2163,7 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
 
     companion object {
         private const val LIVE_GUIDE_CAP = 25_000
+        const val META_MISS_TTL_MS = 7L * 24L * 60L * 60L * 1000L
         const val LIVE = "live"
         const val VOD = "vod"
         const val SERIES = "series"

@@ -164,7 +164,7 @@ class OlympusIptvApp : Application() {
         super.onCreate()
         AppLog.install(this)
         playlistStore = PlaylistStore(this)
-        com.olympus.iptv.playlist.TitleRatings.init(this)
+        com.olympus.iptv.playlist.TitleRatings.init(this, catalogDb)
         appScope.launch { runCatching { playlistStore.videoDecoder() } }
         playlistStore.onLineupSaved = { id, config ->
             stagedLineup = id to config

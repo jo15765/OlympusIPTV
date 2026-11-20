@@ -628,6 +628,15 @@
     <string name="playback_error_next">Next</string>
     <string name="now_playing">Now playing</string>
     <string name="now_playing_resume">Resume</string>
+    <string name="now_playing_live_badge">LIVE • Return to Fullscreen</string>
+    <string name="now_playing_fullscreen">Fullscreen</string>
+    <string name="preview_live_return">LIVE • %1$s — Return to Fullscreen</string>
+    <string name="remote_tip_browse">OK: Watch • Hold OK: Favorite / Record • Menu: Quick Guide</string>
+    <string name="remote_tip_player">CH±: Zap • OK: Pause • Hold OK: Favorite • Menu: Options</string>
+    <string name="playlist_sync_now">Sync Now</string>
+    <string name="playlist_counts">%1$d live · %2$d movies · %3$d shows</string>
+    <string name="playlist_synced">Synced %1$s</string>
+    <string name="playlist_never_synced">Not synced yet</string>
     <string name="groups_filter_hint">Find a group</string>
     <string name="empty_favorites_cta">No favorites yet. Tap to open Favorites setup.</string>
     <string name="empty_continue_cta">Nothing to continue. Browse Movies or Shows.</string>
