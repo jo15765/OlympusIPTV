@@ -13,7 +13,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.olympus.iptv.R
-import com.olympus.iptv.databinding.ActivityBrowseBinding
+import com.olympus.iptv.databinding.BrowsePaneVpnBinding
 import com.olympus.iptv.ui.SoftKeyboard
 import java.io.InterruptedIOException
 import java.net.UnknownHostException
@@ -25,7 +25,7 @@ import kotlinx.coroutines.withContext
 
 class VpnUi(
     private val activity: AppCompatActivity,
-    private val binding: ActivityBrowseBinding,
+    private val binding: BrowsePaneVpnBinding,
     private val askConsent: (Intent) -> Unit
 ) {
     private var provider = ""

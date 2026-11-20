@@ -11,14 +11,30 @@
     android:orientation="horizontal"
     android:padding="10dp">
 
-    <ImageView
-        android:id="@+id/episodeArt"
+    <FrameLayout
         android:layout_width="168dp"
-        android:layout_height="94dp"
-        android:background="@color/bg_elevated"
-        android:contentDescription="@null"
-        android:scaleType="fitCenter"
-        android:src="@drawable/ic_channel_placeholder" />
+        android:layout_height="94dp">
+
+        <ImageView
+            android:id="@+id/episodeArt"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@color/bg_elevated"
+            android:contentDescription="@null"
+            android:scaleType="centerCrop"
+            android:src="@drawable/ic_channel_placeholder" />
+
+        <ProgressBar
+            android:id="@+id/episodeProgress"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="4dp"
+            android:layout_gravity="bottom"
+            android:max="1000"
+            android:progress="0"
+            android:progressDrawable="@drawable/bg_episode_progress"
+            android:visibility="gone" />
+    </FrameLayout>
 
     <LinearLayout
         android:layout_width="0dp"
@@ -54,7 +70,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
             android:ellipsize="end"
-            android:maxLines="3"
+            android:maxLines="2"
             android:textColor="@color/text_secondary"
             android:textSize="14sp"
             android:visibility="gone" />

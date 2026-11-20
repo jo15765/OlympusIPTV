@@ -12,6 +12,7 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
 import android.widget.TextView
+import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import com.olympus.iptv.R
 import com.olympus.iptv.data.Channel
@@ -23,7 +24,7 @@ class ProgramGuideAdapter(
     context: Context,
     private val onPlay: (Channel, EpgProgram?) -> Unit,
     private val onScroll: (Int) -> Unit,
-    private val onFocus: (Channel) -> Unit = {}
+    private val onFocus: (Channel, EpgProgram?) -> Unit = { _, _ -> }
 ) : RecyclerView.Adapter<ProgramGuideAdapter.Holder>() {
 
     data class Slot(val row: Int, val column: Int)
@@ -102,9 +103,17 @@ class ProgramGuideAdapter(
             if (shared > 0) notifyItemRangeChanged(0, shared)
             return
         }
+        val old = channels.toList()
         channels.clear()
         channels.addAll(list)
-        notifyDataSetChanged()
+        DiffUtil.calculateDiff(object : DiffUtil.Callback() {
+            override fun getOldListSize(): Int = old.size
+            override fun getNewListSize(): Int = list.size
+            override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean =
+                old[oldItemPosition].id == list[newItemPosition].id
+            override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean =
+                old[oldItemPosition] == list[newItemPosition]
+        }, true).dispatchUpdatesTo(this)
     }
 
     fun channelAt(index: Int): Channel? = channels.getOrNull(index)
@@ -372,10 +381,11 @@ class ProgramGuideAdapter(
             slot: Slot
         ) {
             val hadFocus = view.hasFocus()
+            val kind = if (program != null) EpgProgramStyle.kind(program, channel) else EpgKind.OTHER
             view.tag = slot
-            view.background = backgroundFor(focused = false)
+            view.background = backgroundFor(kind, focused = false)
             view.setTextColor(primary)
-            view.text = label(title, time, false)
+            view.text = label(title, time, kind, false)
             val layout = view.layoutParams as? FrameLayout.LayoutParams
                 ?: FrameLayout.LayoutParams(width, ViewGroup.LayoutParams.MATCH_PARENT)
             layout.width = width
@@ -387,25 +397,27 @@ class ProgramGuideAdapter(
             shiftLabel(view, left, width)
             view.setOnClickListener { onPlay(channel, program) }
             view.setOnFocusChangeListener { _, hasFocus ->
-                view.background = backgroundFor(hasFocus)
+                view.background = backgroundFor(kind, hasFocus)
                 view.setTextColor(if (hasFocus) ink else primary)
-                view.text = label(title, time, hasFocus)
+                view.text = label(title, time, kind, hasFocus)
                 if (hasFocus) {
                     reveal(view)
-                    onFocus(channel)
+                    onFocus(channel, program)
                 }
             }
             if (hadFocus) {
-                view.background = backgroundFor(true)
+                view.background = backgroundFor(kind, true)
                 view.setTextColor(ink)
-                view.text = label(title, time, true)
+                view.text = label(title, time, kind, true)
             }
         }
 
-        private fun label(title: String, time: String?, focused: Boolean): CharSequence {
-            if (time.isNullOrBlank()) return title
-            val text = SpannableString("$title\n$time")
-            val start = title.length + 1
+        private fun label(title: String, time: String?, kind: EpgKind, focused: Boolean): CharSequence {
+            val pill = EpgProgramStyle.pill(kind)
+            val headline = if (pill == null) title else "[$pill] $title"
+            if (time.isNullOrBlank()) return headline
+            val text = SpannableString("$headline\n$time")
+            val start = headline.length + 1
             text.setSpan(AbsoluteSizeSpan(12, true), start, text.length, 0)
             text.setSpan(
                 ForegroundColorSpan(if (focused) ink else secondary),
@@ -413,13 +425,28 @@ class ProgramGuideAdapter(
                 text.length,
                 0
             )
+            if (pill != null) {
+                text.setSpan(
+                    AbsoluteSizeSpan(11, true),
+                    0,
+                    pill.length + 2,
+                    0
+                )
+                text.setSpan(
+                    ForegroundColorSpan(if (focused) ink else EpgProgramStyle.stroke(itemView.context, kind, false)),
+                    0,
+                    pill.length + 2,
+                    0
+                )
+            }
             return text
         }
 
-        private fun backgroundFor(focused: Boolean): GradientDrawable {
+        private fun backgroundFor(kind: EpgKind, focused: Boolean): GradientDrawable {
             return GradientDrawable().apply {
                 cornerRadius = 8f * density
-                setColor(if (focused) focus else panel)
+                setColor(EpgProgramStyle.fill(itemView.context, kind, focused))
+                setStroke(dp(1), EpgProgramStyle.stroke(itemView.context, kind, focused))
             }
         }
 

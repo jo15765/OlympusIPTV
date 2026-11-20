@@ -27,6 +27,7 @@ import androidx.transition.AutoTransition
 import androidx.transition.TransitionManager
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.MediaItem
 import androidx.media3.datasource.DefaultHttpDataSource
@@ -104,7 +105,10 @@ import java.text.NumberFormat
 
 class BrowseActivity : AppCompatActivity() {
     private lateinit var binding: ActivityBrowseBinding
+    private val browseModel by lazy { ViewModelProvider(this)[BrowseViewModel::class.java] }
     private val loader = PlaylistLoader()
+    private lateinit var previewCtl: BrowsePreviewController
+    private lateinit var epgCtl: BrowseEpgController
 
     private var playlist: SavedPlaylist? = null
     private var source: LoadedPlaylist? = null
@@ -195,6 +199,64 @@ class BrowseActivity : AppCompatActivity() {
     }
 
     private lateinit var vpnUi: VpnUi
+    private lateinit var panes: BrowseLazyPanes
+    private var pendingVpnDetail: String? = null
+    private var pendingRefreshStatus: String? = null
+    private var pendingDeviceId: String? = null
+    private var dashboardUrlText: String? = null
+
+    /** Wires listeners and replays state that arrived while a pane was still a ViewStub. */
+    private fun wireLazyPanes() {
+        panes.onAdminInflated = { admin ->
+            if (touchPrimary) {
+                listOf(
+                    admin.cardAdminRefresh, admin.cardAdminWeb, admin.cardAdminEpg, admin.cardAdminVpn,
+                    admin.cardAdminAbout, admin.cardAdminFavorites
+                ).forEach { card -> card.isFocusableInTouchMode = false }
+            }
+            admin.cardAdminRefresh.setOnClickListener {
+                if (playlist == null) return@setOnClickListener
+                showRefreshPane()
+            }
+            admin.cardAdminWeb.setOnClickListener { showDevicePane() }
+            admin.cardAdminEpg.setOnClickListener {
+                if (source == null) return@setOnClickListener
+                openEpgEdits()
+            }
+            admin.cardAdminVpn.setOnClickListener { showVpnPane() }
+            admin.cardAdminAbout.setOnClickListener { showAboutPane() }
+            admin.cardAdminFavorites.setOnClickListener { openFavoritesSetup() }
+            admin.adminQuietToggle.setOnClickListener { toggleAdminQuietHours() }
+            admin.adminQuietSchedule.setOnClickListener { cycleAdminQuietSchedule() }
+            admin.adminBackupLink.setOnClickListener { openBackupShortcut() }
+            pendingVpnDetail?.let { admin.cardAdminVpnDetail.text = it }
+        }
+        panes.onDeviceInflated = { device ->
+            device.deviceBack.setOnClickListener { showAdminPane(panes.cardAdminWeb) }
+            device.deviceRemovePlaylist.setOnClickListener { confirmRemovePlaylist() }
+            pendingDeviceId?.let { device.deviceIdValue.text = it }
+            dashboardUrlText?.let {
+                device.deviceUrlValue.text = it
+                device.deviceUrlValue.setTextColor(getColor(R.color.accent))
+            }
+        }
+        panes.onVpnInflated = { vpn ->
+            vpnUi = VpnUi(this, vpn) { vpnConsent.launch(it) }
+            vpn.vpnBack.setOnClickListener { showAdminPane(panes.cardAdminVpn) }
+            if (lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)) vpnUi.start()
+        }
+        panes.onRefreshInflated = { refresh ->
+            if (touchPrimary) {
+                refresh.refreshNowCard.isFocusableInTouchMode = false
+                refresh.refreshIntervalCard.isFocusableInTouchMode = false
+            }
+            refresh.refreshBack.setOnClickListener { showAdminPane(panes.cardAdminRefresh) }
+            refresh.refreshNowCard.setOnClickListener { refreshPlaylist(quiet = true) }
+            refresh.refreshIntervalCard.setOnClickListener { cycleRefreshInterval() }
+            refresh.refreshIntervalValue.text = getString(R.string.refresh_every, intervalLabel(refreshMinutes))
+            pendingRefreshStatus?.let { refresh.refreshStatus.text = it }
+        }
+    }
 
     private val vpnConsent = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == RESULT_OK) AppTunnel.connect(this)
@@ -210,7 +272,9 @@ class BrowseActivity : AppCompatActivity() {
         detail = { cardDetail(it) },
         icon = { cardIcon(it) },
         onHold = { offerGroupLock(it) },
-        locked = { GroupLock.locked(activeConfig, it.id) }
+        locked = { GroupLock.locked(activeConfig, it.id) },
+        previewLogos = { categoryPreviewLogos(it) },
+        liveGroup = { isLiveBadgeGroup(it) }
     )
     private val channelAdapter = ChannelAdapter(
         onClick = { play(it) },
@@ -240,12 +304,17 @@ class BrowseActivity : AppCompatActivity() {
             context = this,
             onPlay = { channel, program -> playFromGuide(channel, program) },
             onScroll = { scrollProgramGuide(it) },
-            onFocus = { showChannelDetail(it) }
+            onFocus = { channel, program ->
+                showChannelDetail(channel)
+                paintProgramSynopsis(channel, program)
+            }
         )
         programAdapter.preferKeepPx = {
             programAdapter.pxFor(com.olympus.iptv.playlist.EpgUtils.now())
         }
         binding = ActivityBrowseBinding.inflate(layoutInflater)
+        panes = BrowseLazyPanes(binding)
+        wireLazyPanes()
         setContentView(binding.root)
         touchPrimary = com.olympus.iptv.ui.DeviceForm.isTouchPrimary(this)
         if (touchPrimary) {
@@ -261,15 +330,28 @@ class BrowseActivity : AppCompatActivity() {
             setupMobileChrome()
             enlargeTouchChips()
             categoryAdapter.phoneListMode = true
-            listOf(
-                binding.cardAdminRefresh, binding.cardAdminWeb, binding.cardAdminEpg, binding.cardAdminVpn,
-                binding.refreshNowCard, binding.refreshIntervalCard
-            ).forEach { card ->
-                card.isFocusableInTouchMode = false
-            }
         }
         wireHomeContinue()
         paintQueueChip()
+        previewCtl = BrowsePreviewController(
+            activity = this,
+            binding = binding,
+            touchPrimary = touchPrimary,
+            epgNowTitle = { epgCache[it]?.now?.title },
+            focusAllowsPreview = {
+                focusIsIn(binding.channelList) || focusIsIn(binding.programPane)
+            },
+            focusedChannelId = { focusedChannel?.id }
+        )
+        epgCtl = BrowseEpgController(
+            activity = this,
+            binding = binding,
+            programAdapter = programAdapter,
+            halfHourMs = halfHourMs,
+            epgCache = { epgCache },
+            onRecord = { offerRecording(it) },
+            onRemind = { offerReminder(it) }
+        )
 
         binding.categoryList.layoutManager = if (touchPrimary) {
             LinearLayoutManager(this)
@@ -281,6 +363,9 @@ class BrowseActivity : AppCompatActivity() {
         binding.channelList.adapter = channelAdapter
         binding.programList.layoutManager = LinearLayoutManager(this)
         binding.programList.adapter = programAdapter
+        binding.programList.setHasFixedSize(true)
+        binding.programList.setRecycledViewPool(binding.channelList.recycledViewPool)
+        binding.programList.recycledViewPool.setMaxRecycledViews(0, if (touchPrimary) 12 else 24)
         binding.programList.itemAnimator = null
         binding.categoryList.itemAnimator = null
         binding.channelList.itemAnimator = null
@@ -359,6 +444,10 @@ class BrowseActivity : AppCompatActivity() {
             val saved = playlist ?: return@setOnClickListener
             startActivity(FreshActivity.intent(this, saved.id))
         }
+        binding.btnLibrary.setOnClickListener {
+            val saved = playlist ?: return@setOnClickListener
+            startActivity(LibraryActivity.intent(this, saved.id))
+        }
         binding.btnSearch.setOnClickListener { openSearch() }
         binding.btnRecord.setOnClickListener {
             val saved = playlist ?: return@setOnClickListener
@@ -373,32 +462,11 @@ class BrowseActivity : AppCompatActivity() {
             startActivity(com.olympus.iptv.ui.epg.ParentalActivity.intent(this, saved.id))
         }
         binding.btnAdmin.setOnClickListener {
-            if (binding.adminPane.visibility == View.VISIBLE) showBlank() else showAdminPane()
+            if (panes.isAdminVisible()) showBlank() else showAdminPane()
         }
-        binding.cardAdminRefresh.setOnClickListener {
-            if (playlist == null) return@setOnClickListener
-            showRefreshPane()
-        }
-        binding.cardAdminWeb.setOnClickListener { showDevicePane() }
-        binding.cardAdminEpg.setOnClickListener {
-            if (source == null) return@setOnClickListener
-            openEpgEdits()
-        }
-        vpnUi = VpnUi(this, binding) { vpnConsent.launch(it) }
-        binding.cardAdminVpn.setOnClickListener { showVpnPane() }
-        binding.vpnBack.setOnClickListener { showAdminPane(binding.cardAdminVpn) }
-        binding.refreshBack.setOnClickListener { showAdminPane(binding.cardAdminRefresh) }
-        binding.deviceBack.setOnClickListener { showAdminPane(binding.cardAdminWeb) }
-        binding.deviceRemovePlaylist.setOnClickListener { confirmRemovePlaylist() }
-        binding.refreshNowCard.setOnClickListener { refreshPlaylist(quiet = true) }
-        binding.refreshIntervalCard.setOnClickListener { cycleRefreshInterval() }
-        binding.adminQuietToggle.setOnClickListener { toggleAdminQuietHours() }
-        binding.adminQuietSchedule.setOnClickListener { cycleAdminQuietSchedule() }
-        binding.adminBackupLink.setOnClickListener { openBackupShortcut() }
         binding.btnLastGroup.setOnClickListener { openLastGroup() }
-        showRefreshInterval(refreshMinutes)
         binding.btnAbout.setOnClickListener {
-            if (binding.aboutPane.visibility == View.VISIBLE) showBlank() else showAboutPane()
+            if (panes.isAboutVisible()) showBlank() else showAboutPane()
         }
         binding.btnFavoritesSetup.setOnClickListener { openFavoritesSetup() }
         binding.tabLive.isSelected = true
@@ -485,7 +553,9 @@ class BrowseActivity : AppCompatActivity() {
             val liveJob = async(Dispatchers.IO) { db.readCategoriesOnly(saved.id, CatalogDb.LIVE) }
             launch {
                 val deviceId = deviceJob.await()
-                if (!isDestroyed) binding.deviceIdValue.text = deviceId
+                if (isDestroyed) return@launch
+                pendingDeviceId = deviceId
+                panes.deviceOrNull?.deviceIdValue?.text = deviceId
             }
             val liveCategories = liveJob.await()
             val catalogJob = app.catalogRefresh
@@ -1174,11 +1244,8 @@ class BrowseActivity : AppCompatActivity() {
         binding.contentColumn.visibility = View.GONE
         binding.programPane.visibility = View.GONE
         binding.blankPane.visibility = View.GONE
-        binding.devicePane.visibility = View.GONE
-        binding.aboutPane.visibility = View.GONE
-        binding.adminPane.visibility = View.GONE
-        binding.refreshPane.visibility = View.GONE
-        binding.vpnPane.visibility = View.VISIBLE
+        panes.hideAllSettingPanes()
+        panes.ensureVpn().root.visibility = View.VISIBLE
         hidePreviewChrome()
         vpnUi.onShow()
     }
@@ -1195,29 +1262,27 @@ class BrowseActivity : AppCompatActivity() {
         binding.contentColumn.visibility = View.GONE
         binding.programPane.visibility = View.GONE
         binding.blankPane.visibility = View.GONE
-        binding.devicePane.visibility = View.GONE
-        binding.aboutPane.visibility = View.GONE
-        binding.adminPane.visibility = View.GONE
-        binding.vpnPane.visibility = View.GONE
-        binding.refreshPane.visibility = View.VISIBLE
+        panes.hideAllSettingPanes()
+        panes.ensureRefresh().root.visibility = View.VISIBLE
         hidePreviewChrome()
         showRefreshInterval(refreshMinutes)
-        binding.refreshNowCard.post { binding.refreshNowCard.requestFocus() }
+        panes.refreshNowCard.post { panes.refreshNowCard.requestFocus() }
         val app = application as OlympusIptvApp
         lifecycleScope.launch {
             val minutes = withContext(Dispatchers.IO) { app.playlistStore.refreshIntervalMinutes() }
             refreshMinutes = minutes
-            if (!isDestroyed && binding.refreshPane.visibility == View.VISIBLE) showRefreshInterval(minutes)
+            if (!isDestroyed && panes.isRefreshVisible()) showRefreshInterval(minutes)
         }
     }
 
     private fun showRefreshStatus(text: String) {
         if (!::binding.isInitialized || isDestroyed) return
-        binding.refreshStatus.text = text
+        pendingRefreshStatus = text
+        panes.refreshOrNull?.refreshStatus?.text = text
     }
 
     private fun showRefreshInterval(minutes: Int) {
-        binding.refreshIntervalValue.text = getString(R.string.refresh_every, intervalLabel(minutes))
+        panes.refreshOrNull?.refreshIntervalValue?.text = getString(R.string.refresh_every, intervalLabel(minutes))
     }
 
     private fun cycleRefreshInterval() {
@@ -1362,12 +1427,12 @@ class BrowseActivity : AppCompatActivity() {
                 }
                 val config = (application as OlympusIptvApp).playlistStore.lineup(playlist?.id ?: return@withLock)
                 val openGuide = loaded == null &&
-                    binding.devicePane.visibility != View.VISIBLE &&
-                    binding.aboutPane.visibility != View.VISIBLE &&
-                    binding.adminPane.visibility != View.VISIBLE &&
+                    !panes.isDeviceVisible() &&
+                    !panes.isAboutVisible() &&
+                    !panes.isAdminVisible() &&
                     binding.blankPane.visibility != View.VISIBLE &&
-                    binding.refreshPane.visibility != View.VISIBLE &&
-                    binding.vpnPane.visibility != View.VISIBLE
+                    !panes.isRefreshVisible() &&
+                    !panes.isVpnVisible()
                 if (bucket == CatalogDb.VOD) moviesPending = false
                 if (bucket == CatalogDb.SERIES) showsPending = false
                 showCatalog(next, config, openGuide = openGuide && next.liveChannels.isNotEmpty())
@@ -1511,12 +1576,12 @@ class BrowseActivity : AppCompatActivity() {
             return
         }
         if (!openGuide ||
-            binding.devicePane.visibility == View.VISIBLE ||
-            binding.aboutPane.visibility == View.VISIBLE ||
-            binding.adminPane.visibility == View.VISIBLE ||
+            panes.isDeviceVisible() ||
+            panes.isAboutVisible() ||
+            panes.isAdminVisible() ||
             binding.blankPane.visibility == View.VISIBLE ||
-            binding.refreshPane.visibility == View.VISIBLE ||
-            binding.vpnPane.visibility == View.VISIBLE
+            panes.isRefreshVisible() ||
+            panes.isVpnVisible()
         ) {
             return
         }
@@ -1687,10 +1752,10 @@ class BrowseActivity : AppCompatActivity() {
             binding.tabLive,
             binding.tabVod,
             binding.tabShows,
+            binding.btnLibrary,
             binding.btnRecord,
             binding.btnAdmin,
-            binding.refreshLine,
-            binding.btnAbout
+            binding.refreshLine
         )
         var needed = 0
         val density = resources.displayMetrics.density
@@ -1744,8 +1809,8 @@ class BrowseActivity : AppCompatActivity() {
 
     private fun backFromOverlay() {
         val rail = when {
-            binding.aboutPane.visibility == View.VISIBLE -> binding.btnAbout
-            binding.adminPane.visibility == View.VISIBLE -> binding.btnAdmin
+            panes.isAboutVisible() -> binding.btnAbout
+            panes.isAdminVisible() -> binding.btnAdmin
             else -> sectionButton()
         }
         showMenu(GuideMenu.SETTINGS)
@@ -1754,20 +1819,20 @@ class BrowseActivity : AppCompatActivity() {
     }
 
     private fun goBackOneScreen() {
-        if (binding.vpnPane.visibility == View.VISIBLE) {
-            showAdminPane(binding.cardAdminVpn)
+        if (panes.isVpnVisible()) {
+            showAdminPane(panes.cardAdminVpn)
             return
         }
-        if (binding.refreshPane.visibility == View.VISIBLE) {
-            showAdminPane(binding.cardAdminRefresh)
+        if (panes.isRefreshVisible()) {
+            showAdminPane(panes.cardAdminRefresh)
             return
         }
-        if (binding.devicePane.visibility == View.VISIBLE) {
-            showAdminPane(binding.cardAdminWeb)
+        if (panes.isDeviceVisible()) {
+            showAdminPane(panes.cardAdminWeb)
             return
         }
-        if (binding.adminPane.visibility == View.VISIBLE ||
-            binding.aboutPane.visibility == View.VISIBLE ||
+        if (panes.isAdminVisible() ||
+            panes.isAboutVisible() ||
             binding.blankPane.visibility == View.VISIBLE
         ) {
             backFromOverlay()
@@ -1873,33 +1938,32 @@ class BrowseActivity : AppCompatActivity() {
         binding.contentColumn.visibility = View.GONE
         binding.programPane.visibility = View.GONE
         binding.blankPane.visibility = View.GONE
-        binding.refreshPane.visibility = View.GONE
-        binding.vpnPane.visibility = View.GONE
-        binding.aboutPane.visibility = View.GONE
-        binding.adminPane.visibility = View.GONE
-        binding.devicePane.visibility = View.VISIBLE
+        panes.hideAllSettingPanes()
+        panes.ensureDevice().root.visibility = View.VISIBLE
         hidePreviewChrome()
-        binding.deviceBack.post { binding.deviceBack.requestFocus() }
+        panes.deviceBack.post { panes.deviceBack.requestFocus() }
         val knownEmail = playlist?.email?.trim().orEmpty()
-        if (knownEmail.isNotBlank()) binding.deviceEmailValue.text = knownEmail
+        if (knownEmail.isNotBlank()) panes.deviceEmailValue.text = knownEmail
         showDashboardUrl(LineupClient.peekDashboardUrl() ?: com.olympus.iptv.portal.DashboardHost.url())
         lifecycleScope.launch {
             if (knownEmail.isBlank()) {
                 val email = (application as OlympusIptvApp).playlistStore.session.first()?.email?.trim().orEmpty()
-                if (email.isNotBlank() && binding.devicePane.visibility == View.VISIBLE) {
-                    binding.deviceEmailValue.text = email
+                if (email.isNotBlank() && panes.isDeviceVisible()) {
+                    panes.deviceEmailValue.text = email
                 }
             }
             val url = runCatching { LineupClient(this@BrowseActivity).dashboardAddress() }.getOrNull()
-            if (!url.isNullOrBlank() && binding.devicePane.visibility == View.VISIBLE) {
+            if (!url.isNullOrBlank() && panes.isDeviceVisible()) {
                 showDashboardUrl(url)
             }
         }
     }
 
     private fun showDashboardUrl(url: String) {
-        binding.deviceUrlValue.text = url
-        binding.deviceUrlValue.setTextColor(getColor(R.color.accent))
+        dashboardUrlText = url
+        val urlValue = panes.deviceOrNull?.deviceUrlValue ?: return
+        urlValue.text = url
+        urlValue.setTextColor(getColor(R.color.accent))
     }
 
     private fun confirmRemovePlaylist() {
@@ -1913,7 +1977,7 @@ class BrowseActivity : AppCompatActivity() {
 
     private fun removePlaylistAndRestart() {
         val app = application as OlympusIptvApp
-        binding.deviceRemovePlaylist.isEnabled = false
+        panes.deviceRemovePlaylist.isEnabled = false
         lifecycleScope.launch {
             withContext(Dispatchers.IO) {
                 runCatching { AppTunnel.disconnect(this@BrowseActivity) }
@@ -1938,11 +2002,7 @@ class BrowseActivity : AppCompatActivity() {
     private fun showGuide() {
         binding.btnAdmin.isSelected = false
         binding.btnAbout.isSelected = false
-        binding.devicePane.visibility = View.GONE
-        binding.aboutPane.visibility = View.GONE
-        binding.adminPane.visibility = View.GONE
-        binding.refreshPane.visibility = View.GONE
-        binding.vpnPane.visibility = View.GONE
+        panes.hideAllSettingPanes()
         binding.blankPane.visibility = View.GONE
         binding.groupColumn.visibility = View.VISIBLE
         applyGuideColumns()
@@ -1963,11 +2023,7 @@ class BrowseActivity : AppCompatActivity() {
         binding.contentDivider.visibility = View.GONE
         binding.contentColumn.visibility = View.GONE
         binding.programPane.visibility = View.GONE
-        binding.devicePane.visibility = View.GONE
-        binding.aboutPane.visibility = View.GONE
-        binding.adminPane.visibility = View.GONE
-        binding.refreshPane.visibility = View.GONE
-        binding.vpnPane.visibility = View.GONE
+        panes.hideAllSettingPanes()
         binding.blankPane.visibility = View.VISIBLE
         hidePreviewChrome()
         updateGroupClock()
@@ -1986,13 +2042,11 @@ class BrowseActivity : AppCompatActivity() {
         binding.contentColumn.visibility = View.GONE
         binding.programPane.visibility = View.GONE
         binding.blankPane.visibility = View.GONE
-        binding.refreshPane.visibility = View.GONE
-        binding.vpnPane.visibility = View.GONE
-        binding.devicePane.visibility = View.GONE
-        binding.adminPane.visibility = View.GONE
-        binding.aboutPane.visibility = View.VISIBLE
+        panes.hideAllSettingPanes()
+        panes.ensureAbout().root.visibility = View.VISIBLE
         hidePreviewChrome()
         updateGroupClock()
+        paintBreadcrumb(getString(R.string.nav_about))
         if (touchPrimary) {
             binding.mobileTopBar.visibility = View.VISIBLE
             binding.mobileBack.visibility = View.VISIBLE
@@ -2002,7 +2056,7 @@ class BrowseActivity : AppCompatActivity() {
         }
     }
 
-    private fun showAdminPane(focus: View = binding.cardAdminRefresh) {
+    private fun showAdminPane(focus: View = panes.cardAdminRefresh) {
         rememberReturnScreen()
         epgPrefetchJob?.cancel()
         binding.btnAdmin.isSelected = true
@@ -2015,14 +2069,12 @@ class BrowseActivity : AppCompatActivity() {
         binding.contentColumn.visibility = View.GONE
         binding.programPane.visibility = View.GONE
         binding.blankPane.visibility = View.GONE
-        binding.refreshPane.visibility = View.GONE
-        binding.vpnPane.visibility = View.GONE
-        binding.devicePane.visibility = View.GONE
-        binding.aboutPane.visibility = View.GONE
-        binding.adminPane.visibility = View.VISIBLE
+        panes.hideAllSettingPanes()
+        panes.ensureAdmin().root.visibility = View.VISIBLE
         hidePreviewChrome()
         updateGroupClock()
         paintAdminParentalSummary()
+        paintBreadcrumb(getString(R.string.nav_admin))
         if (touchPrimary) {
             binding.mobileTopBar.visibility = View.VISIBLE
             binding.mobileBack.visibility = View.VISIBLE
@@ -2047,15 +2099,17 @@ class BrowseActivity : AppCompatActivity() {
                 getString(R.string.admin_parental_summary, locked, prefs.parentalTimeoutMinutes)
             }
             val quiet = getString(if (prefs.quietHours) R.string.admin_quiet_on else R.string.admin_quiet_off)
-            binding.adminParentalSummary.text = base + quiet
-            binding.adminQuietToggle.text = getString(
-                if (prefs.quietHours) R.string.quiet_hours_on else R.string.quiet_hours_off
-            )
-            binding.adminQuietSchedule.text = getString(
-                R.string.admin_quiet_schedule,
-                clockLabel(prefs.quietStartMinute),
-                clockLabel(prefs.quietEndMinute)
-            )
+            panes.adminOrNull?.let { admin ->
+                admin.adminParentalSummary.text = base + quiet
+                admin.adminQuietToggle.text = getString(
+                    if (prefs.quietHours) R.string.quiet_hours_on else R.string.quiet_hours_off
+                )
+                admin.adminQuietSchedule.text = getString(
+                    R.string.admin_quiet_schedule,
+                    clockLabel(prefs.quietStartMinute),
+                    clockLabel(prefs.quietEndMinute)
+                )
+            }
             paintParentalChip(locked)
             paintLastGroupChip()
             maybeShowBackupTip()
@@ -2148,7 +2202,7 @@ class BrowseActivity : AppCompatActivity() {
     }
 
     private fun openBackupShortcut() {
-        Haptics.tick(binding.adminBackupLink)
+        Haptics.tick(panes.adminBackupLink)
         showDevicePane()
         Toast.makeText(this, R.string.admin_backup_detail, Toast.LENGTH_LONG).show()
     }
@@ -2184,20 +2238,19 @@ class BrowseActivity : AppCompatActivity() {
     }
 
     override fun onStop() {
+        rememberGuideUi()
         (application as OlympusIptvApp).unwatchLineup(lineupWatch)
         AppTunnel.removeListener(vpnWatch)
         if (::vpnUi.isInitialized) vpnUi.stop()
         focusHandler.removeCallbacks(clockTick)
         runCatching { unregisterReceiver(systemClock) }
-        previewPlayer?.playWhenReady = false
+        if (::previewCtl.isInitialized) previewCtl.pause()
         super.onStop()
     }
 
     override fun onDestroy() {
         com.olympus.iptv.portal.DashboardHost.removeUrlListener(dashboardUrls)
-        previewJob?.cancel()
-        previewPlayer?.release()
-        previewPlayer = null
+        if (::previewCtl.isInitialized) previewCtl.release()
         refreshLoop?.cancel()
         refreshLoop = null
         super.onDestroy()
@@ -2226,7 +2279,8 @@ class BrowseActivity : AppCompatActivity() {
             is TunnelState.Reconnecting -> getString(R.string.vpn_reconnecting, state.label)
             is TunnelState.Failed -> state.message
         }
-        binding.cardAdminVpnDetail.text = detail
+        pendingVpnDetail = detail
+        panes.adminOrNull?.cardAdminVpnDetail?.text = detail
         val chip = when (state) {
             is TunnelState.On -> getString(R.string.vpn_chip, state.label)
             is TunnelState.Reconnecting -> getString(R.string.vpn_chip_retry)
@@ -2400,10 +2454,13 @@ class BrowseActivity : AppCompatActivity() {
             holdChannelId = returnChannelId
             binding.channelList.post {
                 restoreAfterPlayer()
+                restoreGuideUiIfPossible()
+                maybeShowGuidePip()
                 adoptRemoteLineup()
             }
             return
         }
+        restoreGuideUiIfPossible()
         val stagedPins = (application as OlympusIptvApp).stagedLineup?.takeIf { it.first == playlist?.id }?.second
         if (stagedPins != null && stagedPins.groupPins != activeConfig.groupPins) {
             activeConfig = stagedPins
@@ -3042,10 +3099,10 @@ class BrowseActivity : AppCompatActivity() {
         if (event.action == KeyEvent.ACTION_DOWN && focusIsIn(binding.navRail)) {
             when (event.keyCode) {
                 KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                    if (binding.vpnPane.visibility == View.VISIBLE) binding.vpnBack.requestFocus()
-                    else if (binding.adminPane.visibility == View.VISIBLE) binding.cardAdminRefresh.requestFocus()
-                    else if (binding.devicePane.visibility == View.VISIBLE) binding.deviceBack.requestFocus()
-                    else if (binding.refreshPane.visibility == View.VISIBLE) binding.refreshNowCard.requestFocus()
+                    if (panes.isVpnVisible()) panes.vpnBack.requestFocus()
+                    else if (panes.isAdminVisible()) panes.cardAdminRefresh.requestFocus()
+                    else if (panes.isDeviceVisible()) panes.deviceBack.requestFocus()
+                    else if (panes.isRefreshVisible()) panes.refreshNowCard.requestFocus()
                     else if (binding.groupColumn.visibility == View.VISIBLE) {
                         showMenu(GuideMenu.GROUPS)
                         focusGroups()
@@ -3172,19 +3229,19 @@ class BrowseActivity : AppCompatActivity() {
                 }
             }
         }
-        if (event.action == KeyEvent.ACTION_DOWN && focusIsIn(binding.refreshPane)) {
+        if (event.action == KeyEvent.ACTION_DOWN && panes.refreshRoot?.let { focusIsIn(it) } == true) {
             when (event.keyCode) {
                 KeyEvent.KEYCODE_DPAD_UP -> {
                     when (currentFocus) {
-                        binding.refreshIntervalCard -> binding.refreshNowCard.requestFocus()
-                        binding.refreshNowCard -> binding.refreshBack.requestFocus()
+                        panes.refreshIntervalCard -> panes.refreshNowCard.requestFocus()
+                        panes.refreshNowCard -> panes.refreshBack.requestFocus()
                     }
                     return true
                 }
                 KeyEvent.KEYCODE_DPAD_DOWN -> {
                     when (currentFocus) {
-                        binding.refreshBack -> binding.refreshNowCard.requestFocus()
-                        binding.refreshNowCard -> binding.refreshIntervalCard.requestFocus()
+                        panes.refreshBack -> panes.refreshNowCard.requestFocus()
+                        panes.refreshNowCard -> panes.refreshIntervalCard.requestFocus()
                     }
                     return true
                 }
@@ -3233,14 +3290,14 @@ class BrowseActivity : AppCompatActivity() {
                 event.keyCode == KeyEvent.KEYCODE_DPAD_LEFT ||
                 event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT)
         ) {
-            if (binding.vpnPane.visibility == View.VISIBLE) {
-                binding.vpnBack.requestFocus()
-            } else if (binding.adminPane.visibility == View.VISIBLE) {
-                binding.cardAdminRefresh.requestFocus()
-            } else if (binding.devicePane.visibility == View.VISIBLE) {
-                binding.deviceBack.requestFocus()
-            } else if (binding.refreshPane.visibility == View.VISIBLE) {
-                binding.refreshNowCard.requestFocus()
+            if (panes.isVpnVisible()) {
+                panes.vpnBack.requestFocus()
+            } else if (panes.isAdminVisible()) {
+                panes.cardAdminRefresh.requestFocus()
+            } else if (panes.isDeviceVisible()) {
+                panes.deviceBack.requestFocus()
+            } else if (panes.isRefreshVisible()) {
+                panes.refreshNowCard.requestFocus()
             } else {
                 focusGroups()
             }
@@ -3347,9 +3404,6 @@ class BrowseActivity : AppCompatActivity() {
     private var previousMenu = GuideMenu.GROUPS
     private var navExpanded = true
     private val navLabels = HashMap<Int, CharSequence>()
-    private var previewPlayer: ExoPlayer? = null
-    private var previewChannelId: String? = null
-    private var previewJob: Job? = null
 
     private fun setupMobileChrome() {
         binding.mobileTopBar.visibility = View.VISIBLE
@@ -3395,8 +3449,8 @@ class BrowseActivity : AppCompatActivity() {
 
     private fun paintBottomTabs() {
         if (!touchPrimary || !::binding.isInitialized) return
-        val settingsOpen = binding.adminPane.visibility == View.VISIBLE ||
-            binding.aboutPane.visibility == View.VISIBLE
+        val settingsOpen = panes.isAdminVisible() ||
+            panes.isAboutVisible()
         binding.bottomTabLive.isSelected = !settingsOpen && section == GuideSection.TV
         binding.bottomTabMovies.isSelected = !settingsOpen && section == GuideSection.MOVIES
         binding.bottomTabShows.isSelected = !settingsOpen && section == GuideSection.SHOWS
@@ -3419,8 +3473,8 @@ class BrowseActivity : AppCompatActivity() {
 
     private fun paintMobileSettingsChips() {
         if (!touchPrimary || !::binding.isInitialized) return
-        val adminOpen = binding.adminPane.visibility == View.VISIBLE
-        val aboutOpen = binding.aboutPane.visibility == View.VISIBLE
+        val adminOpen = panes.isAdminVisible()
+        val aboutOpen = panes.isAboutVisible()
         binding.mobileAdmin.isSelected = adminOpen
         binding.mobileAbout.isSelected = aboutOpen
         binding.mobileAdmin.setTextColor(
@@ -3664,11 +3718,11 @@ class BrowseActivity : AppCompatActivity() {
                 armGroupFocus()
                 focusGroups()
             }
-            binding.devicePane.visibility == View.VISIBLE ||
-                binding.aboutPane.visibility == View.VISIBLE ||
-                binding.adminPane.visibility == View.VISIBLE ||
-                binding.refreshPane.visibility == View.VISIBLE ||
-                binding.vpnPane.visibility == View.VISIBLE -> {
+            panes.isDeviceVisible() ||
+                panes.isAboutVisible() ||
+                panes.isAdminVisible() ||
+                panes.isRefreshVisible() ||
+                panes.isVpnVisible() -> {
                 openSection(section)
             }
             else -> Unit
@@ -3733,16 +3787,16 @@ class BrowseActivity : AppCompatActivity() {
         if (phoneChrome) {
             val pinOpen = binding.groupPin.visibility == View.VISIBLE ||
                 binding.groupPinWrong.visibility == View.VISIBLE
-            val settingsOpen = binding.adminPane.visibility == View.VISIBLE ||
-                binding.aboutPane.visibility == View.VISIBLE ||
-                binding.refreshPane.visibility == View.VISIBLE ||
-                binding.vpnPane.visibility == View.VISIBLE ||
-                binding.devicePane.visibility == View.VISIBLE
+            val settingsOpen = panes.isAdminVisible() ||
+                panes.isAboutVisible() ||
+                panes.isRefreshVisible() ||
+                panes.isVpnVisible() ||
+                panes.isDeviceVisible()
             binding.mobileBack.visibility = if (full || pinOpen || settingsOpen) View.VISIBLE else View.GONE
             binding.mobileSectionRow.visibility = View.GONE
             binding.mobileTitle.text = when {
-                binding.adminPane.visibility == View.VISIBLE -> getString(R.string.nav_admin)
-                binding.aboutPane.visibility == View.VISIBLE -> getString(R.string.nav_about)
+                panes.isAdminVisible() -> getString(R.string.nav_admin)
+                panes.isAboutVisible() -> getString(R.string.nav_about)
                 full && selectedCategoryName.isNotBlank() -> selectedCategoryName
                 live -> getString(R.string.nav_tv)
                 section == GuideSection.MOVIES -> getString(R.string.vod)
@@ -3786,7 +3840,7 @@ class BrowseActivity : AppCompatActivity() {
         binding.contentColumn.layoutParams = content
         binding.programPane.layoutParams = programs
         binding.previewCard.visibility = View.GONE
-        previewPlayer?.playWhenReady = false
+        if (::previewCtl.isInitialized) previewCtl.pause()
         styleGuideHeader()
         if (showPrograms) {
             if (full) fitChannelColumn()
@@ -3872,7 +3926,7 @@ class BrowseActivity : AppCompatActivity() {
     private fun hidePreviewChrome() {
         binding.groupPills.visibility = View.GONE
         binding.previewCard.visibility = View.GONE
-        previewPlayer?.playWhenReady = false
+        if (::previewCtl.isInitialized) previewCtl.pause()
     }
 
     private var landOnOpened = false
@@ -4021,88 +4075,19 @@ class BrowseActivity : AppCompatActivity() {
     }
 
     private fun queuePreview(channel: Channel) {
-        if (section != GuideSection.TV || channel.kind != ContentKind.LIVE || channel.streamUrl.isBlank()) return
-        updatePreviewCaption(channel)
-        // Phones: skip auto-preview on focus — saves a second decoder/RAM. TV guide still previews.
-        if (touchPrimary) return
-        if (channel.id == previewChannelId && previewPlayer != null) return
-        previewJob?.cancel()
-        previewJob = lifecycleScope.launch {
-            kotlinx.coroutines.delay(400)
-            if (isDestroyed) return@launch
-            val onRow = focusIsIn(binding.channelList) || focusIsIn(binding.programPane)
-            if (onRow && focusedChannel != null && focusedChannel?.id != channel.id) return@launch
-            startPreview(channel)
-        }
+        previewCtl.queue(channel, liveSection = section == GuideSection.TV)
     }
 
     private fun startPreview(channel: Channel) {
-        val player = previewPlayer ?: ExoPlayer.Builder(this)
-            .setLoadControl(
-                DefaultLoadControl.Builder()
-                    .setBufferDurationsMs(1_000, 6_000, 250, 500)
-                    .setTargetBufferBytes(4 * 1024 * 1024)
-                    .setPrioritizeTimeOverSizeThresholds(true)
-                    .build()
-            )
-            .setMediaSourceFactory(
-                DefaultMediaSourceFactory(this).setDataSourceFactory(
-                    DefaultHttpDataSource.Factory()
-                        .setUserAgent("Olympus-IPTV")
-                        .setConnectTimeoutMs(15_000)
-                        .setReadTimeoutMs(20_000)
-                        .setAllowCrossProtocolRedirects(true)
-                )
-            )
-            .build()
-            .also { created ->
-                created.volume = 0f
-                previewPlayer = created
-                binding.previewPlayer.player = created
-            }
-        previewChannelId = channel.id
-        player.setMediaItem(
-            MediaItem.Builder()
-                .setUri(channel.streamUrl)
-                .setLiveConfiguration(
-                    MediaItem.LiveConfiguration.Builder()
-                        .setTargetOffsetMs(8_000)
-                        .setMinOffsetMs(2_000)
-                        .setMaxOffsetMs(24_000)
-                        .build()
-                )
-                .build()
-        )
-        player.prepare()
-        player.playWhenReady = true
-        updatePreviewCaption(channel)
-    }
-
-    private fun updatePreviewCaption(channel: Channel) {
-        val title = epgCache[channel.id]?.now?.title?.takeIf { it.isNotBlank() } ?: channel.name
-        binding.previewCaption.text = getString(R.string.preview_on_now, title)
+        previewCtl.start(channel)
     }
 
     private fun handOffPreview(channel: Channel) {
-        val warm = previewPlayer
-        if (warm != null && previewChannelId == channel.id) {
-            val app = application as OlympusIptvApp
-            app.warmPlayer = warm
-            app.warmChannelId = channel.id
-            previewPlayer = null
-            previewChannelId = null
-            previewJob?.cancel()
-            binding.previewPlayer.player = null
-        } else {
-            stopPreview()
-        }
+        previewCtl.handOff(channel)
     }
 
     private fun stopPreview() {
-        previewJob?.cancel()
-        previewChannelId = null
-        previewPlayer?.stop()
-        previewPlayer?.clearMediaItems()
+        previewCtl.stop()
     }
 
     private var selectedCategoryName = ""
@@ -4139,17 +4124,10 @@ class BrowseActivity : AppCompatActivity() {
             val now = com.olympus.iptv.playlist.EpgUtils.now()
             guideHeaderHalfHour = now / halfHourMs
             binding.guideDate.text = com.olympus.iptv.playlist.EpgUtils.formatWhen(now)
-            binding.contentTitle.text = getString(R.string.guide_group, selectedCategoryName)
-            binding.contentTitle.setTextColor(getColor(R.color.text_secondary))
-            binding.contentTitle.textSize = 13f
-            binding.contentTitle.setTypeface(null, android.graphics.Typeface.NORMAL)
         } else {
             guideHeaderHalfHour = -1L
-            binding.contentTitle.text = selectedCategoryName
-            binding.contentTitle.setTextColor(getColor(R.color.text_primary))
-            binding.contentTitle.textSize = 16f
-            binding.contentTitle.setTypeface(null, android.graphics.Typeface.BOLD)
         }
+        paintBreadcrumb(selectedCategoryName)
     }
 
     private fun jumpGuideToNow() {
@@ -4605,53 +4583,8 @@ class BrowseActivity : AppCompatActivity() {
     }
 
     private fun buildProgramHeader() {
-        val header = binding.programHeader
-        header.removeAllViews()
-        val start = programAdapter.windowStart
-        val count = ((programAdapter.windowEnd - start) / halfHourMs).toInt().coerceAtLeast(1)
-        val width = programAdapter.timelineWidth()
-        val nowIndex = ((com.olympus.iptv.playlist.EpgUtils.now() - start) / halfHourMs).toInt()
-        val times = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            layoutParams = LinearLayout.LayoutParams(width, 0, 1f)
-        }
-        repeat(count) { index ->
-            times.addView(TextView(this).apply {
-                text = EpgUtils.formatClock(start + index * halfHourMs)
-                gravity = Gravity.CENTER
-                setTextColor(getColor(if (index == nowIndex) R.color.accent else R.color.text_secondary))
-                textSize = 13f
-                layoutParams = LinearLayout.LayoutParams(programAdapter.slotPx, ViewGroup.LayoutParams.MATCH_PARENT)
-            })
-        }
-        val density = resources.displayMetrics.density
-        val rule = android.widget.FrameLayout(this).apply {
-            layoutParams = LinearLayout.LayoutParams(width, (10 * density).toInt())
-        }
-        rule.addView(View(this).apply {
-            setBackgroundColor(getColor(R.color.stroke))
-            layoutParams = android.widget.FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                density.toInt().coerceAtLeast(1)
-            ).apply { gravity = Gravity.CENTER_VERTICAL }
-        })
-        val dot = (5 * density).toInt()
-        repeat(count) { index ->
-            rule.addView(View(this).apply {
-                background = android.graphics.drawable.GradientDrawable().apply {
-                    shape = android.graphics.drawable.GradientDrawable.OVAL
-                    setColor(getColor(if (index == nowIndex) R.color.accent else R.color.text_secondary))
-                }
-                layoutParams = android.widget.FrameLayout.LayoutParams(dot, dot).apply {
-                    gravity = Gravity.CENTER_VERTICAL
-                    leftMargin = index * programAdapter.slotPx + programAdapter.slotPx / 2 - dot / 2
-                }
-            })
-        }
-        header.addView(times)
-        header.addView(rule)
-        binding.programHeaderScroll.scrollTo(programAdapter.scrollX, 0)
-        positionNowLine(programAdapter.scrollX)
+        browseModel.rememberEpgWindow(programAdapter.windowStart, programAdapter.windowEnd)
+        epgCtl.buildHeader()
     }
 
     private fun scrollProgramGuide(x: Int) {
@@ -4673,15 +4606,33 @@ class BrowseActivity : AppCompatActivity() {
     }
 
     private fun positionNowLine(scrollX: Int) {
-        val line = binding.programNowLine
-        val x = programAdapter.pxFor(com.olympus.iptv.playlist.EpgUtils.now()) - scrollX
-        val width = binding.programList.width
-        if (width > 0 && x in 0..width) {
-            line.visibility = View.VISIBLE
-            line.translationX = x.toFloat()
-        } else {
-            line.visibility = View.INVISIBLE
-        }
+        if (::epgCtl.isInitialized) epgCtl.positionNowLine(scrollX)
+    }
+
+    private fun paintProgramSynopsis(channel: Channel, program: EpgProgram?) {
+        if (!::binding.isInitialized || !::epgCtl.isInitialized) return
+        epgCtl.paintSynopsis(channel, program)
+    }
+
+    private fun rememberGuideUi() {
+        if (!::binding.isInitialized || !::epgCtl.isInitialized) return
+        epgCtl.captureScrolls(
+            model = browseModel,
+            playlistId = playlist?.id,
+            sectionKey = when (section) {
+                GuideSection.MOVIES -> "vod"
+                GuideSection.SHOWS -> "series"
+                else -> "live"
+            },
+            categoryId = selectedCategoryId,
+            categoryName = selectedCategoryName,
+            menu = guideMenu.name.lowercase(Locale.US)
+        )
+    }
+
+    private fun restoreGuideUiIfPossible() {
+        if (!::epgCtl.isInitialized) return
+        epgCtl.restoreScrolls(browseModel, playlist?.id)
     }
 
     private var guideDensity = PlaylistStore.GUIDE_COMFORTABLE
@@ -4935,6 +4886,56 @@ class BrowseActivity : AppCompatActivity() {
         PlaylistLoader.FAVORITES_ID -> R.drawable.ic_star
         PlaylistLoader.ALL_ID -> R.drawable.ic_nav_tv
         else -> R.drawable.ic_card_layers
+    }
+
+    private fun categoryPreviewLogos(category: Category): List<String> {
+        val map = when (section) {
+            GuideSection.TV -> liveByCategory
+            GuideSection.MOVIES -> vodByCategory
+            GuideSection.SHOWS -> if (seriesByCategory.isNotEmpty()) seriesByCategory else vodByCategory
+        }
+        val rows = map[category.id].orEmpty()
+        if (rows.isEmpty()) return emptyList()
+        val urls = ArrayList<String>(3)
+        for (channel in rows) {
+            val url = channel.logoUrl?.takeIf { it.isNotBlank() } ?: continue
+            if (urls.contains(url)) continue
+            urls.add(url)
+            if (urls.size >= 3) break
+        }
+        return urls
+    }
+
+    private fun isLiveBadgeGroup(category: Category): Boolean {
+        if (section != GuideSection.TV) return false
+        val name = category.name
+        return name.contains("espn", ignoreCase = true) ||
+            name.contains("dazn", ignoreCase = true) ||
+            name.contains("sport", ignoreCase = true) ||
+            name.contains("event", ignoreCase = true)
+    }
+
+    private fun paintBreadcrumb(leaf: String? = null) {
+        if (!::binding.isInitialized) return
+        val sectionLabel = when {
+            panes.isAdminVisible() -> getString(R.string.breadcrumb_admin)
+            panes.isAboutVisible() -> getString(R.string.nav_about)
+            panes.isDeviceVisible() -> getString(R.string.nav_device)
+            panes.isVpnVisible() -> getString(R.string.vpn_card)
+            panes.isRefreshVisible() -> getString(R.string.refresh_playlist)
+            section == GuideSection.MOVIES -> getString(R.string.vod)
+            section == GuideSection.SHOWS -> getString(R.string.nav_shows)
+            else -> getString(R.string.breadcrumb_live)
+        }
+        val tip = leaf?.takeIf { it.isNotBlank() } ?: selectedCategoryName.takeIf { it.isNotBlank() }
+        binding.contentTitle.text = if (tip.isNullOrBlank() || tip.equals(sectionLabel, ignoreCase = true)) {
+            sectionLabel
+        } else {
+            "$sectionLabel › $tip"
+        }
+        binding.contentTitle.setTextColor(getColor(R.color.text_primary))
+        binding.contentTitle.textSize = 15f
+        binding.contentTitle.setTypeface(null, android.graphics.Typeface.BOLD)
     }
 
     private fun cardDetail(category: Category): String {
@@ -5787,7 +5788,7 @@ class BrowseActivity : AppCompatActivity() {
                 if (focusedChannel?.id != channel.id) return@launch
                 rememberEpg(channel.id, nowNext)
                 channelAdapter.notifyEpgChanged(channel.id)
-                updatePreviewCaption(channel)
+                queuePreview(channel)
             }
         }
         epgWait = run
@@ -5974,6 +5975,16 @@ class BrowseActivity : AppCompatActivity() {
         if (guideMenu != GuideMenu.CHANNELS) showMenu(GuideMenu.CHANNELS)
         val row = visibleChannels.indexOfFirst { it.id == returnChannelId }
         focusReturnChannel(row)
+    }
+
+    /** Keep the last live stream in the corner preview after leaving full-screen playback. */
+    private fun maybeShowGuidePip() {
+        val app = application as OlympusIptvApp
+        val channel = app.lastPlayed?.takeIf {
+            it.kind == ContentKind.LIVE && it.seriesId.isNullOrBlank() && it.streamUrl.isNotBlank()
+        } ?: return
+        if (app.lastPlayedPlaylistId != playlist?.id) return
+        previewCtl.showGuidePip(channel) { play(it) }
     }
 
     private fun focusReturnChannel(row: Int) {

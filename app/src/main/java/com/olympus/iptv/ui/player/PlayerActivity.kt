@@ -202,6 +202,7 @@ class PlayerActivity : AppCompatActivity() {
         setContentView(binding.root)
         binding.playerView.useController = false
         binding.playerView.setKeepContentOnPlayerReset(true)
+        binding.playerViewB.setKeepContentOnPlayerReset(true)
         applyPicture(pictureMode)
         setupPhoneChrome()
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
@@ -775,7 +776,7 @@ class PlayerActivity : AppCompatActivity() {
         playersDecoder = mode
         decoderDirty = false
         val control = DefaultLoadControl.Builder()
-            .setBufferDurationsMs(1_500, 8_000, 250, 500)
+            .setBufferDurationsMs(2_500, 15_000, 1_000, 2_000)
             .setTargetBufferBytes(6 * 1024 * 1024)
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
@@ -1704,6 +1705,7 @@ class PlayerActivity : AppCompatActivity() {
             current = queue.getOrNull(index)
             stepping = true
             if (touchPrimary) Haptics.tick(binding.root)
+            current?.let { showZapOsd(it) }
             playCurrent()
             return
         }
@@ -1717,7 +1719,52 @@ class PlayerActivity : AppCompatActivity() {
             }
             current = next
             if (touchPrimary) Haptics.tick(binding.root)
+            showZapOsd(next)
             playCurrent()
+        }
+    }
+
+    private val hideZapBanner = Runnable {
+        if (::binding.isInitialized && !isDestroyed) binding.zapBanner.visibility = View.GONE
+    }
+    private var zapToken = 0
+
+    private fun showZapOsd(channel: Channel) {
+        if (!::binding.isInitialized || isDestroyed) return
+        val token = ++zapToken
+        val alias = lineupName(channel, channel).ifBlank { channel.name }
+        binding.zapBanner.visibility = View.VISIBLE
+        binding.zapTitle.text = alias
+        binding.zapNow.text = "…"
+        binding.zapNext.text = ""
+        binding.zapProgress.progress = 0
+        binding.zapLogo.load(channel.logoUrl) {
+            channelLogo((48 * resources.displayMetrics.density).toInt().coerceAtLeast(1))
+            placeholder(R.drawable.ic_channel_placeholder)
+            error(R.drawable.ic_channel_placeholder)
+        }
+        hideHandler.removeCallbacks(hideZapBanner)
+        hideHandler.postDelayed(hideZapBanner, 3_500L)
+        flashOverlay()
+        if (channel.kind != ContentKind.LIVE) return
+        val savedId = playlistId ?: return
+        lifecycleScope.launch {
+            val playlist = savedPlaylist(savedId) ?: return@launch
+            val lookup = channel.copy(epgChannelId = channel.epgChannelId ?: channel.id)
+            val epg = runCatching { epgRepo.nowNext(playlist, lookup) }.getOrDefault(EpgNowNext())
+            if (token != zapToken || isDestroyed) return@launch
+            val raw = channel.name
+            val now = epg.now
+            binding.zapNow.text = now?.let { aliasProgram(it.title, raw, alias) } ?: "…"
+            binding.zapNext.text = epg.next
+                ?.let { getString(R.string.zap_up_next, aliasProgram(it.title, raw, alias)) }
+                .orEmpty()
+            val span = (now?.endMillis ?: 0L) - (now?.startMillis ?: 0L)
+            binding.zapProgress.progress = if (now != null && span > 0L) {
+                (((System.currentTimeMillis() - now.startMillis) * 1000L) / span).toInt().coerceIn(0, 1000)
+            } else {
+                0
+            }
         }
     }
 
@@ -2773,6 +2820,7 @@ class PlayerActivity : AppCompatActivity() {
         subtitleJob?.cancel()
         seekJob?.cancel()
         hideHandler.removeCallbacks(hideOverlay)
+        hideHandler.removeCallbacks(hideZapBanner)
         hideHandler.removeCallbacks(seekTick)
         hideHandler.removeCallbacks(sleepFire)
         preloadJob?.cancel()

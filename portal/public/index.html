@@ -7,18 +7,18 @@
   <style>
     :root {
       color-scheme: dark;
-      --bg: #1b1e26;
-      --side: #14161c;
-      --elev: #2a2d36;
-      --panel: #323640;
-      --stroke: #3c404a;
-      --text: #f5f6f8;
-      --muted: #9aa1ad;
-      --accent: #e0b15a;
+      --bg: #141210;
+      --side: #1b1814;
+      --elev: #221f1a;
+      --panel: #2c271f;
+      --stroke: #433b31;
+      --text: #f6f1e7;
+      --muted: #c9bba8;
+      --accent: #e2a15a;
       --accent-ink: #1c1408;
-      --save: #c47b3a;
+      --save: #b07a38;
       --danger: #e07a72;
-      --focus: #e0c07a;
+      --focus: #f0c48a;
     }
     * { box-sizing: border-box; }
     body {
@@ -87,7 +87,118 @@
     .error { color: var(--danger); min-height: 1.2em; }
     .ok { color: var(--accent); min-height: 0; margin: 6px 2px 0; font-size: 13px; }
     .ok:empty { display: none; }
-    .login { max-width: 420px; }
+    .login {
+      max-width: 420px;
+      background: rgba(27, 24, 20, 0.88);
+      border: 1.5px solid var(--accent);
+      box-shadow: 0 0 0 2px rgba(226, 161, 90, 0.22), 0 18px 40px rgba(0, 0, 0, 0.35);
+      backdrop-filter: blur(10px);
+    }
+    .address-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .copy-url {
+      border: 1px solid var(--stroke);
+      background: var(--panel);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 6px 10px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    #gateArt { display: none; }
+    .pin-mask {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(8, 10, 14, 0.72);
+    }
+    .pin-mask[hidden] { display: none; }
+    .pin-card {
+      width: min(420px, calc(100% - 32px));
+      background: #1b1814;
+      border: 1px solid #e2a15a;
+      border-radius: 18px;
+      padding: 22px;
+    }
+    .pin-card h2 { color: #e2a15a; font-size: 22px; }
+    .pin-field { position: relative; }
+    .pin-field .error:empty { display: none; }
+    .pin-field .error:not(:empty) {
+      position: absolute;
+      inset: 0;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #2a241c;
+      border: 1px solid #e07a72;
+      border-radius: 10px;
+      text-align: center;
+      padding: 0 12px;
+    }
+    .pin-actions { display: flex; gap: 8px; margin-top: 14px; }
+    .pin-actions button { flex: 1; }
+    body:has(#login:not([hidden])) {
+      background:
+        radial-gradient(880px 460px at 0% 0%, rgba(226, 161, 90, 0.34), transparent 58%),
+        radial-gradient(720px 420px at 100% 0%, rgba(226, 161, 90, 0.22), transparent 52%),
+        radial-gradient(640px 480px at 78% 100%, rgba(36, 64, 112, 0.45), transparent 60%),
+        #12161f;
+    }
+    body:has(#login:not([hidden])) .wrap { width: min(1180px, calc(100% - 40px)); justify-content: center; }
+    body:has(#login:not([hidden])) header {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      margin-bottom: 36px;
+    }
+    body:has(#login:not([hidden])) h1 { color: #e2a15a; font-size: 42px; font-weight: 800; }
+    body:has(#login:not([hidden])) #address { color: #d7deea; font-size: 16px; text-align: center; }
+    body:has(#login:not([hidden])) #email {
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23e2a15a' stroke-width='1.8'><rect x='3' y='5' width='18' height='14' rx='2'/><path d='M3 7l9 7 9-7'/></svg>");
+      background-repeat: no-repeat;
+      background-position: 12px center;
+      background-size: 18px;
+      padding-left: 40px;
+    }
+    body:has(#login:not([hidden])) #logLinks a {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      border-radius: 999px;
+      border: 1px solid #e2a15a;
+      background: #1a140c;
+      color: #e2a15a;
+      text-decoration: none;
+      font-weight: 700;
+    }
+    body:has(#login:not([hidden])) .gate-row { display: flex; align-items: center; gap: 48px; }
+    body:has(#login:not([hidden])) #login {
+      max-width: 460px;
+      margin: 0;
+      padding: 28px 26px 22px;
+      border: 1px solid #e2a15a;
+      border-radius: 22px;
+      background: rgba(16, 22, 36, 0.94);
+      box-shadow: 0 0 0 1px rgba(226, 161, 90, 0.28), 0 24px 70px rgba(0, 0, 0, 0.38);
+    }
+    body:has(#login:not([hidden])) #login h2 { color: #e2a15a; font-size: 32px; margin-bottom: 6px; }
+    body:has(#login:not([hidden])) #login p { color: #d5dbe6; font-size: 16px; }
+    body:has(#login:not([hidden])) #login .primary {
+      width: 100%;
+      margin-top: 16px;
+      padding: 14px 16px;
+      border-radius: 999px;
+      background: linear-gradient(#f3d48a, #e2a15a);
+      color: #1c1408;
+      font-size: 18px;
+      font-weight: 800;
+    }
+    body:has(#login:not([hidden])) #gateArt { display: block; flex: 1; min-width: 280px; }
+    #gateArt svg { width: 100%; height: auto; }
     #deviceList { flex: 1; min-height: 0; overflow: auto; }
     .toolbar, .panel-head { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
     .panel-head { margin-bottom: 10px; flex-wrap: nowrap; }
@@ -365,6 +476,88 @@
     #panelClean .panel-head { display: block; }
     .epg-title { display: flex; align-items: center; gap: 12px; }
     .epg-title h2 { margin: 0; }
+    .section-save {
+      flex: 0 0 auto;
+      width: auto;
+      margin-left: 12px;
+      background: #E2A15A;
+      color: #141210;
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: 0.03em;
+      border: 2px solid #F0C48A;
+      border-radius: 999px;
+      padding: 12px 28px;
+      box-shadow: 0 0 0 4px rgba(226, 161, 90, 0.28);
+    }
+    .section-save:hover, .section-save:focus-visible { background: #F0C48A; }
+    #leaveGuard {
+      position: fixed;
+      inset: 0;
+      z-index: 40;
+      display: grid;
+      place-items: center;
+      background: rgba(8, 7, 5, 0.72);
+      padding: 24px;
+    }
+    #leaveGuard[hidden] { display: none; }
+    .leave-card {
+      width: min(440px, 100%);
+      background: #221F1A;
+      border: 1px solid #E2A15A;
+      border-radius: 18px;
+      padding: 28px 24px 22px;
+      text-align: center;
+    }
+    .leave-card h2 { margin: 0 0 8px; color: #F6F1E7; font-size: 26px; }
+    .leave-card p { margin: 0; color: #C9BBA8; font-size: 16px; line-height: 1.45; }
+    .leave-card button {
+      margin-top: 20px;
+      min-width: 140px;
+      background: #E2A15A;
+      color: #141210;
+      font-size: 16px;
+      font-weight: 800;
+      border: 0;
+      border-radius: 999px;
+      padding: 12px 28px;
+    }
+    .log-tools { display: flex; align-items: center; gap: 8px; margin: 12px 0; flex-wrap: wrap; }
+    .log-tools button, .log-tools a {
+      background: #2C271F;
+      color: #F6F1E7;
+      border: 1px solid #433B31;
+      border-radius: 10px;
+      padding: 8px 14px;
+      text-decoration: none;
+      font-weight: 700;
+    }
+    #logView {
+      display: block;
+      width: 100%;
+      min-height: 220px;
+      max-height: 70vh;
+      margin: 0;
+      overflow: auto;
+      resize: both;
+      white-space: pre;
+      background: #141210;
+      color: #F6F1E7;
+      border: 1px solid #433B31;
+      border-radius: 12px;
+      padding: 14px;
+      font-size: 14px;
+      line-height: 1.45;
+      box-sizing: border-box;
+    }
+    #logList { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    #logList button {
+      background: #2C271F;
+      color: #E2A15A;
+      border: 1px solid #433B31;
+      border-radius: 999px;
+      padding: 8px 14px;
+    }
     #epgBack { width: auto; }
     .nav-label {
       margin: 16px 10px 4px;
@@ -374,7 +567,7 @@
       letter-spacing: 0.08em;
       text-transform: uppercase;
     }
-    .admin-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 8px; }
+    .admin-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 18px; }
     .admin-card {
       display: flex;
       flex-direction: column;
@@ -382,19 +575,75 @@
       justify-content: center;
       text-align: center;
       gap: 8px;
-      min-height: 180px;
-      background: #2a2e38;
-      color: var(--text);
-      border: 1px solid #3c404a;
-      border-radius: 14px;
-      padding: 18px 16px;
+      min-height: 210px;
+      background: linear-gradient(180deg, #2a3142 0%, #1c2230 100%);
+      color: #f6f1e7;
+      border: 1px solid #3d465c;
+      border-radius: 18px;
+      padding: 22px 18px;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
     }
-    .admin-card strong { font-size: 18px; }
-    .admin-card span { color: var(--muted); font-size: 14px; font-weight: 400; line-height: 1.35; }
-    button.admin-card { cursor: pointer; }
-    button.admin-card:hover, button.admin-card:focus-visible { border-color: #d7b56a; background: #2c291f; }
+    .admin-card .admin-icon { width: 42px; height: 42px; color: #e2a15a; }
+    .admin-card .admin-icon svg { width: 42px; height: 42px; }
+    .admin-card strong { font-size: 20px; }
+    .admin-card span { color: #c9bba8; font-size: 14px; font-weight: 400; line-height: 1.35; }
+    .admin-card em {
+      font-style: normal;
+      color: #c9bba8;
+      background: #2a241c;
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 13px;
+    }
+    #vpnCities button { display: block; width: 100%; margin-top: 8px; text-align: left; }
+    #vpnCities button[aria-pressed="true"] { border-color: #E2A15A; }
+    #logLinks a, #logList a { color: var(--accent); margin-right: 14px; }
+    #logList { margin-top: 8px; }
+    button.admin-card, a.admin-card { cursor: pointer; text-decoration: none; }
+    button.admin-card:hover, button.admin-card:focus-visible, a.admin-card:hover, a.admin-card:focus-visible {
+      border-color: #e2a15a;
+      box-shadow: 0 0 0 1px #e2a15a, 0 0 24px rgba(226, 161, 90, 0.28);
+    }
+    .admin-lead { margin: 6px 0 0; color: #e2a15a; font-size: 15px; }
+    #panelAdmin h2 { font-size: 34px; color: #f6f1e7; }
+    .admin-back { margin: 0 0 8px; padding: 0; background: none; border: 0; color: #c9bba8; font-size: 15px; }
     .admin-note { margin: 12px 2px 0; color: var(--muted); font-size: 13px; }
-    .clean-lead { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+    .clean-lead { margin: 4px 0 0; color: #C9BBA8; font-size: 14px; }
+    .epg-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 16px; }
+    .epg-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      gap: 8px;
+      min-height: 168px;
+      background: #221F1A;
+      color: #F6F1E7;
+      border: 1px solid #433B31;
+      border-radius: 16px;
+      padding: 18px 16px;
+      cursor: pointer;
+    }
+    .epg-card svg { width: 28px; height: 28px; stroke: #E2A15A; }
+    .epg-card strong { font-size: 16px; line-height: 1.25; }
+    .epg-card span { color: #C9BBA8; font-size: 13px; font-weight: 400; line-height: 1.35; }
+    .epg-card:hover, .epg-card:focus-visible { border-color: #E2A15A; background: #2C271F; }
+    #epgDetail { min-height: 22px; margin: 14px 2px 0; color: #C9BBA8; }
+    #epgTools { margin-top: 8px; }
+    #epgToolsBack { width: auto; margin-bottom: 12px; }
+    .sanitize-board { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    .sanitize-pair { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: stretch; min-height: 280px; }
+    .sanitize-col h4 { margin: 0 0 8px; color: #E2A15A; font-size: 15px; }
+    .sanitize-list { max-height: 46vh; overflow: auto; display: flex; flex-direction: column; gap: 6px; }
+    .sanitize-list button { text-align: left; background: #221F1A; color: #F6F1E7; border: 1px solid #433B31; border-radius: 10px; padding: 8px 10px; }
+    .sanitize-list button.on { border-color: #F0C48A; background: #2C271F; }
+    .sanitize-arrows { display: flex; flex-direction: column; justify-content: center; gap: 8px; }
+    .sanitize-arrows button { width: 44px; height: 40px; border-radius: 10px; }
+    #sanitizeCleanup { margin-top: 16px; }
+    #sanitizeBusy { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(20, 18, 16, 0.88); color: #F6F1E7; font-size: 28px; font-weight: 800; z-index: 5; animation: sanitizeFlash 0.7s steps(2, end) infinite; }
+    #epgSanitizeTool { position: relative; }
+    @keyframes sanitizeFlash { 50% { opacity: 0.28; } }
     .clean-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
     .clean-card {
       background: #23262f;
@@ -828,7 +1077,7 @@
       #editor { flex-direction: column; }
       .side { width: 100%; border-right: 0; border-bottom: 1px solid #22252c; }
       #countries { grid-template-columns: 1fr; }
-      .quick-cards, .clean-grid, .clean-top, .device-grid, .fav-board, #favoriteResults { grid-template-columns: 1fr; display: grid; }
+      .quick-cards, .clean-grid, .epg-grid, .clean-top, .device-grid, .fav-board, #favoriteResults { grid-template-columns: 1fr; display: grid; }
       .fav-search { width: 100%; margin-top: 8px; }
       .fav-search .hint { text-align: left; }
       .clean-top { display: block; }
@@ -846,17 +1095,90 @@
         <img class="logo-mark" src="logo.png?v=2" alt="Olympus-IPTV" />
         <h1>Olympus-IPTV</h1>
       </div>
-      <p id="address">Looking up this PC’s home address…</p>
+      <div class="address-row">
+        <p id="address">Looking up this PC’s home address…</p>
+        <button class="copy-url" id="copyTvUrl" type="button">Copy TV URL</button>
+      </div>
+      <p id="logLinks"><a href="/api/log">Download the error log</a></p>
     </header>
 
+    <div id="leaveGuard" hidden>
+      <div class="leave-card">
+        <h2>Unsaved changes</h2>
+        <p>You are about to leave this page. Changes here are not saved yet.</p>
+        <button id="leaveOk" type="button">OK</button>
+      </div>
+    </div>
+    <form class="card login" id="setup" hidden>
+      <h2>Set up this device</h2>
+      <p>Enter the account and playlist here. After you save, finish favorites and filters in this dashboard — they sync to the device.</p>
+      <label for="setupEmail">Email</label>
+      <input id="setupEmail" type="email" autocomplete="username" required />
+      <label for="setupZip">ZIP code</label>
+      <input id="setupZip" inputmode="numeric" maxlength="5" required />
+      <label for="setupMode">Playlist</label>
+      <select id="setupMode">
+        <option value="xtream">Xtream</option>
+        <option value="m3u">M3U</option>
+      </select>
+      <div id="setupXtream">
+        <label for="setupHost">Host</label>
+        <input id="setupHost" autocomplete="off" />
+        <label for="setupUser">Username</label>
+        <input id="setupUser" autocomplete="off" />
+        <label for="setupPass">Password</label>
+        <input id="setupPass" type="password" autocomplete="off" />
+      </div>
+      <div id="setupM3u" hidden>
+        <label for="setupUrl">M3U URL</label>
+        <input id="setupUrl" autocomplete="off" />
+        <label for="setupM3uUser">Username, if the link asks for one</label>
+        <input id="setupM3uUser" autocomplete="off" />
+        <label for="setupM3uPass">Password, if the link asks for one</label>
+        <input id="setupM3uPass" type="password" autocomplete="off" />
+      </div>
+      <label class="intl-switch"><input id="setupVod" type="checkbox" checked /><span class="switch" aria-hidden="true"></span> Include movies and shows</label>
+      <label class="intl-switch"><input id="setupIntl" type="checkbox" /><span class="switch" aria-hidden="true"></span> Include international channels</label>
+      <p class="error" id="setupError"></p>
+      <button class="primary" type="submit">Save on the device</button>
+    </form>
+
+    <div class="gate-row">
     <form class="card login" id="login" hidden>
       <h2>Open your lineup</h2>
-      <p>Use the email shown on the TV.</p>
-      <label for="email">Email</label>
+      <p>Use the email shown on the device.</p>
+      <label for="email">Email Address</label>
       <input id="email" type="email" autocomplete="username" required />
       <p class="error" id="loginError"></p>
-      <button class="primary" type="submit">Open dashboard</button>
+      <button class="primary" type="submit">Open dashboard 🚀</button>
     </form>
+    <div id="gateArt" aria-hidden="true">
+      <svg viewBox="0 0 720 460" fill="none">
+        <rect x="36" y="28" width="150" height="96" rx="12" fill="#1c2433" stroke="#e2a15a" opacity="0.85"/>
+        <rect x="48" y="40" width="54" height="72" rx="4" fill="#3a2a22"/>
+        <rect x="108" y="40" width="64" height="72" rx="4" fill="#243044"/>
+        <rect x="210" y="8" width="470" height="300" rx="26" fill="#121820" stroke="#e2a15a" stroke-width="7"/>
+        <rect x="232" y="30" width="426" height="256" rx="10" fill="#0e141e"/>
+        <rect x="248" y="46" width="92" height="70" rx="6" fill="#2a241c" stroke="#e2a15a"/>
+        <rect x="348" y="46" width="150" height="18" rx="4" fill="#243044"/>
+        <rect x="348" y="70" width="180" height="14" rx="4" fill="#1c2433"/>
+        <rect x="348" y="90" width="120" height="14" rx="4" fill="#1c2433"/>
+        <rect x="248" y="128" width="300" height="22" rx="4" fill="#243044"/>
+        <rect x="248" y="156" width="300" height="22" rx="4" fill="#1c2433"/>
+        <rect x="248" y="184" width="300" height="22" rx="4" fill="#243044"/>
+        <rect x="248" y="212" width="300" height="22" rx="4" fill="#1c2433"/>
+        <rect x="248" y="240" width="300" height="22" rx="4" fill="#243044"/>
+        <rect x="560" y="128" width="80" height="134" rx="8" fill="#1c2433" stroke="#3d465c"/>
+        <rect x="570" y="140" width="60" height="16" rx="3" fill="#e2a15a" opacity="0.8"/>
+        <rect x="570" y="164" width="60" height="12" rx="3" fill="#243044"/>
+        <rect x="570" y="182" width="60" height="12" rx="3" fill="#243044"/>
+        <rect x="570" y="200" width="60" height="12" rx="3" fill="#243044"/>
+        <rect x="570" y="218" width="60" height="12" rx="3" fill="#243044"/>
+        <path d="M360 308h160l24 34H336l24-34z" fill="#2a3142"/>
+        <rect x="300" y="342" width="280" height="12" rx="6" fill="#2a3142"/>
+      </svg>
+    </div>
+    </div>
 
     <section class="device-page" id="deviceList" hidden>
       <div class="device-head">
@@ -893,12 +1215,12 @@
           <button id="tabChannels" type="button" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 6v12l10-6z"/></svg>Channels</button>
           <button id="tabFavorites" type="button" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 19s-7-4.4-7-9a4 4 0 0 1 7-2 4 4 0 0 1 7 2c0 4.6-7 9-7 9z"/></svg>Favorites</button>
           <button id="tabRecord" type="button" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3" fill="currentColor" stroke="none"/></svg>Recordings</button>
+          <button id="tabReminders" type="button" aria-selected="false"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 22a2 2 0 0 0 2-2h-4a2 2 0 0 0 2 2zm6-6v-5a6 6 0 0 0-5-5.91V4a1 1 0 1 0-2 0v1.09A6 6 0 0 0 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>Reminders</button>
           <button id="tabBackup" type="button" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 4v10"/><path d="M8 10l4 4 4-4"/><path d="M5 18h14"/></svg>Backup & Restore</button>
           <button id="tabAdmin" type="button" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4"/></svg>Admin</button>
         </div>
         <div class="side-foot">
           <button id="backDevices" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8"/></svg>Devices</button>
-          <button id="save" type="button">Save</button>
           <button id="signOut" type="button">↪ Sign out</button>
         </div>
       </aside>
@@ -913,6 +1235,7 @@
             <button class="secondary" id="countriesVisible" type="button" aria-pressed="false">Visible</button>
             <button class="secondary" id="countriesHidden" type="button" aria-pressed="false">Hidden</button>
             <button class="secondary" id="countriesBoth" type="button" aria-pressed="true">Both</button>
+            <button class="section-save" type="button">Save</button>
           </div>
         </div>
         <p class="ok" id="saveStatus"></p>
@@ -929,6 +1252,7 @@
             <button class="secondary" id="groupsVisible" type="button" aria-pressed="false">Visible</button>
             <button class="secondary" id="groupsHidden" type="button" aria-pressed="false">Hidden</button>
             <button class="secondary" id="groupsBoth" type="button" aria-pressed="true">Both</button>
+            <button class="section-save" type="button">Save</button>
           </div>
         </div>
         <div class="group-tools">
@@ -948,6 +1272,7 @@
           <h2>Channels</h2>
           <select id="channelGroup"></select>
           <input id="channelSearch" type="search" placeholder="Find a channel in this group..." />
+          <button class="section-save" type="button">Save</button>
         </div>
         <div class="channel-tools">
           <span id="channelNote"></span>
@@ -967,36 +1292,180 @@
       </section>
 
       <section class="card panel" id="panelAdmin" hidden>
-        <div class="panel-head">
-          <h2>Admin</h2>
+        <div id="adminHome">
+          <div class="panel-head">
+            <div>
+              <button class="admin-back" id="adminHomeBack" type="button">← Back</button>
+              <h2>Admin</h2>
+              <p class="admin-lead">Configure and manage your Olympus-IPTV server and dashboard options.</p>
+            </div>
+          </div>
+          <div class="admin-cards">
+            <button class="admin-card" id="adminRefresh" type="button">
+              <span class="admin-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v6h-6"/></svg></span>
+              <strong>Refresh Options</strong>
+              <span>Sync guide, playlists, and channels</span>
+              <em id="adminRefreshAge">Last refresh</em>
+            </button>
+            <button class="admin-card" id="adminWeb" type="button">
+              <span class="admin-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="5" width="12" height="10" rx="2"/><rect x="10" y="9" width="11" height="8" rx="2"/><path d="M8 19h8"/></svg></span>
+              <strong>Web-UI</strong>
+              <span>Access the dashboard on Wi-Fi</span>
+              <em>Online &amp; Ready</em>
+            </button>
+            <button class="admin-card" id="adminLogs" type="button">
+              <span class="admin-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v5h5"/><path d="M9 13h6M9 17h4"/><path d="M5 8v11"/></svg></span>
+              <strong>Error log</strong>
+              <span>Review system events and issues</span>
+              <em id="adminLogAge">0 errors</em>
+            </button>
+            <button class="admin-card" id="adminEpg" type="button">
+              <span class="admin-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M8 10h4M8 14h8"/></svg></span>
+              <strong>EPG edits</strong>
+              <span>Manage guide visibility</span>
+            </button>
+            <button class="admin-card" id="adminVpn" type="button">
+              <span class="admin-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 3l8 3v6c0 5-3.4 8.4-8 9-4.6-.6-8-4-8-9V6l8-3z"/></svg></span>
+              <strong>VPN</strong>
+              <em id="adminVpnCard">Not Connected • Secure your traffic</em>
+              <span>The dashboard stays on your Wi-Fi.</span>
+            </button>
+          </div>
         </div>
-        <div class="admin-cards">
-          <article class="admin-card">
-            <strong>Refresh Options</strong>
-            <span>Check the provider and save channels that are not already on this TV.</span>
-          </article>
-          <article class="admin-card">
-            <strong>Web-UI</strong>
-            <span>Open the lineup on a phone or computer on the same Wi-Fi.</span>
-          </article>
-          <button class="admin-card" id="adminEpg" type="button">
-            <strong>EPG edits</strong>
-            <span>Choose what the guide is allowed to show.</span>
-          </button>
+        <div id="adminRefreshPage" hidden>
+          <div class="panel-head">
+            <button class="secondary" id="adminRefreshBack" type="button">Back</button>
+            <h2>Refresh Options</h2>
+          </div>
+          <p class="hint">Check the provider and save channels that are not already on this TV. That check runs on the TV.</p>
         </div>
-        <p class="admin-note">Refresh Options and Web-UI run on the TV. EPG edits is here.</p>
+        <div id="adminWebPage" hidden>
+          <div class="panel-head">
+            <button class="secondary" id="adminWebBack" type="button">Back</button>
+            <h2>Web-UI</h2>
+          </div>
+          <p class="hint" id="adminWebCopy">Open this address on a phone or computer on the same Wi-Fi.</p>
+        </div>
+        <div id="adminLogPage" hidden>
+          <div class="panel-head">
+            <button class="secondary" id="adminLogBack" type="button">Back</button>
+            <h2>Error log</h2>
+          </div>
+          <p class="hint">Newest entries first. Drag the corner of the log to resize it. Older files stay under 400 KB.</p>
+          <div class="log-tools">
+            <button id="logSmaller" type="button">A−</button>
+            <button id="logLarger" type="button">A+</button>
+            <a id="logDownload" href="/api/log" download="olympus-iptv-log.txt">Download</a>
+          </div>
+          <pre id="logView">Open a log to read it here.</pre>
+          <div id="logList"></div>
+        </div>
+        <div id="adminVpnPage" hidden>
+          <div class="panel-head">
+            <button class="secondary" id="adminVpnBack" type="button">Back</button>
+            <h2>VPN</h2>
+          </div>
+          <p class="hint" id="vpnState">Not connected. The dashboard stays on your Wi-Fi.</p>
+          <div class="clean-fields">
+            <div>
+              <label for="vpnProvider">Provider</label>
+              <select id="vpnProvider">
+                <option value="pia">PIA VPN</option>
+                <option value="proton">Proton VPN</option>
+                <option value="surfshark">Surfshark</option>
+                <option value="nord">NordVPN</option>
+                <option value="wireguard">WireGuard</option>
+              </select>
+            </div>
+            <div id="vpnUserField">
+              <label for="vpnUser">Username</label>
+              <input id="vpnUser" type="text" autocomplete="off" />
+            </div>
+            <div id="vpnPassField">
+              <label for="vpnPass">Password</label>
+              <input id="vpnPass" type="password" autocomplete="off" />
+            </div>
+            <div id="vpnCodeField" hidden>
+              <label for="vpnCode">Authenticator code</label>
+              <input id="vpnCode" type="text" inputmode="numeric" autocomplete="off" />
+            </div>
+          </div>
+          <textarea id="vpnProfile" hidden placeholder="Paste a WireGuard profile" style="width:100%;min-height:140px;margin-top:12px;"></textarea>
+          <p class="hint" id="vpnNordHint" hidden>NordVPN can use the access token from its manual setup page in the password box, with the username token.</p>
+          <p class="hint" id="vpnWireHint" hidden>WireGuard uses a profile instead of a username.</p>
+          <div class="panel-head">
+            <button id="vpnSignIn" type="button">Sign in</button>
+            <button id="vpnDisconnect" class="secondary" type="button" hidden>Disconnect</button>
+          </div>
+          <input id="vpnFind" type="search" placeholder="Find a city" hidden />
+          <div class="list" id="vpnCities"></div>
+          <div class="panel-head">
+            <button id="vpnGo" type="button" hidden>Connect</button>
+            <button id="vpnBackup" class="secondary" type="button" hidden>Backup city</button>
+          </div>
+          <p class="hint" id="vpnBackupNote" hidden></p>
+        </div>
       </section>
 
       <section class="card panel" id="panelClean" hidden>
-        <div class="panel-head">
+        <div class="panel-head" id="epgHomeHead">
           <div class="epg-title">
             <button class="secondary" id="epgBack" type="button">Admin</button>
             <h2>EPG edits</h2>
+            <button class="section-save" type="button">Save</button>
           </div>
-          <p class="clean-lead">Quickly manage prefix/suffix stripping, bulk group renaming, and emoji/image removal.</p>
         </div>
-        <div class="clean-grid">
-          <article class="clean-card">
+        <div class="epg-grid" id="epgCards">
+          <button class="epg-card" id="epgCountries" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.8 2.5 15.2 0 18M12 3c-2.5 2.8-2.5 15.2 0 18"/></svg>
+            <strong>Show/Hide Countries</strong>
+            <span>Filter visibility of country feeds</span>
+          </button>
+          <button class="epg-card" id="epgLineup" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+            <strong>Show/Hide Groups/Channels</strong>
+            <span>Customize lists and visibility</span>
+          </button>
+          <button class="epg-card" id="epgReset" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.3-5.7"/><path d="M4 4v5h5"/></svg>
+            <strong>Show everything again</strong>
+            <span>Reset all visibility rules</span>
+          </button>
+          <button class="epg-card" id="epgStrip" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" aria-hidden="true"><path d="M4 7h16M7 7l2 13h6l2-13M10 7V5h4v2"/></svg>
+            <strong>Bulk Channel Stripper</strong>
+            <span>Simplify multiple channel lists</span>
+          </button>
+          <button class="epg-card" id="epgRename" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" aria-hidden="true"><path d="M4 20h4l10-10-4-4L4 16v4z"/><path d="M13 7l4 4"/></svg>
+            <strong>Bulk Group Renamer</strong>
+            <span>Rename multiple groups at once</span>
+          </button>
+          <button class="epg-card" id="epgSanitize" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" aria-hidden="true"><path d="M12 3l2.2 4.6L19 8.2l-3.5 3.4.8 4.9L12 14.8 7.7 16.5l.8-4.9L5 8.2l4.8-.6L12 3z"/></svg>
+            <strong>Sanitize Group &amp; Channel Names</strong>
+            <span>Apply the sports and US cleanup</span>
+          </button>
+          <button class="epg-card" id="epgParse" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" aria-hidden="true"><path d="M5 5h10l4 4v10H5z"/><path d="M15 5v4h4M8 13h8M8 17h5"/></svg>
+            <strong>Parse channel names into the guide</strong>
+            <span>Import name metadata into EPG</span>
+          </button>
+          <button class="epg-card" id="epgImages" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.4"/><path d="M7 16l3.2-3.2 2.2 2.2L16 11l3 4"/></svg>
+            <strong>Remove images</strong>
+            <span>Remove EPG visual assets</span>
+          </button>
+        </div>
+        <div id="epgTools" hidden>
+          <div class="panel-head">
+            <button class="secondary" id="epgToolsBack" type="button">Back</button>
+            <h2 id="epgToolTitle">EPG edits</h2>
+            <button id="epgToolSave" type="button">Save</button>
+          </div>
+          <p class="note" id="epgPageStatus"></p>
+          <div class="clean-grid">
+          <article class="clean-card" id="epgStripTool">
             <h3>Strip Names <button class="info-dot" type="button" title="Comma-separated. A space you type is kept. An entry with a space or a colon is removed exactly, wherever it appears. A plain word comes off the start or the end. Capitalization does not matter. Save sends it to the TV.">i</button></h3>
             <p class="hint">Remove specific words/characters from group/channel names (comma-separated).</p>
             <div class="clean-fields">
@@ -1010,7 +1479,7 @@
               </div>
             </div>
           </article>
-          <article class="clean-card">
+          <article class="clean-card" id="epgRenameTool">
             <h3>Bulk Rename Groups <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20h4l10-10-4-4L4 16v4z"/><path d="M13 7l4 4"/></svg> <button class="info-dot" type="button" title="Replaces this text in every group name, ignoring capitalization, including names you set on the Groups tab. Apply saves it for the TV.">i</button></h3>
             <p class="hint">Find and replace text across all group names (capitalization ignored).</p>
             <div class="clean-fields">
@@ -1025,13 +1494,12 @@
             </div>
             <div class="clean-actions">
               <button class="secondary" id="groupRenamePreview" type="button">Preview</button>
-              <button class="clean-apply" id="groupRenameApply" type="button">Apply</button>
             </div>
             <p class="note" id="groupRenameStatus"></p>
             <div class="clean-examples" id="groupRenameExamples"></div>
           </article>
         </div>
-        <article class="clean-card wide">
+        <article class="clean-card wide" id="epgImagesTool">
           <div class="clean-top">
             <div>
               <h3>Remove Images & Emojis <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M9 7V5h6v2M8 7l1 13h6l1-13"/></svg> <button class="info-dot" type="button" title="Takes the selected pictures out of group and channel names. Words and numbers stay. Superscript HD stays.">i</button></h3>
@@ -1047,13 +1515,54 @@
           <p class="note" id="imageStatus"></p>
           <div class="clean-examples" id="imageExamples"></div>
         </article>
+        <article class="clean-card wide" id="epgResetTool" hidden>
+          <h3>Show everything again</h3>
+          <p class="hint">Save makes every country, group, and channel visible again.</p>
+        </article>
+        <article class="clean-card wide" id="epgSanitizeTool" hidden>
+          <h3>Sanitize Group &amp; Channel Names</h3>
+          <p class="hint">The right list of each pair is what Cleanup will remove. Select a label and use the arrows to keep it or put it back.</p>
+          <div class="sanitize-board">
+            <div>
+              <div class="sanitize-pair">
+                <div class="sanitize-col"><h4>Channel names</h4><div class="sanitize-list" id="channelKept"></div></div>
+                <div class="sanitize-arrows">
+                  <button id="channelToKept" type="button" title="Keep this label">◀</button>
+                  <button id="channelToStrip" type="button" title="Strip this label">▶</button>
+                </div>
+                <div class="sanitize-col"><h4>Strip from channels</h4><div class="sanitize-list" id="channelStrip"></div></div>
+              </div>
+            </div>
+            <div>
+              <div class="sanitize-pair">
+                <div class="sanitize-col"><h4>Group names</h4><div class="sanitize-list" id="groupKept"></div></div>
+                <div class="sanitize-arrows">
+                  <button id="groupToKept" type="button" title="Keep this label">◀</button>
+                  <button id="groupToStrip" type="button" title="Strip this label">▶</button>
+                </div>
+                <div class="sanitize-col"><h4>Strip from groups</h4><div class="sanitize-list" id="groupStrip"></div></div>
+              </div>
+            </div>
+          </div>
+          <button id="sanitizeCleanup" type="button">Cleanup</button>
+          <div id="sanitizeBusy" hidden>Cleaning…</div>
+        </article>
+        <article class="clean-card wide" id="epgParseTool" hidden>
+          <h3>Parse channel names into the guide</h3>
+          <p class="hint">Save fills empty guide slots from the channel name the next time that TV opens the guide.</p>
+        </article>
+        </div>
       </section>
 
       <section class="card panel" id="panelFavorites" hidden>
         <div class="quick-fav">
           <div class="quick-head">
-            <h2>Auto-add to favorites</h2>
-            <p class="hint" id="quickStatus">Add a few channels you watch, then search below for anything else. Off keeps Countries on USA only.</p>
+            <div>
+              <h2>Auto-add to favorites</h2>
+              <p class="hint" id="catalogLoadingBanner" hidden aria-live="polite">Catalog still loading on the device… auto-add unlocks when groups arrive.</p>
+              <p class="hint" id="quickStatus">Add a few channels you watch, then search below for anything else. Off keeps Countries on USA only.</p>
+            </div>
+            <button class="section-save" type="button">Save</button>
           </div>
           <label class="intl-switch"><input id="includeInternational" type="checkbox" /><span class="switch" aria-hidden="true"></span> Include International Channels</label>
           <div class="quick-cards">
@@ -1091,7 +1600,15 @@
             </button>
             <button class="quick-card" id="quickDirectv" type="button">
               <span class="quick-icon directv" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
-              <span class="quick-copy"><strong>ErectTV Streamer</strong><span>Entertainment package and your local stations</span></span>
+              <span class="quick-copy"><strong>DurictTV Streamer</strong><span>Entertainment package and your local stations</span></span>
+            </button>
+            <button class="quick-card" id="quickFrndly" type="button">
+              <span class="quick-icon gold" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20s-7-4.4-7-9a4 4 0 0 1 7-2 4 4 0 0 1 7 2c0 4.6-7 9-7 9z"/></svg></span>
+              <span class="quick-copy"><strong>YourFriendlyTV</strong><span>Hallmark, Lifetime, classic TV, and the family lineup</span></span>
+            </button>
+            <button class="quick-card" id="quickHulu" type="button">
+              <span class="quick-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8M12 17v4"/></svg></span>
+              <span class="quick-copy"><strong>HoolaHoop Live TV</strong><span>Locals, sports, news, and the live lineup</span></span>
             </button>
           </div>
           <div id="quickSportsPanel" hidden>
@@ -1102,7 +1619,7 @@
         </div>
         <div class="fav-head">
           <div>
-            <h2>Favorites</h2>
+            <h2>Favorites <span id="favoriteCount" class="hint" style="font-weight:normal"></span></h2>
             <p class="hint" id="favoriteOrderNote">Drag to reorder. Drag items up/down or click remove to manage.</p>
           </div>
           <div class="fav-search">
@@ -1115,12 +1632,21 @@
         </div>
         <div id="favoriteResults" hidden></div>
         <div class="fav-board" id="favoriteOrder"></div>
+        <p class="hint" id="favoriteUndo" hidden style="margin-top:10px"></p>
+      </section>
+
+      <section class="card panel" id="panelReminders" hidden>
+        <div class="panel-head">
+          <h2>Reminders</h2>
+        </div>
+        <p class="hint" id="remindEmpty">No reminders yet. Hold OK on a program on the TV and choose Remind me.</p>
+        <div class="list" id="remindList"></div>
       </section>
 
       <section class="card panel" id="panelRecord" hidden>
         <div class="panel-head">
           <h2>Record</h2>
-          <p class="hint">Starts one minute early and stops one minute late. The TV app has to be open to record.</p>
+          <button class="section-save" id="saveShare" type="button">Save</button>
         </div>
         <div class="record-grid">
           <div>
@@ -1145,9 +1671,7 @@
             </div>
             <label for="smbPass">Password</label>
             <input id="smbPass" type="password" autocomplete="new-password" />
-            <div class="actions">
-              <button class="secondary" id="saveShare" type="button">Save share</button>
-            </div>
+            <p class="hint">Starts one minute early and stops one minute late. The TV app has to be open to record. Save stores the network share.</p>
             <h3>Set the times</h3>
             <label for="recordTitle">Program</label>
             <input id="recordTitle" type="text" autocomplete="off" />
@@ -1185,7 +1709,7 @@
       <section class="card panel" id="panelBackup" hidden>
         <div class="panel-head">
           <h2>Backup & Restore</h2>
-          <p class="clean-lead">Export this device's lineup, or import a lineup you saved earlier.</p>
+          <p class="clean-lead">Export downloads a file. Import saves that lineup onto this TV.</p>
         </div>
         <div class="clean-grid">
           <article class="clean-card">
@@ -1204,6 +1728,22 @@
       </div>
     </section>
   </div>
+  <div class="pin-mask" id="groupPin" hidden>
+    <form class="pin-card" id="groupPinForm">
+      <h2 id="groupPinTitle">Group password</h2>
+      <p id="groupPinText">Enter the 4-digit password to open this group.</p>
+      <label for="groupPinInput">Password</label>
+      <div class="pin-field">
+        <input id="groupPinInput" inputmode="numeric" maxlength="4" autocomplete="off" />
+        <p class="error" id="groupPinError"></p>
+      </div>
+      <div class="pin-actions">
+        <button class="primary" type="submit">Continue</button>
+        <button class="secondary" id="groupPinCancel" type="button">Cancel</button>
+        <button class="secondary" id="groupPinClear" type="button" hidden>Remove lock</button>
+      </div>
+    </form>
+  </div>
   <script>
     const loginForm = document.querySelector("#login");
     const editor = document.querySelector("#editor");
@@ -1221,7 +1761,55 @@
     let channelDragId = "";
     const groupTotals = new Map();
 
+    const lineupWatched = new WeakSet();
+    let lineupLive = false;
+    let lineupHold = false;
+    let lineupTimer = 0;
+    function watchLineup(value) {
+      if (!value || typeof value !== "object" || lineupWatched.has(value)) return value;
+      const proxy = new Proxy(value, {
+        get(target, prop, receiver) {
+          const current = Reflect.get(target, prop, receiver);
+          if (!current || typeof current !== "object") return current;
+          const wrapped = watchLineup(current);
+          if (wrapped !== current) target[prop] = wrapped;
+          return wrapped;
+        },
+        set(target, prop, next) {
+          if (prop === "revision") {
+            target.revision = next;
+            return true;
+          }
+          const wrapped = next && typeof next === "object" ? watchLineup(next) : next;
+          const changed = target[prop] !== wrapped;
+          target[prop] = wrapped;
+          if (changed) scheduleLineupSync();
+          return true;
+        },
+        deleteProperty(target, prop) {
+          if (!Object.prototype.hasOwnProperty.call(target, prop)) return true;
+          delete target[prop];
+          scheduleLineupSync();
+          return true;
+        }
+      });
+      lineupWatched.add(value);
+      lineupWatched.add(proxy);
+      return proxy;
+    }
+    let pageDirty = false;
+    let pendingTab = "";
+    function scheduleLineupSync() {
+      if (!lineupLive || lineupHold) return;
+      pageDirty = true;
+      const status = document.querySelector("#saveStatus");
+      if (status && !status.textContent.startsWith("Save failed") && status.textContent !== "Saving…") {
+        status.textContent = "Not saved yet";
+      }
+    }
     function lineup() {
+      if (!session || !session.lineup) return session && session.lineup;
+      if (!lineupWatched.has(session.lineup)) session.lineup = watchLineup(session.lineup);
       return session.lineup;
     }
     function isMarkToken(token) {
@@ -1329,6 +1917,45 @@
       const lineupNow = lineup();
       document.querySelector("#stripPrefixes").value = (lineupNow.namePrefixes || []).join(", ");
       document.querySelector("#stripSuffixes").value = (lineupNow.nameSuffixes || []).join(", ");
+      paintGroupRule();
+    }
+    function paintGroupRule() {
+      const lineupNow = lineup();
+      document.querySelector("#groupFind").value = lineupNow.groupFind || "";
+      document.querySelector("#groupReplace").value = lineupNow.groupReplace || "";
+    }
+    function foldRenameChar(ch) {
+      if (ch === "\u00A0" || ch === "\u2007" || ch === "\u202F" || ch === "\u2009" || ch === "\u200A") return " ";
+      if ("|│┃┆┇┊┋ǀǁ∣¦｜❘❙❚".includes(ch)) return "|";
+      return ch;
+    }
+    function foldRename(value) {
+      let text = "";
+      const start = [];
+      const end = [];
+      let pending = false;
+      let spaceAt = 0;
+      const source = String(value || "");
+      for (let index = 0; index < source.length; index += 1) {
+        const ch = foldRenameChar(source[index]);
+        if (ch === " ") {
+          if (!pending && text) {
+            pending = true;
+            spaceAt = index;
+          }
+          continue;
+        }
+        if (pending) {
+          text += " ";
+          start.push(spaceAt);
+          end.push(index);
+          pending = false;
+        }
+        text += ch;
+        start.push(index);
+        end.push(index + 1);
+      }
+      return { text, start, end };
     }
     function captureStrip() {
       const prefixes = stripTokens(document.querySelector("#stripPrefixes").value);
@@ -1407,27 +2034,40 @@
       if (parsed) return parsed.id;
       return String(group.kind || "LIVE").toUpperCase() === "LIVE" ? "__other__" : "";
     }
-    function countryAllowed(group) {
+    function groupBlocked(group) {
+      const live = String(group.kind || "LIVE").toUpperCase() === "LIVE";
+      const countryId = group.countryId || "";
+      if (lineup().includeInternational !== true) {
+        if (!countryId) return live;
+        if (countryId !== "us") return true;
+      }
       const hidden = lineup().hiddenCountries || [];
-      if (!hidden.length) return true;
-      const id = groupCountryId(group);
-      if (!id) return true;
-      return !hidden.includes(id);
+      if (!hidden.length) return false;
+      if (!countryId) return live && hidden.includes("__other__");
+      return hidden.includes(countryId);
     }
     function channelFromAllowedCountry(channel) {
       const groupId = String(channel.groupId || channel.categoryId || "");
       const group = groupsById().get(groupId);
       if (!group) {
-        if (String(channel.kind || "LIVE").toUpperCase() !== "LIVE") return true;
+        const live = String(channel.kind || "LIVE").toUpperCase() === "LIVE";
+        if (!live) return true;
+        if (lineup().includeInternational !== true) return false;
         return !(lineup().hiddenCountries || []).includes("__other__");
       }
       if ((lineup().hiddenGroups || []).includes(group.id)) return false;
-      return countryAllowed(group);
+      return !groupBlocked(group);
     }
     function allowedGroups() {
-      return orderedGroups().filter(countryAllowed);
+      return orderedGroups().filter((group) => !groupBlocked(group));
     }
-    function groupName(group) { return (lineup().groupNames || {})[group.id] || group.name; }
+    function groupName(group) {
+      const custom = (lineup().groupNames || {})[group.id];
+      if (custom) return custom;
+      const find = lineup().groupFind || "";
+      if (!String(find).trim()) return group.name || "";
+      return replaceGroupText(group.name || "", find, lineup().groupReplace || "");
+    }
     function channelName(channel) {
       const custom = (lineup().channelNames || {})[channel.id];
       return stripName(custom || channel.name, lineup().namePrefixes || [], lineup().nameSuffixes || []);
@@ -1437,7 +2077,55 @@
       const rank = new Map(((lineup().channelOrder || {})[groupId] || []).map((id, index) => [id, index]));
       return channels.slice().sort((a, b) => (rank.get(a.id) ?? 999999) - (rank.get(b.id) ?? 999999) || String(a.name || "").localeCompare(String(b.name || "")));
     }
+    const groupPinSession = new Map();
+    let groupPinWait = null;
+    function pinCode(digits) {
+      let hash = 2166136261;
+      for (let index = 0; index < digits.length; index++) {
+        hash ^= digits.charCodeAt(index);
+        hash = Math.imul(hash, 16777619);
+      }
+      return (hash >>> 0).toString(16);
+    }
+    function groupLocked(id) {
+      return !!((lineup().groupPins || {})[id]);
+    }
+    function askGroupPin(groupId, mode) {
+      if (groupPinWait) return Promise.resolve(false);
+      const mask = document.querySelector("#groupPin");
+      const input = document.querySelector("#groupPinInput");
+      const error = document.querySelector("#groupPinError");
+      const clear = document.querySelector("#groupPinClear");
+      document.querySelector("#groupPinTitle").textContent = mode === "set" ? "Lock this group" : "Group password";
+      document.querySelector("#groupPinText").textContent = mode === "set"
+        ? "Choose a 4-digit password. The group stays closed until that password is entered. To remove an existing lock, enter that PIN and press Remove lock."
+        : "Enter the 4-digit password to open this group, or enter it and press Remove lock to clear the PIN permanently.";
+      clear.hidden = !groupLocked(groupId);
+      error.textContent = "";
+      input.value = "";
+      mask.hidden = false;
+      input.focus();
+      return new Promise((resolve) => {
+        groupPinWait = { groupId, mode, resolve };
+      });
+    }
+    function finishGroupPin(ok) {
+      const wait = groupPinWait;
+      groupPinWait = null;
+      document.querySelector("#groupPin").hidden = true;
+      if (wait) wait.resolve(ok);
+    }
+    async function ensureGroupPin(groupId) {
+      if (!groupId || !groupLocked(groupId) || groupPinSession.has(groupId)) return true;
+      const ok = await askGroupPin(groupId, "open");
+      if (!ok) {
+        showTab("groups");
+        return false;
+      }
+      return true;
+    }
     async function channelsFor(groupId, query) {
+      if (!(await ensureGroupPin(groupId))) return [];
       const key = groupId + "\n" + (query || "");
       if (!groupCache.has(key)) {
         const params = new URLSearchParams({
@@ -1447,7 +2135,12 @@
           q: query || "",
           limit: "400"
         });
+        if (groupPinSession.has(groupId)) params.set("pin", groupPinSession.get(groupId));
         const response = await fetch("/api/catalog/group?" + params);
+        if (response.status === 403) {
+          groupPinSession.delete(groupId);
+          return [];
+        }
         const body = await response.json().catch(() => ({}));
         groupCache.set(key, body.channels || []);
         groupTotals.set(key, Number(body.total) || (body.channels || []).length);
@@ -1539,19 +2232,58 @@
         .map(([id, count]) => ({ id, label: labels.get(id) || id, count }))
         .sort((a, b) => (a.id === "__other__") - (b.id === "__other__") || a.label.localeCompare(b.label));
     }
+    let countryChoiceHold = null;
     function countryChoices() {
+      const groups = catalog().groups || [];
       const published = catalog().countries || [];
+      if (countryChoiceHold && countryChoiceHold.groups === groups && countryChoiceHold.published === published) {
+        return countryChoiceHold.list;
+      }
+      const summed = new Map();
+      for (const group of groups) {
+        if (String(group.kind || "LIVE").toUpperCase() !== "LIVE") continue;
+        const id = group.countryId || "__other__";
+        summed.set(id, (summed.get(id) || 0) + (Number(group.count) || 0));
+      }
       const fromTv = published.some((country) => country.id && country.id !== "__other__");
-      return fromTv ? published : countriesFromGroups();
+      const base = fromTv ? published : countriesFromGroups();
+      const list = base.map((country) => {
+        const count = Math.max(Number(country.count) || 0, summed.get(country.id) || 0);
+        return count === Number(country.count) ? country : Object.assign({}, country, { count });
+      });
+      countryChoiceHold = { groups, published, list };
+      return list;
     }
 
     function showTab(next) {
+      if (pageDirty && next !== tab) {
+        pendingTab = next;
+        const guard = document.querySelector("#leaveGuard");
+        guard.hidden = false;
+        document.querySelector("#leaveOk").focus();
+        return;
+      }
+      openTab(next);
+    }
+
+    const tabPaint = Object.create(null);
+    function tabPaintKey(next) {
+      const lineupRev = session && session.lineup ? (session.lineup.revision || 0) : 0;
+      const favRev = session && session.favorites ? (session.favorites.revision || 0) : 0;
+      const recRev = session && session.recordings ? (session.recordings.revision || 0) : 0;
+      return next + ":" + lineupRev + ":" + favRev + ":" + recRev;
+    }
+    function forgetTabPaint() {
+      Object.keys(tabPaint).forEach((key) => { delete tabPaint[key]; });
+    }
+    function openTab(next) {
       tab = next;
       document.querySelector("#tabCountries").setAttribute("aria-selected", String(next === "countries"));
       document.querySelector("#tabGroups").setAttribute("aria-selected", String(next === "groups"));
       document.querySelector("#tabChannels").setAttribute("aria-selected", String(next === "channels"));
       document.querySelector("#tabFavorites").setAttribute("aria-selected", String(next === "favorites"));
       document.querySelector("#tabRecord").setAttribute("aria-selected", String(next === "record"));
+      document.querySelector("#tabReminders").setAttribute("aria-selected", String(next === "reminders"));
       document.querySelector("#tabBackup").setAttribute("aria-selected", String(next === "backup"));
       document.querySelector("#tabAdmin").setAttribute("aria-selected", String(next === "admin" || next === "clean"));
       document.querySelector("#panelCountries").hidden = next !== "countries";
@@ -1561,14 +2293,24 @@
       document.querySelector("#panelClean").hidden = next !== "clean";
       document.querySelector("#panelFavorites").hidden = next !== "favorites";
       document.querySelector("#panelRecord").hidden = next !== "record";
+      document.querySelector("#panelReminders").hidden = next !== "reminders";
       document.querySelector("#panelBackup").hidden = next !== "backup";
       const active = document.querySelector("#editor .panel:not([hidden])");
       const head = active && active.querySelector(".panel-head");
       if (head) head.after(document.querySelector("#saveStatus"));
-      if (next === "groups") renderGroups();
-      if (next === "channels") renderChannelPanel();
-      if (next === "favorites") renderFavorites();
+      const paintKey = tabPaintKey(next);
+      const fresh = tabPaint[next] !== paintKey;
+      if (next === "countries" && fresh) renderCountries();
+      if (next === "groups" && fresh) renderGroups();
+      if (next === "channels" && fresh) renderChannelPanel();
+      if (next === "favorites" && fresh) renderFavorites();
       if (next === "record") renderRecordings();
+      if (next === "reminders") renderReminders();
+      if (next === "clean") {
+        paintStrip();
+        showEpgHome();
+      }
+      if (fresh) tabPaint[next] = paintKey;
     }
 
     function flagFor(id, label) {
@@ -1612,9 +2354,14 @@
           count.textContent = String(country.count);
           chip.append(label, count);
           chip.addEventListener("click", () => {
-            lineup().hiddenCountries = toggle(lineup().hiddenCountries, country.id, !hidden.has(country.id));
+            const wasHidden = hidden.has(country.id);
+            lineup().hiddenCountries = toggle(lineup().hiddenCountries, country.id, !wasHidden);
             syncInternationalFlag();
-            renderCountries();
+            if (countryFilter !== "both") {
+              renderCountries();
+              return;
+            }
+            chip.className = "country-card" + (wasHidden ? " on" : "");
           });
           box.append(chip);
         });
@@ -1634,12 +2381,27 @@
     }
     function visibleGroups() {
       const groupQuery = document.querySelector("#groupSearch").value.trim().toLowerCase();
+      const hidden = new Set(lineup().hiddenGroups || []);
       return allowedGroups().filter((group) => {
-        const isHidden = (lineup().hiddenGroups || []).includes(group.id);
+        const isHidden = hidden.has(group.id);
         const matchesFilter = groupFilter === "both" || (groupFilter === "hidden" ? isHidden : !isHidden);
         const label = (groupName(group) + " " + (group.name || "")).toLowerCase();
         return matchesFilter && (!groupQuery || label.includes(groupQuery));
       });
+    }
+    function paintGroupSelectAll() {
+      const groups = visibleGroups();
+      const selectAll = document.querySelector("#groupsSelectAll");
+      selectAll.checked = groups.length > 0 && groups.every((group) => selectedGroups.has(group.id));
+      selectAll.indeterminate = !selectAll.checked && groups.some((group) => selectedGroups.has(group.id));
+    }
+    function paintChannelSelectAll() {
+      const picks = document.querySelector("#channels").querySelectorAll(".group-check");
+      const selectAll = document.querySelector("#channelsSelectAll");
+      let checked = 0;
+      picks.forEach((pick) => { if (pick.checked) checked += 1; });
+      selectAll.checked = picks.length > 0 && checked === picks.length;
+      selectAll.indeterminate = checked > 0 && checked < picks.length;
     }
     function commitGroupName(group, typed) {
       const value = String(typed || "").trim();
@@ -1670,13 +2432,44 @@
       lineup().groupOrder = ids;
       renderGroups();
     }
-    function renderGroups() {
+    const LIST_WINDOW = 80;
+    let groupWindowStart = 0;
+    let channelWindowStart = 0;
+    let groupWindowItems = [];
+    let channelWindowItems = [];
+    function windowSlice(items, start) {
+      const from = Math.max(0, Math.min(start, Math.max(0, items.length - LIST_WINDOW)));
+      return { from, rows: items.slice(from, from + LIST_WINDOW) };
+    }
+    function bindWindowScroll(box, kind) {
+      if (box.dataset.windowBound === "1") return;
+      box.dataset.windowBound = "1";
+      box.addEventListener("scroll", () => {
+        const items = kind === "group" ? groupWindowItems : channelWindowItems;
+        if (items.length <= LIST_WINDOW) return;
+        const rowH = Math.max(48, (box.scrollHeight / Math.max(1, box.childElementCount)) | 0);
+        const next = Math.max(0, Math.min(items.length - LIST_WINDOW, ((box.scrollTop / rowH) | 0) - 8));
+        if (kind === "group") {
+          if (Math.abs(next - groupWindowStart) < 12) return;
+          groupWindowStart = next;
+          renderGroups(true);
+        } else {
+          if (Math.abs(next - channelWindowStart) < 12) return;
+          channelWindowStart = next;
+          renderChannels(true);
+        }
+      }, { passive: true });
+    }
+    function renderGroups(keepWindow) {
       const groups = visibleGroups();
+      groupWindowItems = groups;
+      if (!keepWindow) groupWindowStart = 0;
       const orderIndex = new Map(orderedGroups().map((group, index) => [group.id, index]));
       const hiddenGroups = new Set(lineup().hiddenGroups || []);
       const box = document.querySelector("#groups");
       const selectAll = document.querySelector("#groupsSelectAll");
       const scroll = box.scrollTop;
+      bindWindowScroll(box, "group");
       box.replaceChildren();
       selectAll.checked = groups.length > 0 && groups.every((group) => selectedGroups.has(group.id));
       selectAll.indeterminate = !selectAll.checked && groups.some((group) => selectedGroups.has(group.id));
@@ -1688,7 +2481,16 @@
         requestAnimationFrame(() => { box.scrollTop = scroll; });
         return;
       }
-      groups.forEach((group) => {
+      const sliced = windowSlice(groups, groupWindowStart);
+      groupWindowStart = sliced.from;
+      if (sliced.from > 0) {
+        const pad = document.createElement("div");
+        pad.className = "group-empty";
+        pad.style.height = (sliced.from * 56) + "px";
+        pad.textContent = "";
+        box.append(pad);
+      }
+      sliced.rows.forEach((group) => {
         const index = orderIndex.get(group.id) ?? -1;
         const hidden = hiddenGroups.has(group.id);
         const editing = groupEditors.has(group.id);
@@ -1722,7 +2524,8 @@
         pick.addEventListener("change", () => {
           if (pick.checked) selectedGroups.add(group.id);
           else selectedGroups.delete(group.id);
-          renderGroups();
+          row.classList.toggle("picked", pick.checked);
+          paintGroupSelectAll();
         });
         const toggleShown = document.createElement("button");
         toggleShown.type = "button";
@@ -1731,8 +2534,15 @@
         toggleShown.title = hidden ? "Show group" : "Hide group";
         toggleShown.append(document.createElement("i"));
         toggleShown.addEventListener("click", () => {
-          lineup().hiddenGroups = toggle(lineup().hiddenGroups, group.id, !hidden);
-          renderGroups();
+          const wasHidden = row.classList.contains("off");
+          lineup().hiddenGroups = toggle(lineup().hiddenGroups, group.id, !wasHidden);
+          if (groupFilter !== "both") {
+            renderGroups();
+            return;
+          }
+          row.classList.toggle("off", !wasHidden);
+          toggleShown.setAttribute("aria-pressed", String(wasHidden));
+          toggleShown.title = wasHidden ? "Hide group" : "Show group";
         });
         const nameBox = document.createElement("div");
         nameBox.className = "group-name";
@@ -1803,6 +2613,14 @@
         const count = document.createElement("span");
         count.className = "group-count";
         count.textContent = Number.isFinite(Number(group.count)) ? Number(group.count) + " Ch" : "";
+        const lock = document.createElement("button");
+        lock.type = "button";
+        lock.className = "group-step";
+        lock.title = groupLocked(group.id) ? "Change password" : "Lock group";
+        lock.textContent = groupLocked(group.id) ? "Locked" : "Lock";
+        lock.addEventListener("click", () => {
+          askGroupPin(group.id, "set").then((ok) => { if (ok) renderGroups(); });
+        });
         const up = document.createElement("button");
         up.type = "button";
         up.className = "group-step";
@@ -1815,9 +2633,17 @@
         down.title = "Down";
         down.textContent = "▼";
         down.addEventListener("click", () => reorderGroups(index, 1));
-        row.append(grip, pick, toggleShown, nameBox, display, count, up, down);
+        row.append(grip, pick, toggleShown, nameBox, display, count, lock, up, down);
         box.append(row);
       });
+      const remaining = groups.length - (groupWindowStart + sliced.rows.length);
+      if (remaining > 0) {
+        const pad = document.createElement("div");
+        pad.className = "group-empty";
+        pad.style.height = (remaining * 56) + "px";
+        pad.textContent = "";
+        box.append(pad);
+      }
       requestAnimationFrame(() => { box.scrollTop = scroll; });
     }
 
@@ -1870,18 +2696,20 @@
       else lineup().channelNames[channel.id] = value;
     }
     let channelRender = 0;
-    async function renderChannels() {
+    async function renderChannels(keepWindow) {
       const token = ++channelRender;
       const group = orderedGroups().find((item) => item.id === selectedGroupId);
       const box = document.querySelector("#channels");
       const note = document.querySelector("#channelNote");
       const selectAll = document.querySelector("#channelsSelectAll");
       const scroll = box.scrollTop;
+      bindWindowScroll(box, "channel");
       box.classList.toggle("grid", channelView === "grid");
       if (!group) {
         box.replaceChildren();
         note.textContent = "Choose a group.";
         selectAll.checked = false;
+        channelWindowItems = [];
         return;
       }
       const query = document.querySelector("#channelSearch").value.trim().toLowerCase();
@@ -1892,6 +2720,8 @@
       const matches = channelAlpha
         ? all.slice().sort((a, b) => channelName(a).localeCompare(channelName(b)))
         : all;
+      channelWindowItems = matches;
+      if (!keepWindow) channelWindowStart = 0;
       const total = groupTotals.get(group.id + "\n" + queryKey) ?? matches.length;
       note.textContent = (total > matches.length ? matches.length + " of " + total : String(matches.length)) + " channels";
       selectAll.checked = matches.length > 0 && matches.every((channel) => selectedChannels.has(channel.id));
@@ -1905,7 +2735,16 @@
         return;
       }
       const hidden = new Set(lineup().hiddenChannels || []);
-      matches.forEach((channel) => {
+      const sliced = windowSlice(matches, channelWindowStart);
+      channelWindowStart = sliced.from;
+      if (sliced.from > 0) {
+        const pad = document.createElement("div");
+        pad.className = "group-empty";
+        pad.style.height = (sliced.from * (channelView === "grid" ? 84 : 64)) + "px";
+        pad.textContent = "";
+        box.append(pad);
+      }
+      sliced.rows.forEach((channel) => {
         const editing = channelEditors.has(channel.id);
         const row = document.createElement("div");
         row.className = "channel-row" + (selectedChannels.has(channel.id) ? " picked" : "") + (hidden.has(channel.id) ? " off" : "");
@@ -1937,7 +2776,8 @@
         pick.addEventListener("change", () => {
           if (pick.checked) selectedChannels.add(channel.id);
           else selectedChannels.delete(channel.id);
-          renderChannels();
+          row.classList.toggle("picked", pick.checked);
+          paintChannelSelectAll();
         });
         const logo = document.createElement("span");
         logo.className = "channel-logo";
@@ -2013,12 +2853,23 @@
         shown.title = hidden.has(channel.id) ? "Show channel" : "Hide channel";
         shown.append(document.createElement("i"));
         shown.addEventListener("click", () => {
-          lineup().hiddenChannels = toggle(lineup().hiddenChannels, channel.id, !hidden.has(channel.id));
-          renderChannels();
+          const wasHidden = row.classList.contains("off");
+          lineup().hiddenChannels = toggle(lineup().hiddenChannels, channel.id, !wasHidden);
+          row.classList.toggle("off", !wasHidden);
+          shown.setAttribute("aria-pressed", String(wasHidden));
+          shown.title = wasHidden ? "Hide channel" : "Show channel";
         });
         row.append(grip, pick, logo, copy, up, down, shown);
         box.append(row);
       });
+      const remaining = matches.length - (channelWindowStart + sliced.rows.length);
+      if (remaining > 0) {
+        const pad = document.createElement("div");
+        pad.className = "group-empty";
+        pad.style.height = (remaining * (channelView === "grid" ? 84 : 64)) + "px";
+        pad.textContent = "";
+        box.append(pad);
+      }
       requestAnimationFrame(() => { box.scrollTop = scroll; });
     }
 
@@ -2424,11 +3275,17 @@
       const ids = (session.favorites && session.favorites.ids) || [];
       const labels = (session.favorites && session.favorites.labels) || {};
       const logos = (session.favorites && session.favorites.logos) || {};
-      document.querySelector("#favoriteOrderNote").textContent = "Drag to reorder. Drag items up/down or click remove to manage.";
+      const countEl = document.querySelector("#favoriteCount");
+      if (countEl) countEl.textContent = ids.length ? "(" + ids.length + ")" : "";
+      document.querySelector("#favoriteOrderNote").textContent = ids.length
+        ? "Drag to reorder. Use the arrows or Remove on a row. Changes sync to the device."
+        : "Add from the cards above or search below — favorites sync to the device as you go.";
       if (!ids.length) {
         const empty = document.createElement("p");
         empty.className = "fav-empty";
-        empty.textContent = "Favorites you add are listed here.";
+        empty.textContent = catalogIsReady()
+          ? "No favorites yet. Use an auto-add card above, or type two letters to search."
+          : "Waiting for the catalog… auto-add and search unlock when groups arrive.";
         box.append(empty);
         return;
       }
@@ -2554,7 +3411,35 @@
       }
       note.textContent = shown ? shown + " matches. Movies and shows show up after the TV opens once." : "Nothing matched. Movies and shows show up after the TV opens once.";
     }
-    async function toggleWebFavorite(key, adding) {
+    let favoriteUndoKey = "";
+    let favoriteUndoTimer = 0;
+    function showFavoriteUndo(key) {
+      favoriteUndoKey = key;
+      const bar = document.querySelector("#favoriteUndo");
+      if (!bar) return;
+      bar.hidden = false;
+      bar.replaceChildren();
+      const text = document.createElement("span");
+      text.textContent = "Removed. ";
+      const undo = document.createElement("button");
+      undo.type = "button";
+      undo.className = "section-save";
+      undo.textContent = "Undo";
+      undo.addEventListener("click", () => {
+        clearTimeout(favoriteUndoTimer);
+        bar.hidden = true;
+        const restore = favoriteUndoKey;
+        favoriteUndoKey = "";
+        if (restore) toggleWebFavorite(restore, true, true);
+      });
+      bar.append(text, undo);
+      clearTimeout(favoriteUndoTimer);
+      favoriteUndoTimer = setTimeout(() => {
+        bar.hidden = true;
+        favoriteUndoKey = "";
+      }, 6000);
+    }
+    async function toggleWebFavorite(key, adding, fromUndo) {
       const note = document.querySelector("#favoriteNote");
       note.textContent = "Saving favorite…";
       const response = await fetch("/api/favorites", {
@@ -2570,6 +3455,11 @@
       const body = await response.json().catch(() => ({}));
       if (response.ok && body.favorites) session.favorites = body.favorites;
       renderFavorites();
+      if (response.ok && !adding && !fromUndo) showFavoriteUndo(key);
+      if (adding && fromUndo) {
+        const bar = document.querySelector("#favoriteUndo");
+        if (bar) bar.hidden = true;
+      }
     }
 
     function clipRename(value) {
@@ -2580,8 +3470,24 @@
       const needle = String(find || "").trim();
       const source = String(name || "");
       if (!needle) return source;
-      const pattern = new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
-      return source.replace(pattern, replacement).trim();
+      const foldedNeedle = foldRename(needle).text;
+      if (!foldedNeedle) return source;
+      let out = "";
+      let index = 0;
+      while (index < source.length) {
+        const rest = source.slice(index);
+        const folded = foldRename(rest);
+        const at = folded.text.toLowerCase().indexOf(foldedNeedle.toLowerCase());
+        if (at < 0) {
+          out += rest;
+          break;
+        }
+        const from = folded.start[at];
+        const to = folded.end[at + foldedNeedle.length - 1];
+        out += rest.slice(0, from) + String(replacement || "");
+        index += to;
+      }
+      return out.trim();
     }
     function planGroupRename() {
       const find = document.querySelector("#groupFind").value;
@@ -2590,11 +3496,17 @@
       const samples = [];
       let changed = 0;
       for (const group of catalog().groups || []) {
-        const before = names[group.id] || group.name || "";
-        const after = replaceGroupText(before, find, replacement);
+        const original = group.name || "";
+        const displayed = names[group.id] || original;
+        let before = displayed;
+        let after = replaceGroupText(before, find, replacement);
+        if (!after || after === before) {
+          before = original;
+          after = replaceGroupText(before, find, replacement);
+        }
         if (!find.trim() || !after || after === before) continue;
         changed += 1;
-        if (after === group.name) delete names[group.id];
+        if (after === original) delete names[group.id];
         else names[group.id] = after;
         samples.push({ before: clipRename(before), after: clipRename(after) });
       }
@@ -2627,20 +3539,49 @@
     document.querySelector("#groupRenamePreview").addEventListener("click", () => {
       showGroupRenamePlan(planGroupRename(), false);
     });
-    document.querySelector("#groupRenameApply").addEventListener("click", async () => {
+    async function saveGroupRename() {
+      const status = document.querySelector("#epgPageStatus");
       const plan = planGroupRename();
-      const status = document.querySelector("#groupRenameStatus");
       if (!plan.changed) {
         showGroupRenamePlan(plan, false);
-        return;
+        status.textContent = document.querySelector("#groupRenameStatus").textContent;
+        return false;
       }
-      lineup().groupNames = plan.names;
-      showGroupRenamePlan(plan, true);
-      const saved = await saveLineup();
-      status.textContent = saved
-        ? "Saved " + plan.changed + " renamed groups."
-        : "The rename is on this page, but the save did not stick.";
-    });
+      status.textContent = "Saving group names…";
+      const find = document.querySelector("#groupFind").value.replace(/^\s+|\s+$/g, "");
+      const replacement = document.querySelector("#groupReplace").value;
+      try {
+        const response = await fetch("/api/groups/rename", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: session.email,
+            deviceId: session.deviceId,
+            find,
+            replace: replacement
+          })
+        });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          status.textContent = body.error || "Could not rename groups.";
+          return false;
+        }
+        session.lineup = Object.assign(blankLineup(), body.lineup || {});
+        for (const group of catalog().groups || []) {
+          const next = replaceGroupText(group.name || "", find, replacement);
+          if (next && next !== group.name) group.name = next;
+        }
+        orderedCache = null;
+        groupCache.clear();
+        paintStrip();
+        showGroupRenamePlan({ changed: body.changed || plan.changed, names: session.lineup.groupNames || {}, examples: body.examples || plan.examples }, true);
+        status.textContent = "Saved. " + (body.changed || 0) + " group names were rewritten. The TV guide updates now.";
+        return true;
+      } catch (failure) {
+        status.textContent = failure.message || "Could not rename groups.";
+        return false;
+      }
+    }
 
     document.querySelectorAll(".clean-chip").forEach((chip) => {
       chip.addEventListener("click", () => {
@@ -2707,10 +3648,503 @@
     document.querySelector("#tabChannels").addEventListener("click", () => showTab("channels"));
     document.querySelector("#tabFavorites").addEventListener("click", () => showTab("favorites"));
     document.querySelector("#tabRecord").addEventListener("click", () => showTab("record"));
+    document.querySelector("#tabReminders").addEventListener("click", () => showTab("reminders"));
     document.querySelector("#tabBackup").addEventListener("click", () => showTab("backup"));
-    document.querySelector("#tabAdmin").addEventListener("click", () => showTab("admin"));
+    document.querySelector("#tabAdmin").addEventListener("click", () => {
+      showAdminPage("home");
+      showTab("admin");
+    });
+    function showAdminPage(which) {
+      document.querySelector("#adminHome").hidden = which !== "home";
+      document.querySelector("#adminRefreshPage").hidden = which !== "refresh";
+      document.querySelector("#adminWebPage").hidden = which !== "web";
+      document.querySelector("#adminLogPage").hidden = which !== "logs";
+      document.querySelector("#adminVpnPage").hidden = which !== "vpn";
+      if (which === "vpn") refreshVpn();
+      else stopVpnPoll();
+    }
+    document.querySelector("#adminRefresh").addEventListener("click", () => showAdminPage("refresh"));
+    document.querySelector("#adminWeb").addEventListener("click", () => showAdminPage("web"));
+    document.querySelector("#adminLogs").addEventListener("click", () => showAdminPage("logs"));
+    document.querySelector("#leaveOk").addEventListener("click", () => {
+      document.querySelector("#leaveGuard").hidden = true;
+      const next = pendingTab;
+      pendingTab = "";
+      pageDirty = false;
+      if (next) openTab(next);
+    });
+    let logFont = 14;
+    function sortLogNewestFirst(text) {
+      if (!text) return text;
+      const trimmed = text.replace(/^\uFEFF/, "");
+      if (trimmed.indexOf("No errors have been recorded") === 0) return trimmed;
+      const parts = trimmed.split(/(?=^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} )/m).filter((part) => part.length);
+      if (parts.length <= 1) return trimmed;
+      parts.reverse();
+      return parts.join("").replace(/\n+$/, "\n");
+    }
+    async function showLog(href, filename) {
+      const view = document.querySelector("#logView");
+      const download = document.querySelector("#logDownload");
+      if (!view || !download) return;
+      download.href = href;
+      download.setAttribute("download", filename || "olympus-iptv-log.txt");
+      view.textContent = "Loading…";
+      try {
+        const response = await fetch(href);
+        view.textContent = sortLogNewestFirst(await response.text());
+      } catch (failure) {
+        view.textContent = failure.message || "The log could not be opened.";
+      }
+    }
+    function paintLogSize() {
+      const view = document.querySelector("#logView");
+      if (view) view.style.fontSize = logFont + "px";
+    }
+    document.querySelector("#logSmaller").addEventListener("click", () => {
+      logFont = Math.max(11, logFont - 1);
+      paintLogSize();
+    });
+    document.querySelector("#logLarger").addEventListener("click", () => {
+      logFont = Math.min(28, logFont + 1);
+      paintLogSize();
+    });
+    document.querySelector("#adminRefreshBack").addEventListener("click", () => showAdminPage("home"));
+    document.querySelector("#adminWebBack").addEventListener("click", () => showAdminPage("home"));
+    document.querySelector("#adminLogBack").addEventListener("click", () => showAdminPage("home"));
+    document.querySelector("#adminVpn").addEventListener("click", () => showAdminPage("vpn"));
+    document.querySelector("#adminVpnBack").addEventListener("click", () => showAdminPage("home"));
     document.querySelector("#adminEpg").addEventListener("click", () => showTab("clean"));
+    let vpnPoll = 0;
+    let vpnCities = [];
+    let vpnCityId = "";
+    let vpnBackupId = "";
+    let vpnPickingBackup = false;
+    function stopVpnPoll() {
+      if (vpnPoll) clearInterval(vpnPoll);
+      vpnPoll = 0;
+    }
+    function syncVpnFields() {
+      const id = document.querySelector("#vpnProvider").value;
+      const wire = id === "wireguard";
+      document.querySelector("#vpnUserField").hidden = wire;
+      document.querySelector("#vpnPassField").hidden = wire;
+      document.querySelector("#vpnCodeField").hidden = id !== "proton";
+      document.querySelector("#vpnProfile").hidden = !wire;
+      document.querySelector("#vpnNordHint").hidden = id !== "nord";
+      document.querySelector("#vpnWireHint").hidden = !wire;
+      document.querySelector("#vpnSignIn").textContent = wire ? "Check profile" : "Sign in";
+    }
+    function renderVpnCities() {
+      const needle = document.querySelector("#vpnFind").value.trim().toLowerCase();
+      const rows = vpnCities.filter((city) => !needle || city.name.toLowerCase().includes(needle));
+      const box = document.querySelector("#vpnCities");
+      box.innerHTML = "";
+      document.querySelector("#vpnFind").hidden = vpnCities.length === 0;
+      document.querySelector("#vpnGo").hidden = !vpnCityId;
+      const backup = document.querySelector("#vpnBackup");
+      const note = document.querySelector("#vpnBackupNote");
+      backup.hidden = vpnCities.length < 2;
+      const chosen = vpnCities.find((city) => city.id === vpnBackupId);
+      backup.textContent = chosen ? ("Backup · " + chosen.name) : "Backup city";
+      note.hidden = !vpnPickingBackup;
+      note.textContent = vpnPickingBackup ? "Choose a different city. That city is used if the first one does not answer." : "";
+      rows.forEach((city) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = city.name;
+        if (city.id === vpnCityId) button.setAttribute("aria-pressed", "true");
+        button.addEventListener("click", () => {
+          if (vpnPickingBackup) {
+            if (city.id === vpnCityId) {
+              document.querySelector("#vpnState").textContent = "Pick a different city for the backup.";
+              return;
+            }
+            vpnBackupId = city.id;
+            vpnPickingBackup = false;
+            renderVpnCities();
+            return;
+          }
+          vpnCityId = city.id;
+          renderVpnCities();
+        });
+        box.appendChild(button);
+      });
+    }
+    function paintVpn(body, fillForm) {
+      const state = body.state || "off";
+      const label = body.label || "";
+      let text = "Not connected. The dashboard stays on your Wi-Fi.";
+      if (body.needsConsent) text = "Allow the VPN on the TV to finish connecting.";
+      else if (state === "on") text = "Connected · " + label;
+      else if (state === "reconnecting") text = "Reconnecting · " + label + ". The stream stays off your home connection.";
+      else if (state === "connecting") text = "Connecting…";
+      else if (state === "failed" && body.message) text = body.message;
+      document.querySelector("#vpnState").textContent = text;
+      document.querySelector("#adminVpnCard").textContent = state === "on" ? ("Connected • " + label) : (state === "reconnecting" ? "Reconnecting • " + label : "Not Connected • Secure your traffic");
+      document.querySelector("#vpnDisconnect").hidden = state === "off" || state === "failed";
+      if (fillForm) {
+        if (body.provider) document.querySelector("#vpnProvider").value = body.provider;
+        if (body.username) document.querySelector("#vpnUser").value = body.username;
+        if (body.cityId) vpnCityId = body.cityId;
+        if (body.backupCityId) vpnBackupId = body.backupCityId;
+        syncVpnFields();
+      }
+      if ((body.cities || []).length) {
+        vpnCities = body.cities;
+        renderVpnCities();
+      }
+    }
+    async function refreshVpn() {
+      if (!session) return;
+      const response = await fetch("/api/vpn");
+      paintVpn(await response.json(), true);
+      if (!vpnPoll) {
+        vpnPoll = setInterval(() => {
+          if (document.querySelector("#adminVpnPage").hidden) {
+            stopVpnPoll();
+            return;
+          }
+          fetch("/api/vpn").then((item) => item.json()).then((body) => paintVpn(body, false)).catch(() => {});
+        }, 4000);
+      }
+    }
+    document.querySelector("#vpnProvider").addEventListener("change", syncVpnFields);
+    document.querySelector("#vpnFind").addEventListener("input", renderVpnCities);
+    document.querySelector("#vpnSignIn").addEventListener("click", async () => {
+      if (!session) return;
+      document.querySelector("#vpnState").textContent = "Checking the account…";
+      const response = await fetch("/api/vpn/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: session.email,
+          deviceId: session.deviceId,
+          provider: document.querySelector("#vpnProvider").value,
+          username: document.querySelector("#vpnUser").value,
+          password: document.querySelector("#vpnPass").value,
+          code: document.querySelector("#vpnCode").value,
+          profile: document.querySelector("#vpnProfile").value
+        })
+      });
+      const body = await response.json();
+      if (!response.ok) {
+        document.querySelector("#vpnState").textContent = body.error || "The VPN service refused the sign-in.";
+        return;
+      }
+      document.querySelector("#vpnPass").value = "";
+      vpnCities = body.cities || [];
+      vpnCityId = "";
+      vpnBackupId = "";
+      vpnPickingBackup = false;
+      renderVpnCities();
+      paintVpn(body, false);
+    });
+    async function renderReminders() {
+      const box = document.querySelector("#remindList");
+      const empty = document.querySelector("#remindEmpty");
+      if (!session) {
+        box.innerHTML = "";
+        empty.hidden = false;
+        return;
+      }
+      const response = await fetch("/api/reminders?email=" + encodeURIComponent(session.email) + "&deviceId=" + encodeURIComponent(session.deviceId));
+      const body = await response.json();
+      const rows = body.reminders || [];
+      empty.hidden = rows.length > 0;
+      box.innerHTML = "";
+      rows.forEach((item) => {
+        const card = document.createElement("div");
+        card.className = "card";
+        card.style.margin = "12px 0";
+        card.style.padding = "16px";
+        const title = document.createElement("strong");
+        title.textContent = item.title || item.channelName || "Reminder";
+        const line = document.createElement("p");
+        const when = item.startMillis ? new Date(item.startMillis).toLocaleString() : "";
+        line.textContent = "Channel " + (item.channelNumber || "") + " — " + (item.channelName || "") + (when ? " — " + when : "");
+        const lead = document.createElement("p");
+        lead.className = "hint";
+        lead.textContent = (item.leadMinutes || 15) + " minutes before";
+        const edit = document.createElement("select");
+        [15, 30, 45, 60].forEach((minutes) => {
+          const option = document.createElement("option");
+          option.value = String(minutes);
+          option.textContent = minutes + " minutes before";
+          if (minutes === (item.leadMinutes || 15)) option.selected = true;
+          edit.appendChild(option);
+        });
+        edit.addEventListener("change", async () => {
+          await fetch("/api/reminders/update", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: session.email, deviceId: session.deviceId, id: item.id, minutes: Number(edit.value) })
+          });
+          renderReminders();
+        });
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "secondary";
+        remove.textContent = "Delete";
+        remove.style.marginLeft = "8px";
+        remove.addEventListener("click", async () => {
+          await fetch("/api/reminders/delete", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: session.email, deviceId: session.deviceId, id: item.id })
+          });
+          renderReminders();
+        });
+        card.append(title, line, lead, edit, remove);
+        box.appendChild(card);
+      });
+    }
+    document.querySelector("#vpnBackup").addEventListener("click", () => {
+      if (vpnCities.length < 2) return;
+      vpnPickingBackup = true;
+      renderVpnCities();
+    });
+    document.querySelector("#vpnGo").addEventListener("click", async () => {
+      if (!session || !vpnCityId) return;
+      document.querySelector("#vpnState").textContent = "Connecting…";
+      const response = await fetch("/api/vpn/connect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: session.email, deviceId: session.deviceId, cityId: vpnCityId, backupCityId: vpnBackupId })
+      });
+      const body = await response.json();
+      if (!response.ok) {
+        document.querySelector("#vpnState").textContent = body.error || "The VPN service refused the sign-in.";
+        return;
+      }
+      paintVpn(body, false);
+    });
+    document.querySelector("#vpnDisconnect").addEventListener("click", async () => {
+      if (!session) return;
+      const response = await fetch("/api/vpn/disconnect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: session.email, deviceId: session.deviceId })
+      });
+      const body = await response.json();
+      if (response.ok) paintVpn(body, false);
+    });
+    syncVpnFields();
     document.querySelector("#epgBack").addEventListener("click", () => showTab("admin"));
+    let SANITIZE_STREAMS = null;
+    function sanitizeStreamTokens() {
+      if (SANITIZE_STREAMS) return SANITIZE_STREAMS;
+      SANITIZE_STREAMS = [
+        "USA", "US:", "HD", "GA | Atlanta |", "Big10+", "BLKET:", "DAZN US", "Dirtvision",
+        "Disney+ Events", "ESPN+", "Fanatiz", "Flo Football", "Flo Racing", "Flo Sports",
+        "Fox One", "MAX USA", "MLS", "MLS NEXT PRO", "The MW +", "The MW+", "NBA",
+        "NCAA Baseball", "NCAAB", "NCAAW B", "NCAAF", "NFHS Network", "NFL Teams:",
+        "NHL", "NHL:", "NJCAA Women's Basketball", "NWSL", "Paramount+", "Peacock",
+        "Plex:", "SEC+ / Acc extra", "USA Soccer", "Stirr:", "Tubi:", "VIX PREMIUM DEPORTES",
+        "WNBA", "Xumo:"
+      ];
+      return SANITIZE_STREAMS;
+    }
+    let epgTool = "";
+    function showEpgHome() {
+      epgTool = "";
+      document.querySelector("#epgCards").hidden = false;
+      document.querySelector("#epgTools").hidden = true;
+      document.querySelector("#epgHomeHead").hidden = false;
+    }
+    function showEpgTool(which) {
+      epgTool = which;
+      document.querySelector("#epgCards").hidden = true;
+      document.querySelector("#epgTools").hidden = false;
+      document.querySelector("#epgHomeHead").hidden = true;
+      document.querySelector("#epgStripTool").hidden = which !== "strip";
+      document.querySelector("#epgRenameTool").hidden = which !== "rename";
+      document.querySelector("#epgImagesTool").hidden = which !== "images";
+      document.querySelector("#epgResetTool").hidden = which !== "reset";
+      document.querySelector("#epgSanitizeTool").hidden = which !== "sanitize";
+      document.querySelector("#epgParseTool").hidden = which !== "parse";
+      document.querySelector("#epgToolSave").hidden = which === "sanitize";
+      if (which === "sanitize") resetSanitize();
+      const titles = {
+        strip: "Bulk Channel Stripper",
+        rename: "Bulk Group Renamer",
+        images: "Remove images",
+        reset: "Show everything again",
+        sanitize: "Sanitize Group & Channel Names",
+        parse: "Parse channel names into the guide"
+      };
+      document.querySelector("#epgToolTitle").textContent = titles[which] || "EPG edits";
+      document.querySelector("#epgPageStatus").textContent = "";
+    }
+    function mergeStrip(current, extra) {
+      const out = Array.isArray(current) ? current.slice() : [];
+      const seen = new Set(out.map((token) => String(token).toLowerCase()));
+      extra.forEach((token) => {
+        const key = token.toLowerCase();
+        if (seen.has(key)) return;
+        seen.add(key);
+        out.push(token);
+      });
+      return out;
+    }
+    const sanitizePick = { channel: "", group: "" };
+    const sanitizeLists = { channelKept: [], channelStrip: [], groupKept: [], groupStrip: [] };
+    function resetSanitize() {
+      sanitizeLists.channelKept = [];
+      sanitizeLists.channelStrip = sanitizeStreamTokens().slice();
+      sanitizeLists.groupKept = [];
+      sanitizeLists.groupStrip = ["USA |"];
+      sanitizePick.channel = "";
+      sanitizePick.group = "";
+      paintSanitize();
+    }
+    function paintSanitize() {
+      ["channelKept", "channelStrip", "groupKept", "groupStrip"].forEach((id) => {
+        const box = document.querySelector("#" + id);
+        const kind = id.startsWith("channel") ? "channel" : "group";
+        box.replaceChildren();
+        const tokens = sanitizeLists[id];
+        if (!tokens.length) {
+          const empty = document.createElement("div");
+          empty.textContent = "None";
+          empty.style.color = "#C9BBA8";
+          box.append(empty);
+          return;
+        }
+        tokens.forEach((token) => {
+          const row = document.createElement("button");
+          row.type = "button";
+          row.textContent = token;
+          if (sanitizePick[kind] === token) row.className = "on";
+          row.addEventListener("click", () => {
+            sanitizePick[kind] = token;
+            paintSanitize();
+          });
+          box.append(row);
+        });
+      });
+    }
+    function moveSanitize(kind, toStrip) {
+      const token = sanitizePick[kind];
+      if (!token) return;
+      const kept = sanitizeLists[kind + "Kept"];
+      const strip = sanitizeLists[kind + "Strip"];
+      const from = toStrip ? kept : strip;
+      const to = toStrip ? strip : kept;
+      const index = from.findIndex((item) => item.toLowerCase() === token.toLowerCase());
+      if (index < 0) return;
+      const [moved] = from.splice(index, 1);
+      if (!to.some((item) => item.toLowerCase() === moved.toLowerCase())) to.push(moved);
+      paintSanitize();
+    }
+    function withoutHeld(current, held, strip) {
+      const skip = new Set(held.map((token) => String(token).toLowerCase()));
+      const base = (current || []).filter((token) => !skip.has(String(token).toLowerCase()));
+      return mergeStrip(base, strip);
+    }
+    function dropToken(name, token) {
+      const lower = String(name).toLowerCase();
+      const needle = String(token).toLowerCase();
+      let out = "";
+      let index = 0;
+      while (index < name.length) {
+        const at = lower.indexOf(needle, index);
+        if (at < 0) {
+          out += name.slice(index);
+          break;
+        }
+        out += name.slice(index, at);
+        index = at + token.length;
+      }
+      return out.replace(/\s{2,}/g, " ").trim();
+    }
+    async function sanitizeNames() {
+      const busy = document.querySelector("#sanitizeBusy");
+      const detail = document.querySelector("#epgPageStatus");
+      busy.hidden = false;
+      const current = lineup();
+      current.namePrefixes = withoutHeld(current.namePrefixes, sanitizeLists.channelKept, sanitizeLists.channelStrip);
+      current.nameSuffixes = withoutHeld(current.nameSuffixes, sanitizeLists.channelKept, sanitizeLists.channelStrip);
+      const names = current.groupNames || {};
+      Object.keys(names).forEach((id) => {
+        let next = names[id];
+        sanitizeLists.groupStrip.forEach((token) => { next = dropToken(next, token); });
+        if (next) names[id] = next;
+        else delete names[id];
+      });
+      current.groupNames = names;
+      paintStrip();
+      const saved = await saveLineup(true);
+      if (!saved) {
+        busy.hidden = true;
+        detail.textContent = "The cleanup is on this page, but the save did not stick.";
+        return;
+      }
+      for (const token of sanitizeLists.groupStrip) {
+        document.querySelector("#groupFind").value = token;
+        document.querySelector("#groupReplace").value = "";
+        if (!planGroupRename().changed) continue;
+        const renamed = await saveGroupRename();
+        if (!renamed) {
+          busy.hidden = true;
+          return;
+        }
+      }
+      busy.hidden = true;
+      showEpgHome();
+    }
+    document.querySelector("#channelToKept").addEventListener("click", () => moveSanitize("channel", false));
+    document.querySelector("#channelToStrip").addEventListener("click", () => moveSanitize("channel", true));
+    document.querySelector("#groupToKept").addEventListener("click", () => moveSanitize("group", false));
+    document.querySelector("#groupToStrip").addEventListener("click", () => moveSanitize("group", true));
+    document.querySelector("#sanitizeCleanup").addEventListener("click", () => sanitizeNames());
+    document.querySelector("#epgToolsBack").addEventListener("click", showEpgHome);
+    document.querySelector("#epgCountries").addEventListener("click", () => showTab("countries"));
+    document.querySelector("#epgLineup").addEventListener("click", () => showTab("groups"));
+    document.querySelector("#epgReset").addEventListener("click", () => showEpgTool("reset"));
+    document.querySelector("#epgStrip").addEventListener("click", () => showEpgTool("strip"));
+    document.querySelector("#epgRename").addEventListener("click", () => showEpgTool("rename"));
+    document.querySelector("#epgSanitize").addEventListener("click", () => showEpgTool("sanitize"));
+    document.querySelector("#epgParse").addEventListener("click", () => showEpgTool("parse"));
+    document.querySelector("#epgImages").addEventListener("click", () => showEpgTool("images"));
+    document.querySelector("#epgToolSave").addEventListener("click", async () => {
+      const detail = document.querySelector("#epgPageStatus");
+      if (epgTool === "rename") {
+        await saveGroupRename();
+        return;
+      }
+      if (epgTool === "sanitize") {
+        await sanitizeNames();
+        return;
+      }
+      if (epgTool === "images") {
+        document.querySelector("#stripImages").click();
+        return;
+      }
+      if (epgTool === "reset") {
+        const current = lineup();
+        current.hiddenCountries = [];
+        current.hiddenGroups = [];
+        current.hiddenChannels = [];
+        const saved = await saveLineup();
+        detail.textContent = saved
+          ? "Saved. Every country, group, and channel is visible again. The TV guide updates now."
+          : "The reset is on this page, but the save did not stick.";
+        return;
+      }
+      if (epgTool === "parse") {
+        lineup().nameEpg = true;
+        const saved = await saveLineup();
+        detail.textContent = saved
+          ? "Saved. Empty guide slots fill from the channel name the next time that TV opens the guide."
+          : "The switch is on this page, but the save did not stick.";
+        return;
+      }
+      const saved = await saveLineup();
+      detail.textContent = saved
+        ? "Saved. The TV guide updates now."
+        : "The change is on this page, but the save did not stick.";
+    });
     document.querySelector("#recordSearch").addEventListener("input", debounce(renderRecordChannels, 120));
     document.querySelector("#saveShare").addEventListener("click", saveShare);
     document.querySelector("#recordManual").addEventListener("click", recordManual);
@@ -2774,7 +4208,9 @@
     document.querySelector("#quickFilo").addEventListener("click", () => addPackage("filo", "Filo", false));
     document.querySelector("#quickUtoob").addEventListener("click", () => addPackage("utoob", "UToob", true));
     document.querySelector("#quickFubo").addEventListener("click", () => addPackage("fubo", "Foooooobowed", true));
-    document.querySelector("#quickDirectv").addEventListener("click", () => addPackage("directv", "ErectTV Streamer", true));
+    document.querySelector("#quickDirectv").addEventListener("click", () => addPackage("directv", "DurictTV Streamer", true));
+    document.querySelector("#quickFrndly").addEventListener("click", () => addPackage("frndly", "YourFriendlyTV", false));
+    document.querySelector("#quickHulu").addEventListener("click", () => addPackage("hulu", "HoolaHoop Live TV", true));
     document.querySelector("#quickSlingOrange").addEventListener("click", async () => {
       if (quickBusy) return;
       quickBusy = true;
@@ -2960,10 +4396,11 @@
 
     function blankLineup() {
       return {
-        groupOrder: [], hiddenGroups: [], hiddenChannels: [], groupNames: {}, channelNames: {}, channelOrder: {}, hiddenCountries: [], includeInternational: false, namePrefixes: [], nameSuffixes: [], nameEpg: false, revision: 0
+        groupOrder: [], hiddenGroups: [], hiddenChannels: [], groupNames: {}, channelNames: {}, channelOrder: {}, hiddenCountries: [], includeInternational: false, namePrefixes: [], nameSuffixes: [], nameEpg: false, groupFind: "", groupReplace: "", groupPins: {}, revision: 0
       };
     }
     function showSignIn() {
+      lineupLive = false;
       session = null;
       accountEmail = "";
       sessionStorage.removeItem("olympus-email");
@@ -3072,6 +4509,7 @@
       document.querySelector("#deviceList").hidden = false;
     }
     async function openDevice(deviceId) {
+      document.querySelector("#deviceListEmail").textContent = "Opening…";
       const response = await fetch("/api/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -3084,12 +4522,14 @@
       }
       session = body;
       session.deviceId = deviceId;
+      paintRefreshAge(body.refreshedAt);
+      lineupLive = false;
       session.lineup = Object.assign(blankLineup(), body.lineup || {});
       session.catalog = body.catalog || { groups: [], channels: [], countries: [] };
       applyInternational(session.lineup.includeInternational === true, false);
       session.favorites = body.favorites || { ids: [], revision: 0 };
       session.recordings = body.recordings || blankRecordings();
-      paintStrip();
+      forgetTabPaint();
       document.querySelector("#who").textContent = body.email;
       document.querySelector("#devices").textContent = deviceId;
       sessionStorage.setItem("olympus-device", deviceId);
@@ -3099,28 +4539,41 @@
       editor.hidden = false;
       selectedGroupId = null;
       showTab("countries");
-      renderCountries();
+      lineupLive = true;
+      const ready = catalogIsReady();
+      paintCatalogReady(ready);
+      if (!ready) watchCatalogAfterSetup();
     }
-    async function saveLineup() {
+    async function saveLineup(quiet) {
       const status = document.querySelector("#saveStatus");
-      status.textContent = "Saving…";
-      captureStrip();
-      session.lineup.revision = Date.now();
-      const response = await fetch("/api/lineup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: session.email,
-          deviceId: session.deviceId,
-          lineup: session.lineup
-        })
-      });
-      const body = await response.json();
-      if (!response.ok) { status.textContent = body.error || "Save failed"; return false; }
-      session.lineup = body.lineup;
-      paintStrip();
-      status.textContent = "Saved for " + session.deviceId + ". Open the guide on that TV to use this lineup.";
-      return true;
+      clearTimeout(lineupTimer);
+      if (status && !quiet) status.textContent = "Saving…";
+      lineupHold = true;
+      try {
+        captureStrip();
+        session.lineup.revision = Date.now();
+        const response = await fetch("/api/lineup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: session.email,
+            deviceId: session.deviceId,
+            lineup: session.lineup
+          })
+        });
+        const body = await response.json();
+        if (!response.ok) {
+          if (status) status.textContent = body.error || "Save failed";
+          return false;
+        }
+        session.lineup = body.lineup;
+        paintStrip();
+        if (status) status.textContent = "Updated on the device";
+        pageDirty = false;
+        return true;
+      } finally {
+        lineupHold = false;
+      }
     }
 
     loginForm.addEventListener("submit", async (event) => {
@@ -3134,8 +4587,16 @@
       }
     });
 
-    document.querySelector("#save").addEventListener("click", saveLineup);
+    document.querySelectorAll(".section-save").forEach((button) => {
+      if (button.id === "saveShare") return;
+      button.addEventListener("click", () => saveLineup(false));
+    });
+    const stripPrefixes = document.querySelector("#stripPrefixes");
+    const stripSuffixes = document.querySelector("#stripSuffixes");
+    if (stripPrefixes) stripPrefixes.addEventListener("input", scheduleLineupSync);
+    if (stripSuffixes) stripSuffixes.addEventListener("input", scheduleLineupSync);
     document.querySelector("#backDevices").addEventListener("click", () => loadDevices(accountEmail));
+    document.querySelector("#adminHomeBack").addEventListener("click", () => loadDevices(accountEmail));
     document.querySelector("#signOut").addEventListener("click", showSignIn);
     document.querySelector("#signOutDevices").addEventListener("click", showSignIn);
     document.querySelector("#addDevice").addEventListener("click", showAddDevice);
@@ -3166,35 +4627,314 @@
         const parsed = JSON.parse(await file.text());
         const incoming = parsed && parsed.lineup ? parsed.lineup : parsed;
         if (!incoming || typeof incoming !== "object" || Array.isArray(incoming)) throw new Error("That file is not a Olympus-IPTV settings file.");
+        const preview = backupPreview(incoming, parsed && parsed.exportedAt);
+        if (!window.confirm("Restore this backup onto " + session.deviceId + "?\n\n" + preview)) {
+          status.textContent = "Import cancelled.";
+          return;
+        }
         session.lineup = Object.assign(blankLineup(), incoming);
+        forgetTabPaint();
         paintStrip();
-        renderCountries();
-        if (tab === "groups") renderGroups();
-        if (tab === "channels") renderChannelPanel();
+        openTab(tab || "countries");
         await saveLineup();
-        if (!status.textContent.startsWith("Saved")) return;
-        status.textContent = "Imported onto " + session.deviceId + ". Open the guide on that TV and it will use this lineup.";
+        if (!status.textContent.startsWith("Updated")) return;
+        status.textContent = "Imported onto " + session.deviceId + ". The TV guide updates now.";
       } catch (failure) {
         status.textContent = failure.message || "Could not import that file.";
       }
     });
 
-    const savedEmail = sessionStorage.getItem("olympus-email") || "";
-    if (savedEmail) {
-      document.querySelector("#email").value = savedEmail;
-      loadDevices(savedEmail).catch((failure) => {
-        sessionStorage.removeItem("olympus-email");
-        loginForm.hidden = false;
-        document.querySelector("#loginError").textContent = failure.message || "Could not sign in";
-      });
-    } else {
-      loginForm.hidden = false;
+    function backupPreview(lineup, exportedAt) {
+      const count = (value) => Array.isArray(value) ? value.length : Object.keys(value || {}).length;
+      const hiddenCountries = count(lineup.hiddenCountries);
+      const hiddenGroups = count(lineup.hiddenGroups);
+      const hiddenChannels = count(lineup.hiddenChannels);
+      const renamed = count(lineup.channelNames) + count(lineup.groupNames);
+      const pins = count(lineup.groupPins);
+      const when = exportedAt ? ("Exported " + exportedAt + "\n") : "";
+      return when +
+        "Hidden countries: " + hiddenCountries + "\n" +
+        "Hidden groups: " + hiddenGroups + "\n" +
+        "Hidden channels: " + hiddenChannels + "\n" +
+        "Renames: " + renamed + "\n" +
+        "Parental PINs: " + pins + "\n" +
+        "International: " + (lineup.includeInternational ? "on" : "off");
     }
 
+    const setupForm = document.querySelector("#setup");
+    document.querySelector("#setupMode").addEventListener("change", () => {
+      const m3u = document.querySelector("#setupMode").value === "m3u";
+      document.querySelector("#setupXtream").hidden = m3u;
+      document.querySelector("#setupM3u").hidden = !m3u;
+    });
+    function catalogIsReady() {
+      const count = Number((session && session.catalog && session.catalog.channelCount) || 0);
+      const groups = (session && session.catalog && session.catalog.groups) || [];
+      return count > 0 || groups.length > 0;
+    }
+
+    function paintCatalogReady(ready) {
+      const banner = document.querySelector("#catalogLoadingBanner");
+      const status = document.querySelector("#quickStatus");
+      const cards = document.querySelector(".quick-cards");
+      const search = document.querySelector("#favoriteSearch");
+      const note = document.querySelector("#favoriteNote");
+      if (banner) {
+        banner.hidden = !!ready;
+        banner.setAttribute("aria-busy", ready ? "false" : "true");
+      }
+      if (status) {
+        status.textContent = ready
+          ? "Add a few channels you watch, then search below for anything else. Off keeps Countries on USA only."
+          : "Catalog still loading on the device… auto-add unlocks when groups arrive.";
+      }
+      if (cards) {
+        cards.style.opacity = ready ? "1" : "0.45";
+        cards.style.pointerEvents = ready ? "" : "none";
+        cards.setAttribute("aria-disabled", ready ? "false" : "true");
+      }
+      if (search) {
+        search.disabled = !ready;
+        search.placeholder = ready
+          ? "Find a channel, movie, or show"
+          : "Catalog loading… search unlocks soon";
+      }
+      if (note && !ready) note.textContent = "Search waits until the device catalog is ready.";
+      if (note && ready && (search.value || "").trim().length < 2) {
+        note.textContent = "Type at least two letters.";
+      }
+      if (session) renderFavoriteOrder();
+    }
+
+    async function refreshSessionCatalog() {
+      if (!session || !accountEmail || !session.deviceId) return false;
+      try {
+        const response = await fetch("/api/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: accountEmail, deviceId: session.deviceId })
+        });
+        const body = await response.json();
+        if (!response.ok) return false;
+        session.catalog = body.catalog || session.catalog || { groups: [], channels: [], countries: [] };
+        session.lineup = Object.assign(blankLineup(), body.lineup || session.lineup || {});
+        session.favorites = body.favorites || session.favorites || { ids: [], revision: 0 };
+        paintRefreshAge(body.refreshedAt);
+        forgetTabPaint();
+        openTab(tab || "favorites");
+        const ready = catalogIsReady();
+        paintCatalogReady(ready);
+        return ready;
+      } catch (_) {
+        return false;
+      }
+    }
+
+    function watchCatalogAfterSetup() {
+      let tries = 0;
+      paintCatalogReady(false);
+      const tick = async () => {
+        tries += 1;
+        const ready = await refreshSessionCatalog();
+        if (ready || tries >= 60) {
+          paintCatalogReady(ready);
+          if (ready) {
+            document.querySelector("#address").textContent =
+              "Catalog is ready. Add favorites and filters here — Save pushes them to the device.";
+          } else {
+            document.querySelector("#address").textContent =
+              "Catalog is still catching up. Refresh this page in a minute, or use Search once groups appear.";
+          }
+          return;
+        }
+        document.querySelector("#address").textContent =
+          "Loading the catalog on the device… favorites and filters unlock as groups arrive.";
+        paintCatalogReady(false);
+        setTimeout(tick, 2000);
+      };
+      setTimeout(tick, 1500);
+    }
+
+    setupForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const error = document.querySelector("#setupError");
+      error.textContent = "Checking the playlist…";
+      const m3u = document.querySelector("#setupMode").value === "m3u";
+      const payload = {
+        email: document.querySelector("#setupEmail").value.trim(),
+        zip: document.querySelector("#setupZip").value.trim(),
+        mode: m3u ? "m3u" : "xtream",
+        host: document.querySelector("#setupHost").value.trim(),
+        url: document.querySelector("#setupUrl").value.trim(),
+        username: m3u ? document.querySelector("#setupM3uUser").value.trim() : document.querySelector("#setupUser").value.trim(),
+        password: m3u ? document.querySelector("#setupM3uPass").value : document.querySelector("#setupPass").value,
+        includeVod: document.querySelector("#setupVod").checked,
+        includeInternational: document.querySelector("#setupIntl").checked
+      };
+      try {
+        const response = await fetch("/api/setup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const body = await response.json();
+        if (!response.ok) throw new Error(body.error || "Could not save the playlist");
+        setupForm.hidden = true;
+        const email = (body.email || payload.email || "").trim().toLowerCase();
+        const deviceId = body.deviceId || "";
+        document.querySelector("#address").textContent =
+          "Saved on the device. Finish favorites and filters here — they sync to the player.";
+        if (!email) return;
+        accountEmail = email;
+        sessionStorage.setItem("olympus-email", email);
+        if (deviceId) {
+          await openDevice(deviceId);
+          showTab("favorites");
+          watchCatalogAfterSetup();
+        } else {
+          await loadDevices(email);
+        }
+      } catch (failure) {
+        error.textContent = failure.message || "Could not save the playlist";
+      }
+    });
+
+    const savedEmail = sessionStorage.getItem("olympus-email") || "";
+    fetch("/api/setup").then((response) => response.json()).then((status) => {
+      if (!status.ready) {
+        setupForm.hidden = false;
+        loginForm.hidden = true;
+        return;
+      }
+      if (savedEmail) {
+        document.querySelector("#email").value = savedEmail;
+        loadDevices(savedEmail).catch((failure) => {
+          sessionStorage.removeItem("olympus-email");
+          loginForm.hidden = false;
+          document.querySelector("#loginError").textContent = failure.message || "Could not sign in";
+        });
+      } else {
+        loginForm.hidden = false;
+      }
+    }).catch(() => {
+      loginForm.hidden = false;
+    });
+
+    function paintRefreshAge(at) {
+      const node = document.querySelector("#adminRefreshAge");
+      if (!node) return;
+      const time = Number(at) || 0;
+      if (!time) {
+        node.textContent = "Not refreshed yet";
+        return;
+      }
+      const minutes = Math.max(0, Math.round((Date.now() - time) / 60000));
+      if (minutes < 1) node.textContent = "Last refresh: just now";
+      else if (minutes < 60) node.textContent = "Last refresh: " + minutes + "m ago";
+      else node.textContent = "Last refresh: " + Math.round(minutes / 60) + "h ago";
+    }
+    document.querySelector("#groupPinForm").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const wait = groupPinWait;
+      if (!wait) return;
+      const digits = document.querySelector("#groupPinInput").value.replace(/\D/g, "");
+      const error = document.querySelector("#groupPinError");
+      if (digits.length !== 4) {
+        error.textContent = "Enter 4 digits.";
+        return;
+      }
+      if (wait.mode === "set") {
+        const pins = Object.assign({}, lineup().groupPins || {});
+        pins[wait.groupId] = pinCode(digits);
+        lineup().groupPins = pins;
+        const saved = await saveLineup();
+        if (!saved) return;
+        finishGroupPin(true);
+        return;
+      }
+      const saved = (lineup().groupPins || {})[wait.groupId];
+      if (pinCode(digits) !== saved) {
+        error.textContent = "Incorrect password. Try again.";
+        document.querySelector("#groupPinInput").value = "";
+        document.querySelector("#groupPinInput").focus();
+        return;
+      }
+      groupPinSession.set(wait.groupId, digits);
+      finishGroupPin(true);
+    });
+    document.querySelector("#groupPinCancel").addEventListener("click", () => finishGroupPin(false));
+    document.querySelector("#groupPinClear").addEventListener("click", async () => {
+      const wait = groupPinWait;
+      if (!wait) return;
+      const digits = document.querySelector("#groupPinInput").value.replace(/\D/g, "");
+      const error = document.querySelector("#groupPinError");
+      const savedPin = (lineup().groupPins || {})[wait.groupId];
+      if (!savedPin) {
+        finishGroupPin(false);
+        return;
+      }
+      if (digits.length !== 4 || pinCode(digits) !== savedPin) {
+        error.textContent = "Enter the current 4-digit PIN to remove this lock.";
+        document.querySelector("#groupPinInput").value = "";
+        document.querySelector("#groupPinInput").focus();
+        return;
+      }
+      const pins = Object.assign({}, lineup().groupPins || {});
+      delete pins[wait.groupId];
+      lineup().groupPins = Object.keys(pins).length ? pins : null;
+      groupPinSession.delete(wait.groupId);
+      const saved = await saveLineup();
+      if (!saved) return;
+      finishGroupPin(true);
+    });
+    fetch("/api/logs").then((response) => response.json()).then((body) => {
+      const files = body.files || [];
+      const current = files.find((file) => file.current) || files[0];
+      const bytes = current ? current.bytes || 0 : 0;
+      const kb = Math.max(1, Math.round(bytes / 1024));
+      const label = bytes ? "Current log (" + kb + " KB)" : "Current log";
+      document.querySelector("#logLinks").innerHTML = '<a href="/api/log">' + label + "</a>";
+      const age = document.querySelector("#adminLogAge");
+      if (age) age.textContent = bytes ? kb + " KB" : "0 errors";
+      const list = document.querySelector("#logList");
+      if (list) {
+        list.innerHTML = "";
+        files.forEach((file) => {
+          const size = Math.max(1, Math.round((file.bytes || 0) / 1024));
+          const name = file.current ? "Current log" : file.name;
+          const href = file.current ? "/api/log" : "/api/log?name=" + encodeURIComponent(file.name);
+          const button = document.createElement("button");
+          button.type = "button";
+          button.textContent = name + " (" + size + " KB)";
+          button.addEventListener("click", () => showLog(href, file.current ? "olympus-iptv-log.txt" : file.name));
+          list.append(button);
+        });
+      }
+      const open = current ? (current.current ? "/api/log" : "/api/log?name=" + encodeURIComponent(current.name)) : "/api/log";
+      showLog(open, current && !current.current ? current.name : "olympus-iptv-log.txt");
+    }).catch(() => {});
+
+    let tvUrl = "";
+    const copyBtn = document.querySelector("#copyTvUrl");
+    if (copyBtn) {
+      copyBtn.addEventListener("click", () => {
+        const value = tvUrl || (document.querySelector("#address")?.textContent || "").trim();
+        if (!value) return;
+        const plain = tvUrl || (value.match(/https?:\/\/\S+/) || [value])[0];
+        navigator.clipboard.writeText(plain).then(() => {
+          copyBtn.textContent = "Copied";
+          setTimeout(() => { copyBtn.textContent = "Copy TV URL"; }, 1400);
+        }).catch(() => {});
+      });
+    }
     fetch("/api/info").then((response) => response.json()).then((info) => {
-      document.querySelector("#address").textContent = info.url
+      tvUrl = info.url || "";
+      const line = info.url
         ? "On this Wi-Fi, open " + info.url
         : "Open this page from a device on the same Wi-Fi.";
+      document.querySelector("#address").textContent = line;
+      const webCopy = document.querySelector("#adminWebCopy");
+      if (webCopy) webCopy.textContent = line;
     }).catch(() => {
       document.querySelector("#address").textContent = "Stay on this Wi-Fi. This page is not published on the internet.";
     });

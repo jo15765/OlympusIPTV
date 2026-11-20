@@ -13,4 +13,12 @@
     <color name="danger">#E07A72</color>
     <color name="chip">#3A3126</color>
     <color name="black">#000000</color>
+    <color name="epg_live">#2A3328</color>
+    <color name="epg_live_stroke">#6FAE6A</color>
+    <color name="epg_new">#332A22</color>
+    <color name="epg_new_stroke">#E2A15A</color>
+    <color name="epg_sports">#1F2A33</color>
+    <color name="epg_sports_stroke">#5B9BD5</color>
+    <color name="epg_movie">#322433</color>
+    <color name="epg_movie_stroke">#B07AC8</color>
 </resources>

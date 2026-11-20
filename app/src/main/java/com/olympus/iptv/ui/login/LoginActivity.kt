@@ -97,6 +97,12 @@ class LoginActivity : AppCompatActivity() {
         binding.portalHint.text = getString(R.string.portal_hint, url)
         binding.dashboardAddress.text = url
         binding.qrCode.setImageBitmap(QrBitmap.encode(url, 256))
+        binding.copyTvUrl.setOnClickListener {
+            val clipboard = getSystemService(android.content.Context.CLIPBOARD_SERVICE)
+                as android.content.ClipboardManager
+            clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Olympus TV URL", url))
+            android.widget.Toast.makeText(this, R.string.copy_tv_url_done, android.widget.Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun selectMode(type: PlaylistType) {

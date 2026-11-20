@@ -1,14 +1,20 @@
 package com.olympus.iptv.ui.search
 
+import android.app.Activity
+import android.content.ActivityNotFoundException
+import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.speech.RecognizerIntent
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.inputmethod.EditorInfo
 import android.view.KeyEvent
 import android.view.View
 import android.widget.TextView
+import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
@@ -35,6 +41,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.Locale
 
 class SearchActivity : AppCompatActivity() {
     private lateinit var binding: ActivitySearchBinding
@@ -51,6 +58,20 @@ class SearchActivity : AppCompatActivity() {
     private val searchHandler = Handler(Looper.getMainLooper())
     private var searchWait: Runnable? = null
     private var focusResults = false
+    private val voiceSearch = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode != Activity.RESULT_OK) return@registerForActivityResult
+        val spoken = result.data
+            ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+            ?.firstOrNull()
+            ?.trim()
+            .orEmpty()
+        if (spoken.isBlank()) return@registerForActivityResult
+        binding.inputSearch.setText(spoken)
+        binding.inputSearch.setSelection(spoken.length)
+        submitSearch()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -128,6 +149,7 @@ class SearchActivity : AppCompatActivity() {
         binding.btnBack.setOnClickListener { finish() }
         SoftKeyboard.keepOffUntilAsked(this, binding.inputSearch)
         binding.btnSearch.setOnClickListener { submitSearch() }
+        binding.btnVoice.setOnClickListener { startVoiceSearch() }
         binding.btnHideKeyboard.setOnClickListener { hideKeyboard() }
         paintRecentSearches()
         binding.inputSearch.setOnEditorActionListener { _, actionId, _ ->
@@ -308,13 +330,26 @@ class SearchActivity : AppCompatActivity() {
         }
     }
 
+    private fun startVoiceSearch() {
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
+            putExtra(RecognizerIntent.EXTRA_PROMPT, getString(R.string.search_voice))
+        }
+        try {
+            voiceSearch.launch(intent)
+        } catch (_: ActivityNotFoundException) {
+            Toast.makeText(this, R.string.search_voice_missing, Toast.LENGTH_SHORT).show()
+        }
+    }
+
     private fun scheduleSearch(rawQuery: String) {
         searchWait?.let { searchHandler.removeCallbacks(it) }
         val run = Runnable { showMatches(rawQuery) }
         searchWait = run
-        // Typeahead: first character searches almost immediately; short debounce only for rapid typing.
+        // FTS path is fast; debounce keystrokes so D-pad typing doesn't flood queries.
         if (rawQuery.isBlank()) searchHandler.post(run)
-        else searchHandler.postDelayed(run, if (rawQuery.trim().length <= 1) 40L else 90L)
+        else searchHandler.postDelayed(run, 150L)
     }
 
     private fun showMatches(rawQuery: String) {

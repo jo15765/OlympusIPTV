@@ -36,6 +36,7 @@ class EpisodesActivity : AppCompatActivity() {
     private val showLogo by lazy { intent.getStringExtra(EXTRA_LOGO) }
     private var episodes = emptyList<Channel>()
     private var watched = emptySet<String>()
+    private var progressById = emptyMap<String, Int>()
     private var season = 1
     private val seasons = EpisodeSeasons()
     private val adapter = EpisodeAdapter()
@@ -92,6 +93,19 @@ class EpisodesActivity : AppCompatActivity() {
             }
             watched = withContext(Dispatchers.IO) {
                 runCatching { app.catalogDb.watchedEpisodes(playlistId, seriesId) }.getOrDefault(emptySet())
+            }
+            progressById = withContext(Dispatchers.IO) {
+                runCatching {
+                    app.playlistStore.recent(playlistId)
+                        .mapNotNull { entry ->
+                            val id = entry.channelId?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                            val pos = entry.positionMs ?: return@mapNotNull null
+                            if (pos <= 0L) return@mapNotNull null
+                            val duration = entry.durationMs?.takeIf { it > 0L } ?: return@mapNotNull null
+                            id to ((pos * 1000L) / duration).toInt().coerceIn(1, 999)
+                        }
+                        .toMap()
+                }.getOrDefault(emptyMap())
             }
             if (isDestroyed) return
             val hadCache = !cached.isNullOrEmpty()
@@ -297,8 +311,17 @@ class EpisodesActivity : AppCompatActivity() {
             fun bind(number: Int) {
                 val done = seasonDone(number)
                 val active = number == season
+                val unwatched = episodes.count {
+                    (it.season ?: 1) == number && it.id !in watched
+                }
                 row.seasonName.text = getString(R.string.season_number, number)
                 row.seasonCheck.visibility = if (done) View.VISIBLE else View.GONE
+                if (!done && unwatched > 0) {
+                    row.seasonUnwatched.text = getString(R.string.season_unwatched, unwatched)
+                    row.seasonUnwatched.visibility = View.VISIBLE
+                } else {
+                    row.seasonUnwatched.visibility = View.GONE
+                }
                 row.root.isSelected = active
                 row.root.setOnClickListener {
                     if (season == number) {
@@ -358,6 +381,14 @@ class EpisodesActivity : AppCompatActivity() {
                 row.episodePlot.text = plot
                 row.episodePlot.visibility = if (plot.isBlank()) View.GONE else View.VISIBLE
                 row.episodeCheck.visibility = if (marked) View.VISIBLE else View.GONE
+                val progress = progressById[episode.id] ?: 0
+                if (!marked && progress > 0) {
+                    row.episodeProgress.progress = progress
+                    row.episodeProgress.visibility = View.VISIBLE
+                } else {
+                    row.episodeProgress.progress = 0
+                    row.episodeProgress.visibility = View.GONE
+                }
                 bindArt(row.episodeArt, episode.logoUrl, 168, 94)
                 row.root.setOnClickListener { play(episode) }
                 row.root.setOnLongClickListener {

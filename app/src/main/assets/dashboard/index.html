@@ -7,18 +7,18 @@
   <style>
     :root {
       color-scheme: dark;
-      --bg: #1b1e26;
-      --side: #14161c;
-      --elev: #2a2d36;
-      --panel: #323640;
-      --stroke: #3c404a;
-      --text: #f5f6f8;
-      --muted: #9aa1ad;
-      --accent: #e0b15a;
+      --bg: #141210;
+      --side: #1b1814;
+      --elev: #221f1a;
+      --panel: #2c271f;
+      --stroke: #433b31;
+      --text: #f6f1e7;
+      --muted: #c9bba8;
+      --accent: #e2a15a;
       --accent-ink: #1c1408;
-      --save: #c47b3a;
+      --save: #b07a38;
       --danger: #e07a72;
-      --focus: #e0c07a;
+      --focus: #f0c48a;
     }
     * { box-sizing: border-box; }
     body {
@@ -87,7 +87,23 @@
     .error { color: var(--danger); min-height: 1.2em; }
     .ok { color: var(--accent); min-height: 0; margin: 6px 2px 0; font-size: 13px; }
     .ok:empty { display: none; }
-    .login { max-width: 420px; }
+    .login {
+      max-width: 420px;
+      background: rgba(27, 24, 20, 0.88);
+      border: 1.5px solid var(--accent);
+      box-shadow: 0 0 0 2px rgba(226, 161, 90, 0.22), 0 18px 40px rgba(0, 0, 0, 0.35);
+      backdrop-filter: blur(10px);
+    }
+    .address-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .copy-url {
+      border: 1px solid var(--stroke);
+      background: var(--panel);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 6px 10px;
+      font-size: 12px;
+      font-weight: 700;
+    }
     #gateArt { display: none; }
     .pin-mask {
       position: fixed;
@@ -1079,7 +1095,10 @@
         <img class="logo-mark" src="logo.png?v=2" alt="Olympus-IPTV" />
         <h1>Olympus-IPTV</h1>
       </div>
-      <p id="address">Looking up this PC’s home address…</p>
+      <div class="address-row">
+        <p id="address">Looking up this PC’s home address…</p>
+        <button class="copy-url" id="copyTvUrl" type="button">Copy TV URL</button>
+      </div>
       <p id="logLinks"><a href="/api/log">Download the error log</a></p>
     </header>
 
@@ -4895,7 +4914,21 @@
       showLog(open, current && !current.current ? current.name : "olympus-iptv-log.txt");
     }).catch(() => {});
 
+    let tvUrl = "";
+    const copyBtn = document.querySelector("#copyTvUrl");
+    if (copyBtn) {
+      copyBtn.addEventListener("click", () => {
+        const value = tvUrl || (document.querySelector("#address")?.textContent || "").trim();
+        if (!value) return;
+        const plain = tvUrl || (value.match(/https?:\/\/\S+/) || [value])[0];
+        navigator.clipboard.writeText(plain).then(() => {
+          copyBtn.textContent = "Copied";
+          setTimeout(() => { copyBtn.textContent = "Copy TV URL"; }, 1400);
+        }).catch(() => {});
+      });
+    }
     fetch("/api/info").then((response) => response.json()).then((info) => {
+      tvUrl = info.url || "";
       const line = info.url
         ? "On this Wi-Fi, open " + info.url
         : "Open this page from a device on the same Wi-Fi.";

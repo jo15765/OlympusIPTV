@@ -28,6 +28,7 @@ import java.io.BufferedOutputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
+import java.util.zip.GZIPOutputStream
 import java.net.Inet4Address
 import java.net.InetAddress
 import java.net.InetSocketAddress
@@ -64,6 +65,7 @@ object DashboardHost {
     private val urlListeners = CopyOnWriteArrayList<(String) -> Unit>()
     private val started = AtomicBoolean(false)
     private val gson = Gson()
+    private val requestGzip = ThreadLocal.withInitial { false }
     private val removed = ConcurrentHashMap<String, MutableList<String>>()
     private val logoAllow = ConcurrentHashMap<String, Boolean>()
     @Volatile private var appContext: Context? = null
@@ -336,7 +338,12 @@ object DashboardHost {
             return
         }
         val body = if (length > 0) readBytes(input, length) else ByteArray(0)
-        route(context, socket, method, path, query, body)
+        requestGzip.set(headers["accept-encoding"].orEmpty().contains("gzip", ignoreCase = true))
+        try {
+            route(context, socket, method, path, query, body)
+        } finally {
+            requestGzip.set(false)
+        }
     }
 
     private fun route(
@@ -350,7 +357,7 @@ object DashboardHost {
         val app = context as? OlympusIptvApp ?: (context.applicationContext as OlympusIptvApp)
         when {
             method == "GET" && (path == "/" || path == "/index.html") -> writeBytes(socket, 200, "text/html; charset=utf-8", pageBytes(context), "no-store")
-            method == "GET" && path == "/logo.png" -> writeBytes(socket, 200, "image/png", logoBytes(context), "public, max-age=86400")
+            method == "GET" && path == "/logo.png" -> writeBytes(socket, 200, "image/png", logoBytes(context), "public, max-age=86400", allowGzip = false)
             method == "GET" && path == "/api/info" -> writeJson(socket, 200, mapOf("url" to url(), "urls" to listOf(url()), "privateNetwork" to true))
             method == "GET" && path == "/api/logs" -> {
                 val files = com.olympus.iptv.AppLog.list().map {
@@ -1398,15 +1405,34 @@ object DashboardHost {
         type: String,
         body: ByteArray,
         cache: String,
-        download: String? = null
+        download: String? = null,
+        allowGzip: Boolean = true
     ) {
+        val compressible = allowGzip && (
+            type.startsWith("text/") ||
+                type.startsWith("application/json") ||
+                type.startsWith("application/javascript")
+            )
+        val payload = if (compressible && requestGzip.get() == true && body.size >= 512) {
+            gzipBytes(body)
+        } else {
+            null
+        }
+        val outBody = payload ?: body
+        val encoding = if (payload != null) "Content-Encoding: gzip\r\nVary: Accept-Encoding\r\n" else ""
         val output = BufferedOutputStream(socket.getOutputStream())
         val disposition = if (download == null) "" else "Content-Disposition: attachment; filename=\"$download\"\r\n"
-        val head = "HTTP/1.1 $code ${reason(code)}\r\nContent-Type: $type\r\nContent-Length: ${body.size}\r\n$disposition" +
+        val head = "HTTP/1.1 $code ${reason(code)}\r\nContent-Type: $type\r\nContent-Length: ${outBody.size}\r\n$encoding$disposition" +
             "Cache-Control: $cache\r\nConnection: close\r\n\r\n"
         output.write(head.toByteArray(Charsets.UTF_8))
-        output.write(body)
+        output.write(outBody)
         output.flush()
+    }
+
+    private fun gzipBytes(body: ByteArray): ByteArray {
+        val sink = ByteArrayOutputStream(body.size / 2)
+        GZIPOutputStream(sink).use { gzip -> gzip.write(body) }
+        return sink.toByteArray()
     }
 
     private fun writeFile(socket: Socket, file: File, type: String, download: String?) {

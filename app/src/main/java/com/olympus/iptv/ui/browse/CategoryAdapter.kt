@@ -3,19 +3,26 @@ package com.olympus.iptv.ui.browse
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
+import coil.load
+import coil.size.Scale
+import com.olympus.iptv.R
 import com.olympus.iptv.data.Category
 import com.olympus.iptv.databinding.ItemCategoryBinding
 import com.olympus.iptv.ui.FocusMotion
 import com.olympus.iptv.ui.Haptics
+import com.olympus.iptv.ui.channelLogo
 
 class CategoryAdapter(
     private val onSelect: (Category, Boolean) -> Unit,
     private val detail: (Category) -> String,
     private val icon: (Category) -> Int,
     private val onHold: (Category) -> Unit = {},
-    private val locked: (Category) -> Boolean = { false }
+    private val locked: (Category) -> Boolean = { false },
+    private val previewLogos: (Category) -> List<String> = { emptyList() },
+    private val liveGroup: (Category) -> Boolean = { false }
 ) : RecyclerView.Adapter<CategoryAdapter.Holder>() {
 
     private val allItems = mutableListOf<Category>()
@@ -159,6 +166,8 @@ class CategoryAdapter(
         fun bind(item: Category) {
             binding.label.text = com.olympus.iptv.data.NameImages.strip(item.name)
             binding.icon.setImageResource(icon(item))
+            bindPreviews(item)
+            binding.liveBadge.visibility = if (liveGroup(item)) View.VISIBLE else View.GONE
             binding.root.isSelected = item.id == selectedId
             showDetail(item)
             if (phoneListMode) {
@@ -218,6 +227,37 @@ class CategoryAdapter(
             binding.detail.text = text
             binding.detail.visibility = if (text.isBlank()) View.GONE else View.VISIBLE
             binding.lock.visibility = if (locked(item)) View.VISIBLE else View.GONE
+        }
+
+        private fun bindPreviews(item: Category) {
+            val urls = previewLogos(item).filter { it.isNotBlank() }.distinct().take(3)
+            val views = listOf(binding.preview0, binding.preview1, binding.preview2)
+            if (urls.isEmpty()) {
+                binding.icon.visibility = View.VISIBLE
+                views.forEach { it.visibility = View.GONE }
+                return
+            }
+            binding.icon.visibility = View.GONE
+            val px = (28 * binding.root.resources.displayMetrics.density).toInt().coerceAtLeast(1)
+            for (index in views.indices) {
+                val view = views[index]
+                val url = urls.getOrNull(index)
+                if (url == null) {
+                    view.visibility = View.GONE
+                    continue
+                }
+                view.visibility = View.VISIBLE
+                loadPreview(view, url, px)
+            }
+        }
+
+        private fun loadPreview(view: ImageView, url: String, px: Int) {
+            view.load(url) {
+                channelLogo(px)
+                scale(Scale.FILL)
+                placeholder(R.drawable.ic_channel_placeholder)
+                error(R.drawable.ic_channel_placeholder)
+            }
         }
     }
 

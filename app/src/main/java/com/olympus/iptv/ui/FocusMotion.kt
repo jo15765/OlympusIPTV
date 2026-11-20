@@ -5,9 +5,9 @@ import android.view.animation.DecelerateInterpolator
 
 object FocusMotion {
     private val ease = DecelerateInterpolator()
-    private const val FOCUSED = 1.03f
+    private const val FOCUSED = 1.04f
     private const val NORMAL = 1f
-    private const val MS = 140L
+    private const val MS = 120L
 
     fun bind(view: View, enabled: Boolean = true) {
         if (!enabled) {

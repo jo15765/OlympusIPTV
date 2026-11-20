@@ -36,8 +36,27 @@
         android:singleLine="true"
         android:textColor="@color/text_primary"
         android:textColorHint="@color/text_secondary"
-        app:layout_constraintEnd_toStartOf="@id/btnSearch"
+        app:layout_constraintEnd_toStartOf="@id/btnVoice"
         app:layout_constraintStart_toEndOf="@id/btnBack"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <TextView
+        android:id="@+id/btnVoice"
+        android:layout_width="wrap_content"
+        android:layout_height="52dp"
+        android:layout_marginStart="8dp"
+        android:background="@drawable/bg_nav"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center"
+        android:minWidth="64dp"
+        android:paddingHorizontal="12dp"
+        android:text="@string/search_voice_glyph"
+        android:textColor="@color/accent"
+        android:textSize="15sp"
+        android:textStyle="bold"
+        android:contentDescription="@string/search_voice"
+        app:layout_constraintEnd_toStartOf="@id/btnSearch"
         app:layout_constraintTop_toTopOf="parent" />
 
     <Button

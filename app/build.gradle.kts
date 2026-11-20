@@ -28,8 +28,8 @@ android {
         applicationId = "com.olympus.iptv"
         minSdk = 24
         targetSdk = 35
-        versionCode = 67
-        versionName = "0.2.66"
+        versionCode = 71
+        versionName = "0.2.70"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "WATCHMODE_API_KEY", "\"$watchmodeKey\"")
         buildConfigField("String", "OPENSUBTITLES_API_KEY", "\"$opensubtitlesKey\"")
@@ -62,7 +62,46 @@ android {
         viewBinding = true
         buildConfig = true
     }
+
+    // Never ship portal/data (e.g. store.json ~48MB) or Node portal trees inside the APK.
+    packaging {
+        resources {
+            excludes += setOf(
+                "**/portal/data/**",
+                "**/store.json",
+                "META-INF/DEPENDENCIES"
+            )
+        }
+    }
+
+    androidResources {
+        ignoreAssetsPattern = "!.svn:!.git:.*:!CVS:!thumbs.db:!picasa.ini:!*.scc:*~:!store.json"
+    }
 }
+
+tasks.register("assertNoPortalDataInAssets") {
+    group = "verification"
+    description = "Fails if portal/data or store.json appears under app assets."
+    val assetsDir = layout.projectDirectory.dir("src/main/assets")
+    inputs.dir(assetsDir)
+    doLast {
+        val assets = assetsDir.asFile
+        if (!assets.exists()) return@doLast
+        val hits = assets.walkTopDown()
+            .filter { it.isFile }
+            .filter {
+                it.name.equals("store.json", ignoreCase = true) ||
+                    it.invariantSeparatorsPath.contains("/portal/data/")
+            }
+            .map { it.path }
+            .toList()
+        if (hits.isNotEmpty()) {
+            error("Do not package portal data into assets: ${hits.joinToString()}")
+        }
+    }
+}
+
+tasks.named("preBuild").configure { dependsOn("assertNoPortalDataInAssets") }
 
 val startPortal = tasks.register<Exec>("startPortal") {
     group = "application"

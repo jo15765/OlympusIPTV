@@ -1,0 +1,358 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/adminPane"
+    android:layout_width="0dp"
+    android:layout_height="match_parent"
+    android:layout_weight="1"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:paddingStart="28dp"
+    android:paddingEnd="28dp"
+    android:paddingTop="18dp"
+    android:paddingBottom="18dp"
+    android:visibility="gone">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="horizontal">
+
+    <LinearLayout
+        android:id="@+id/cardAdminRefresh"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_marginEnd="14dp"
+        android:layout_weight="1"
+        android:background="@drawable/bg_focusable"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center"
+        android:nextFocusDown="@id/cardAdminEpg"
+        android:nextFocusLeft="@id/btnAdmin"
+        android:nextFocusRight="@id/cardAdminWeb"
+        android:orientation="vertical"
+        android:paddingHorizontal="18dp"
+        android:paddingVertical="16dp">
+
+        <ImageView
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:contentDescription="@null"
+            android:src="@drawable/ic_nav_refresh"
+            android:tint="@color/accent" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:gravity="center"
+            android:text="@string/refresh_playlist"
+            android:textColor="@color/text_primary"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:gravity="center"
+            android:text="@string/admin_refresh_detail"
+            android:textColor="@color/text_secondary"
+            android:textSize="14sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/cardAdminWeb"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_marginStart="14dp"
+        android:layout_weight="1"
+        android:background="@drawable/bg_focusable"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center"
+        android:nextFocusDown="@id/cardAdminVpn"
+        android:nextFocusLeft="@id/cardAdminRefresh"
+        android:orientation="vertical"
+        android:paddingHorizontal="18dp"
+        android:paddingVertical="16dp">
+
+        <ImageView
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:contentDescription="@null"
+            android:src="@drawable/ic_nav_web"
+            android:tint="@color/accent" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:gravity="center"
+            android:text="@string/nav_device"
+            android:textColor="@color/text_primary"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:gravity="center"
+            android:text="@string/admin_web_detail"
+            android:textColor="@color/text_secondary"
+            android:textSize="14sp" />
+    </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="12dp"
+        android:layout_weight="1"
+        android:orientation="horizontal">
+
+    <LinearLayout
+        android:id="@+id/cardAdminEpg"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_marginStart="14dp"
+        android:layout_weight="1"
+        android:background="@drawable/bg_focusable"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center"
+        android:nextFocusLeft="@id/btnAdmin"
+        android:nextFocusRight="@id/cardAdminVpn"
+        android:nextFocusUp="@id/cardAdminRefresh"
+        android:orientation="vertical"
+        android:paddingHorizontal="18dp"
+        android:paddingVertical="16dp">
+
+        <ImageView
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:contentDescription="@null"
+            android:src="@drawable/ic_nav_edit"
+            android:tint="@color/accent" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:gravity="center"
+            android:text="@string/epg_edits"
+            android:textColor="@color/text_primary"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:gravity="center"
+            android:text="@string/admin_epg_detail"
+            android:textColor="@color/text_secondary"
+            android:textSize="14sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/cardAdminVpn"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_marginStart="14dp"
+        android:layout_weight="1"
+        android:background="@drawable/bg_focusable"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center"
+        android:nextFocusLeft="@id/cardAdminEpg"
+        android:nextFocusUp="@id/cardAdminWeb"
+        android:orientation="vertical"
+        android:paddingHorizontal="18dp"
+        android:paddingVertical="16dp">
+
+        <ImageView
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:contentDescription="@null"
+            android:src="@drawable/ic_vpn"
+            android:tint="@color/accent" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:gravity="center"
+            android:text="@string/vpn_card"
+            android:textColor="@color/text_primary"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/cardAdminVpnDetail"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:gravity="center"
+            android:maxLines="3"
+            android:text="@string/admin_vpn_detail"
+            android:textColor="@color/text_secondary"
+            android:textSize="14sp" />
+    </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="12dp"
+        android:layout_weight="1"
+        android:orientation="horizontal">
+
+        <LinearLayout
+            android:id="@+id/cardAdminAbout"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_marginEnd="14dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_focusable"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:nextFocusLeft="@id/btnAdmin"
+            android:nextFocusRight="@id/cardAdminFavorites"
+            android:nextFocusUp="@id/cardAdminEpg"
+            android:orientation="vertical"
+            android:paddingHorizontal="18dp"
+            android:paddingVertical="16dp">
+
+            <ImageView
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_nav_edit"
+                android:tint="@color/accent" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:gravity="center"
+                android:text="@string/nav_about"
+                android:textColor="@color/text_primary"
+                android:textSize="20sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:gravity="center"
+                android:text="@string/admin_about_detail"
+                android:textColor="@color/text_secondary"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/cardAdminFavorites"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_marginStart="14dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_focusable"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:nextFocusLeft="@id/cardAdminAbout"
+            android:nextFocusUp="@id/cardAdminVpn"
+            android:orientation="vertical"
+            android:paddingHorizontal="18dp"
+            android:paddingVertical="16dp">
+
+            <ImageView
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_star"
+                android:tint="@color/accent" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:gravity="center"
+                android:text="@string/favorites_setup_again"
+                android:textColor="@color/text_primary"
+                android:textSize="20sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:gravity="center"
+                android:text="@string/admin_favorites_detail"
+                android:textColor="@color/text_secondary"
+                android:textSize="14sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/adminParentalSummary"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14dp"
+        android:gravity="center"
+        android:textColor="@color/text_secondary"
+        android:textSize="14sp" />
+
+    <LinearLayout
+        android:id="@+id/adminQuietRow"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:gravity="center"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/adminQuietToggle"
+            android:layout_width="wrap_content"
+            android:layout_height="44dp"
+            android:background="@drawable/bg_nav"
+            android:focusable="true"
+            android:gravity="center"
+            android:paddingHorizontal="14dp"
+            android:text="@string/quiet_hours_off"
+            android:textColor="@color/text_primary"
+            android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/adminQuietSchedule"
+            android:layout_width="wrap_content"
+            android:layout_height="44dp"
+            android:layout_marginStart="10dp"
+            android:background="@drawable/bg_nav"
+            android:focusable="true"
+            android:gravity="center"
+            android:paddingHorizontal="14dp"
+            android:textColor="@color/text_secondary"
+            android:textSize="14sp" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/adminBackupLink"
+        android:layout_width="wrap_content"
+        android:layout_height="44dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="10dp"
+        android:background="@drawable/bg_button"
+        android:focusable="true"
+        android:gravity="center"
+        android:paddingHorizontal="18dp"
+        android:text="@string/admin_backup"
+        android:textColor="@color/bg"
+        android:textSize="14sp"
+        android:textStyle="bold" />
+</LinearLayout>
