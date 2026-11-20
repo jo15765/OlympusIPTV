@@ -2079,9 +2079,9 @@
       const clear = document.querySelector("#groupPinClear");
       document.querySelector("#groupPinTitle").textContent = mode === "set" ? "Lock this group" : "Group password";
       document.querySelector("#groupPinText").textContent = mode === "set"
-        ? "Choose a 4-digit password. The group stays closed until that password is entered."
-        : "Enter the 4-digit password to open this group.";
-      clear.hidden = mode !== "set" || !groupLocked(groupId);
+        ? "Choose a 4-digit password. The group stays closed until that password is entered. To remove an existing lock, enter that PIN and press Remove lock."
+        : "Enter the 4-digit password to open this group, or enter it and press Remove lock to clear the PIN permanently.";
+      clear.hidden = !groupLocked(groupId);
       error.textContent = "";
       input.value = "";
       mask.hidden = false;
@@ -4847,9 +4847,22 @@
     document.querySelector("#groupPinClear").addEventListener("click", async () => {
       const wait = groupPinWait;
       if (!wait) return;
+      const digits = document.querySelector("#groupPinInput").value.replace(/\D/g, "");
+      const error = document.querySelector("#groupPinError");
+      const savedPin = (lineup().groupPins || {})[wait.groupId];
+      if (!savedPin) {
+        finishGroupPin(false);
+        return;
+      }
+      if (digits.length !== 4 || pinCode(digits) !== savedPin) {
+        error.textContent = "Enter the current 4-digit PIN to remove this lock.";
+        document.querySelector("#groupPinInput").value = "";
+        document.querySelector("#groupPinInput").focus();
+        return;
+      }
       const pins = Object.assign({}, lineup().groupPins || {});
       delete pins[wait.groupId];
-      lineup().groupPins = pins;
+      lineup().groupPins = Object.keys(pins).length ? pins : null;
       groupPinSession.delete(wait.groupId);
       const saved = await saveLineup();
       if (!saved) return;

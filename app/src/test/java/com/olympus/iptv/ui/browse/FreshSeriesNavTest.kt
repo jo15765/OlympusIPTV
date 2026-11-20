@@ -64,6 +64,23 @@ class FreshSeriesNavTest {
     }
 
     @Test
+    fun pickSeasonPrefersPremiereSeason() {
+        assertEquals(3, FreshSeriesNav.pickSeason(listOf(1, 2, 3), 1, prefer = 3))
+        assertEquals(1, FreshSeriesNav.pickSeason(listOf(1, 2), 1, prefer = 3))
+    }
+
+    @Test
+    fun seasonsIgnoreEpisodesWithoutStreamUrl() {
+        val episodes = listOf(
+            ep("s1e1", 1, 1),
+            Channel("s3e1", "S3", "", kind = ContentKind.VOD, season = 3, number = 1),
+            ep("s2e1", 2, 1)
+        )
+        assertEquals(listOf(1, 2), FreshSeriesNav.seasons(episodes))
+        assertTrue(FreshSeriesNav.playQueue(episodes, 3).isEmpty())
+    }
+
+    @Test
     fun playQueueOnlyIncludesChosenSeason() {
         val episodes = listOf(
             ep("s1e1", 1, 1),

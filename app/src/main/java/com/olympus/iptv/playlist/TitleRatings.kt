@@ -92,27 +92,31 @@ object TitleRatings {
         }
     }
 
+    // Android ICU requires `}` escaped outside character classes; an unescaped `}` crashed playback.
+    private val bracketNoise = Regex("""\[[^\]]*]|\{[^}]*\}""")
+    private val qualityParens = Regex(
+        """\((?:[^)]*(?:4K|UHD|1080|720|480|HEVC|H\.?26[45]|HDR|DV|WEB-?DL|BluRay)[^)]*)\)""",
+        RegexOption.IGNORE_CASE
+    )
+    private val qualityTokens = Regex(
+        """\b(4K|UHD|1080p?|720p?|480p?|HEVC|H\.?265|H\.?264|HDR10?\+?|DV|WEB-?DL|Blu-?Ray|x264|x265|AAC|DTS)\b""",
+        RegexOption.IGNORE_CASE
+    )
+    private val pipes = Regex("""\|+""")
+    private val multiSpace = Regex("""\s{2,}""")
+
     fun cleanTitle(raw: String): String {
-        var s = raw.trim()
-        if (s.isEmpty()) return s
-        s = s.replace(Regex("""\[[^\]]*]|\{[^}]*}"""), " ")
-        s = s.replace(
-            Regex(
-                """\((?:[^)]*(?:4K|UHD|1080|720|480|HEVC|H\.?26[45]|HDR|DV|WEB-?DL|BluRay)[^)]*)\)""",
-                RegexOption.IGNORE_CASE
-            ),
-            " "
-        )
-        s = s.replace(
-            Regex(
-                """\b(4K|UHD|1080p?|720p?|480p?|HEVC|H\.?265|H\.?264|HDR10?\+?|DV|WEB-?DL|Blu-?Ray|x264|x265|AAC|DTS)\b""",
-                RegexOption.IGNORE_CASE
-            ),
-            " "
-        )
-        s = s.replace(Regex("""[|]+"""), " ")
-        s = s.replace(Regex("""\s{2,}"""), " ").trim()
-        return s.ifBlank { raw.trim() }
+        val trimmed = raw.trim()
+        if (trimmed.isEmpty()) return trimmed
+        return runCatching {
+            var s = trimmed
+            s = s.replace(bracketNoise, " ")
+            s = s.replace(qualityParens, " ")
+            s = s.replace(qualityTokens, " ")
+            s = s.replace(pipes, " ")
+            s = s.replace(multiSpace, " ").trim()
+            s.ifBlank { trimmed }
+        }.getOrDefault(trimmed)
     }
 
     fun cacheKey(name: String, preferTv: Boolean): String =

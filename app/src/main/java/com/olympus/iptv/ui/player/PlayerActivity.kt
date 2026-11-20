@@ -170,18 +170,11 @@ class PlayerActivity : AppCompatActivity() {
         get() = (application as OlympusIptvApp).epgRepository
 
     private val hideHandler = Handler(Looper.getMainLooper())
-    private val hideOverlay = Runnable {
-        hidePlaybackMenu()
-        binding.overlay.animate().alpha(0f).setDuration(250).withEndAction {
-            binding.overlay.visibility = View.GONE
-            binding.overlay.alpha = 1f
-            if (touchPrimary) setPhoneSystemBarsHidden(true)
-        }.start()
-    }
+    private val hideOverlay = Runnable { hideTransportChrome(animated = true) }
     private val seekTick = object : Runnable {
         override fun run() {
             if (!::binding.isInitialized || isDestroyed) return
-            val seekOpen = binding.seekPane.visibility == View.VISIBLE
+            val seekOpen = transportSeekVisible()
             val liveBehind = binding.btnGoLive.visibility == View.VISIBLE
             if (seekOpen) paintSeekBar()
             if (seekOpen || binding.playbackMenu.visibility == View.VISIBLE) paintGoLive()
@@ -360,8 +353,13 @@ class PlayerActivity : AppCompatActivity() {
         binding.btnPhonePlay.setOnClickListener {
             com.olympus.iptv.ui.Haptics.tick(binding.btnPhonePlay)
             togglePause()
+            showTransportChrome()
         }
         binding.btnPhoneMenu.setOnClickListener { showPlaybackMenu() }
+        binding.btnSeekPlay.setOnClickListener {
+            togglePause()
+            showTransportChrome()
+        }
         binding.phoneSeek.setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: android.widget.SeekBar?, progress: Int, fromUser: Boolean) {
                 if (!fromUser) return
@@ -468,12 +466,105 @@ class PlayerActivity : AppCompatActivity() {
             return
         }
         if (binding.playbackMenu.visibility == View.VISIBLE) {
-            hidePlaybackMenu()
-            binding.overlay.visibility = View.GONE
-            if (touchPrimary) setPhoneSystemBarsHidden(true)
-        } else {
-            showPlaybackMenu()
+            hideTransportChrome(animated = false)
+            return
         }
+        if (transportShowing()) {
+            hideTransportChrome(animated = false)
+        } else {
+            showTransportChrome()
+        }
+    }
+
+    private fun transportSeekVisible(): Boolean =
+        ::binding.isInitialized && (
+            binding.seekPane.visibility == View.VISIBLE ||
+                binding.phoneSeek.visibility == View.VISIBLE
+            )
+
+    private fun transportShowing(): Boolean =
+        ::binding.isInitialized && (
+            binding.overlay.visibility == View.VISIBLE ||
+                transportSeekVisible() ||
+                binding.playbackMenu.visibility == View.VISIBLE
+            )
+
+    private fun showTransportChrome() {
+        if (!::binding.isInitialized || isDestroyed) return
+        val channel = current
+        binding.overlay.visibility = View.VISIBLE
+        binding.overlay.alpha = 1f
+        applySeekVisibility(channel)
+        paintSeekBar()
+        paintSeekPlayLabel()
+        if (touchPrimary) setPhoneSystemBarsHidden(false)
+        hideHandler.removeCallbacks(seekTick)
+        val pausedLive = isLiveNow(channel) && player?.playWhenReady == false
+        if (transportSeekVisible() || pausedLive) {
+            hideHandler.postDelayed(seekTick, 500L)
+        }
+        val hideMs = if (binding.playbackMenu.visibility == View.VISIBLE) 8_000L else TRANSPORT_HIDE_MS
+        hideHandler.removeCallbacks(hideOverlay)
+        hideHandler.postDelayed(hideOverlay, hideMs)
+    }
+
+    private fun hideTransportChrome(animated: Boolean) {
+        if (!::binding.isInitialized) return
+        hidePlaybackMenu()
+        hideHandler.removeCallbacks(hideOverlay)
+        hideHandler.removeCallbacks(seekTick)
+        binding.seekPane.visibility = View.GONE
+        binding.phoneSeek.visibility = View.GONE
+        if (touchPrimary) {
+            binding.phoneDock.visibility = View.GONE
+            setPhoneSystemBarsHidden(true)
+        }
+        if (animated && binding.overlay.visibility == View.VISIBLE) {
+            binding.overlay.animate().alpha(0f).setDuration(250).withEndAction {
+                if (!isDestroyed && ::binding.isInitialized) {
+                    binding.overlay.visibility = View.GONE
+                    binding.overlay.alpha = 1f
+                }
+            }.start()
+        } else {
+            binding.overlay.animate().cancel()
+            binding.overlay.visibility = View.GONE
+            binding.overlay.alpha = 1f
+        }
+    }
+
+    private fun applySeekVisibility(channel: Channel?) {
+        val portrait = touchPrimary &&
+            resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT
+        if (channel == null || isLiveNow(channel)) {
+            binding.seekPane.visibility = View.GONE
+            binding.phoneSeek.visibility = View.GONE
+            if (touchPrimary && portrait) {
+                binding.phoneDock.visibility = View.VISIBLE
+                layoutPhonePortraitDock()
+            } else if (touchPrimary) {
+                binding.phoneDock.visibility = View.GONE
+            }
+            return
+        }
+        if (portrait) {
+            binding.seekPane.visibility = View.GONE
+            binding.phoneSeek.visibility = View.VISIBLE
+            binding.phoneDock.visibility = View.VISIBLE
+            layoutPhonePortraitDock()
+        } else {
+            binding.seekPane.visibility = View.VISIBLE
+            binding.phoneSeek.visibility = if (touchPrimary) View.VISIBLE else View.GONE
+            if (touchPrimary) binding.phoneDock.visibility = View.GONE
+        }
+    }
+
+    private fun paintSeekPlayLabel() {
+        if (!::binding.isInitialized) return
+        val playing = player?.playWhenReady == true
+        val label = if (playing) R.string.player_pause else R.string.player_play
+        binding.btnSeekPlay.setText(label)
+        paintPhonePlayLabel()
     }
 
     private fun playbackErrorOpen(): Boolean =
@@ -490,10 +581,8 @@ class PlayerActivity : AppCompatActivity() {
             finish()
             return
         }
-        if (binding.playbackMenu.visibility == View.VISIBLE) {
-            hidePlaybackMenu()
-            binding.overlay.visibility = View.GONE
-            if (touchPrimary) setPhoneSystemBarsHidden(true)
+        if (binding.playbackMenu.visibility == View.VISIBLE || transportShowing()) {
+            hideTransportChrome(animated = false)
             return
         }
         armBrowseBack()
@@ -526,6 +615,7 @@ class PlayerActivity : AppCompatActivity() {
             if (loaded.streamUrl.isBlank()) {
                 PlaybackTrace.blankUrl(loaded)
                 Toast.makeText(this@PlayerActivity, R.string.playback_no_url, Toast.LENGTH_LONG).show()
+                armBrowseBack()
                 finish()
                 return@launch
             }
@@ -1623,10 +1713,7 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun flashOverlay() {
-        binding.overlay.visibility = View.VISIBLE
-        binding.overlay.alpha = 1f
-        hideHandler.removeCallbacks(hideOverlay)
-        hideHandler.postDelayed(hideOverlay, 4000)
+        showTransportChrome()
     }
 
     private var swallowMenuClick = false
@@ -1657,10 +1744,9 @@ class PlayerActivity : AppCompatActivity() {
             binding.btnMenuBack.visibility = View.GONE
         }
         binding.playbackMenu.visibility = View.VISIBLE
-        binding.overlay.visibility = View.VISIBLE
-        binding.overlay.alpha = 1f
+        showTransportChrome()
         hideHandler.removeCallbacks(hideOverlay)
-        hideHandler.postDelayed(hideOverlay, 8000)
+        hideHandler.postDelayed(hideOverlay, 8_000L)
         val shown = listOf(
             binding.btnMenuBack,
             binding.btnAudio,
@@ -2194,25 +2280,9 @@ class PlayerActivity : AppCompatActivity() {
         channel != null && channel.kind == ContentKind.LIVE && channel.seriesId.isNullOrBlank()
 
     private fun configureSeekPane(channel: Channel) {
-        hideHandler.removeCallbacks(seekTick)
-        val portrait = touchPrimary &&
-            resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT
-        if (isLiveNow(channel)) {
-            binding.seekPane.visibility = View.GONE
-            binding.phoneSeek.visibility = View.GONE
-            layoutPhonePortraitDock()
-            return
-        }
-        if (portrait) {
-            binding.seekPane.visibility = View.GONE
-            binding.phoneSeek.visibility = View.VISIBLE
-        } else {
-            binding.seekPane.visibility = View.VISIBLE
-            binding.phoneSeek.visibility = View.VISIBLE
-        }
-        paintSeekBar()
-        layoutPhonePortraitDock()
-        hideHandler.postDelayed(seekTick, 500L)
+        // Seek/play chrome is transient — show briefly, then auto-hide.
+        showTransportChrome()
+        if (isLiveNow(channel) && touchPrimary) layoutPhonePortraitDock()
     }
 
     private fun paintSeekBar() {
@@ -2236,9 +2306,17 @@ class PlayerActivity : AppCompatActivity() {
         if (!touchPrimary || !::binding.isInitialized) return
         val portrait = resources.configuration.orientation ==
             android.content.res.Configuration.ORIENTATION_PORTRAIT
-        binding.phoneDock.visibility = if (portrait) View.VISIBLE else View.GONE
-        if (portrait) {
-            binding.playbackMenu.visibility = View.GONE
+        if (!portrait) {
+            if (binding.phoneDock.visibility == View.VISIBLE &&
+                binding.overlay.visibility != View.VISIBLE &&
+                binding.playbackMenu.visibility != View.VISIBLE
+            ) {
+                binding.phoneDock.visibility = View.GONE
+            }
+            return
+        }
+        if (binding.overlay.visibility == View.VISIBLE || binding.playbackMenu.visibility == View.VISIBLE) {
+            binding.phoneDock.visibility = View.VISIBLE
             InsetsPad.apply(
                 binding.phoneDock,
                 bottom = true,
@@ -2305,7 +2383,7 @@ class PlayerActivity : AppCompatActivity() {
         val exo = player ?: return
         exo.playWhenReady = !exo.playWhenReady
         paintGoLive()
-        paintPhonePlayLabel()
+        paintSeekPlayLabel()
         if (isLiveNow() && !exo.playWhenReady) {
             hideHandler.removeCallbacks(seekTick)
             hideHandler.post(seekTick)
@@ -2434,12 +2512,20 @@ class PlayerActivity : AppCompatActivity() {
         }
         if (centerKey(event.keyCode)) {
             if (binding.subtitlePanel.visibility == View.VISIBLE) return super.dispatchKeyEvent(event)
-            if (menuButtonFocused()) {
+            if (menuButtonFocused() || binding.btnSeekPlay.isFocused) {
                 swallowMenuClick = false
                 return super.dispatchKeyEvent(event)
             }
             if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
-                showPlaybackMenu()
+                if (binding.playbackMenu.visibility == View.VISIBLE) {
+                    return super.dispatchKeyEvent(event)
+                }
+                if (!transportShowing()) {
+                    showTransportChrome()
+                } else {
+                    togglePause()
+                    showTransportChrome()
+                }
                 swallowMenuClick = true
                 return true
             }
@@ -2499,7 +2585,9 @@ class PlayerActivity : AppCompatActivity() {
             }
             KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.KEYCODE_MEDIA_PAUSE, KeyEvent.KEYCODE_MEDIA_PLAY -> {
                 if (binding.subtitlePanel.visibility == View.VISIBLE) return false
-                togglePause(); true
+                togglePause()
+                showTransportChrome()
+                true
             }
             KeyEvent.KEYCODE_INFO -> {
                 if (binding.subtitlePanel.visibility == View.VISIBLE) return false
@@ -2593,9 +2681,11 @@ class PlayerActivity : AppCompatActivity() {
         lifecycleScope.launch {
             val preferTv = !channel.seriesId.isNullOrBlank()
             val bundle = withContext(Dispatchers.IO) {
-                TitleRatings.peek(channel.name, preferTv)
-                    ?: TitleRatings.loadScores(channel.name, preferTv)
-            }
+                runCatching {
+                    TitleRatings.peek(channel.name, preferTv)
+                        ?: TitleRatings.loadScores(channel.name, preferTv)
+                }.getOrNull()
+            } ?: return@launch
             if (isDestroyed || current?.id != channel.id) return@launch
             val line = bundle.scoreLine(2)
             if (line.isBlank()) return@launch
@@ -2696,6 +2786,7 @@ class PlayerActivity : AppCompatActivity() {
         private const val LIVE_REBUFFER_BADGE_MS = 4_500L
         private const val STILL_SPOOL_MS = 2_500L
         private const val MAX_LIVE_RECOVER = 3
+        private const val TRANSPORT_HIDE_MS = 3_000L
         private const val EXTRA_ID = "id"
         private const val EXTRA_NAME = "name"
         private const val EXTRA_URL = "url"

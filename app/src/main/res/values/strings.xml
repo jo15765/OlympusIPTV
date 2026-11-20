@@ -257,7 +257,9 @@
     <string name="fresh_service">New to %1$s</string>
     <string name="fresh_when">%1$s · %2$s</string>
     <string name="fresh_loading">Looking up this week’s premieres…</string>
-    <string name="fresh_empty">Nothing premiering this week matched a title in your Movies or TV Shows library.</string>
+    <string name="fresh_empty">Nothing premiering this week matched a playable title in your Movies or TV Shows library.</string>
+    <string name="fresh_season_missing">Season %1$d is not in your library yet.</string>
+    <string name="fresh_episode_unavailable">That episode is not available to play yet.</string>
     <string name="fresh_need_key">This build has no Watchmode key, so this week’s releases cannot load.</string>
     <string name="fresh_rejected">The Watchmode key was not accepted.</string>
     <string name="fresh_failed">This week’s releases could not be loaded.</string>
@@ -484,7 +486,7 @@
     <string name="epg_card_parental_detail">Choose a group, set a 4-digit PIN, and that group shows a lock.</string>
     <string name="parental_chip">Parental</string>
     <string name="parental_title">Parental controls</string>
-    <string name="parental_hint">Select one or more Live TV groups, then Set PIN or Remove lock. Use the on-screen keypad for a 4-digit numeric PIN.</string>
+    <string name="parental_hint">Select locked groups, then Remove lock and enter the PIN. Or select groups and Set PIN. You can also Remove lock from the PIN pad when opening a locked group.</string>
     <string name="parental_live">Live TV</string>
     <string name="parental_movies">Movies</string>
     <string name="parental_shows">Shows</string>
@@ -613,7 +615,10 @@
     <string name="admin_quiet_on"> · quiet hours on</string>
     <string name="admin_quiet_off"> · quiet hours off</string>
     <string name="parental_clear_need_pin">Enter the PIN to remove these locks</string>
+    <string name="parental_clear_need_pin_one">Enter the PIN to remove this lock</string>
     <string name="parental_clear_bad_pin">That PIN does not match a selected lock</string>
+    <string name="parental_clear_none_locked">Select a locked group first</string>
+    <string name="pin_cleared_ok">Lock removed</string>
     <string name="backup_tip">Tip: on the Web-UI, use Backup export so this lineup can move to another device.</string>
     <string name="admin_backup">Backup export</string>
     <string name="admin_backup_detail">Open Web-UI and export a lineup backup for another device.</string>

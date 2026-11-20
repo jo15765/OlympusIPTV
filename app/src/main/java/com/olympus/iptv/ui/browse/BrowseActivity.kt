@@ -2602,6 +2602,7 @@ class BrowseActivity : AppCompatActivity() {
 
     private var pinCategory: Category? = null
     private var pinOpens = false
+    private var pinClearing = false
     private var pinDigits = ""
     private var pinKeyIndex = 4
     private var dialDigits = ""
@@ -2650,26 +2651,24 @@ class BrowseActivity : AppCompatActivity() {
                 if (hasFocus) pinKeyIndex = index
             }
         }
+        binding.groupPinCancel.nextFocusDownId = binding.groupPinClear.id
+        binding.guidePin0.nextFocusDownId = binding.groupPinClear.id
+        binding.guidePinClearDigit.nextFocusDownId = binding.groupPinClear.id
+        binding.groupPinClear.nextFocusUpId = binding.groupPinCancel.id
     }
 
     private fun showGroupPin(category: Category, open: Boolean) {
         wireGuidePinPad()
         pinCategory = category
         pinOpens = open
+        pinClearing = false
         pinDigits = ""
         pinKeyIndex = 4
         binding.groupPinTitle.setText(if (open) R.string.group_pin_title else R.string.group_pin_set)
         binding.groupPinWrong.visibility = View.GONE
-        binding.groupPinClear.visibility =
-            if (!open && GroupLock.locked(activeConfig, category.id)) View.VISIBLE else View.GONE
         paintGroupPin()
-        binding.groupPinClear.setOnClickListener {
-            val current = pinCategory ?: return@setOnClickListener
-            saveGroupPin(current.id, null)
-            hideGroupPin()
-            categoryAdapter.refreshDetails()
-            focusGroups()
-        }
+        paintGuidePinClear(category.id)
+        binding.groupPinClear.setOnClickListener { beginGuidePinClear() }
         binding.guideShell.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
         if (touchPrimary) {
             val params = binding.groupPin.layoutParams as? FrameLayout.LayoutParams
@@ -2689,9 +2688,30 @@ class BrowseActivity : AppCompatActivity() {
         binding.groupPin.post { reclaimGuidePinFocus() }
     }
 
+    private fun paintGuidePinClear(groupId: String = pinCategory?.id.orEmpty()) {
+        val hasPin = !activeConfig.groupPins.orEmpty()[groupId].isNullOrBlank()
+        binding.groupPinClear.visibility =
+            if (hasPin && !pinClearing) View.VISIBLE else View.GONE
+    }
+
+    private fun beginGuidePinClear() {
+        val category = pinCategory ?: return
+        if (activeConfig.groupPins.orEmpty()[category.id].isNullOrBlank()) return
+        pinClearing = true
+        pinOpens = false
+        pinDigits = ""
+        pinKeyIndex = 4
+        binding.groupPinTitle.setText(R.string.parental_clear_need_pin_one)
+        paintGroupPin()
+        paintGuidePinClear(category.id)
+        binding.groupPinWrong.visibility = View.GONE
+        reclaimGuidePinFocus()
+    }
+
     private fun hideGroupPin() {
         pinCategory = null
         pinDigits = ""
+        pinClearing = false
         binding.groupPin.visibility = View.GONE
         binding.groupPinScrim.visibility = View.GONE
         binding.groupPinWrong.visibility = View.GONE
@@ -2781,10 +2801,27 @@ class BrowseActivity : AppCompatActivity() {
 
     private fun submitGroupPin() {
         val category = pinCategory ?: return
+        if (pinClearing) {
+            if (GroupLock.accepts(activeConfig, category.id, pinDigits)) {
+                pinFailStreak = 0
+                Haptics.tick(binding.groupPin)
+                saveGroupPin(category.id, null)
+                hideGroupPin()
+                categoryAdapter.refreshDetails()
+                paintParentalChip()
+                Toast.makeText(this, R.string.pin_cleared_ok, Toast.LENGTH_SHORT).show()
+                focusGroups()
+            } else {
+                Haptics.reject(binding.groupPin)
+                showWrongPinModal()
+            }
+            return
+        }
         if (!pinOpens) {
             saveGroupPin(category.id, pinDigits)
             hideGroupPin()
             categoryAdapter.refreshDetails()
+            paintParentalChip()
             Haptics.tick(binding.groupPin)
             Toast.makeText(this, R.string.pin_set_ok, Toast.LENGTH_SHORT).show()
             focusGroups()
@@ -2812,13 +2849,20 @@ class BrowseActivity : AppCompatActivity() {
     private fun saveGroupPin(groupId: String, digits: String?) {
         val saved = playlist ?: return
         val pins = activeConfig.groupPins.orEmpty().toMutableMap()
-        if (digits == null) pins.remove(groupId) else pins[groupId] = GroupLock.code(digits)
+        if (digits == null) {
+            pins.remove(groupId)
+            GroupLock.lock(groupId)
+        } else {
+            pins[groupId] = GroupLock.code(digits)
+            GroupLock.lock(groupId)
+        }
         val next = activeConfig.copy(
             groupPins = pins.ifEmpty { null },
             revision = System.currentTimeMillis()
         )
         activeConfig = next
         val app = application as OlympusIptvApp
+        app.stagedLineup = saved.id to next
         app.appScope.launch {
             runCatching { app.playlistStore.saveLineup(saved.id, next) }
             val email = saved.email

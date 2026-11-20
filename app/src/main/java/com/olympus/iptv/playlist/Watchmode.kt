@@ -158,7 +158,8 @@ object Watchmode {
                     service = premiere.service,
                     detail = detail(premiere),
                     day = premiere.day,
-                    watchmodeId = premiere.id
+                    watchmodeId = premiere.id,
+                    season = premiere.season?.takeIf { it > 0 }
                 )
             )
         }

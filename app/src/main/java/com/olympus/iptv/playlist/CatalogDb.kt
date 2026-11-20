@@ -1253,7 +1253,8 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         val service: String,
         val detail: String,
         val day: String = "",
-        val watchmodeId: Int = 0
+        val watchmodeId: Int = 0,
+        val season: Int? = null
     )
 
     data class CatalogTitle(

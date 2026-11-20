@@ -179,7 +179,7 @@ class ParentalActivity : AppCompatActivity() {
         if (saving) return
         val locked = selected.filter { !config.groupPins.orEmpty()[it].isNullOrBlank() }
         if (locked.isEmpty()) {
-            Toast.makeText(this, R.string.parental_select_first, Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, R.string.parental_clear_none_locked, Toast.LENGTH_SHORT).show()
             return
         }
         clearingLocks = true
@@ -317,6 +317,7 @@ class ParentalActivity : AppCompatActivity() {
                 hidePin()
                 adapter.notifyDataSetChanged()
                 updateHint()
+                Toast.makeText(this, R.string.pin_cleared_ok, Toast.LENGTH_SHORT).show()
                 return
             }
             selected.clear()

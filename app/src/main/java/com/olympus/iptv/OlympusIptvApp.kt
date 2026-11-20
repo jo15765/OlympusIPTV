@@ -14,6 +14,7 @@ import com.olympus.iptv.playlist.CatalogDb
 import com.olympus.iptv.portal.DashboardHost
 import com.olympus.iptv.playlist.EpgRepository
 import com.olympus.iptv.playlist.LoadedPlaylist
+import com.olympus.iptv.playlist.FreshPlayable
 import com.olympus.iptv.playlist.Watchmode
 import com.olympus.iptv.playlist.WatchmodeException
 import kotlinx.coroutines.CompletableDeferred
@@ -92,7 +93,7 @@ class OlympusIptvApp : Application() {
         freshJob = appScope.launch { prepareFresh(playlistId) }
     }
 
-    private fun prepareFresh(playlistId: String) {
+    private suspend fun prepareFresh(playlistId: String) {
         val cacheFile = File(filesDir, "watchmode-week.json")
         val week = Watchmode.weekKey()
         val stamp = runCatching { catalogDb.libraryStamp(playlistId) }.getOrDefault(0L)
@@ -103,11 +104,8 @@ class OlympusIptvApp : Application() {
             return
         }
         val disk = readFreshFile(playlistId, week)
-        if (disk != null && disk.stamp == stamp && !Watchmode.needsRefresh(cacheFile)) {
-            freshHold = disk
-            freshFailure = null
-            return
-        }
+        // Always re-check playable streams when warming — season premieres can land in Watchmode
+        // before the provider has the episodes.
         if (disk != null) freshHold = disk
         try {
             val premieres = if (Watchmode.needsRefresh(cacheFile)) {
@@ -116,7 +114,13 @@ class OlympusIptvApp : Application() {
                 Watchmode.load(cacheFile)
             }
             val catalog = catalogDb.titlesForPremieres(playlistId, Watchmode.lookupPrefixes(premieres))
-            val cards = if (catalog.isEmpty()) emptyList() else Watchmode.match(premieres, catalog)
+            val matched = if (catalog.isEmpty()) emptyList() else Watchmode.match(premieres, catalog)
+            val account = runCatching { playlistStore.account(playlistId) }.getOrNull()
+            val cards = if (account == null || matched.isEmpty()) {
+                emptyList()
+            } else {
+                FreshPlayable.filter(filesDir, account, catalogDb, matched)
+            }
             val next = FreshHold(
                 playlistId,
                 runCatching { catalogDb.libraryStamp(playlistId) }.getOrDefault(stamp),

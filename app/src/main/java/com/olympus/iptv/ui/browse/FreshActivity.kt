@@ -7,6 +7,7 @@ import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewTreeObserver
 import android.widget.ImageView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
@@ -58,6 +59,7 @@ class FreshActivity : AppCompatActivity() {
     private var listFocusPos = 0
     private lateinit var cacheFile: File
     private var opening = false
+    private var focusGuard: ViewTreeObserver.OnGlobalFocusChangeListener? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -109,12 +111,25 @@ class FreshActivity : AppCompatActivity() {
         binding.freshStatus.text = getString(R.string.fresh_loading)
         binding.btnBack.setOnClickListener { leaveFresh() }
         binding.detailBack.setOnClickListener { leaveFresh() }
+        // D-pad from content may move to Back; Back is the only intentional exit control.
+        binding.btnBack.nextFocusDownId = binding.freshList.id
+        binding.detailBack.nextFocusDownId = binding.detailSeasonList.id
+        binding.freshList.nextFocusUpId = binding.btnBack.id
+        binding.detailSeasonList.nextFocusUpId = binding.detailBack.id
+        binding.detailPlay.nextFocusUpId = binding.detailBack.id
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
+                if (PlayerActivity.consumeBrowseBack()) return
                 leaveFresh()
             }
         })
+        attachFocusGuard()
         lifecycleScope.launch { load() }
+    }
+
+    override fun onDestroy() {
+        detachFocusGuard()
+        super.onDestroy()
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
@@ -122,13 +137,103 @@ class FreshActivity : AppCompatActivity() {
             event.keyCode == KeyEvent.KEYCODE_ESCAPE ||
             event.keyCode == KeyEvent.KEYCODE_BUTTON_B
         ) {
-            if (event.action == KeyEvent.ACTION_DOWN) leaveFresh()
+            if (event.action == KeyEvent.ACTION_DOWN) {
+                if (!PlayerActivity.consumeBrowseBack()) leaveFresh()
+            }
             return true
+        }
+        if (event.action == KeyEvent.ACTION_DOWN &&
+            (event.keyCode == KeyEvent.KEYCODE_DPAD_LEFT ||
+                event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT ||
+                event.keyCode == KeyEvent.KEYCODE_DPAD_UP ||
+                event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN)
+        ) {
+            if (trapDpad(event.keyCode)) return true
         }
         return super.dispatchKeyEvent(event)
     }
 
+    private fun detailOpen(): Boolean = binding.freshDetail.visibility == View.VISIBLE
+
+    private fun activeBack(): View = if (detailOpen()) binding.detailBack else binding.btnBack
+
+    private fun focusAllowed(view: View?): Boolean {
+        if (view == null) return false
+        if (view === activeBack()) return true
+        return focusIsIn(if (detailOpen()) binding.freshDetail else binding.freshMain, view)
+    }
+
+    private fun focusIsIn(root: View, start: View? = currentFocus): Boolean {
+        var view = start ?: return false
+        while (true) {
+            if (view === root) return true
+            view = view.parent as? View ?: return false
+        }
+    }
+
+    private fun trapDpad(keyCode: Int): Boolean {
+        val focused = currentFocus ?: run {
+            reclaimFreshFocus()
+            return true
+        }
+        if (!focusAllowed(focused)) {
+            reclaimFreshFocus()
+            return true
+        }
+        val direction = when (keyCode) {
+            KeyEvent.KEYCODE_DPAD_LEFT -> View.FOCUS_LEFT
+            KeyEvent.KEYCODE_DPAD_RIGHT -> View.FOCUS_RIGHT
+            KeyEvent.KEYCODE_DPAD_UP -> View.FOCUS_UP
+            KeyEvent.KEYCODE_DPAD_DOWN -> View.FOCUS_DOWN
+            else -> return false
+        }
+        val next = focused.focusSearch(direction)
+        if (focusAllowed(next)) return false
+        // Edge of the page — keep focus where it is (Back key/button is the exit).
+        return true
+    }
+
+    private fun reclaimFreshFocus() {
+        if (isDestroyed) return
+        if (detailOpen()) {
+            if (binding.detailSeriesPane.visibility == View.VISIBLE) {
+                val seasonHolder = binding.detailSeasonList.findViewHolderForAdapterPosition(
+                    seasonNumbers.indexOf(season).coerceAtLeast(0)
+                )
+                if (seasonHolder?.itemView?.requestFocus() == true) return
+                if (binding.detailEpisodeList.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus() == true) {
+                    return
+                }
+            }
+            if (binding.detailPlay.visibility == View.VISIBLE && binding.detailPlay.requestFocus()) return
+            binding.detailBack.requestFocus()
+            return
+        }
+        focusFreshCard(listFocusPos)
+    }
+
+    private fun attachFocusGuard() {
+        if (focusGuard != null) return
+        val guard = ViewTreeObserver.OnGlobalFocusChangeListener { _, newFocus ->
+            if (isDestroyed) return@OnGlobalFocusChangeListener
+            if (focusAllowed(newFocus)) return@OnGlobalFocusChangeListener
+            binding.root.post {
+                if (!isDestroyed && !focusAllowed(currentFocus)) reclaimFreshFocus()
+            }
+        }
+        focusGuard = guard
+        binding.root.viewTreeObserver.addOnGlobalFocusChangeListener(guard)
+    }
+
+    private fun detachFocusGuard() {
+        val guard = focusGuard ?: return
+        focusGuard = null
+        val observer = binding.root.viewTreeObserver
+        if (observer.isAlive) observer.removeOnGlobalFocusChangeListener(guard)
+    }
+
     private fun leaveFresh() {
+        if (PlayerActivity.consumeBrowseBack()) return
         if (binding.freshDetail.visibility == View.VISIBLE) hideDetail() else finish()
     }
 
@@ -174,14 +279,6 @@ class FreshActivity : AppCompatActivity() {
             if (currentFocus == null || !focusIsIn(binding.freshList)) {
                 focusFreshCard(listFocusPos)
             }
-        }
-    }
-
-    private fun focusIsIn(root: View): Boolean {
-        var view = currentFocus ?: return false
-        while (true) {
-            if (view === root) return true
-            view = view.parent as? View ?: return false
         }
     }
 
@@ -353,12 +450,38 @@ class FreshActivity : AppCompatActivity() {
 
     private fun presentSeries(loaded: List<Channel>, focusSeasons: Boolean) {
         if (isDestroyed || loaded.isEmpty()) return
-        val grouped = FreshSeriesNav.bySeason(loaded)
-        val numbers = FreshSeriesNav.seasons(loaded)
-        if (numbers.isEmpty()) return
-        seriesEpisodes = loaded
+        val playable = FreshSeriesNav.playable(loaded)
+        val grouped = FreshSeriesNav.bySeason(playable)
+        val numbers = FreshSeriesNav.seasons(playable)
+        val prefer = shown?.season
+        if (numbers.isEmpty()) {
+            seriesEpisodes = emptyList()
+            episodesBySeason = emptyMap()
+            seasonNumbers = emptyList()
+            seasonAdapter.submit(emptyList())
+            episodeAdapter.submit(emptyList())
+            binding.detailEpisodeStatus.visibility = View.VISIBLE
+            binding.detailEpisodeStatus.text = if (prefer != null && prefer > 0) {
+                getString(R.string.fresh_season_missing, prefer)
+            } else {
+                getString(R.string.episodes_none)
+            }
+            return
+        }
+        if (prefer != null && prefer > 0 && prefer !in numbers) {
+            seriesEpisodes = playable
+            episodesBySeason = grouped
+            seasonNumbers = numbers
+            seasonAdapter.submit(numbers)
+            episodeAdapter.submit(emptyList())
+            binding.detailEpisodeStatus.visibility = View.VISIBLE
+            binding.detailEpisodeStatus.text = getString(R.string.fresh_season_missing, prefer)
+            if (focusSeasons) focusSeasonChip(0)
+            return
+        }
+        seriesEpisodes = playable
         episodesBySeason = grouped
-        season = FreshSeriesNav.pickSeason(numbers, season)
+        season = FreshSeriesNav.pickSeason(numbers, season, prefer)
         binding.detailEpisodeStatus.visibility = View.GONE
         val seasonsChanged = !FreshSeriesNav.sameSeasons(seasonNumbers, numbers)
         seasonNumbers = numbers
@@ -385,9 +508,15 @@ class FreshActivity : AppCompatActivity() {
         val nextIndex = seasonNumbers.indexOf(number)
         if (previousIndex >= 0) seasonAdapter.notifyItemChanged(previousIndex)
         if (nextIndex >= 0) seasonAdapter.notifyItemChanged(nextIndex)
+        // Keep the episode list in sync with the season chip immediately (avoid Play on stale rows).
+        episodeAdapter.submit(episodes)
+        binding.detailEpisodeStatus.visibility =
+            if (episodes.isEmpty()) View.VISIBLE else View.GONE
+        if (episodes.isEmpty()) {
+            binding.detailEpisodeStatus.text = getString(R.string.fresh_season_missing, number)
+        }
         binding.detailEpisodeList.post {
             if (isDestroyed || token != seasonSwitchToken || shown == null) return@post
-            episodeAdapter.submit(episodes)
             if (nextIndex >= 0) {
                 binding.detailSeasonList.scrollToPosition(nextIndex)
                 binding.detailSeasonList.findViewHolderForAdapterPosition(nextIndex)?.itemView?.requestFocus()
@@ -447,8 +576,16 @@ class FreshActivity : AppCompatActivity() {
 
     private fun playEpisode(episode: Channel) {
         if (opening || playlistId.isBlank() || episode.id.isBlank()) return
-        val queue = FreshSeriesNav.playQueue(seriesEpisodes, episode.season ?: season)
-        if (queue.isEmpty() || queue.none { it.id == episode.id }) return
+        if (episode.streamUrl.isBlank()) {
+            Toast.makeText(this, R.string.fresh_episode_unavailable, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val wantSeason = episode.season ?: season
+        val queue = FreshSeriesNav.playQueue(seriesEpisodes, wantSeason)
+        if (queue.isEmpty() || queue.none { it.id == episode.id }) {
+            Toast.makeText(this, R.string.fresh_episode_unavailable, Toast.LENGTH_SHORT).show()
+            return
+        }
         opening = true
         try {
             SeriesPlay.open(this, playlistId, queue, episode)
