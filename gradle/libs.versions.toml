@@ -17,6 +17,7 @@ coil = "2.7.0"
 smbj = "0.13.0"
 bouncycastle = "1.79"
 junit = "4.13.2"
+profileinstaller = "1.4.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -41,6 +42,7 @@ coil = { group = "io.coil-kt", name = "coil", version.ref = "coil" }
 smbj = { group = "com.hierynomus", name = "smbj", version.ref = "smbj" }
 bouncycastle = { group = "org.bouncycastle", name = "bcprov-jdk18on", version.ref = "bouncycastle" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
+androidx-profileinstaller = { group = "androidx.profileinstaller", name = "profileinstaller", version.ref = "profileinstaller" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

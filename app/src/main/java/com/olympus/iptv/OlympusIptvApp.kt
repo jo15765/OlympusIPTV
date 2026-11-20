@@ -25,6 +25,8 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.SupervisorJob
 import java.io.File
@@ -48,6 +50,8 @@ class OlympusIptvApp : Application() {
     val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO + appErrors)
     @Volatile var catalogRefresh: Job? = null
     @Volatile var catalogLiveReady: CompletableDeferred<Boolean>? = null
+
+    @Volatile var autoResumeUsed = false
 
     lateinit var playlistStore: PlaylistStore
         private set
@@ -193,6 +197,17 @@ class OlympusIptvApp : Application() {
     override fun onCreate() {
         super.onCreate()
         com.olympus.iptv.playlist.HttpClients.install(this)
+        if (BuildConfig.DEBUG) {
+            android.os.StrictMode.setThreadPolicy(
+                android.os.StrictMode.ThreadPolicy.Builder()
+                    .detectDiskReads()
+                    .detectDiskWrites()
+                    .penaltyLog()
+                    .build()
+            )
+        }
+        MemoryTrim.install(this)
+        com.olympus.iptv.data.AvSyncStore.warm(this)
         registerActivityLifecycleCallbacks(overscan)
         AppLog.install(this)
         playlistStore = PlaylistStore(this)
@@ -227,6 +242,12 @@ class OlympusIptvApp : Application() {
         })
         epgRepository.attach(catalogDb, appScope)
         DashboardHost.start(this)
+        appScope.launch {
+            while (isActive) {
+                runCatching { catalogDb.maintainDaily() }
+                delay(6L * 60L * 60L * 1000L)
+            }
+        }
         com.olympus.iptv.vpn.AppTunnel.restore(this)
         val touch = com.olympus.iptv.ui.DeviceForm.isTouchPrimary(this)
         val lowRam = com.olympus.iptv.ui.DeviceForm.isLowRam(this)

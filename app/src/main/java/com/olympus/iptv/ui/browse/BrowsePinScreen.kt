@@ -8,6 +8,7 @@ import android.widget.Toast
 import androidx.lifecycle.lifecycleScope
 import com.olympus.iptv.OlympusIptvApp
 import com.olympus.iptv.R
+import com.olympus.iptv.ui.ChannelNumberJump
 import com.olympus.iptv.data.Category
 import com.olympus.iptv.playlist.GroupLock
 import com.olympus.iptv.playlist.LineupClient
@@ -364,19 +365,15 @@ internal fun BrowseActivity.onDialKey(event: KeyEvent): Boolean {
         val inGuide = binding.contentColumn.visibility == View.VISIBLE &&
             (focusIsIn(binding.channelList) || focusIsIn(binding.programPane))
         if (!inGuide && dialDigits.isEmpty()) return false
-        val digit = when (event.keyCode) {
-            in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9 -> event.keyCode - KeyEvent.KEYCODE_0
-            in KeyEvent.KEYCODE_NUMPAD_0..KeyEvent.KEYCODE_NUMPAD_9 -> event.keyCode - KeyEvent.KEYCODE_NUMPAD_0
-            else -> -1
-        }
+        val digit = ChannelNumberJump.digit(event.keyCode)
         if (digit >= 0 && inGuide) {
-            if (dialDigits.length >= 4) dialDigits = ""
-            dialDigits += digit.toString()
+            dialDigits = ChannelNumberJump.append(dialDigits, digit)
             binding.channelDialNumber.text = dialDigits
+            binding.channelDialNumber.setShadowLayer(24f, 0f, 0f, getColor(R.color.accent))
             binding.channelDialHint.visibility = View.GONE
             binding.channelDial.visibility = View.VISIBLE
             focusHandler.removeCallbacks(dialJump)
-            focusHandler.postDelayed(dialJump, 1200L)
+            focusHandler.postDelayed(dialJump, ChannelNumberJump.DELAY_MS)
             return true
         }
         if (dialDigits.isEmpty()) return false
@@ -404,8 +401,7 @@ internal fun BrowseActivity.jumpDial() {
         val onPrograms = focusIsIn(binding.programPane)
         val number = typed.toIntOrNull() ?: 0
         clearDial()
-        val byNumber = visibleChannels.indexOfFirst { it.number == number }
-        val index = if (byNumber >= 0) byNumber else number - 1
+        val index = ChannelNumberJump.indexFor(visibleChannels.map { it.number }, number)
         if (number <= 0 || index !in visibleChannels.indices) {
             binding.channelDialNumber.text = typed
             binding.channelDialHint.text = getString(R.string.channel_missing)

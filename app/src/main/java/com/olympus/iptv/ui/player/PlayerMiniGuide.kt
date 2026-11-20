@@ -20,7 +20,8 @@ class PlayerMiniGuide(
     private val channels: () -> List<Channel>,
     private val onTune: (Int) -> Unit,
     private val nowTitle: (Channel) -> String? = { null },
-    private val progress: (Channel) -> Int = { 0 }
+    private val progress: (Channel) -> Int = { 0 },
+    private val sameShow: (Channel) -> Boolean = { false }
 ) {
     private val rows = ArrayList<Channel>()
     private var selected = 0
@@ -37,7 +38,7 @@ class PlayerMiniGuide(
 
     fun show(currentId: String?) {
         rows.clear()
-        rows.addAll(channels())
+        rows.addAll(channels().sortedByDescending { sameShow(it) && it.id != currentId })
         if (rows.isEmpty()) return
         selected = rows.indexOfFirst { it.id == currentId }.coerceAtLeast(0)
         playingId = currentId
@@ -99,7 +100,12 @@ class PlayerMiniGuide(
             fun bind(channel: Channel, active: Boolean) {
                 label.text = channel.name
                 val title = nowTitle(channel)
-                show.text = title.orEmpty()
+                val same = sameShow(channel) && channel.id != playingId
+                show.text = if (same && !title.isNullOrBlank()) {
+                    itemView.context.getString(R.string.same_show) + " · " + title
+                } else {
+                    title.orEmpty()
+                }
                 show.visibility = if (title.isNullOrBlank()) View.GONE else View.VISIBLE
                 val fraction = progress(channel)
                 bar.progress = fraction

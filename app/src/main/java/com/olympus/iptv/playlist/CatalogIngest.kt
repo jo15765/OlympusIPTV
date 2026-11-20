@@ -70,6 +70,7 @@ object CatalogIngest {
                     liveReady.complete(false)
                     return
                 }
+                StreamHeaders.remember(app, scoped.id, fresh.liveChannels + fresh.vodChannels)
                 store(app, db, scoped.id, CatalogDb.LIVE, fresh.liveChannels, true, db.knownChannelIds(scoped.id, CatalogDb.LIVE))
                 db.insertMissing(scoped.id, CatalogDb.LIVE, fresh.liveCategories, emptyList())
                 reached = true

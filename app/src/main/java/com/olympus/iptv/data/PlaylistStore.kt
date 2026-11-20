@@ -75,6 +75,8 @@ class PlaylistStore(private val context: Context) {
     private val traktTokenKey = stringPreferencesKey("trakt_token")
     private val traktClientIdKey = stringPreferencesKey("trakt_client_id")
     private val pipSwipeHomeKey = booleanPreferencesKey("pip_swipe_home")
+    private val autoResumeKey = booleanPreferencesKey("auto_resume_last_channel")
+    private val nightModeKey = booleanPreferencesKey("audio_night_mode")
     private val recordingsType = object : TypeToken<Map<String, RecordingBook>>() {}.type
     private val stringMapType = object : TypeToken<Map<String, String>>() {}.type
     private val stringListType = object : TypeToken<List<String>>() {}.type
@@ -729,6 +731,8 @@ class PlaylistStore(private val context: Context) {
             prefs.remove(traktTokenKey)
             prefs.remove(traktClientIdKey)
             prefs.remove(pipSwipeHomeKey)
+            prefs.remove(autoResumeKey)
+            prefs.remove(nightModeKey)
         }
         lineupParsed = null
         favoritesParsed = null
@@ -877,6 +881,18 @@ class PlaylistStore(private val context: Context) {
 
     suspend fun savePipSwipeHome(enabled: Boolean) {
         context.dataStore.edit { prefs -> prefs[pipSwipeHomeKey] = enabled }
+    }
+
+    suspend fun nightMode(): Boolean = context.dataStore.data.first()[nightModeKey] ?: false
+
+    suspend fun saveNightMode(enabled: Boolean) {
+        context.dataStore.edit { prefs -> prefs[nightModeKey] = enabled }
+    }
+
+    suspend fun autoResume(): Boolean = context.dataStore.data.first()[autoResumeKey] ?: false
+
+    suspend fun saveAutoResume(enabled: Boolean) {
+        context.dataStore.edit { prefs -> prefs[autoResumeKey] = enabled }
     }
 
     suspend fun scrobbleConfig(): ScrobbleConfig {

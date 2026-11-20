@@ -1,4 +1,6 @@
+import java.io.FileOutputStream
 import java.util.Properties
+import java.util.zip.GZIPOutputStream
 
 plugins {
     alias(libs.plugins.android.application)
@@ -38,6 +40,8 @@ android {
         buildConfigField("String", "TMDB_API_KEY", "\"$tmdbKey\"")
     }
 
+    // Release stays a single APK. TV sticks only need ARM. Debug keeps every ABI so the emulator still runs.
+
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -46,6 +50,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            ndk {
+                abiFilters += listOf("armeabi-v7a", "arm64-v8a")
+            }
         }
     }
 
@@ -75,8 +82,13 @@ android {
     }
 
     androidResources {
+        localeFilters += listOf("en")
         ignoreAssetsPattern = "!.svn:!.git:.*:!CVS:!thumbs.db:!picasa.ini:!*.scc:*~:!store.json"
     }
+
+    sourceSets.getByName("main").assets.srcDir(
+        project.layout.buildDirectory.get().asFile.resolve("generated/dashboardAssets")
+    )
 }
 
 tasks.register("assertNoPortalDataInAssets") {
@@ -101,7 +113,32 @@ tasks.register("assertNoPortalDataInAssets") {
     }
 }
 
-tasks.named("preBuild").configure { dependsOn("assertNoPortalDataInAssets") }
+val gzipDashboardHtml = tasks.register("gzipDashboardHtml") {
+    group = "build"
+    description = "Pre-compress the web portal so the TV does not gzip it on each request."
+    val html = layout.projectDirectory.file("src/main/assets/dashboard/index.html")
+    val outDir = layout.buildDirectory.dir("generated/dashboardAssets/dashboard")
+    inputs.file(html)
+    outputs.dir(outDir)
+    doLast {
+        val destDir = outDir.get().asFile
+        destDir.mkdirs()
+        GZIPOutputStream(FileOutputStream(destDir.resolve("index.html.gz"))).use { gzip ->
+            html.asFile.inputStream().use { it.copyTo(gzip) }
+        }
+    }
+}
+
+tasks.named("preBuild").configure {
+    dependsOn("assertNoPortalDataInAssets")
+    dependsOn(gzipDashboardHtml)
+}
+
+tasks.configureEach {
+    if (name.startsWith("merge") && name.endsWith("Assets")) {
+        dependsOn(gzipDashboardHtml)
+    }
+}
 
 val startPortal = tasks.register<Exec>("startPortal") {
     group = "application"
@@ -137,6 +174,7 @@ dependencies {
     implementation(libs.gson)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.coil)
+    implementation(libs.androidx.profileinstaller)
     implementation(libs.smbj)
     implementation(libs.bouncycastle)
     testImplementation(libs.junit)

@@ -30,12 +30,14 @@ data class Recording(
     val fileName: String? = null,
     val bytes: Long? = null,
     val error: String? = null,
-    val copied: Boolean? = null
+    val copied: Boolean? = null,
+    val startPadMillis: Long? = null,
+    val endPadMillis: Long? = null
 ) {
     fun start(): Long = startMillis ?: 0L
     fun end(): Long = endMillis ?: 0L
-    fun windowStart(): Long = start() - PAD
-    fun windowEnd(): Long = end() + PAD
+    fun windowStart(): Long = start() - (startPadMillis ?: PAD)
+    fun windowEnd(): Long = end() + (endPadMillis ?: PAD)
 
     companion object {
         const val LOCAL = "local"

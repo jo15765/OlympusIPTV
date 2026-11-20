@@ -57,8 +57,40 @@ object RecordPrompt {
             .setTitle(R.string.record_where)
             .setItems(arrayOf(activity.getString(R.string.record_local), activity.getString(R.string.record_smb))) { _, which ->
                 val destination = if (which == 0) Recording.LOCAL else Recording.SMB
+                askEndPad(activity, playlistId, channel, program, series, destination)
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .create()
+        com.olympus.iptv.ui.DialogChrome.dress(dialog)
+        dialog.show()
+    }
+
+    private fun askEndPad(
+        activity: AppCompatActivity,
+        playlistId: String,
+        channel: Channel,
+        program: EpgProgram,
+        series: Boolean,
+        destination: String
+    ) {
+        val minutes = intArrayOf(5, 15, 30)
+        val labels = minutes.map { activity.getString(R.string.record_end_pad, it) }.toTypedArray()
+        val dialog = AlertDialog.Builder(activity)
+            .setTitle(R.string.record_pad_title)
+            .setItems(labels) { _, which ->
+                val endPad = minutes[which] * 60_000L
                 activity.lifecycleScope.launch {
-                    prepareSchedule(activity, playlistId, channel, program, series, destination, force = false)
+                    prepareSchedule(
+                        activity,
+                        playlistId,
+                        channel,
+                        program,
+                        series,
+                        destination,
+                        force = false,
+                        startPadMs = 2 * 60_000L,
+                        endPadMs = endPad
+                    )
                 }
             }
             .setNegativeButton(android.R.string.cancel, null)
@@ -74,7 +106,9 @@ object RecordPrompt {
         program: EpgProgram,
         series: Boolean,
         destination: String,
-        force: Boolean
+        force: Boolean,
+        startPadMs: Long = 2 * 60_000L,
+        endPadMs: Long = 5 * 60_000L
     ) {
         val app = activity.application as OlympusIptvApp
         val preview = withContext(Dispatchers.IO) {
@@ -117,7 +151,10 @@ object RecordPrompt {
                 )
                 .setPositiveButton(R.string.record_overlap_anyway) { _, _ ->
                     activity.lifecycleScope.launch {
-                        prepareSchedule(activity, playlistId, channel, program, series, destination, force = true)
+                        prepareSchedule(
+                            activity, playlistId, channel, program, series, destination,
+                            force = true, startPadMs = startPadMs, endPadMs = endPadMs
+                        )
                     }
                 }
                 .setNegativeButton(android.R.string.cancel, null)
@@ -128,9 +165,9 @@ object RecordPrompt {
         }
         val message = withContext(Dispatchers.IO) {
             if (series) {
-                scheduleAll(app, playlistId, channel, preview.programs, destination, force = force)
+                scheduleAll(app, playlistId, channel, preview.programs, destination, force, startPadMs, endPadMs)
             } else {
-                schedule(app, playlistId, channel, program, destination, force = force)
+                schedule(app, playlistId, channel, program, destination, force, startPadMs, endPadMs)
             }
         }
         val failed = message == activity.getString(R.string.record_share_needed) ||
@@ -166,7 +203,9 @@ object RecordPrompt {
         channel: Channel,
         program: EpgProgram,
         destination: String,
-        force: Boolean = false
+        force: Boolean = false,
+        startPadMs: Long = 2 * 60_000L,
+        endPadMs: Long = 5 * 60_000L
     ): String {
         val book = app.playlistStore.recordingBook(playlistId)
         if (destination == Recording.SMB && !book.smbOrEmpty().ready()) {
@@ -175,7 +214,7 @@ object RecordPrompt {
         if (!force && overlapping(book, program) != null) {
             return app.getString(R.string.record_overlap)
         }
-        val recording = recording(channel, program, destination)
+        val recording = recording(channel, program, destination, startPadMs, endPadMs)
         val next = book.copy(
             items = book.itemsOrEmpty() + recording,
             revision = System.currentTimeMillis()
@@ -191,7 +230,9 @@ object RecordPrompt {
         channel: Channel,
         programs: List<EpgProgram>,
         destination: String,
-        force: Boolean = false
+        force: Boolean = false,
+        startPadMs: Long = 2 * 60_000L,
+        endPadMs: Long = 5 * 60_000L
     ): String {
         if (programs.isEmpty()) return app.getString(R.string.record_no_program)
         val book = app.playlistStore.recordingBook(playlistId)
@@ -207,7 +248,7 @@ object RecordPrompt {
                     program.endMillis + Recording.PAD > item.windowStart()
             }
             if (blocked) continue
-            added += recording(channel, program, destination)
+            added += recording(channel, program, destination, startPadMs, endPadMs)
         }
         if (added.isEmpty()) return app.getString(R.string.record_overlap)
         val seed = programs.first().title
@@ -253,7 +294,7 @@ object RecordPrompt {
                         program.endMillis + Recording.PAD > item.windowStart()
                 }
                 if (blocked) continue
-                added += recording(channel, program, destination)
+                added += recording(channel, program, destination, 2 * 60_000L, 5 * 60_000L)
             }
         }
         if (added.isEmpty()) return book
@@ -263,7 +304,13 @@ object RecordPrompt {
         )
     }
 
-    private fun recording(channel: Channel, program: EpgProgram, destination: String): Recording {
+    private fun recording(
+        channel: Channel,
+        program: EpgProgram,
+        destination: String,
+        startPadMs: Long,
+        endPadMs: Long
+    ): Recording {
         return Recording(
             id = UUID.randomUUID().toString(),
             channelId = channel.id,
@@ -275,7 +322,9 @@ object RecordPrompt {
             status = Recording.SCHEDULED,
             fileName = RecordingFiles.safeName(channel.name, program.title, program.startMillis),
             bytes = 0L,
-            copied = false
+            copied = false,
+            startPadMillis = startPadMs,
+            endPadMillis = endPadMs
         )
     }
 

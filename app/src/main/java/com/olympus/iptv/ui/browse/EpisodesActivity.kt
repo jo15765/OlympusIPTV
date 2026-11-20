@@ -71,6 +71,19 @@ class EpisodesActivity : AppCompatActivity() {
         binding.episodeList.itemAnimator = null
         binding.episodeList.setHasFixedSize(true)
         binding.episodeList.adapter = adapter
+        binding.episodeList.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
+                if (newState != RecyclerView.SCROLL_STATE_IDLE) return
+                val layout = recyclerView.layoutManager as? LinearLayoutManager ?: return
+                val last = layout.findLastVisibleItemPosition()
+                if (last < 0) return
+                val shown = episodes.filter { (it.season ?: 1) == season }
+                val urls = com.olympus.iptv.ui.ImagePrefetcher.ahead(shown.map { it.logoUrl }, last + 1)
+                if (urls.isEmpty()) return
+                val px = (160 * resources.displayMetrics.density).toInt().coerceAtLeast(1)
+                com.olympus.iptv.ui.ImagePrefetcher.warm(this@EpisodesActivity, urls, px)
+            }
+        })
         binding.markSeason.setOnClickListener { toggleSeason(season) }
         binding.playNextUnwatched.setOnClickListener {
             val shown = episodes.filter { (it.season ?: 1) == season }

@@ -71,6 +71,7 @@ object DashboardHost {
     private val logoAllow = ConcurrentHashMap<String, Boolean>()
     @Volatile private var appContext: Context? = null
     @Volatile private var page: ByteArray? = null
+    @Volatile private var pageGzip: ByteArray? = null
     @Volatile private var logo: ByteArray? = null
     private data class GuideHold(
         val playlistId: String,
@@ -357,7 +358,7 @@ object DashboardHost {
     ) {
         val app = context as? OlympusIptvApp ?: (context.applicationContext as OlympusIptvApp)
         when {
-            method == "GET" && (path == "/" || path == "/index.html") -> writeBytes(socket, 200, "text/html; charset=utf-8", pageBytes(context), "no-store")
+            method == "GET" && (path == "/" || path == "/index.html") -> writePortalPage(socket, context)
             method == "GET" && path == "/logo.png" -> writeBytes(socket, 200, "image/png", logoBytes(context), "public, max-age=86400", allowGzip = false)
             method == "GET" && path == "/api/info" -> writeJson(socket, 200, mapOf("url" to url(), "urls" to listOf(url()), "privateNetwork" to true))
             method == "GET" && path == "/api/logs" -> {
@@ -389,6 +390,8 @@ object DashboardHost {
             method == "GET" && path == "/api/catalog/search" -> search(app, socket, query)
             method == "GET" && path == "/api/catalog/group" -> group(app, socket, query)
             method == "POST" && path == "/api/catalog" -> writeJson(socket, 200, mapOf("ok" to true))
+            method == "GET" && path == "/api/profile" -> profile(app, socket, query["email"], query["deviceId"])
+            method == "POST" && path == "/api/profile" -> restoreProfile(app, socket, json(body))
             method == "GET" && path == "/api/lineup" -> lineup(app, socket, query["email"], query["deviceId"])
             method == "POST" && path == "/api/lineup" || method == "PUT" && path == "/api/lineup" -> saveLineup(app, socket, json(body))
             method == "POST" && path == "/api/names/strip-images" -> strip(app, socket, json(body))
@@ -867,6 +870,53 @@ object DashboardHost {
             )
         }
         writeJson(socket, 200, mapOf("channels" to pageRows, "total" to total))
+    }
+
+    private fun profile(app: OlympusIptvApp, socket: Socket, email: String?, deviceId: String?) {
+        val gate = gate(app, email, deviceId) ?: run {
+            writeJson(socket, 401, mapOf("error" to "Device not registered"))
+            return
+        }
+        val lineup = filled(runBlocking { app.playlistStore.lineup(gate.playlist.id) })
+        val favorites = runBlocking { app.playlistStore.favorites(gate.playlist.id) }
+        writeJson(
+            socket,
+            200,
+            mapOf(
+                "olympus-iptv" to "profile",
+                "deviceId" to gate.deviceId,
+                "exportedAt" to System.currentTimeMillis().toString(),
+                "lineup" to lineup,
+                "favorites" to favorites,
+                "avSync" to com.olympus.iptv.data.AvSyncStore.all(app)
+            )
+        )
+    }
+
+    private fun restoreProfile(app: OlympusIptvApp, socket: Socket, body: JsonObject) {
+        val gate = gate(app, text(body, "email"), text(body, "deviceId")) ?: run {
+            writeJson(socket, 401, mapOf("error" to "Device not registered"))
+            return
+        }
+        val incoming = body.get("lineup")?.let { gson.fromJson(it, LineupConfig::class.java) }
+        if (incoming != null) {
+            val next = filled(incoming).let { config ->
+                if ((config.revision ?: 0L) == 0L) config.copy(revision = System.currentTimeMillis()) else config
+            }
+            runBlocking { app.playlistStore.saveLineup(gate.playlist.id, next) }
+        }
+        if (body.has("favorites") && body.get("favorites").isJsonArray) {
+            val ids = body.getAsJsonArray("favorites").map { it.asString.trim() }.filter { it.isNotBlank() }
+            runBlocking { app.playlistStore.saveFavorites(gate.playlist.id, ids, System.currentTimeMillis()) }
+        }
+        if (body.has("avSync") && body.get("avSync").isJsonObject) {
+            val offsets = LinkedHashMap<String, Int>()
+            for ((key, value) in body.getAsJsonObject("avSync").entrySet()) {
+                if (value.isJsonPrimitive && value.asJsonPrimitive.isNumber) offsets[key] = value.asInt
+            }
+            com.olympus.iptv.data.AvSyncStore.replace(app, offsets)
+        }
+        writeJson(socket, 200, mapOf("ok" to true))
     }
 
     private fun lineup(app: OlympusIptvApp, socket: Socket, email: String?, deviceId: String?) {
@@ -1400,6 +1450,43 @@ object DashboardHost {
         val bytes = context.assets.open("dashboard/index.html").use { it.readBytes() }
         page = bytes
         return bytes
+    }
+
+    private fun pageGzipBytes(context: Context): ByteArray? {
+        pageGzip?.let { return it }
+        val bytes = runCatching {
+            context.assets.open("dashboard/index.html.gz").use { it.readBytes() }
+        }.getOrNull() ?: return null
+        pageGzip = bytes
+        return bytes
+    }
+
+    private fun writePortalPage(socket: Socket, context: Context) {
+        if (requestGzip.get() == true) {
+            val packed = pageGzipBytes(context)
+            if (packed != null) {
+                writePrepared(socket, 200, "text/html; charset=utf-8", packed, "no-store", gzip = true)
+                return
+            }
+        }
+        writeBytes(socket, 200, "text/html; charset=utf-8", pageBytes(context), "no-store")
+    }
+
+    private fun writePrepared(
+        socket: Socket,
+        code: Int,
+        type: String,
+        body: ByteArray,
+        cache: String,
+        gzip: Boolean
+    ) {
+        val encoding = if (gzip) "Content-Encoding: gzip\r\nVary: Accept-Encoding\r\n" else ""
+        val output = BufferedOutputStream(socket.getOutputStream())
+        val head = "HTTP/1.1 $code ${reason(code)}\r\nContent-Type: $type\r\nContent-Length: ${body.size}\r\n$encoding" +
+            "Cache-Control: $cache\r\nConnection: close\r\n\r\n"
+        output.write(head.toByteArray(Charsets.UTF_8))
+        output.write(body)
+        output.flush()
     }
 
     private fun logoBytes(context: Context): ByteArray {

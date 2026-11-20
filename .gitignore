@@ -37,3 +37,4 @@ Thumbs.db
 
 # Local portal snapshots are not source. Keep clones and archives small.
 portal/data/*.json
+olympus-source.zip

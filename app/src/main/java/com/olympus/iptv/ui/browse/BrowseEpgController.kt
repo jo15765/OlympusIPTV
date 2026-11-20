@@ -120,7 +120,7 @@ class BrowseEpgController(
             val programAt = IntArray(2)
             binding.channelList.getLocationInWindow(channelAt)
             binding.programList.getLocationInWindow(programAt)
-            val delta = programAt[1] - channelAt[1]
+            val delta = GuideMetrics.verticalDelta(channelAt[1], programAt[1])
             if (delta > 1) setSpacer(delta)
             else if (delta < -1) {
                 binding.programList.setPadding(0, -delta, 0, binding.programList.paddingBottom)

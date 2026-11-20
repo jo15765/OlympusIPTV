@@ -1051,21 +1051,60 @@ internal fun BrowseActivity.cardDetail(category: Category): String {
 
 internal fun BrowseActivity.nowPlayingLine(category: Category): String {
         if (section != GuideSection.TV) return ""
-        val savedId = playlist?.id ?: return ""
         val ids = if (category.id == PlaylistLoader.FAVORITES_ID) {
             favoriteIds.map { it.substringAfter(':') }.take(8)
         } else {
-            val db = (application as com.olympus.iptv.OlympusIptvApp).catalogDb
-            runCatching { db.sampleChannelIds(savedId, category.id) }.getOrDefault(emptyList())
+            groupSampleIds[category.id].orEmpty()
         }
-        val titles = ArrayList<String>(2)
-        for (channelId in ids) {
-            val title = epgCache[channelId]?.now?.title?.takeIf { it.isNotBlank() } ?: continue
-            if (title !in titles) titles.add(title)
-            if (titles.size == 2) break
+        return GroupNow.line(ids) { epgCache[it]?.now?.title }
+    }
+
+internal fun BrowseActivity.warmGroupNow(categories: List<Category>) {
+        if (section != GuideSection.TV) return
+        val savedId = playlist?.id ?: return
+        val now = android.os.SystemClock.uptimeMillis()
+        if (now - groupNowAt < 20_000L && groupSampleIds.isNotEmpty()) {
+            categoryAdapter.refreshDetails()
+            return
         }
-        if (titles.isEmpty()) return ""
-        return "Now: " + titles.joinToString(" • ")
+        groupNowAt = now
+        val wanted = categories.filter { category ->
+            category.id != PlaylistLoader.ALL_ID &&
+                category.id != PlaylistLoader.RECENT_ID &&
+                category.id != PlaylistLoader.CONTINUE_ID &&
+                category.id != PlaylistLoader.FOR_YOU_ID &&
+                category.id != PlaylistLoader.TOP_WATCHED_ID
+        }.take(12)
+        groupNowJob?.cancel()
+        val favorites = if (wanted.any { it.id == PlaylistLoader.FAVORITES_ID }) {
+            favoriteIds.map { it.substringAfter(':') }.take(8)
+        } else {
+            emptyList()
+        }
+        groupNowJob = lifecycleScope.launch(Dispatchers.IO) {
+            val db = (application as OlympusIptvApp).catalogDb
+            val samples = HashMap<String, List<String>>()
+            val loaded = HashMap<String, com.olympus.iptv.data.EpgNowNext>()
+            for (category in wanted) {
+                val ids = if (category.id == PlaylistLoader.FAVORITES_ID) {
+                    favorites
+                } else {
+                    runCatching { db.sampleChannelIds(savedId, category.id, 6) }.getOrDefault(emptyList())
+                }
+                samples[category.id] = ids
+                for (id in ids) {
+                    if (epgCache.containsKey(id) || loaded.containsKey(id)) continue
+                    val row = runCatching { db.readEpg(savedId, id) }.getOrNull() ?: continue
+                    loaded[id] = com.olympus.iptv.playlist.EpgUtils.nowNext(row.second)
+                }
+            }
+            withContext(Dispatchers.Main) {
+                if (isDestroyed) return@withContext
+                groupSampleIds.putAll(samples)
+                loaded.forEach { (id, epg) -> rememberEpg(id, epg) }
+                categoryAdapter.refreshDetails()
+            }
+        }
     }
 
 internal fun BrowseActivity.favoriteSection(sectionNow: GuideSection): String = when (sectionNow) {

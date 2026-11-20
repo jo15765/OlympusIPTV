@@ -67,6 +67,13 @@ class RecordingsActivity : AppCompatActivity() {
             val watches = book.seriesOrEmpty()
             val items = book.itemsOrEmpty().sortedByDescending { it.start() }
             rows = watches.map { Row.Watch(it) } + items.map { Row.Item(it) }
+            val thumbs = withContext(Dispatchers.IO) {
+                List(watches.size) { null as java.io.File? } + items.map { item ->
+                    val name = item.fileName?.takeIf { it.isNotBlank() } ?: return@map null
+                    val media = RecordingFiles.file(this@RecordingsActivity, name)
+                    RecordingProgress.ensureThumb(this@RecordingsActivity, item.id.orEmpty(), media)
+                }
+            }
             binding.emptyText.visibility = if (rows.isEmpty()) android.view.View.VISIBLE else android.view.View.GONE
             paintStorage()
             val format = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
@@ -80,11 +87,13 @@ class RecordingsActivity : AppCompatActivity() {
                         val status = statusLabel(row.recording.status)
                         val whenLabel = format.format(Date(row.recording.start()))
                         val grown = localSize(row.recording)
-                        "$status  ${row.recording.channelName.orEmpty()}  ${row.recording.title.orEmpty()}  $whenLabel$grown"
+                        val resume = RecordingProgress.position(this@RecordingsActivity, row.recording.id.orEmpty())
+                        val resumeLabel = if (resume >= 60_000L) "  ·  ${resume / 60_000L}m" else ""
+                        "$status  ${row.recording.channelName.orEmpty()}  ${row.recording.title.orEmpty()}  $whenLabel$grown$resumeLabel"
                     }
                 }
             }
-            binding.list.adapter = RecordingRows(labels) { index -> open(rows[index]) }
+            binding.list.adapter = RecordingRows(labels, thumbs) { index -> open(rows[index]) }
             val capturing = items.any { it.status == Recording.RECORDING }
             binding.list.removeCallbacks(sizeLoop)
             if (capturing && !isDestroyed) binding.list.postDelayed(sizeLoop, 3_000L)
@@ -190,8 +199,11 @@ class RecordingsActivity : AppCompatActivity() {
                 id = item.id.orEmpty(),
                 name = item.title.orEmpty(),
                 streamUrl = uri.toString(),
-                kind = ContentKind.LIVE
+                kind = ContentKind.VOD
             )
+            val startAt = withContext(Dispatchers.IO) {
+                RecordingProgress.position(this@RecordingsActivity, item.id.orEmpty())
+            }
             app.playbackQueue = listOf(channel)
             startActivity(
                 PlayerActivity.intent(
@@ -202,7 +214,7 @@ class RecordingsActivity : AppCompatActivity() {
                     startIndex = 0,
                     playlistId = playlistId,
                     zapMode = PlayerActivity.ZAP_LIST
-                )
+                ).putExtra(PlayerActivity.EXTRA_START_AT, startAt)
             )
         }
     }
@@ -232,6 +244,7 @@ class RecordingsActivity : AppCompatActivity() {
                             revision = System.currentTimeMillis()
                         )
                         app.playlistStore.saveRecordingBook(playlistId, next)
+                        RecordingProgress.forget(this@RecordingsActivity, item.id.orEmpty())
                         RecordPrompt.push(app, playlistId, next)
                     }
                     reload()
@@ -275,6 +288,7 @@ class RecordingsActivity : AppCompatActivity() {
 
 private class RecordingRows(
     private val labels: List<String>,
+    private val thumbs: List<java.io.File?>,
     private val onClick: (Int) -> Unit
 ) : RecyclerView.Adapter<RecordingRows.Holder>() {
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder {
@@ -285,6 +299,15 @@ private class RecordingRows(
     override fun getItemCount(): Int = labels.size
     override fun onBindViewHolder(holder: Holder, position: Int) {
         holder.label.text = labels[position]
+        val thumb = thumbs.getOrNull(position)
+        val drawable = thumb?.takeIf { it.exists() }?.let {
+            android.graphics.drawable.BitmapDrawable(
+                holder.label.resources,
+                android.graphics.BitmapFactory.decodeFile(it.absolutePath)
+            )
+        }
+        holder.label.setCompoundDrawablesRelativeWithIntrinsicBounds(drawable, null, null, null)
+        holder.label.compoundDrawablePadding = (12 * holder.label.resources.displayMetrics.density).toInt()
         holder.label.setOnClickListener { onClick(position) }
     }
 

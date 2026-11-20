@@ -80,7 +80,10 @@ data class Channel(
     val catchupSource: String? = null,
     val catchupDays: Int? = null,
     val tvArchive: Boolean? = null,
-    val tvArchiveDuration: Int? = null
+    val tvArchiveDuration: Int? = null,
+    /** M3U #EXTVLCOPT values. Not stored in the catalog database. */
+    val userAgent: String? = null,
+    val httpReferer: String? = null
 ) {
     fun supportsCatchup(): Boolean {
         if (tvArchive == true && (tvArchiveDuration ?: 0) > 0) return true

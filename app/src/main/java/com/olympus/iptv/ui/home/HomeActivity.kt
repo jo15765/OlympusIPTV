@@ -49,6 +49,7 @@ class HomeActivity : AppCompatActivity() {
         }
         binding.btnAdd.requestFocus()
         paintProfiles()
+        maybeAutoResumeHome()
 
         lifecycleScope.launch {
             store.playlists.collectLatest { list ->
@@ -77,6 +78,20 @@ class HomeActivity : AppCompatActivity() {
             adapter.submit(cards)
             binding.emptyState.visibility = if (list.isEmpty()) View.VISIBLE else View.GONE
             binding.playlistList.visibility = if (list.isEmpty()) View.GONE else View.VISIBLE
+        }
+    }
+
+    private fun maybeAutoResumeHome() {
+        val app = application as OlympusIptvApp
+        if (app.autoResumeUsed) return
+        lifecycleScope.launch {
+            val enabled = withContext(Dispatchers.IO) { store.autoResume() }
+            if (!enabled || app.autoResumeUsed || isDestroyed) return@launch
+            val list = store.playlists.first()
+            val playlist = list.firstOrNull() ?: return@launch
+            val last = withContext(Dispatchers.IO) { store.lastChannelId(playlist.id) } ?: return@launch
+            if (last.isBlank() || app.autoResumeUsed || isDestroyed) return@launch
+            openPlaylist(playlist)
         }
     }
 

@@ -34,7 +34,22 @@ internal fun PlayerActivity.openAudio() {
         binding.subtitlePanel.visibility = View.VISIBLE
         binding.subtitleRows.removeAllViews()
         val choices = streamChoices(exo, C.TRACK_TYPE_AUDIO)
-        binding.subtitleStatus.text = if (choices.isEmpty()) getString(R.string.audio_none) else ""
+        binding.subtitleStatus.text = if (nightMode) getString(R.string.night_mode_on) else if (choices.isEmpty()) getString(R.string.audio_none) else ""
+        addSubtitleRow(getString(if (nightMode) R.string.night_mode_on else R.string.night_mode)) {
+            chooseNightMode(!nightMode)
+            closeSubtitlePanel()
+        }
+        addSubtitleRow(getString(if (radioOn) R.string.radio_on else R.string.radio_mode)) {
+            closeSubtitlePanel()
+            toggleRadioMode()
+        }
+        val offset = com.olympus.iptv.data.AvSyncStore.get(current?.id.orEmpty())
+        addSubtitleRow(getString(R.string.av_sync_earlier, offset)) {
+            nudgeAvSync(-com.olympus.iptv.data.AvSyncStore.STEP_MS)
+        }
+        addSubtitleRow(getString(R.string.av_sync_later, offset)) {
+            nudgeAvSync(com.olympus.iptv.data.AvSyncStore.STEP_MS)
+        }
         choices.forEach { choice ->
             addSubtitleRow(choice.label) {
                 selectTrack(choice, C.TRACK_TYPE_AUDIO)

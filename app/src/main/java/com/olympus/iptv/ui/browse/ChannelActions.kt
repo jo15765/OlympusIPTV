@@ -34,6 +34,10 @@ internal fun BrowseActivity.showRowOptions(seed: com.olympus.iptv.data.Channel? 
         actions += 8
         labels += getString(if (favorite) R.string.guide_remove_favorite else R.string.guide_add_favorite)
         actions += 0
+        if (section == GuideSection.TV) {
+            labels += getString(R.string.guide_hide_channel)
+            actions += 9
+        }
         if (section == GuideSection.TV && !touchPrimary) {
             labels += getString(R.string.guide_move_up)
             actions += 1
@@ -74,6 +78,7 @@ internal fun BrowseActivity.showRowOptions(seed: com.olympus.iptv.data.Channel? 
                 6 -> openVodRatings(channel)
                 7 -> play(channel, enterPip = true)
                 8 -> play(channel)
+                9 -> hideGuideChannel(channel)
             }
         }
         com.olympus.iptv.ui.GuideActionSheet.show(screen(), channel.name, labels) { which ->

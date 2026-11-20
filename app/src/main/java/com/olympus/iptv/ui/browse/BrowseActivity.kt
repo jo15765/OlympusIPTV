@@ -480,6 +480,12 @@ class BrowseActivity : AppCompatActivity(), ToolHost {
 
     internal var dialDigits = ""
 
+    internal val groupSampleIds = HashMap<String, List<String>>()
+
+    internal var groupNowJob: Job? = null
+
+    internal var groupNowAt = 0L
+
     internal val lowRamDevice by lazy { com.olympus.iptv.ui.DeviceForm.isLowRam(this) }
 
     internal val dialJump = Runnable { jumpDial() }
@@ -695,6 +701,21 @@ class BrowseActivity : AppCompatActivity(), ToolHost {
     }
 
     private fun applyDashboardRemote(command: com.olympus.iptv.portal.RemotePad.Command) {
+        if (command.action == "play") {
+            val id = command.text.trim()
+            if (id.isEmpty()) return
+            lifecycleScope.launch {
+                val saved = playlist ?: return@launch
+                val channel = withContext(Dispatchers.IO) {
+                    val db = (application as OlympusIptvApp).catalogDb
+                    db.readChannel(saved.id, com.olympus.iptv.playlist.CatalogDb.LIVE, id)
+                        ?: db.readChannel(saved.id, com.olympus.iptv.playlist.CatalogDb.VOD, id)
+                        ?: db.readChannel(saved.id, com.olympus.iptv.playlist.CatalogDb.SERIES, id)
+                }
+                if (channel != null && !isDestroyed) play(channel)
+            }
+            return
+        }
         val code = when (command.action) {
             "up" -> android.view.KeyEvent.KEYCODE_DPAD_UP
             "down" -> android.view.KeyEvent.KEYCODE_DPAD_DOWN
@@ -765,6 +786,7 @@ class BrowseActivity : AppCompatActivity(), ToolHost {
     companion object {
         const val EXTRA_PLAYLIST_ID = "playlist_id"
         const val EXTRA_SKIP_RESUME = "skip_resume"
+        const val EXTRA_TUNE_ID = "tune_id"
         const val CARD_SPAN = 3
         const val PAGE_SIZE_TV = 200
         const val PAGE_SIZE_PHONE = 100

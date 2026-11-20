@@ -17,6 +17,11 @@ object BackdropGlow {
     @Volatile var motion: Boolean = true
     @Volatile private var quietUntil = 0L
 
+    /** Gradients live on the views that asked for them. This stops a new sample during a trim. */
+    fun release() {
+        motion = false
+    }
+
     /** Called while a low-RAM stick is repeating Up/Down so the glow paints in place. */
     fun noteScroll() {
         quietUntil = SystemClock.uptimeMillis() + 450L

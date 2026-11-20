@@ -12,4 +12,11 @@ object FtsQuery {
             if (word.all { it.isLetterOrDigit() }) "$word*" else "\"$word\"*"
         }
     }
+
+    /** Words left after punctuation is removed. Used when the FTS prefix query finds nothing. */
+    fun looseTokens(text: String): List<String> {
+        return text.lowercase().split(split).filter { token ->
+            token.length >= 2 || (token.isNotEmpty() && token.all { it.isDigit() })
+        }
+    }
 }

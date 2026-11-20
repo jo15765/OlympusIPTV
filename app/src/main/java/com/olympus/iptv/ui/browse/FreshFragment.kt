@@ -35,7 +35,6 @@ import com.olympus.iptv.playlist.XtreamClient
 import com.olympus.iptv.ui.channelLogo
 import com.olympus.iptv.ui.player.PlayerActivity
 import com.olympus.iptv.ui.player.SeriesPlay
-import com.olympus.iptv.ui.prefetchLogos
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -395,14 +394,10 @@ class FreshFragment : Fragment() {
 
     private fun prefetchFrom(start: Int) {
         if (start < 0 || start >= rows.size) return
-        val urls = ArrayList<String>(COLUMNS)
-        val end = (start + COLUMNS).coerceAtMost(rows.size)
-        for (index in start until end) {
-            rows[index].logoUrl?.takeIf { it.isNotBlank() }?.let { urls.add(it) }
-        }
+        val urls = com.olympus.iptv.ui.ImagePrefetcher.ahead(rows.map { it.logoUrl }, start)
         if (urls.isEmpty()) return
         val px = (160 * resources.displayMetrics.density).toInt().coerceAtLeast(1)
-        prefetchLogos(requireContext(), urls, px)
+        com.olympus.iptv.ui.ImagePrefetcher.warm(requireContext(), urls, px)
     }
 
     private fun showStatus(message: Int) {

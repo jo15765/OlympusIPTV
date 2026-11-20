@@ -1,6 +1,5 @@
 package com.olympus.iptv.remind
 
-import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.olympus.iptv.R
@@ -36,7 +35,15 @@ object RemindPrompt {
                 }
                 ReminderStore.save(activity, item)
                 ReminderClock.arm(activity)
-                Toast.makeText(activity, R.string.remind_set, Toast.LENGTH_SHORT).show()
+                com.olympus.iptv.ui.ActionPill.show(
+                    activity,
+                    activity.getString(R.string.pill_reminder, channel.name.orEmpty())
+                ) {
+                    item.id?.let { id ->
+                        ReminderStore.remove(activity, id)
+                        ReminderClock.arm(activity)
+                    }
+                }
             }
             .setNegativeButton(android.R.string.cancel, null)
             .create()

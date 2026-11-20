@@ -888,15 +888,6 @@ internal fun BrowseActivity.showDashboardUrl(url: String) {
         urlValue.setTextColor(getColor(R.color.accent))
     }
 
-internal fun BrowseActivity.confirmRemovePlaylist() {
-        androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle(R.string.device_remove_playlist_title)
-            .setMessage(R.string.device_remove_playlist_message)
-            .setPositiveButton(R.string.device_remove_playlist_confirm) { _, _ -> removePlaylistAndRestart() }
-            .setNegativeButton(R.string.cancel, null)
-            .show()
-    }
-
 internal fun BrowseActivity.removePlaylistAndRestart() {
         val app = application as OlympusIptvApp
         panes.deviceRemovePlaylist.isEnabled = false
@@ -1141,99 +1132,6 @@ internal fun BrowseActivity.hasContinue(sectionNow: GuideSection): Boolean {
     }
 
 internal fun BrowseActivity.withContinue(rest: List<Category>): List<Category> = withRecent(rest)
-
-internal fun BrowseActivity.continueText(channel: Channel): String? {
-        val spot = resumeEntry(channel) ?: return null
-        val minutes = ((spot.positionMs ?: 0L) / 60_000L).toInt().coerceAtLeast(1)
-        val episode = spot.name?.takeIf {
-            it.isNotBlank() && it != channel.name && channel.streamUrl.isBlank()
-        }
-        return if (episode == null) {
-            getString(R.string.continue_watching, minutes)
-        } else {
-            getString(R.string.continue_episode, episode, minutes)
-        }
-    }
-
-internal fun BrowseActivity.continueProgress(channel: Channel): Int? {
-        val spot = resumeEntry(channel) ?: return null
-        val position = spot.positionMs ?: return null
-        val duration = spot.durationMs ?: return null
-        if (duration <= 0L) return null
-        return ((position * 1000L) / duration).toInt().coerceIn(1, 1000)
-    }
-
-internal fun BrowseActivity.posterRatingLabel(channel: Channel): String? {
-        if (channel.kind == ContentKind.LIVE && channel.seriesId.isNullOrBlank()) return null
-        val preferTv = !channel.seriesId.isNullOrBlank()
-        val peek = com.olympus.iptv.playlist.TitleRatings.peek(channel.name, preferTv) ?: return null
-        val score = peek.ratings.firstOrNull()?.scoreLabel ?: return null
-        val number = score.substringBefore('/').substringBefore('%').trim()
-        if (number.isBlank()) return null
-        return "★ $number"
-    }
-
-internal fun BrowseActivity.posterMetaLine(channel: Channel): String? {
-        val year = Regex("""\b(19|20)\d{2}\b""").find(channel.name)?.value
-        val resume = continueText(channel)
-        return listOfNotNull(year, resume).joinToString(" · ").ifBlank { null }
-    }
-
-internal fun BrowseActivity.recentChannels(sectionNow: GuideSection, config: LineupConfig): List<Channel> {
-        val saved = playlist ?: return emptyList()
-        val db = (application as OlympusIptvApp).catalogDb
-        val wanted = sectionKey(sectionNow)
-        val seen = HashSet<String>()
-        val rows = ArrayList<Channel>()
-        for (entry in recentEntries) {
-            if (entrySection(entry) != wanted) continue
-            val id = if (wanted == "series") entry.seriesId ?: entry.channelId else entry.channelId
-            if (id.isNullOrBlank() || !seen.add(id)) continue
-            val row = db.readChannel(saved.id, libraryBucket(sectionNow), id) ?: continue
-            val tagged = if (wanted == "series" && row.seriesId.isNullOrBlank()) row.copy(seriesId = id) else row
-            rows.add(tagged)
-            if (rows.size == 20) break
-        }
-        return prepareGroup(rows, config)
-    }
-
-internal fun BrowseActivity.continueChannels(sectionNow: GuideSection, config: LineupConfig): List<Channel> {
-        val saved = playlist ?: return emptyList()
-        val db = (application as OlympusIptvApp).catalogDb
-        val wanted = sectionKey(sectionNow)
-        val seen = HashSet<String>()
-        val rows = ArrayList<Channel>()
-        for (entry in recentEntries) {
-            if (entrySection(entry) != wanted || !entry.canResume()) continue
-            if (wanted == "series") {
-                val seriesId = entry.seriesId ?: entry.channelId ?: continue
-                if (!seen.add(seriesId)) continue
-                val show = db.readChannel(saved.id, CatalogDb.SERIES, seriesId)
-                val episodeId = entry.channelId
-                val cached = if (episodeId.isNullOrBlank()) null else {
-                    EpisodeCache.peek(filesDir, saved.id, seriesId)?.firstOrNull { it.id == episodeId }
-                }
-                val row = if (cached != null) {
-                    cached.copy(
-                        seriesId = seriesId,
-                        name = EpisodeSequence.heading(show?.name.orEmpty(), cached),
-                        logoUrl = cached.logoUrl ?: show?.logoUrl
-                    )
-                } else {
-                    show ?: continue
-                }
-                val tagged = if (row.seriesId.isNullOrBlank()) row.copy(seriesId = seriesId) else row
-                rows.add(tagged)
-            } else {
-                val id = entry.channelId ?: continue
-                if (!seen.add(id)) continue
-                val row = db.readChannel(saved.id, libraryBucket(sectionNow), id) ?: continue
-                rows.add(row)
-            }
-            if (rows.size == 20) break
-        }
-        return prepareGroup(rows, config)
-    }
 
 internal fun BrowseActivity.reloadFavorites() {
         val saved = playlist ?: return
@@ -1508,61 +1406,6 @@ internal fun BrowseActivity.rowSelectKey(keyCode: Int): Boolean =
             keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER ||
             keyCode == KeyEvent.KEYCODE_BUTTON_A
 
-internal fun BrowseActivity.showPhoneRowSheet(
-        title: String,
-        labels: List<String>,
-        actions: List<Int>,
-        runAction: (Int) -> Unit
-    ) {
-        val sheet = BottomSheetDialog(this)
-        val column = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(
-                (20 * resources.displayMetrics.density).toInt(),
-                (16 * resources.displayMetrics.density).toInt(),
-                (20 * resources.displayMetrics.density).toInt(),
-                (24 * resources.displayMetrics.density).toInt()
-            )
-            setBackgroundColor(getColor(R.color.bg_elevated))
-        }
-        column.addView(TextView(this).apply {
-            text = title
-            setTextColor(getColor(R.color.text_primary))
-            textSize = 18f
-            setTypeface(typeface, android.graphics.Typeface.BOLD)
-            setPadding(0, 0, 0, (12 * resources.displayMetrics.density).toInt())
-        })
-        labels.forEachIndexed { index, label ->
-            column.addView(TextView(this).apply {
-                text = label
-                setTextColor(getColor(R.color.text_primary))
-                textSize = 16f
-                minHeight = (52 * resources.displayMetrics.density).toInt()
-                gravity = Gravity.CENTER_VERTICAL
-                setBackgroundResource(R.drawable.bg_nav)
-                setPadding(
-                    (14 * resources.displayMetrics.density).toInt(),
-                    (10 * resources.displayMetrics.density).toInt(),
-                    (14 * resources.displayMetrics.density).toInt(),
-                    (10 * resources.displayMetrics.density).toInt()
-                )
-                val params = LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-                )
-                params.topMargin = (6 * resources.displayMetrics.density).toInt()
-                layoutParams = params
-                setOnClickListener {
-                    Haptics.tick(this)
-                    sheet.dismiss()
-                    runAction(actions[index])
-                }
-            })
-        }
-        sheet.setContentView(column)
-        sheet.show()
-    }
-
 internal fun BrowseActivity.focusedChannelRow(): Int {
         val focused = currentFocus ?: return 0
         val position = binding.channelList.findContainingViewHolder(focused)?.bindingAdapterPosition ?: return 0
@@ -1737,6 +1580,7 @@ internal fun BrowseActivity.render(restoreFocus: Boolean = false, reloadChannels
             selectedCategoryId = categories.firstOrNull()?.id
         }
         categoryAdapter.submit(categories, selectedCategoryId)
+        if (section == GuideSection.TV) warmGroupNow(categories)
         refreshGroupCounts()
         if (binding.groupPills.visibility == View.VISIBLE) syncGroupPills()
         paintHomeContinue()
@@ -1817,64 +1661,6 @@ internal fun BrowseActivity.stillShowing(query: Int, sectionNow: GuideSection, c
             open &&
             section == sectionNow &&
             selectedCategoryId == categoryId
-    }
-
-internal fun BrowseActivity.libraryBucket(sectionNow: GuideSection): String = when (sectionNow) {
-        GuideSection.TV -> CatalogDb.LIVE
-        GuideSection.MOVIES -> CatalogDb.VOD
-        GuideSection.SHOWS -> CatalogDb.SERIES
-    }
-
-internal fun BrowseActivity.libraryGroup(sectionNow: GuideSection, categoryId: String, config: LineupConfig): List<Channel> {
-        val saved = playlist ?: return emptyList()
-        val rows = (application as OlympusIptvApp).catalogDb.readCategoryChannels(
-            saved.id,
-            libraryBucket(sectionNow),
-            categoryId
-        )
-        return prepareGroup(rows, config)
-    }
-
-internal fun BrowseActivity.forYouChannels(config: LineupConfig): List<Channel> {
-        val recent = recentChannels(GuideSection.TV, config)
-        val favorites = libraryFavorites(GuideSection.TV, config)
-        val sports = (recent + favorites).filter { channel ->
-            val title = epgCache[channel.id]?.now?.title ?: channel.name
-            com.olympus.iptv.ui.browse.SportsEvent.isMatchup(title)
-        }
-        val ordered = LinkedHashSet<Channel>()
-        sports.forEach { ordered.add(it) }
-        recent.take(8).forEach { ordered.add(it) }
-        favorites.take(16).forEach { ordered.add(it) }
-        return ordered.toList()
-    }
-
-internal fun BrowseActivity.libraryFavorites(sectionNow: GuideSection, config: LineupConfig): List<Channel> {
-        val saved = playlist ?: return emptyList()
-        val section = favoriteSection(sectionNow)
-        val keys = favoriteOrder.filter { Favorites.inSection(it, section) }
-        val ids = keys.map { it.substringAfter(':') }
-        val rows = (application as OlympusIptvApp).catalogDb.readChannelsByIds(
-            saved.id,
-            libraryBucket(sectionNow),
-            ids
-        ).map { channel ->
-            if (section == Favorites.SERIES && channel.seriesId.isNullOrBlank()) channel.copy(seriesId = channel.id) else channel
-        }
-        return prepareGroup(Favorites.ordered(keys, rows.associateBy { it.id }, favoriteIds), config)
-    }
-
-
-internal fun BrowseActivity.topWatchedFavorites(sectionNow: GuideSection, config: LineupConfig): List<Channel> {
-        ensureTopWatchedCache()
-        val wanted = sectionKey(sectionNow)
-        val orderedIds = topWatchedIdsBySection[wanted].orEmpty()
-        val favorites = libraryFavorites(sectionNow, config)
-        if (favorites.isEmpty()) return emptyList()
-        if (orderedIds.isEmpty()) return favorites.take(10)
-        val byId = favorites.associateBy { it.id }
-        val ranked = orderedIds.mapNotNull { byId[it] }
-        return ranked.ifEmpty { favorites.take(10) }
     }
 
 internal fun BrowseActivity.showChannelWait(text: String) {
@@ -2219,53 +2005,6 @@ internal fun BrowseActivity.ensureGroupCountries() {
         }
     }
 
-internal fun BrowseActivity.visibleGroups(categories: List<Category>, config: LineupConfig): List<Category> {
-        ensureGroupCountries()
-        if (groupedSection == section &&
-            groupedCategories === categories &&
-            groupedConfig === config &&
-            groupedCountries === groupCountries
-        ) {
-            return groupedResult
-        }
-        val groups = LineupApplier.groups(categories, config, groupCountries, groupCountriesLoaded)
-        groupedSection = section
-        groupedCategories = categories
-        groupedConfig = config
-        groupedCountries = groupCountries
-        groupedResult = groups
-        return groups
-    }
-
-internal fun BrowseActivity.withoutEmptyGroups(categories: List<Category>): List<Category> {
-        if (!hideEmptyGroups || groupCounts.isEmpty()) return categories
-        return categories.filter { category ->
-            category.id == PlaylistLoader.ALL_ID ||
-                category.id == PlaylistLoader.FAVORITES_ID ||
-                category.id == PlaylistLoader.RECENT_ID ||
-                category.id == PlaylistLoader.FOR_YOU_ID ||
-                category.id == PlaylistLoader.CONTINUE_ID ||
-                category.id == PlaylistLoader.TOP_WATCHED_ID ||
-                (groupCounts[category.id] ?: 0) > 0
-        }
-    }
-
-internal fun BrowseActivity.prepareGroup(channels: List<Channel>, config: LineupConfig): List<Channel> {
-        val hidden = config.hiddenChannels.orEmpty()
-        val names = config.channelNames.orEmpty()
-        val prefixes = config.namePrefixes.orEmpty()
-        val suffixes = config.nameSuffixes.orEmpty()
-        if (hidden.isEmpty() && names.isEmpty() && prefixes.isEmpty() && suffixes.isEmpty()) return channels
-        val hiddenSet = hidden.toSet()
-        val out = ArrayList<Channel>(channels.size)
-        for (channel in channels) {
-            if (channel.id in hiddenSet) continue
-            val name = ChannelNames.present(channel, config)
-            out.add(if (name == channel.name) channel else channel.copy(name = name))
-        }
-        return out
-    }
-
 internal fun BrowseActivity.selectCategory(category: Category, immediate: Boolean) {
         categoryAdapter.setSelected(category.id)
         selectedCategoryName = category.name
@@ -2390,112 +2129,6 @@ internal fun BrowseActivity.schedulePrefetch(channels: List<Channel>) {
         }
         epgPrefetchWait = run
         focusHandler.postDelayed(run, if (touchPrimary) 220L else FOCUS_SETTLE_MS)
-    }
-
-internal fun BrowseActivity.glowFrom(url: String?) {
-        if (url.isNullOrBlank()) return
-        val request = coil.request.ImageRequest.Builder(this)
-            .data(url)
-            .size(com.olympus.iptv.ui.BackdropGlow.THUMB_W, com.olympus.iptv.ui.BackdropGlow.THUMB_H)
-            .target { drawable ->
-                val bitmap = (drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap ?: return@target
-                com.olympus.iptv.ui.BackdropGlow.apply(bitmap, binding.guideShell)
-            }
-            .build()
-        coil.Coil.imageLoader(this).enqueue(request)
-    }
-
-internal fun BrowseActivity.showChannelDetail(channel: Channel) {
-        focusedChannel = channel
-        queuePreview(channel)
-        epgWait?.let { focusHandler.removeCallbacks(it) }
-        epgWait = null
-        if (channel.kind != ContentKind.LIVE) {
-            loadTitleLine(channel)
-            glowFrom(channel.logoUrl)
-            return
-        }
-        if (epgCache.containsKey(channel.id)) {
-            channelAdapter.notifyEpgChanged(channel.id)
-            return
-        }
-        val run = Runnable {
-            epgWait = null
-            if (focusedChannel?.id != channel.id || epgCache.containsKey(channel.id)) return@Runnable
-            detailJob?.cancel()
-            val saved = playlist ?: return@Runnable
-            detailJob = lifecycleScope.launch {
-                val nowNext = runCatching { epgRepo.nowNext(saved, channel) }.getOrDefault(EpgNowNext())
-                if (focusedChannel?.id != channel.id) return@launch
-                rememberEpg(channel.id, nowNext)
-                channelAdapter.notifyEpgChanged(channel.id)
-                queuePreview(channel)
-            }
-        }
-        epgWait = run
-        focusHandler.postDelayed(run, FOCUS_SETTLE_MS)
-    }
-
-internal fun BrowseActivity.loadTitleLine(channel: Channel) {
-        val saved = playlist ?: return
-        detailJob?.cancel()
-        val run = object : Runnable {
-            override fun run() {
-                if (focusedChannel?.id != channel.id) return
-                // Wait until the list is idle so rapid scrolling doesn't spam TMDB.
-                if (channelAdapter.isScrolling()) {
-                    focusHandler.postDelayed(this, FOCUS_SETTLE_MS)
-                    return
-                }
-                detailJob = lifecycleScope.launch {
-                    val series = section == GuideSection.SHOWS || !channel.seriesId.isNullOrBlank()
-                    val id = channel.seriesId?.takeIf { it.isNotBlank() } ?: channel.id
-                    val xtream = withContext(Dispatchers.IO) {
-                        runCatching { XtreamClient().titleLine(saved, series, id) }.getOrDefault("")
-                    }
-                    if (focusedChannel?.id != channel.id) return@launch
-                    val cached = TitleRatings.peek(channel.name, series)
-                    if (cached != null) {
-                        val line = listOf(xtream, cached.scoreLine(2)).filter { it.isNotBlank() }.joinToString(" · ")
-                        if (line.isNotBlank()) channelAdapter.setDetail(channel.id, line)
-                        return@launch
-                    }
-                    if (channelAdapter.isScrolling() || focusedChannel?.id != channel.id) {
-                        if (xtream.isNotBlank()) channelAdapter.setDetail(channel.id, xtream)
-                        return@launch
-                    }
-                    val scores = withContext(Dispatchers.IO) {
-                        TitleRatings.loadScores(channel.name, preferTv = series)
-                    }
-                    if (focusedChannel?.id != channel.id) return@launch
-                    val line = listOf(xtream, scores.scoreLine(2)).filter { it.isNotBlank() }.joinToString(" · ")
-                    if (line.isNotBlank()) channelAdapter.setDetail(channel.id, line)
-                }
-            }
-        }
-        focusHandler.postDelayed(run, if (touchPrimary) 280L else FOCUS_SETTLE_MS)
-    }
-
-internal fun BrowseActivity.openVodRatings(channel: Channel) {
-        VodDetailSheet.showLoading(this)
-        lifecycleScope.launch {
-            val preferTv = section == GuideSection.SHOWS || !channel.seriesId.isNullOrBlank()
-            val limit = withContext(Dispatchers.IO) {
-                (application as OlympusIptvApp).playlistStore.tmdbItemsLimit()
-            }
-            val bundle = withContext(Dispatchers.IO) {
-                TitleRatings.loadFull(channel.name, preferTv = preferTv, tmdbLimit = limit)
-            }
-            if (isDestroyed) return@launch
-            VodDetailSheet.show(
-                context = screen(),
-                bundle = bundle,
-                onTrailer = {
-                    openYoutubeTrailer(channel.name, preferTv)
-                },
-                onPlay = { play(channel) }
-            )
-        }
     }
 
 internal fun BrowseActivity.pushFavorites(app: OlympusIptvApp, playlistId: String, baseRevision: Long) {

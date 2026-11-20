@@ -734,4 +734,22 @@
     <string name="vpn_need_login">Enter the username and password.</string>
     <string name="vpn_refused">The VPN service refused the sign-in.</string>
     <string name="vpn_no_answer">The VPN service did not answer.</string>
+    <string name="auto_resume_title">Auto-resume last channel</string>
+    <string name="auto_resume_hint">Turn the box on and go straight to the last live channel.</string>
+    <string name="action_undo">Undo</string>
+    <string name="pill_favorite_add">Added %1$s to Favorites</string>
+    <string name="pill_favorite_remove">Removed %1$s from Favorites</string>
+    <string name="pill_reminder">Reminder set for %1$s</string>
+    <string name="pill_hidden">Hid %1$s</string>
+    <string name="guide_hide_channel">Hide channel</string>
+    <string name="night_mode">Night mode</string>
+    <string name="night_mode_on">Night mode is on</string>
+    <string name="record_pad_title">How much extra time?</string>
+    <string name="record_end_pad">Start 2 min early, end %1$d min late</string>
+    <string name="same_show">Same show</string>
+    <string name="radio_mode">Screen off, audio only</string>
+    <string name="radio_on">Screen is off. Tap to show the picture.</string>
+    <string name="av_sync_earlier">Audio earlier (−100 ms) · now %1$d ms</string>
+    <string name="av_sync_later">Audio later (+100 ms) · now %1$d ms</string>
+    <string name="av_sync_status">Audio offset %1$d ms</string>
 </resources>

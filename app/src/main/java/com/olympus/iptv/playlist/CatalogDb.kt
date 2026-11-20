@@ -576,6 +576,14 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
                     arrayOf(playlistId, bucket, contains, contains)
                 )
             }
+            if (found.isEmpty()) {
+                val tokens = FtsQuery.looseTokens(trimmed)
+                if (tokens.isNotEmpty()) {
+                    val where = base + tokens.joinToString("") { " AND name LIKE ? ESCAPE '\\'" }
+                    val args = arrayOf(playlistId, bucket, *tokens.map { likePattern(it) }.toTypedArray())
+                    take(where, args)
+                }
+            }
             found
         }
     }
@@ -2032,6 +2040,22 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         values.put("fetched_at", System.currentTimeMillis())
         values.put("payload", encodeEpg(programs))
         writableDatabase.insertWithOnConflict("epg_cache", null, values, SQLiteDatabase.CONFLICT_REPLACE)
+    }
+
+    /** Once a day, shrink the WAL and drop EPG snapshots older than 24 hours. */
+    fun maintainDaily() = write {
+        val stamp = File(filesDir, "catalog-maintain.day")
+        val day = System.currentTimeMillis() / 86_400_000L
+        val last = runCatching { stamp.readText().trim().toLong() }.getOrDefault(-1L)
+        if (last == day) return@write
+        val cutoff = System.currentTimeMillis() - 86_400_000L
+        val db = writableDatabase
+        db.delete("epg_cache", "fetched_at < ?", arrayOf(cutoff.toString()))
+        // VACUUM compacts into the WAL. Checkpoint then drops that file, and optimize refreshes stats.
+        runCatching { db.execSQL("VACUUM") }
+        runCatching { db.execSQL("PRAGMA wal_checkpoint(TRUNCATE)") }
+        runCatching { db.execSQL("PRAGMA optimize") }
+        runCatching { stamp.writeText(day.toString()) }
     }
 
     fun markWatchedAll(playlistId: String, seriesId: String, season: Int, episodeIds: List<String>) = write {

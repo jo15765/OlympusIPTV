@@ -91,7 +91,7 @@
         android:paddingHorizontal="22dp"
         android:paddingVertical="10dp"
         android:textColor="@color/accent"
-        android:textSize="42sp"
+        android:textSize="64sp"
         android:textStyle="bold"
         android:visibility="gone" />
 

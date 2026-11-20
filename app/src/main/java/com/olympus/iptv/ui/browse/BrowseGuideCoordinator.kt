@@ -41,7 +41,6 @@ import com.olympus.iptv.BuildConfig
 import androidx.transition.AutoTransition
 import androidx.transition.TransitionManager
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.ViewModelProvider
 import androidx.media3.common.MediaItem
@@ -87,7 +86,6 @@ import com.olympus.iptv.playlist.PinAlert
 import com.olympus.iptv.playlist.PlaylistLoader
 import com.olympus.iptv.playlist.TitleRatings
 import com.olympus.iptv.playlist.XtreamClient
-import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.olympus.iptv.record.RecordActivity
 import com.olympus.iptv.record.RecordPrompt
 import com.olympus.iptv.record.RecordingService
@@ -136,6 +134,9 @@ internal fun BrowseActivity.refreshUnhealthy() {
 
 internal fun BrowseActivity.rememberEpg(channelId: String, epg: EpgNowNext) {
         epgCache[channelId] = epg
+        if (section == GuideSection.TV && groupSampleIds.values.any { channelId in it }) {
+            categoryAdapter.refreshDetails()
+        }
         if (epgCache.size <= EPG_CACHE_CAP) return
         val drop = epgCache.size - (EPG_CACHE_CAP * 3 / 4)
         val keys = epgCache.keys.take(drop)
@@ -178,6 +179,8 @@ internal fun BrowseActivity.wireLazyPanes() {
         panes.onDeviceInflated = { device ->
             device.deviceBack.setOnClickListener { showAdminPane(panes.cardAdminWeb) }
             device.deviceRemovePlaylist.setOnClickListener { confirmRemovePlaylist() }
+            device.deviceAutoResume.setOnClickListener { toggleAutoResume() }
+            paintAutoResume()
             pendingDeviceId?.let { device.deviceIdValue.text = it }
             dashboardUrlText?.let {
                 device.deviceUrlValue.text = it
@@ -445,6 +448,8 @@ internal suspend fun BrowseActivity.bootstrap(savedIn: SavedPlaylist) {
             lifecycleScope.launch(Dispatchers.IO) { store.saveSession(fixed) }
         }
         playlist = saved
+        tuneFromLauncher(saved.id)
+        maybeAutoResume(saved.id)
         groupCountriesReady = false
         groupCountriesQueued = false
         groupCountriesLoaded = false
@@ -1592,91 +1597,6 @@ internal fun BrowseActivity.stopPreview() {
     }
 
 
-internal fun BrowseActivity.tickGuideHeader() {
-        if (binding.guideDate.visibility != View.VISIBLE) return
-        val now = com.olympus.iptv.playlist.EpgUtils.now()
-        val half = now / halfHourMs
-        if (half == guideHeaderHalfHour) {
-            positionNowLine(programAdapter.scrollX)
-            return
-        }
-        styleGuideHeader()
-    }
-
-internal fun BrowseActivity.styleGuideHeader() {
-        val guide = binding.programPane.visibility == View.VISIBLE && section == GuideSection.TV
-        val density = resources.displayMetrics.density
-        val height = ((if (guide) 48 else 36) * density).toInt()
-        val channelHeader = binding.channelHeader.layoutParams
-        if (channelHeader.height != height) {
-            channelHeader.height = height
-            binding.channelHeader.layoutParams = channelHeader
-        }
-        val programHeader = binding.programHeaderScroll.layoutParams
-        if (guide && programHeader.height != height) {
-            programHeader.height = height
-            binding.programHeaderScroll.layoutParams = programHeader
-        }
-        binding.guideDate.visibility = if (guide) View.VISIBLE else View.GONE
-        binding.guideNow.visibility = if (guide) View.VISIBLE else View.GONE
-        if (selectedCategoryName.isEmpty()) return
-        if (guide) {
-            val now = com.olympus.iptv.playlist.EpgUtils.now()
-            guideHeaderHalfHour = now / halfHourMs
-            binding.guideDate.text = com.olympus.iptv.playlist.EpgUtils.formatWhen(now)
-        } else {
-            guideHeaderHalfHour = -1L
-        }
-        paintBreadcrumb(selectedCategoryName)
-    }
-
-internal fun BrowseActivity.jumpGuideToNow() {
-        if (binding.programPane.visibility != View.VISIBLE || section != GuideSection.TV) return
-        ensureProgramGuide()
-        val now = com.olympus.iptv.playlist.EpgUtils.now()
-        val start = GuideMetrics.start(now, halfHourMs)
-        val end = GuideMetrics.end(start)
-        if (programAdapter.setWindow(start, end)) {
-            buildProgramHeader()
-        }
-        val row = when {
-            focusIsIn(binding.programPane) ->
-                (currentFocus?.tag as? ProgramGuideAdapter.Slot)?.row ?: focusedChannelRow()
-            focusIsIn(binding.channelList) -> focusedChannelRow()
-            else -> focusedChannelRow()
-        }
-        showMenu(GuideMenu.PROGRAMS)
-        focusCurrentProgram(row)
-    }
-
-internal fun BrowseActivity.widestNamePx(): Float {
-        val size = android.util.TypedValue.applyDimension(
-            android.util.TypedValue.COMPLEX_UNIT_SP,
-            13f,
-            resources.displayMetrics
-        )
-        if (!namePaintReady || namePaint.textSize != size) {
-            namePaint.textSize = size
-            namePaint.typeface = android.graphics.Typeface.DEFAULT
-            namePaintReady = true
-            fittedList = null
-        }
-        var widest = 0f
-        for (channel in visibleChannels) {
-            val measured = namePaint.measureText(com.olympus.iptv.data.NameStrip.shown(channel.name))
-            if (measured > widest) widest = measured
-        }
-        fittedTextPx = widest
-        return widest
-    }
-
-internal fun BrowseActivity.sameNames(previous: List<Channel>, channels: List<Channel>): Boolean {
-        for (index in previous.indices) {
-            if (previous[index].name != channels[index].name) return false
-        }
-        return true
-    }
-
 internal fun BrowseActivity.openProgramGuide() {
         if (section != GuideSection.TV) return
         val row = focusedChannelRow()
@@ -1868,33 +1788,6 @@ internal fun BrowseActivity.scheduleGuideAlign(
         source.postOnAnimation(alignGuideRunnable)
     }
 
-internal fun BrowseActivity.buildProgramHeader() {
-        browseModel.rememberEpgWindow(programAdapter.windowStart, programAdapter.windowEnd)
-        epgCtl.buildHeader()
-    }
-
-internal fun BrowseActivity.scrollProgramGuide(x: Int) {
-        if (guideScrollSync) return
-        guideScrollSync = true
-        programAdapter.scrollX = x
-        binding.programHeaderScroll.scrollTo(x, 0)
-        positionNowLine(x)
-        for (index in 0 until binding.programList.childCount) {
-            val row = binding.programList.getChildAt(index)
-            row.findViewById<android.widget.HorizontalScrollView>(R.id.programRowScroll)?.scrollTo(x, 0)
-        }
-        if (kotlin.math.abs(x - lastLabelShiftScroll) >= 12) {
-            lastLabelShiftScroll = x
-            val needTall = programAdapter.refreshLabelShift(binding.programList)
-            applyGuideRowHeight(needTall)
-        }
-        guideScrollSync = false
-    }
-
-internal fun BrowseActivity.positionNowLine(scrollX: Int) {
-        if (epgReady()) epgCtl.positionNowLine(scrollX)
-    }
-
 internal fun BrowseActivity.paintProgramSynopsis(channel: Channel, program: EpgProgram?) {
         if (!viewReady() || !epgReady()) return
         epgCtl.paintSynopsis(channel, program)
@@ -1919,39 +1812,6 @@ internal fun BrowseActivity.rememberGuideUi() {
 internal fun BrowseActivity.restoreGuideUiIfPossible() {
         if (!epgReady()) return
         epgCtl.restoreScrolls(browseModel, playlist?.id)
-    }
-
-
-internal fun BrowseActivity.baseGuideRowDp(): Int =
-        if (guideDensity == PlaylistStore.GUIDE_COMPACT) 32 else 40
-
-internal fun BrowseActivity.tallGuideRowDp(): Int =
-        if (guideDensity == PlaylistStore.GUIDE_COMPACT) 36 else 44
-
-internal fun BrowseActivity.syncProgramRowHeight() {
-        applyGuideRowHeight(guideRowsTall)
-    }
-
-internal fun BrowseActivity.applyGuideRowHeight(tall: Boolean) {
-        guideRowsTall = tall
-        val dp = if (tall) tallGuideRowDp() else baseGuideRowDp()
-        val height = (dp * resources.displayMetrics.density).toInt()
-        val programChanged = programAdapter.rowHeight != height
-        val channelChanged = channelAdapter.guideRowHeight != height
-        if (!programChanged && !channelChanged) return
-        programAdapter.rowHeight = height
-        channelAdapter.guideRowHeight = height
-        if (programAdapter.itemCount > 0) {
-            programAdapter.notifyItemRangeChanged(0, programAdapter.itemCount)
-        }
-        if (channelAdapter.itemCount > 0 && binding.programPane.visibility == View.VISIBLE) {
-            channelAdapter.notifyItemRangeChanged(0, channelAdapter.itemCount)
-        }
-        if (binding.programPane.visibility == View.VISIBLE) {
-            binding.programList.post {
-                alignGuide(binding.channelList, binding.programList)
-            }
-        }
     }
 
 internal fun BrowseActivity.alignGuide(
@@ -2144,6 +2004,84 @@ internal fun BrowseActivity.toggleGuideFavorite(channel: Channel) {
                 app.playlistStore.setFavorite(saved.id, channel.id, false)
             }
             pushFavorites(app, saved.id, base)
+            app.appScope.launch { com.olympus.iptv.ui.player.TvLauncherBridge.refreshFavorites(app, saved.id) }
+        }
+        com.olympus.iptv.ui.ActionPill.show(
+            this,
+            getString(if (adding) R.string.pill_favorite_add else R.string.pill_favorite_remove, channel.name)
+        ) {
+            toggleGuideFavorite(channel)
+        }
+    }
+
+internal fun BrowseActivity.tuneFromLauncher(playlistId: String) {
+        val id = intent.getStringExtra(BrowseActivity.EXTRA_TUNE_ID)?.takeIf { it.isNotBlank() } ?: return
+        intent.removeExtra(BrowseActivity.EXTRA_TUNE_ID)
+        val app = application as OlympusIptvApp
+        app.autoResumeUsed = true
+        lifecycleScope.launch {
+            val channel = withContext(Dispatchers.IO) {
+                app.catalogDb.readChannel(playlistId, CatalogDb.LIVE, id)
+                    ?: app.catalogDb.readChannel(playlistId, CatalogDb.VOD, id)
+                    ?: app.catalogDb.readChannel(playlistId, CatalogDb.SERIES, id)
+            } ?: return@launch
+            if (!isDestroyed && channel.streamUrl.isNotBlank()) play(channel)
+        }
+    }
+
+internal fun BrowseActivity.paintAutoResume() {
+        if (panes.deviceOrNull?.deviceAutoResumeTitle == null) return
+        val app = application as OlympusIptvApp
+        lifecycleScope.launch {
+            val on = withContext(Dispatchers.IO) { app.playlistStore.autoResume() }
+            if (isDestroyed) return@launch
+            panes.deviceOrNull?.deviceAutoResumeTitle?.text =
+                getString(R.string.auto_resume_title) + if (on) " · On" else " · Off"
+        }
+    }
+
+internal fun BrowseActivity.toggleAutoResume() {
+        val app = application as OlympusIptvApp
+        lifecycleScope.launch {
+            val next = withContext(Dispatchers.IO) { !app.playlistStore.autoResume() }
+            withContext(Dispatchers.IO) { app.playlistStore.saveAutoResume(next) }
+            if (!isDestroyed) paintAutoResume()
+        }
+    }
+
+internal fun BrowseActivity.maybeAutoResume(playlistId: String) {
+        val app = application as OlympusIptvApp
+        if (app.autoResumeUsed) return
+        if (intent.getBooleanExtra(BrowseActivity.EXTRA_SKIP_RESUME, false)) {
+            app.autoResumeUsed = true
+            return
+        }
+        app.autoResumeUsed = true
+        lifecycleScope.launch {
+            val enabled = withContext(Dispatchers.IO) { app.playlistStore.autoResume() }
+            if (!enabled || isDestroyed) return@launch
+            val id = withContext(Dispatchers.IO) { app.playlistStore.lastChannelId(playlistId) } ?: return@launch
+            val channel = withContext(Dispatchers.IO) {
+                app.catalogDb.readChannel(playlistId, CatalogDb.LIVE, id)
+            } ?: return@launch
+            if (isDestroyed || channel.streamUrl.isBlank()) return@launch
+            play(channel)
+        }
+    }
+
+internal fun BrowseActivity.hideGuideChannel(channel: Channel) {
+        val saved = playlist ?: return
+        val previous = activeConfig.hiddenChannels.orEmpty()
+        if (channel.id in previous) return
+        activeConfig = activeConfig.copy(hiddenChannels = previous + channel.id)
+        visibleChannels.removeAll { it.id == channel.id }
+        channelAdapter.remove(channel.id)
+        val app = application as OlympusIptvApp
+        app.appScope.launch { app.playlistStore.saveLineup(saved.id, activeConfig) }
+        com.olympus.iptv.ui.ActionPill.show(this, getString(R.string.pill_hidden, channel.name)) {
+            activeConfig = activeConfig.copy(hiddenChannels = previous)
+            app.appScope.launch { app.playlistStore.saveLineup(saved.id, activeConfig) }
+            render(restoreFocus = true)
         }
     }
 

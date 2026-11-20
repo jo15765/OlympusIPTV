@@ -1,17 +1,18 @@
 package com.olympus.iptv.ui.player
 
-import android.app.PictureInPictureParams
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ActivityInfo
-import android.content.pm.PackageManager
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
-import android.util.Rational
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
@@ -33,7 +34,7 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
-import androidx.media3.datasource.DefaultHttpDataSource
+import com.olympus.iptv.playlist.StreamHeaders
 import androidx.media3.datasource.HttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.analytics.AnalyticsListener
@@ -55,6 +56,7 @@ import com.olympus.iptv.data.PlayerDecoder
 import com.olympus.iptv.data.PlaylistStore
 import com.olympus.iptv.data.SavedPlaylist
 import com.olympus.iptv.data.WatchEntry
+import com.olympus.iptv.ui.ChannelNumberJump
 import com.olympus.iptv.ui.DeviceForm
 import com.olympus.iptv.ui.Haptics
 import com.olympus.iptv.ui.InsetsPad
@@ -70,8 +72,9 @@ import com.olympus.iptv.playlist.Subtitles
 import com.olympus.iptv.playlist.TitleRatings
 import com.olympus.iptv.playlist.LineupApplier
 import java.util.Locale
-import com.olympus.iptv.record.RecordPrompt
 import com.olympus.iptv.playlist.EpgUtils
+import com.olympus.iptv.vpn.AppTunnel
+import com.olympus.iptv.vpn.TunnelState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -89,13 +92,13 @@ class PlayerActivity : AppCompatActivity() {
     private lateinit var miniGuide: PlayerMiniGuide
     internal var player: ExoPlayer? = null
 
-    private var queue: List<Channel> = emptyList()
-    private var index: Int = 0
+    internal var queue: List<Channel> = emptyList()
+    internal var index: Int = 0
     internal var current: Channel? = null
     internal var playlistId: String? = null
     private var zapMode: String = ZAP_LIST
     private var categoryId: String? = null
-    private var stepping = false
+    internal var stepping = false
     private var playJob: Job? = null
     private var progressJob: Job? = null
     private var nextPlayer: ExoPlayer? = null
@@ -106,9 +109,9 @@ class PlayerActivity : AppCompatActivity() {
     private var preloadJob: Job? = null
     private var streamsReleased = false
     private var recoverJob: Job? = null
-    private var countdownJob: Job? = null
-    private var nextLookup: Job? = null
-    private var introJob: Job? = null
+    internal var countdownJob: Job? = null
+    internal var nextLookup: Job? = null
+    internal var introJob: Job? = null
     internal var subtitleJob: Job? = null
     /** Cancels in-flight EPG / catch-up / subtitle work when the user zaps away. */
     private var channelJob = SupervisorJob()
@@ -121,12 +124,12 @@ class PlayerActivity : AppCompatActivity() {
     internal var audioAppliedFor: String? = null
     internal var preferredSubtitle: String = PlaylistStore.SUBTITLE_OFF
     internal var subtitleAppliedFor: String? = null
-    private var nextIsEpisode = false
+    internal var nextIsEpisode = false
     internal var panelEmbedded = emptyList<StreamChoice>()
-    private var pendingNext: Channel? = null
-    private var resolvedSeries: List<Channel>? = null
-    private var countdownFor: String? = null
-    private var nextHanded = false
+    internal var pendingNext: Channel? = null
+    internal var resolvedSeries: List<Channel>? = null
+    internal var countdownFor: String? = null
+    internal var nextHanded = false
     private var advancing = false
     internal var playbackReady = false
     private var playbackToken = 0
@@ -161,33 +164,43 @@ class PlayerActivity : AppCompatActivity() {
     private var menuBaseBottom = 0
     private var overlayBaseTop = 0
     internal var sleepMinutes = 0
+    internal var nightMode = false
+    internal var radioOn = false
+    internal var savedBrightness = -1f
+    internal val radioClock: Runnable = object : Runnable {
+        override fun run() {
+            if (!radioOn || isDestroyed) return
+            paintRadioClock()
+            hideHandler.postDelayed(this, 1_000L)
+        }
+    }
+    internal val audioDelay = DelayAudioProcessor()
+    private var leveler: android.media.audiofx.DynamicsProcessing? = null
     private var lastBackAt = 0L
-    private var upNextToken = 0
-    private var skipIntroSeries = emptySet<String>()
+    internal var upNextToken = 0
+    internal var skipIntroSeries = emptySet<String>()
     private var videoDecoder = PlayerDecoder.HARDWARE
     private var playersDecoder = PlayerDecoder.HARDWARE
     private var decoderDirty = false
     private var pipSwipeHome = true
-    private var scrobble = PlaylistStore.ScrobbleConfig(
+    internal var scrobble = PlaylistStore.ScrobbleConfig(
         provider = Scrobbler.NONE,
         simklToken = "",
         simklClientId = "",
         traktToken = "",
         traktClientId = ""
     )
-    private var scrobbleChannel: Channel? = null
-    private var scrobbleJob: Job? = null
-    private var scrobbleStarted = false
+    internal var scrobbleChannel: Channel? = null
+    internal var scrobbleJob: Job? = null
+    internal var scrobbleStarted = false
     private var inPip = false
-    private var pipPending = false
+    internal var pipPending = false
+    private var networkWatcher: NetworkWatcher? = null
+    private var acceptReconnectAt = 0L
+    private var lastReconnectAt = 0L
     private var enterPipOnReady = false
-    internal val sleepFire = Runnable {
-        if (!isDestroyed) {
-            player?.playWhenReady = false
-            finish()
-        }
-    }
-    private val epgRepo: EpgRepository
+    internal val sleepFire = Runnable { stopForSleep() }
+    internal val epgRepo: EpgRepository
         get() = (application as OlympusIptvApp).epgRepository
 
     internal val hideHandler = Handler(Looper.getMainLooper())
@@ -235,7 +248,13 @@ class PlayerActivity : AppCompatActivity() {
                 }
             },
             nowTitle = { miniTitles[it.id] },
-            progress = { miniProgress[it.id] ?: 0 }
+            progress = { miniProgress[it.id] ?: 0 },
+            sameShow = { channel ->
+                com.olympus.iptv.playlist.SimilarChannels.same(
+                    miniTitles[current?.id],
+                    miniTitles[channel.id]
+                )
+            }
         )
         hideHandler.postDelayed(idleWatch, 60_000L)
         binding.miniGuideLast.setOnClickListener {
@@ -302,7 +321,8 @@ class PlayerActivity : AppCompatActivity() {
 
         playCurrent(
             seedMeta = intent.getStringExtra(EXTRA_META),
-            seedNext = intent.getStringExtra(EXTRA_NEXT)
+            seedNext = intent.getStringExtra(EXTRA_NEXT),
+            startAt = intent.getLongExtra(EXTRA_START_AT, -1L).takeIf { it >= 0L }
         )
         val playbackUrl = current?.streamUrl.orEmpty()
         val libraryPlayback = playbackUrl.startsWith("file:") || playbackUrl.startsWith("http://127.0.0.1")
@@ -378,6 +398,8 @@ class PlayerActivity : AppCompatActivity() {
         })
         lifecycleScope.launch {
             val store = (application as OlympusIptvApp).playlistStore
+            nightMode = withContext(Dispatchers.IO) { store.nightMode() }
+            player?.let { applyNightMode(it) }
             preferredAudio = withContext(Dispatchers.IO) { store.audioLanguage() }
             preferredSubtitle = withContext(Dispatchers.IO) { store.subtitleLanguage() }
             // Multi-view needs a second ExoPlayer; skip on phones to keep RAM free.
@@ -634,6 +656,10 @@ class PlayerActivity : AppCompatActivity() {
         ::binding.isInitialized && binding.playbackErrorCard.visibility == View.VISIBLE
 
     private fun handlePlayerBack() {
+        if (radioOn) {
+            leaveRadioMode()
+            return
+        }
         if (::miniGuide.isInitialized && miniGuide.isOpen()) {
             miniGuide.hide()
             return
@@ -692,12 +718,13 @@ class PlayerActivity : AppCompatActivity() {
 
     internal fun channelScope() = lifecycleScope + channelJob
 
-    private fun playCurrent(seedMeta: String? = null, seedNext: String? = null, startAt: Long? = null) {
+    internal fun playCurrent(seedMeta: String? = null, seedNext: String? = null, startAt: Long? = null) {
         val seed = current ?: queue.getOrNull(index)
         if (seed == null) {
             finish()
             return
         }
+        acceptReconnectAt = SystemClock.elapsedRealtime() + 2_000L
         resetChannelScopedWork()
         playJob?.cancel()
         recoverJob?.cancel()
@@ -774,6 +801,7 @@ class PlayerActivity : AppCompatActivity() {
             refreshEpgForCurrent()
             rememberCurrent()
             scrobbleStart(channel)
+            applyChannelDelay(channel)
             if (channel.kind != ContentKind.LIVE || !channel.seriesId.isNullOrBlank()) {
                 enrichTmdb(channel, alias)
             }
@@ -800,13 +828,16 @@ class PlayerActivity : AppCompatActivity() {
                 StreamSessions.set(channel.id, channel.name, "Playing")
                 binding.playerView.post { syncConnectingFromPlayer(warmed) }
                 if (previous != null && previous !== warmed) recycle(previous)
+                holdRadioSurface()
             } else {
                 val exo = player ?: return@launch
                 watchPlaybackEvents(exo)
                 exo.setMediaItem(mediaItem(channel))
                 if (playAt > 0L) exo.seekTo(playAt)
                 exo.prepare()
+                applyNightMode(exo)
                 exo.playWhenReady = true
+                holdRadioSurface()
                 StreamSessions.set(channel.id, channel.name, "Playing")
                 binding.playerView.post { syncConnectingFromPlayer(exo) }
                 binding.playerView.postDelayed({
@@ -876,20 +907,31 @@ class PlayerActivity : AppCompatActivity() {
         playersDecoder = mode
         decoderDirty = false
         val control = PlayerBuffers.live(DeviceForm.isLowRam(this))
-        val http = DefaultHttpDataSource.Factory()
-            .setUserAgent("Olympus-IPTV")
-            .setConnectTimeoutMs(15_000)
-            .setReadTimeoutMs(20_000)
-            .setAllowCrossProtocolRedirects(true)
+        val http = StreamHeaders.httpFactory(this, { playlistId }, { current })
         return ExoPlayer.Builder(this)
-            .setRenderersFactory(PlayerDecoder.renderersFactory(this, mode))
+            .setRenderersFactory(OffsetRenderersFactory(this, mode, audioDelay))
             .setLoadControl(control)
             .setMediaSourceFactory(DefaultMediaSourceFactory(this).setDataSourceFactory(http))
             .build()
             .also { exo ->
                 exo.addListener(trackListener)
                 watchPlaybackEvents(exo)
+                applyNightMode(exo)
             }
+    }
+
+    private fun applyNightMode(exo: ExoPlayer) {
+        leveler?.let { runCatching { it.release() } }
+        leveler = null
+        if (!nightMode) return
+        leveler = AudioLeveler.attach(exo.audioSessionId)
+    }
+
+    internal fun chooseNightMode(enabled: Boolean) {
+        nightMode = enabled
+        player?.let { applyNightMode(it) }
+        val app = application as OlympusIptvApp
+        app.appScope.launch { runCatching { app.playlistStore.saveNightMode(enabled) } }
     }
 
     private fun discardSparePlayers() {
@@ -1487,7 +1529,7 @@ class PlayerActivity : AppCompatActivity() {
         filtersReady = true
     }
 
-    private suspend fun savedPlaylist(savedId: String): SavedPlaylist? {
+    internal suspend fun savedPlaylist(savedId: String): SavedPlaylist? {
         cachedPlaylist?.let { return it }
         val store = (application as OlympusIptvApp).playlistStore
         val found = store.session.first()?.takeIf { it.id == savedId }
@@ -1517,7 +1559,7 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
-    private suspend fun resumePosition(channel: Channel): Long {
+    internal suspend fun resumePosition(channel: Channel): Long {
         if (channel.kind == ContentKind.LIVE && channel.seriesId.isNullOrBlank()) return 0L
         val savedId = playlistId ?: return 0L
         return withContext(Dispatchers.IO) {
@@ -1545,7 +1587,11 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
-    private fun saveWatch(channel: Channel) {
+    internal fun saveWatch(channel: Channel) {
+        if (channel.streamUrl.startsWith("file:") || channel.streamUrl.startsWith("content:")) {
+            val position = player?.currentPosition?.coerceAtLeast(0L) ?: return
+            com.olympus.iptv.record.RecordingProgress.remember(this, channel.id, position)
+        }
         val savedId = playlistId ?: return
         if (channel.kind == ContentKind.LIVE && channel.seriesId.isNullOrBlank()) return
         val exo = player ?: return
@@ -1564,6 +1610,9 @@ class PlayerActivity : AppCompatActivity() {
         lastSavedWatchAt = position
         app.appScope.launch {
             runCatching { app.playlistStore.rememberWatch(savedId, watchEntry(channel, position, duration)) }
+            if (channel.kind != ContentKind.LIVE || !channel.seriesId.isNullOrBlank()) {
+                TvLauncherBridge.publishContinue(app, channel, savedId, position, duration)
+            }
             if (finished) {
                 runCatching { app.catalogDb.markWatched(savedId, channel.id, channel.seriesId, channel.season) }
             }
@@ -1600,256 +1649,6 @@ class PlayerActivity : AppCompatActivity() {
             offerCatchup(playlist, channel, epg.now)
             flashOverlay()
         }
-    }
-
-    private fun tickUpNext(token: Int) {
-        if (token != upNextToken) return
-        val exo = player ?: return
-        val channel = current ?: return
-        if (!exo.isPlaying) return
-        if (channel.kind == ContentKind.LIVE && channel.seriesId.isNullOrBlank()) return
-        val duration = exo.duration
-        val left = if (duration > 0L) duration - exo.currentPosition else Long.MAX_VALUE
-        if (duration > 0L && left <= 25_000L) offerNext(channel)
-        else hideHandler.postDelayed({ tickUpNext(token) }, 1_000L)
-    }
-
-    private fun armUpNext(exo: ExoPlayer, channel: Channel?) {
-        val token = ++upNextToken
-        if (channel == null) return
-        if (channel.kind == ContentKind.LIVE && channel.seriesId.isNullOrBlank()) return
-        hideHandler.postDelayed({ tickUpNext(token) }, 1_000L)
-    }
-
-    private fun offerNext(channel: Channel) {
-        if (countdownFor == channel.id) return
-        saveWatch(channel)
-        countdownFor = channel.id
-        nextHanded = false
-        introJob?.cancel()
-        nextIsEpisode = !channel.seriesId.isNullOrBlank()
-        val seriesQueued = queue.getOrNull(index + 1)?.takeIf {
-            it.id != channel.id &&
-                !channel.seriesId.isNullOrBlank() &&
-                it.seriesId == channel.seriesId &&
-                it.streamUrl.isNotBlank()
-        }
-        val listQueued = queue.getOrNull(index + 1)?.takeIf {
-            it.id != channel.id && it.streamUrl.isNotBlank()
-        }
-        pendingNext = seriesQueued ?: listQueued?.takeIf { channel.seriesId.isNullOrBlank() }
-        resolvedSeries = null
-        showCountdown(pendingNext)
-        if (pendingNext == null && !channel.seriesId.isNullOrBlank()) {
-            nextLookup = lifecycleScope.launch {
-                val savedId = playlistId
-                val seriesId = channel.seriesId
-                val saved = if (savedId.isNullOrBlank() || seriesId.isNullOrBlank()) null else savedPlaylist(savedId)
-                val episodes = if (saved == null || seriesId.isNullOrBlank()) emptyList()
-                else EpisodeSequence.load(filesDir, saved, seriesId)
-                if (!isActive || countdownFor != channel.id || nextHanded) return@launch
-                val ordered = EpisodeSequence.ordered(episodes)
-                resolvedSeries = ordered
-                val next = EpisodeSequence.nextAfter(ordered, channel)
-                pendingNext = next
-                nextIsEpisode = next != null
-                if (next == null) {
-                    val after = queue.getOrNull(index + 1)?.takeIf {
-                        it.id != channel.id && it.streamUrl.isNotBlank()
-                    }
-                    pendingNext = after
-                    nextIsEpisode = false
-                }
-                if (pendingNext == null) {
-                    countdownJob?.cancel()
-                    hideNextPanel()
-                    return@launch
-                }
-                styleNextPanel(pendingNext)
-            }
-        } else if (pendingNext == null) {
-            hideNextPanel()
-            return
-        }
-        countdownJob = lifecycleScope.launch {
-            for (second in 10 downTo 1) {
-                if (!isActive || nextHanded) return@launch
-                binding.nextCount.text = getString(
-                    if (nextIsEpisode) R.string.next_episode_in else R.string.next_title_in,
-                    second
-                )
-                delay(1_000)
-            }
-            nextLookup?.join()
-            val next = pendingNext
-            if (next == null || nextHanded) {
-                if (!nextHanded) hideNextPanel()
-                return@launch
-            }
-            openNext(next, skipIntro = shouldAutoSkip(next))
-        }
-    }
-
-    private fun showCountdown(next: Channel?) {
-        binding.nextPanel.visibility = View.VISIBLE
-        binding.nextCount.visibility = View.VISIBLE
-        styleNextPanel(next)
-        val focus = if (binding.btnSkipIntro.visibility == View.VISIBLE) {
-            binding.btnSkipIntro
-        } else {
-            binding.btnPlayNext
-        }
-        focus.post { focus.requestFocus() }
-    }
-
-    private fun styleNextPanel(next: Channel?) {
-        if (next == null) {
-            binding.nextName.visibility = View.GONE
-        } else {
-            binding.nextName.visibility = View.VISIBLE
-            binding.nextName.text = if (nextIsEpisode) {
-                EpisodeSequence.heading("", next)
-            } else {
-                next.name
-            }
-        }
-        binding.btnSkipIntro.visibility = if (nextIsEpisode && next != null) View.VISIBLE else View.GONE
-        binding.btnPlayNext.visibility = if (!nextIsEpisode && next != null) View.VISIBLE else View.GONE
-        binding.btnCancelNext.visibility = if (next != null) View.VISIBLE else View.GONE
-        binding.btnNextMenu.visibility = View.VISIBLE
-        val art = next?.logoUrl?.takeIf { it.isNotBlank() }
-        if (art == null) {
-            binding.nextArt.visibility = View.GONE
-        } else {
-            binding.nextArt.visibility = View.VISIBLE
-            binding.nextArt.load(art)
-        }
-        binding.btnSkipIntro.nextFocusDownId = binding.btnCancelNext.id
-        binding.btnPlayNext.nextFocusDownId = binding.btnCancelNext.id
-        binding.btnCancelNext.nextFocusUpId =
-            if (binding.btnSkipIntro.visibility == View.VISIBLE) binding.btnSkipIntro.id else binding.btnPlayNext.id
-        binding.btnCancelNext.nextFocusDownId = binding.btnNextMenu.id
-        binding.btnNextMenu.nextFocusUpId = binding.btnCancelNext.id
-    }
-
-    private fun playPendingNext() {
-        lifecycleScope.launch {
-            nextLookup?.join()
-            val next = pendingNext
-            if (next == null) {
-                hideNextPanel()
-                return@launch
-            }
-            openNext(next, skipIntro = false)
-        }
-    }
-
-    private fun escapeToMenu() {
-        cancelNext()
-        armBrowseBack()
-        finish()
-    }
-
-    private fun showSkipButton() {
-        binding.nextPanel.visibility = View.VISIBLE
-        binding.nextCount.visibility = View.GONE
-        binding.nextName.visibility = View.GONE
-        binding.btnSkipIntro.visibility = View.VISIBLE
-        binding.btnPlayNext.visibility = View.GONE
-        binding.btnNextMenu.visibility = View.GONE
-        binding.btnSkipIntro.post { binding.btnSkipIntro.requestFocus() }
-        introJob?.cancel()
-        introJob = lifecycleScope.launch {
-            while (isActive) {
-                val exo = player
-                if (exo == null) break
-                val duration = exo.duration
-                if (duration > 0L && duration < EpisodeSequence.INTRO_MS + 30_000L) break
-                if (exo.currentPosition >= EpisodeSequence.INTRO_MS) break
-                delay(400)
-            }
-            hideNextPanel()
-        }
-    }
-
-    private fun onSkipIntro() {
-        lifecycleScope.launch {
-            rememberSkipIntroFor(current?.seriesId ?: pendingNext?.seriesId)
-            if (nextHanded) {
-                seekIntro()
-                return@launch
-            }
-            nextLookup?.join()
-            val next = pendingNext
-            if (next == null) {
-                hideNextPanel()
-                return@launch
-            }
-            openNext(next, skipIntro = true)
-        }
-    }
-
-    private fun rememberSkipIntroFor(seriesId: String?) {
-        val id = seriesId?.trim().orEmpty()
-        if (id.isEmpty() || id in skipIntroSeries) return
-        skipIntroSeries = skipIntroSeries + id
-        (application as OlympusIptvApp).appScope.launch {
-            runCatching { (application as OlympusIptvApp).playlistStore.rememberSkipIntro(id) }
-        }
-    }
-
-    private fun shouldAutoSkip(channel: Channel?): Boolean =
-        GuideFeel.autoSkipIntro(channel?.seriesId, skipIntroSeries)
-
-    private fun openNext(next: Channel, skipIntro: Boolean) {
-        if (nextHanded) return
-        nextHanded = true
-        countdownJob?.cancel()
-        val full = resolvedSeries
-        if (full != null && full.any { it.id == next.id }) {
-            queue = full
-            (application as OlympusIptvApp).playbackQueue = full
-        }
-        val at = queue.indexOfFirst { it.id == next.id }
-        if (at >= 0) {
-            index = at
-        } else {
-            queue = listOf(next)
-            index = 0
-        }
-        current = next
-        stepping = true
-        val auto = skipIntro || shouldAutoSkip(next)
-        lifecycleScope.launch {
-            val resume = resumePosition(next)
-            val start = if (auto && resume < EpisodeSequence.INTRO_MS) EpisodeSequence.INTRO_MS else resume
-            playCurrent(startAt = start)
-            if (auto || start >= EpisodeSequence.INTRO_MS) hideNextPanel() else showSkipButton()
-        }
-    }
-
-    private fun seekIntro() {
-        val exo = player ?: return
-        val duration = exo.duration
-        if (duration > 0L && duration < EpisodeSequence.INTRO_MS + 30_000L) {
-            hideNextPanel()
-            return
-        }
-        exo.seekTo(EpisodeSequence.INTRO_MS)
-        hideNextPanel()
-    }
-
-    private fun hideNextPanel() {
-        binding.nextPanel.visibility = View.GONE
-    }
-
-    private fun cancelNext() {
-        countdownJob?.cancel()
-        nextLookup?.cancel()
-        introJob?.cancel()
-        pendingNext = null
-        nextHanded = true
-        hideNextPanel()
     }
 
     private fun nextChannel() = step(1)
@@ -2090,25 +1889,13 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
-    private fun hidePlaybackMenu() {
+    internal fun hidePlaybackMenu() {
         if (!::binding.isInitialized) return
         binding.playbackMenu.visibility = View.GONE
         if (touchPrimary && binding.overlay.visibility != View.VISIBLE) setPhoneSystemBarsHidden(true)
     }
 
-    private fun offerRecording() {
-        val channel = current ?: return
-        val savedId = playlistId ?: return
-        lifecycleScope.launch {
-            val playlist = savedPlaylist(savedId) ?: return@launch
-            val epg = runCatching { epgRepo.nowNext(playlist, channel) }.getOrNull()
-            if (isDestroyed) return@launch
-            RecordPrompt.show(this@PlayerActivity, savedId, channel, epg?.now, epg?.next)
-        }
-    }
-
-    private fun isLiveNow(channel: Channel? = current): Boolean =
-        channel != null && channel.kind == ContentKind.LIVE && channel.seriesId.isNullOrBlank()
+    private fun isLiveNow(channel: Channel? = current): Boolean = liveNow(channel)
 
     private fun configureSeekPane(channel: Channel) {
         // Seek/play chrome is transient — show briefly, then auto-hide.
@@ -2334,6 +2121,32 @@ class PlayerActivity : AppCompatActivity() {
                 if (typed.startsWith("http://") || typed.startsWith("https://")) playPasted(typed)
                 else zapByName(typed)
             }
+            "play" -> playById(command.text)
+        }
+    }
+
+    private fun playById(id: String) {
+        val wanted = id.trim()
+        if (wanted.isBlank()) return
+        val found = queue.indexOfFirst { it.id == wanted }
+        if (found >= 0) {
+            index = found
+            playCurrent()
+            return
+        }
+        val savedId = playlistId ?: return
+        lifecycleScope.launch {
+            val channel = withContext(Dispatchers.IO) {
+                val db = (application as OlympusIptvApp).catalogDb
+                db.readChannel(savedId, CatalogDb.LIVE, wanted)
+                    ?: db.readChannel(savedId, CatalogDb.VOD, wanted)
+                    ?: db.readChannel(savedId, CatalogDb.SERIES, wanted)
+            } ?: return@launch
+            if (isDestroyed) return@launch
+            current = channel
+            queue = listOf(channel)
+            index = 0
+            playCurrent()
         }
     }
 
@@ -2706,11 +2519,7 @@ class PlayerActivity : AppCompatActivity() {
                 toggleLastChannel(); true
             }
             else -> {
-                val digit = when (keyCode) {
-                    in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9 -> keyCode - KeyEvent.KEYCODE_0
-                    in KeyEvent.KEYCODE_NUMPAD_0..KeyEvent.KEYCODE_NUMPAD_9 -> keyCode - KeyEvent.KEYCODE_NUMPAD_0
-                    else -> -1
-                }
+                val digit = ChannelNumberJump.digit(keyCode)
                 if (digit >= 0 && current?.kind == ContentKind.LIVE) {
                     onPlayerDigit(digit)
                     true
@@ -2729,20 +2538,21 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun onPlayerDigit(digit: Int) {
-        if (dialDigits.length >= 4) dialDigits = ""
-        dialDigits += digit.toString()
+        if (dialDigits.length >= ChannelNumberJump.MAX_DIGITS) dialDigits = ""
+        dialDigits = ChannelNumberJump.append(dialDigits, digit)
         binding.playerDial.text = dialDigits
+        binding.playerDial.setShadowLayer(28f, 0f, 0f, getColor(R.color.accent))
         binding.playerDial.visibility = View.VISIBLE
         hideHandler.removeCallbacks(tuneDial)
         hideHandler.removeCallbacks(clearDialHud)
-        hideHandler.postDelayed(tuneDial, 1_200L)
+        hideHandler.postDelayed(tuneDial, ChannelNumberJump.DELAY_MS)
     }
 
     private fun tuneDialedNumber() {
         val typed = dialDigits
         dialDigits = ""
         val number = typed.toIntOrNull() ?: 0
-        val at = queue.indexOfFirst { it.number == number }
+        val at = ChannelNumberJump.indexFor(queue.map { it.number }, number, allowRowFallback = false)
         if (at !in queue.indices) {
             binding.playerDial.text = typed
             hideHandler.postDelayed(clearDialHud, 900L)
@@ -2751,31 +2561,6 @@ class PlayerActivity : AppCompatActivity() {
         binding.playerDial.visibility = View.GONE
         index = at
         playCurrent()
-    }
-
-    private fun canEnterPip(): Boolean {
-        if (!touchPrimary) return false
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return false
-        return packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)
-    }
-
-    private fun enterPip(manual: Boolean) {
-        if (!canEnterPip()) {
-            if (manual) Toast.makeText(this, R.string.pip_unavailable, Toast.LENGTH_SHORT).show()
-            return
-        }
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-        hidePlaybackMenu()
-        binding.overlay.visibility = View.GONE
-        pipPending = true
-        val params = PictureInPictureParams.Builder()
-            .setAspectRatio(Rational(16, 9))
-            .build()
-        runCatching { enterPictureInPictureMode(params) }
-            .onFailure {
-                pipPending = false
-                if (manual) Toast.makeText(this, R.string.pip_unavailable, Toast.LENGTH_SHORT).show()
-            }
     }
 
     override fun onUserLeaveHint() {
@@ -2848,52 +2633,34 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
-    private fun scrobbleStart(channel: Channel) {
-        scrobbleJob?.cancel()
-        stopScrobbleIfStarted()
-        if (scrobble.provider == Scrobbler.NONE || scrobble.activeToken().isBlank()) return
-        scrobbleChannel = channel
-        scrobbleStarted = false
-        val config = scrobble
-        scrobbleJob = lifecycleScope.launch {
-            delay(1_500L)
-            if (!isActive || isDestroyed || current?.id != channel.id) return@launch
-            scrobbleStarted = true
-            withContext(Dispatchers.IO) {
-                runCatching {
-                    Scrobbler.start(config.provider, config.activeToken(), config.activeClientId(), channel)
-                }
-            }
-        }
-    }
-
-    private fun scrobbleStop() {
-        scrobbleJob?.cancel()
-        scrobbleJob = null
-        stopScrobbleIfStarted()
-    }
-
-    private fun stopScrobbleIfStarted() {
-        val channel = scrobbleChannel ?: return
-        val started = scrobbleStarted
-        scrobbleChannel = null
-        scrobbleStarted = false
-        if (!started) return
-        if (scrobble.provider == Scrobbler.NONE || scrobble.activeToken().isBlank()) return
-        val config = scrobble
-        lifecycleScope.launch(Dispatchers.IO) {
-            runCatching {
-                Scrobbler.stop(config.provider, config.activeToken(), config.activeClientId(), channel)
-            }
-        }
-    }
-
     override fun onStart() {
         super.onStart()
+        hookReconnect()
         if (streamsReleased && current != null && !isFinishing) {
             streamsReleased = false
             playCurrent()
         }
+    }
+
+    private fun hookReconnect() {
+        if (networkWatcher != null) return
+        val watcher = NetworkWatcher(this) { runOnUiThread { reconnectNow() } }
+        watcher.start()
+        networkWatcher = watcher
+    }
+
+    private fun reconnectNow() {
+        val now = SystemClock.elapsedRealtime()
+        if (now < acceptReconnectAt || now - lastReconnectAt < 1_500L) return
+        val exo = player ?: return
+        if (!exo.playWhenReady || current == null || isDestroyed) return
+        lastReconnectAt = now
+        playCurrent()
+    }
+
+    private fun unhookReconnect() {
+        networkWatcher?.stop()
+        networkWatcher = null
     }
 
     override fun onStop() {
@@ -2928,6 +2695,9 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        leveler?.let { runCatching { it.release() } }
+        leveler = null
+        unhookReconnect()
         scrobbleStop()
         resetChannelScopedWork()
         channelJob.cancel()
@@ -2970,6 +2740,7 @@ class PlayerActivity : AppCompatActivity() {
         private const val EXTRA_LOGO = "logo"
         private const val EXTRA_META = "meta"
         private const val EXTRA_NEXT = "next"
+        const val EXTRA_START_AT = "start_at"
         private const val EXTRA_INDEX = "index"
         private const val EXTRA_PLAYLIST_ID = "playlist_id"
         private const val EXTRA_ZAP = "zap"

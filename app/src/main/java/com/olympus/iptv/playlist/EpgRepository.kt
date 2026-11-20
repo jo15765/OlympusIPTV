@@ -162,6 +162,13 @@ class EpgRepository(
         trimCache()
     }
 
+    /** Drop the in-memory guide when the process is asked to free RAM. Disk EPG stays. */
+    fun trimForPressure() {
+        windows.evictAll()
+        cache.clear()
+        parsedNames.clear()
+    }
+
     private fun trimCache() {
         val over = cache.size - CACHE_CAP
         if (over <= 0) return

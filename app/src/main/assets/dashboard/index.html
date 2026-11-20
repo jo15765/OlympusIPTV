@@ -2889,7 +2889,13 @@
           shown.setAttribute("aria-pressed", String(wasHidden));
           shown.title = wasHidden ? "Hide channel" : "Show channel";
         });
-        row.append(grip, pick, logo, copy, up, down, shown);
+        const play = document.createElement("button");
+        play.type = "button";
+        play.className = "group-step";
+        play.title = "Play on TV";
+        play.textContent = "▶";
+        play.addEventListener("click", () => sendRemote("play", channel.id));
+        row.append(grip, pick, logo, copy, up, down, shown, play);
         box.append(row);
       });
       const remaining = matches.length - (channelWindowStart + sliced.rows.length);
@@ -4735,20 +4741,22 @@
       loadRemoteFavorites();
     }
     loadRemoteFavorites();
-    document.querySelector("#exportSettings").addEventListener("click", () => {
-      const file = {
-        "olympus-iptv": "lineup",
-        deviceId: session.deviceId,
-        exportedAt: new Date().toISOString(),
-        lineup: session.lineup,
-        favorites: (session.favorites && session.favorites.ids) || []
-      };
-      const blob = new Blob([JSON.stringify(file, null, 2)], { type: "application/json" });
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
-      link.download = "olympus-iptv-" + session.deviceId + "-settings.json";
-      link.click();
-      URL.revokeObjectURL(link.href);
+    document.querySelector("#exportSettings").addEventListener("click", async () => {
+      const status = document.querySelector("#saveStatus");
+      try {
+        const response = await fetch("/api/profile?email=" + encodeURIComponent(accountEmail) + "&deviceId=" + encodeURIComponent(session.deviceId));
+        const file = await response.json();
+        if (!response.ok) throw new Error(file.error || "Could not export settings.");
+        const blob = new Blob([JSON.stringify(file, null, 2)], { type: "application/json" });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = "olympus-iptv-" + session.deviceId + "-settings.json";
+        link.click();
+        URL.revokeObjectURL(link.href);
+        if (status) status.textContent = "Downloaded this TV's favorites, lineup, and audio offsets.";
+      } catch (failure) {
+        if (status) status.textContent = failure.message || "Could not export settings.";
+      }
     });
     document.querySelector("#importSettings").addEventListener("click", () => document.querySelector("#importFile").click());
     document.querySelector("#importFile").addEventListener("change", async (event) => {
@@ -4760,36 +4768,37 @@
         const parsed = JSON.parse(await file.text());
         const incoming = parsed && parsed.lineup ? parsed.lineup : parsed;
         if (!incoming || typeof incoming !== "object" || Array.isArray(incoming)) throw new Error("That file is not a Olympus-IPTV settings file.");
-        const preview = backupPreview(incoming, parsed && parsed.exportedAt);
+        const preview = backupPreview(incoming, parsed && parsed.exportedAt, parsed && parsed.avSync);
         if (!window.confirm("Restore this backup onto " + session.deviceId + "?\n\n" + preview)) {
           status.textContent = "Import cancelled.";
           return;
         }
+        const payload = {
+          email: accountEmail,
+          deviceId: session.deviceId,
+          lineup: incoming
+        };
+        if (Array.isArray(parsed.favorites)) payload.favorites = parsed.favorites;
+        if (parsed.avSync && typeof parsed.avSync === "object" && !Array.isArray(parsed.avSync)) payload.avSync = parsed.avSync;
+        const restored = await fetch("/api/profile", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const restoredBody = await restored.json();
+        if (!restored.ok || !restoredBody.ok) throw new Error(restoredBody.error || "Could not restore that file.");
         session.lineup = Object.assign(blankLineup(), incoming);
+        if (Array.isArray(parsed.favorites) && session.favorites) session.favorites.ids = parsed.favorites;
         forgetTabPaint();
         paintStrip();
         openTab(tab || "countries");
-        await saveLineup();
-        if (Array.isArray(parsed.favorites)) {
-          await fetch("/api/favorites", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              email: session.email,
-              deviceId: session.deviceId,
-              ids: parsed.favorites,
-              baseRevision: Date.now()
-            })
-          });
-        }
-        if (!status.textContent.startsWith("Updated")) return;
         status.textContent = "Imported onto " + session.deviceId + ". The TV guide updates now.";
       } catch (failure) {
         status.textContent = failure.message || "Could not import that file.";
       }
     });
 
-    function backupPreview(lineup, exportedAt) {
+    function backupPreview(lineup, exportedAt, parsedAv) {
       const count = (value) => Array.isArray(value) ? value.length : Object.keys(value || {}).length;
       const hiddenCountries = count(lineup.hiddenCountries);
       const hiddenGroups = count(lineup.hiddenGroups);
@@ -4803,7 +4812,9 @@
         "Hidden channels: " + hiddenChannels + "\n" +
         "Renames: " + renamed + "\n" +
         "Parental PINs: " + pins + "\n" +
-        "International: " + (lineup.includeInternational ? "on" : "off");
+        "International: " + (lineup.includeInternational ? "on" : "off") + "\n" +
+        "Strip rules: " + (count(lineup.namePrefixes) + count(lineup.nameSuffixes)) + "\n" +
+        "Audio offsets: " + count(parsedAv || {});
     }
 
     const setupForm = document.querySelector("#setup");

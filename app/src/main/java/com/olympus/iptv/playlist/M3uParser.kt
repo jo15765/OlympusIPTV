@@ -23,9 +23,23 @@ object M3uParser {
         var epgUrl: String? = null
         val channels = mutableListOf<Channel>()
         var pendingInfo: ExtInf? = null
+        var userAgent: String? = null
+        var referer: String? = null
 
         for (line in lines) {
             when {
+                line.startsWith("#EXTVLCOPT", ignoreCase = true) -> {
+                    val body = line.substringAfter(':').trim()
+                    val eq = body.indexOf('=')
+                    if (eq > 0) {
+                        val key = body.substring(0, eq).trim().lowercase()
+                        val value = body.substring(eq + 1).trim()
+                        when (key) {
+                            "http-user-agent" -> userAgent = value.ifBlank { null }
+                            "http-referrer", "http-referer" -> referer = value.ifBlank { null }
+                        }
+                    }
+                }
                 line.startsWith("#EXTM3U", ignoreCase = true) -> {
                     val attrs = attrRegex.findAll(line)
                         .associate { it.groupValues[1].lowercase() to it.groupValues[2] }
@@ -53,9 +67,13 @@ object M3uParser {
                         epgChannelId = tvgId,
                         catchupType = info?.catchupType,
                         catchupSource = info?.catchupSource,
-                        catchupDays = info?.catchupDays
+                        catchupDays = info?.catchupDays,
+                        userAgent = userAgent,
+                        httpReferer = referer
                     )
                     pendingInfo = null
+                    userAgent = null
+                    referer = null
                 }
             }
         }
