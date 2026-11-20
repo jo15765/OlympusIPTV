@@ -95,10 +95,7 @@ class ParentalFragment : Fragment() {
                 runCatching {
                     val lineup = app.playlistStore.lineup(playlistId)
                     val live = app.catalogDb.readCategoriesOnly(playlistId, CatalogDb.LIVE)
-                    val countries = app.catalogDb.dashboardGroups(playlistId)
-                        .asSequence()
-                        .filter { it.kind == "LIVE" && it.countryId.isNotEmpty() }
-                        .associate { it.id to it.countryId }
+                    val countries = app.catalogDb.liveCountryByCategory(playlistId)
                     Triple(lineup, live, countries)
                 }.getOrElse {
                     if (it is OutOfMemoryError) {

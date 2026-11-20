@@ -518,8 +518,7 @@ class BrowseActivity : AppCompatActivity(), ToolHost {
             return null
         }
         val ready = favoritesReady ?: withContext(Dispatchers.IO) {
-            val count = app.catalogDb.bucketCounts(saved.id).firstOrNull() ?: 0
-            val already = count > 0
+            val already = app.catalogDb.hasLibrary(saved.id)
             if (already) app.playlistStore.setFavoritesSetupDone(true)
             already
         }
@@ -547,6 +546,8 @@ class BrowseActivity : AppCompatActivity(), ToolHost {
         }
         playlist = saved
         groupCountriesReady = false
+        groupCountriesQueued = false
+        groupCountriesLoaded = false
         groupCountries = emptyMap()
         binding.tabVod.visibility = View.VISIBLE
         binding.tabShows.visibility = View.VISIBLE
@@ -3506,6 +3507,7 @@ class BrowseActivity : AppCompatActivity(), ToolHost {
 
     private fun applyChannelLayout() {
         val posters = section != GuideSection.TV
+        if (channelAdapter.posterMode != posters) binding.channelList.recycledViewPool.clear()
         channelAdapter.posterMode = posters
         binding.contentHint.visibility = if (posters) View.VISIBLE else View.GONE
         val manager = binding.channelList.layoutManager
@@ -5649,24 +5651,28 @@ class BrowseActivity : AppCompatActivity(), ToolHost {
     private var groupedResult: List<Category> = emptyList()
     private var groupCountries: Map<String, String> = emptyMap()
     private var groupCountriesReady = false
+    private var groupCountriesQueued = false
+    private var groupCountriesLoaded = false
 
     private fun ensureGroupCountries() {
-        if (groupCountriesReady) return
+        if (groupCountriesReady || groupCountriesQueued) return
         val id = playlist?.id ?: return
-        groupCountriesReady = true
-        val app = application as OlympusIptvApp
-        lifecycleScope.launch {
-            val map = withContext(Dispatchers.IO) {
-                app.catalogDb.dashboardSnapshot(id).groups
-                    .asSequence()
-                    .filter { it.kind == "LIVE" && it.countryId.isNotEmpty() }
-                    .associate { it.id to it.countryId }
-            }
-            if (isDestroyed) return@launch
-            groupCountries = map
-            groupedSection = null
-            if (binding.groupColumn.visibility == View.VISIBLE && loaded != null) {
-                render(restoreFocus = false, reloadChannels = false)
+        groupCountriesQueued = true
+        binding.categoryList.post {
+            if (isDestroyed || groupCountriesReady) return@post
+            groupCountriesReady = true
+            val app = application as OlympusIptvApp
+            lifecycleScope.launch {
+                val map = withContext(Dispatchers.IO) {
+                    app.catalogDb.liveCountryByCategory(id)
+                }
+                if (isDestroyed) return@launch
+                groupCountries = map
+                groupCountriesLoaded = true
+                groupedSection = null
+                if (binding.groupColumn.visibility == View.VISIBLE && loaded != null) {
+                    render(restoreFocus = false, reloadChannels = false)
+                }
             }
         }
     }
@@ -5680,7 +5686,7 @@ class BrowseActivity : AppCompatActivity(), ToolHost {
         ) {
             return groupedResult
         }
-        val groups = LineupApplier.groups(categories, config, groupCountries)
+        val groups = LineupApplier.groups(categories, config, groupCountries, groupCountriesLoaded)
         groupedSection = section
         groupedCategories = categories
         groupedConfig = config

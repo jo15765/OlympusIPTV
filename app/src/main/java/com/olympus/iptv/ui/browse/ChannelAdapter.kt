@@ -156,6 +156,9 @@ class ChannelAdapter(
 
     override fun getItemViewType(position: Int): Int = if (posterMode) VIEW_POSTER else VIEW_ROW
 
+    private fun holderMatchesMode(holder: Holder): Boolean =
+        if (posterMode) holder is PosterHolder else holder is RowHolder
+
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder {
         val inflater = LayoutInflater.from(parent.context)
         return if (viewType == VIEW_POSTER) {
@@ -166,10 +169,12 @@ class ChannelAdapter(
     }
 
     override fun onBindViewHolder(holder: Holder, position: Int) {
+        if (!holderMatchesMode(holder)) return
         holder.bind(items[position], position, full = true)
     }
 
     override fun onBindViewHolder(holder: Holder, position: Int, payloads: MutableList<Any>) {
+        if (!holderMatchesMode(holder)) return
         when {
             payloads.contains(PAYLOAD_EPG) -> holder.bindEpg(items[position])
             payloads.contains(PAYLOAD_FAVORITE) -> holder.bindFavorite(items[position])

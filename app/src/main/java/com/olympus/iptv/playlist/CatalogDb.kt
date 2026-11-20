@@ -20,6 +20,7 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
     private val dashLock = Any()
     @Volatile private var dashHold: DashHold? = null
     @Volatile private var liveCountryHold: LiveCountryHold? = null
+    @Volatile private var fastCountryHold: FastCountryHold? = null
     @Volatile private var searchExportHold: SearchExportHold? = null
 
     private inline fun <T> read(block: () -> T): T {
@@ -1232,6 +1233,9 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         db.execSQL(
             "CREATE INDEX IF NOT EXISTS idx_channels_group_order ON channels(playlist_id, bucket, group_title, number, name COLLATE NOCASE)"
         )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS idx_channels_cat_country ON channels(playlist_id, bucket, category_id, country_id)"
+        )
     }
 
     private fun ensureSearch(db: SQLiteDatabase) {
@@ -1289,6 +1293,12 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         val channelCount: Int
     )
     private data class DashHold(val playlistId: String, val stamp: Long, val body: DashboardSnapshot)
+
+    private data class FastCountryHold(
+        val playlistId: String,
+        val stamp: Long,
+        val countries: Map<String, String>
+    )
 
     private data class LiveCountryHold(
         val playlistId: String,
@@ -1397,6 +1407,44 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
             if (cursor.moveToFirst()) map[PlaylistLoader.ALL_ID] = cursor.getInt(0)
         }
         map
+    }
+
+    /**
+     * Majority stored country per live category. One indexed aggregation — no name scan.
+     * The guide uses this so the group list does not wait on [dashboardGroups].
+     */
+    fun liveCountryByCategory(playlistId: String): Map<String, String> {
+        if (playlistId.isBlank()) return emptyMap()
+        val stamp = libraryStamp(playlistId)
+        fastCountryHold?.takeIf { it.playlistId == playlistId && it.stamp == stamp }?.let { return it.countries }
+        val best = HashMap<String, String>()
+        val votes = HashMap<String, Int>()
+        read {
+            readableDatabase.rawQuery(
+                """
+                SELECT category_id, country_id, COUNT(*)
+                FROM channels
+                WHERE playlist_id=? AND bucket=?
+                  AND category_id IS NOT NULL AND category_id!=''
+                  AND country_id IS NOT NULL AND country_id!=''
+                GROUP BY category_id, country_id
+                """.trimIndent(),
+                arrayOf(playlistId, LIVE)
+            ).use { cursor ->
+                while (cursor.moveToNext()) {
+                    val id = cursor.getString(0) ?: continue
+                    val country = cursor.getString(1) ?: continue
+                    if (id.isEmpty() || country.isEmpty()) continue
+                    val count = cursor.getInt(2)
+                    if (count > (votes[id] ?: 0)) {
+                        votes[id] = count
+                        best[id] = country
+                    }
+                }
+            }
+        }
+        fastCountryHold = FastCountryHold(playlistId, stamp, best)
+        return best
     }
 
     fun dashboardGroups(playlistId: String): List<DashboardGroup> = read {

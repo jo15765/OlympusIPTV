@@ -81,7 +81,8 @@ object LineupApplier {
     fun groups(
         categories: List<Category>,
         config: LineupConfig,
-        countries: Map<String, String> = emptyMap()
+        countries: Map<String, String> = emptyMap(),
+        countriesKnown: Boolean = true
     ): List<Category> {
         val hiddenGroups = config.hiddenGroups.orEmpty().toSet()
         val hiddenCountries = config.hiddenCountries.orEmpty().toSet()
@@ -97,7 +98,8 @@ object LineupApplier {
                         hiddenCountries,
                         category.kind,
                         config.includeInternational,
-                        countries[category.id]
+                        countries[category.id],
+                        countriesKnown
                     )
             }
             .sortedWith(compareBy({ groupRank[it.value.id] ?: Int.MAX_VALUE }, { it.index }))
@@ -217,9 +219,13 @@ object LineupApplier {
         hiddenCountries: Set<String>,
         kind: com.olympus.iptv.data.ContentKind,
         includeInternational: Boolean?,
-        resolved: String?
+        resolved: String?,
+        countriesKnown: Boolean = true
     ): Boolean {
         val countryId = resolved?.takeIf { it.isNotBlank() } ?: CountryIndex.idFor(groupName)
+        // A missing country map is not the same as "this group has no country".
+        // Hiding those rows blanks Live TV until a full channel scan finishes.
+        if (!countriesKnown && countryId == null) return false
         if (includeInternational != true) {
             if (countryId == null) return kind == ContentKind.LIVE
             if (countryId != "us") return true

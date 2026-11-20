@@ -6,7 +6,7 @@
 
 ### For the latest and greatest, build your own APK from this code.
 
-The latest signed file is **0.2.71** (versionCode 72). **One APK** installs on Android TV / set-top boxes and on phones and tablets. It includes the 0.2.70 guide work plus in-place Admin/EPG tools, resident My Library tabs, zap that drops the previous channel’s network work, a 7-day “not found” ratings cache, richer posters, playlist sync cards, a short remote tip, live reconnect, catch-up rewind, and a Fresh hero. Optional keys in `local.properties`: `tmdb.apiKey`, `watchmode.apiKey`, `opensubtitles.apiKey`, `sendgrid.apiKey` + `sendgrid.fromEmail`.
+The latest signed file is **0.2.72** (versionCode 73). **One APK** installs on Android TV / set-top boxes and on phones and tablets. It includes the 0.2.71 guide work, and Live TV groups now paint from the category table instead of waiting on a full-channel country scan. Optional keys in `local.properties`: `tmdb.apiKey`, `watchmode.apiKey`, `opensubtitles.apiKey`, `sendgrid.apiKey` + `sendgrid.fromEmail`.
 
 **This is a player only. You must provide your own streams.**
 
@@ -66,14 +66,14 @@ Olympus-IPTV is one APK for Android TV / set-top boxes and for phones and tablet
 
 | | |
 | --- | --- |
-| Signed file | `C:\Users\chalu\Downloads\olympus-iptv-0.2.71.apk` |
-| What that file is | versionName **0.2.71**, versionCode **72** |
-| Source in this tree | versionName **0.2.71**, versionCode **72** |
-| What to run | Install the signed 0.2.71 APK, or build this source |
+| Signed file | `C:\Users\chalu\Downloads\olympus-iptv-0.2.72.apk` |
+| What that file is | versionName **0.2.72**, versionCode **73** |
+| Source in this tree | versionName **0.2.72**, versionCode **73** |
+| What to run | Install the signed 0.2.72 APK, or build this source |
 | Install | Over the existing copy (TV or phone). Uninstalling wipes the saved account, playlist, and favorites. Downloader works with the same file. |
 | Launcher name | Two centered lines: Olympus over IPTV |
 
-**0.2.71** is the current release. Admin and EPG tools stay inside Browse. Queue, New, and Reminders stay loaded in My Library. Live drops reconnect in place. Left rewinds catch-up. Fresh shows a hero as focus moves.
+**0.2.72** is the current release. Live TV groups appear from the category table first. Admin and EPG tools stay inside Browse. Queue, New, and Reminders stay loaded in My Library. Live drops reconnect in place. Left rewinds catch-up. Fresh shows a hero as focus moves.
 
 ### What’s new since 0.2.56 (enhancements)
 
@@ -120,7 +120,7 @@ Olympus-IPTV is one APK for Android TV / set-top boxes and for phones and tablet
 
 </div>
 
-There is **no separate mobile APK**. The same `olympus-iptv-0.2.71.apk` detects whether it is running on a television (Leanback / UI mode) or a touch-first phone or tablet.
+There is **no separate mobile APK**. The same `olympus-iptv-0.2.72.apk` detects whether it is running on a television (Leanback / UI mode) or a touch-first phone or tablet.
 
 | On phones and tablets | What changed |
 | --- | --- |
@@ -557,7 +557,7 @@ tmdb.apiKey=YOUR_TMDB_V3_API_KEY
 
 5. Rebuild the app. `app/build.gradle.kts` maps that property to `buildConfigField("String", "TMDB_API_KEY", ...)`. Without the key, the browse score chip, ratings sheet, player caption scores, and **Trailer** stay empty or unavailable; the rest of the player still works. See [Where ratings appear](#where-ratings-appear).
 
-The latest signed release is `C:\Users\chalu\Downloads\olympus-iptv-0.2.71.apk`.
+The latest signed release is `C:\Users\chalu\Downloads\olympus-iptv-0.2.72.apk`.
 
 Android Studio: use a 1920×1080 Google TV emulator. Apply Changes does not pick up new screens. Stop the app, then Debug. Click the emulator window before the arrow keys. The emulator is a different device from a Shield or an Onn box, so it does not have that box’s account, playlist, or favorites.
 
@@ -644,6 +644,13 @@ clearcast-tuner/
 ## Version history
 
 </div>
+
+### 0.2.72
+
+- Live TV groups paint from the categories table. Opening the guide no longer waits on a full scan of every channel to guess each group’s country, and it no longer counts the whole library just to decide that favorites setup is already done.
+- Country filtering still runs after the first paint, using one count of the stored country id per live category. Groups whose country is not known yet stay on screen until that count returns.
+- Poster and row channel cards no longer crash when a recycled row is bound as the other layout while switching Live and Movies/Shows.
+- Signed APK: `C:\Users\chalu\Downloads\olympus-iptv-0.2.72.apk` (versionCode 73). Install over 0.2.71 — same signing key, account and playlist data kept.
 
 ### 0.2.71
 
@@ -1051,7 +1058,7 @@ clearcast-tuner/
 
 - This is a player only. You must provide your own streams. The app does not ship channels, movies, shows, or playlist credentials.
 - It is a beta. Feedback is greatly appreciated.
-- **0.2.71** is the latest signed file in Downloads (`olympus-iptv-0.2.71.apk`, versionCode 72).
+- **0.2.72** is the latest signed file in Downloads (`olympus-iptv-0.2.72.apk`, versionCode 73).
 - `portal/data/store.json` is for the Node portal on a PC only — it is not packaged in the APK.
 - Chromecast often cannot play provider IPTV/HLS the way the in-app player can; the Cast button warns before connecting.
 - Ratings, trailers, and New this week need the matching keys in `local.properties` at build time (`tmdb.apiKey`, `watchmode.apiKey`).
