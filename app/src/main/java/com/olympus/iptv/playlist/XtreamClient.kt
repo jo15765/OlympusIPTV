@@ -871,7 +871,7 @@ class XtreamClient(
         try {
             while (splitter.writeNextObject(chunk, count > 0)) {
                 count++
-                if (count >= 1000) submit()
+                if (count >= 500) submit()
             }
             if (count > 0) submit()
             val combined = ArrayList<Channel>()

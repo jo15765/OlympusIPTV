@@ -58,6 +58,13 @@ class FavoritesSetupActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityFavoritesSetupBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        val step = TextView(this).apply {
+            text = getString(R.string.onboarding_step, 3, getString(R.string.onboarding_favorites))
+            setTextColor(getColor(R.color.accent))
+            textSize = 16f
+            setPadding(0, 0, 0, (8 * resources.displayMetrics.density).toInt())
+        }
+        (binding.root as android.view.ViewGroup).addView(step, 0)
         if (touchPrimary) {
             requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
             WindowCompat.setDecorFitsSystemWindows(window, false)

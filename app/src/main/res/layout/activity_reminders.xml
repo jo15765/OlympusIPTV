@@ -18,6 +18,8 @@
             android:layout_height="48dp"
             android:background="@drawable/bg_button"
             android:paddingHorizontal="22dp"
+            android:nextFocusRight="@id/quietHours"
+            android:nextFocusDown="@id/remindCards"
             android:text="@string/back"
             android:textAllCaps="false"
             android:textColor="@color/bg"
@@ -35,6 +37,8 @@
 
         <Button
             android:id="@+id/quietHours"
+            android:nextFocusLeft="@id/remindBack"
+            android:nextFocusDown="@id/remindCards"
             android:layout_width="wrap_content"
             android:layout_height="48dp"
             android:background="@drawable/bg_button_secondary"
@@ -72,6 +76,7 @@
 
         <LinearLayout
             android:id="@+id/remindCards"
+            android:nextFocusUp="@id/remindBack"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical" />

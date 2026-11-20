@@ -24,6 +24,7 @@
 
         <EditText
             android:id="@+id/search"
+            android:nextFocusDown="@id/tabLive"
             android:layout_width="0dp"
             android:layout_height="44dp"
             android:layout_marginStart="16dp"
@@ -39,6 +40,9 @@
 
         <Button
             android:id="@+id/tabLive"
+            android:nextFocusUp="@id/search"
+            android:nextFocusRight="@id/tabVod"
+            android:nextFocusDown="@id/groupList"
             android:layout_width="wrap_content"
             android:layout_height="42dp"
             android:layout_marginStart="8dp"
@@ -51,6 +55,9 @@
 
         <Button
             android:id="@+id/tabVod"
+            android:nextFocusLeft="@id/tabLive"
+            android:nextFocusRight="@id/btnDone"
+            android:nextFocusDown="@id/groupList"
             android:layout_width="wrap_content"
             android:layout_height="42dp"
             android:layout_marginStart="8dp"
@@ -63,6 +70,8 @@
 
         <Button
             android:id="@+id/btnDone"
+            android:nextFocusLeft="@id/tabVod"
+            android:nextFocusDown="@id/groupList"
             android:layout_width="wrap_content"
             android:layout_height="42dp"
             android:layout_marginStart="8dp"
@@ -213,6 +222,8 @@
 
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/groupList"
+                android:nextFocusUp="@id/tabLive"
+                android:nextFocusRight="@id/channelList"
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
                 android:layout_weight="1"
@@ -241,6 +252,7 @@
 
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/channelList"
+                android:nextFocusLeft="@id/groupList"
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
                 android:layout_weight="1"

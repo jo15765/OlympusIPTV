@@ -104,10 +104,22 @@ class FreshFragment : Fragment() {
             )
         }
         cacheFile = File(requireContext().filesDir, "watchmode-week.json")
-        binding.freshList.layoutManager = GridLayoutManager(requireContext(), COLUMNS)
+        if (hostedInLibrary()) {
+            binding.freshHeader.visibility = View.GONE
+            binding.freshSubtitle.visibility = View.GONE
+            binding.freshMain.setPadding(
+                binding.freshMain.paddingLeft,
+                0,
+                binding.freshMain.paddingRight,
+                binding.freshMain.paddingBottom
+            )
+            binding.freshList.nextFocusUpId = View.NO_ID
+        }
+        val columns = if (com.olympus.iptv.ui.DeviceForm.isTouchPrimary(requireContext())) 2 else COLUMNS
+        binding.freshList.layoutManager = GridLayoutManager(requireContext(), columns)
         binding.freshList.adapter = adapter
         binding.freshList.itemAnimator = null
-        binding.freshList.setHasFixedSize(true)
+        binding.freshList.setHasFixedSize(false)
         binding.freshList.setItemViewCacheSize(COLUMNS * 2)
         (binding.freshList.layoutManager as GridLayoutManager).initialPrefetchItemCount = COLUMNS
         binding.freshList.addOnScrollListener(object : RecyclerView.OnScrollListener() {
@@ -163,6 +175,7 @@ class FreshFragment : Fragment() {
             }
             return true
         }
+        if (hostedInLibrary() && !detailOpen()) return false
         if (event.action == KeyEvent.ACTION_DOWN &&
             (event.keyCode == KeyEvent.KEYCODE_DPAD_LEFT ||
                 event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT ||
@@ -174,12 +187,21 @@ class FreshFragment : Fragment() {
         return false
     }
 
+    fun focusFirstCard(): Boolean {
+        if (!viewActive() || rows.isEmpty() || detailOpen()) return false
+        focusFreshCard(listFocusPos)
+        return true
+    }
+
     private fun detailOpen(): Boolean = _binding?.let { it.freshDetail.visibility == View.VISIBLE } == true
 
     private fun activeBack(): View = if (detailOpen()) binding.detailBack else binding.btnBack
 
+    private fun hostedInLibrary(): Boolean = activity is LibraryActivity
+
     private fun focusAllowed(view: View?): Boolean {
         if (view == null) return false
+        if (!detailOpen() && hostedInLibrary()) return true
         if (view === activeBack()) return true
         return focusIsIn(if (detailOpen()) binding.freshDetail else binding.freshMain, view)
     }
@@ -362,7 +384,9 @@ class FreshFragment : Fragment() {
             val grid = binding.freshList.layoutManager as? GridLayoutManager
             val last = grid?.findLastVisibleItemPosition() ?: -1
             if (last >= 0) prefetchFrom(last + 1)
-            if (currentFocus == null || !focusIsIn(binding.freshList)) {
+            val focus = currentFocus
+            val onLibraryChrome = hostedInLibrary() && focus != null && !focusIsIn(binding.root, focus)
+            if (!onLibraryChrome && (focus == null || !focusIsIn(binding.freshList, focus))) {
                 focusFreshCard(listFocusPos)
             }
         }

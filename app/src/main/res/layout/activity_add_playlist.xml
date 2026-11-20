@@ -33,6 +33,8 @@
                 android:layout_weight="1"
                 android:background="@drawable/bg_button"
                 android:focusable="true"
+                android:nextFocusRight="@id/tabXtream"
+                android:nextFocusDown="@id/inputName"
                 android:text="@string/add_m3u"
                 android:textAllCaps="false"
                 android:textColor="@color/bg" />
@@ -45,6 +47,8 @@
                 android:layout_weight="1"
                 android:background="@drawable/bg_button_secondary"
                 android:focusable="true"
+                android:nextFocusLeft="@id/tabM3u"
+                android:nextFocusDown="@id/inputName"
                 android:text="@string/add_xtream"
                 android:textAllCaps="false"
                 android:textColor="@color/text_primary" />
@@ -147,6 +151,7 @@
                 android:layout_weight="1"
                 android:background="@drawable/bg_button_secondary"
                 android:focusable="true"
+                android:nextFocusRight="@id/btnSave"
                 android:text="@string/cancel"
                 android:textAllCaps="false"
                 android:textColor="@color/text_primary" />
@@ -159,6 +164,7 @@
                 android:layout_weight="1"
                 android:background="@drawable/bg_button"
                 android:focusable="true"
+                android:nextFocusLeft="@id/btnCancel"
                 android:text="@string/save"
                 android:textAllCaps="false"
                 android:textColor="@color/bg"

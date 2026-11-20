@@ -222,13 +222,12 @@ object LineupApplier {
         resolved: String?,
         countriesKnown: Boolean = true
     ): Boolean {
-        val countryId = resolved?.takeIf { it.isNotBlank() } ?: CountryIndex.idFor(groupName)
-        // A missing country map is not the same as "this group has no country".
-        // Hiding those rows blanks Live TV until a full channel scan finishes.
-        if (!countriesKnown && countryId == null) return false
+        // Folder name wins. A stored channel country must not reclassify "24/7".
+        val fromName = CountryIndex.idFor(groupName)
+        val countryId = fromName ?: resolved?.takeIf { it.isNotBlank() && countriesKnown }
         if (includeInternational != true) {
-            if (countryId == null) return kind == ContentKind.LIVE
-            if (countryId != "us") return true
+            // No country means a provider folder such as 24/7, not a foreign folder.
+            if (countryId != null && countryId != "us") return true
         }
         if (hiddenCountries.isEmpty()) return false
         if (countryId == null) {

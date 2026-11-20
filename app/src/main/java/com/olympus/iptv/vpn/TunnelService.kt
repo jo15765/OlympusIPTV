@@ -177,11 +177,13 @@ internal class TunnelEngine(
         builder.setBlocking(true)
         builder.addAllowedApplication(service.packageName)
         if (Build.VERSION.SDK_INT >= 29) builder.setMetered(false)
+        check(LanRoutes.excludesRfc1918()) { "VPN routes must leave RFC1918 LAN addresses on the local network." }
         for ((host, prefix) in LanRoutes.publicV4()) builder.addRoute(host, prefix)
         for (dns in config.dns) {
             val literal = dns.substringBefore("%").trim()
             if (LanRoutes.parse(literal) == null) continue
-            if (LanRoutes.isPrivateV4(literal)) builder.addRoute(literal, 32)
+            // A private DNS host stays off the tunnel so phone-to-TV pairing on :8766 keeps working.
+            if (LanRoutes.isPrivateV4(literal)) continue
             runCatching { builder.addDnsServer(literal) }
         }
         runCatching {
@@ -392,11 +394,12 @@ internal class TunnelEngine(
         builder.setBlocking(true)
         builder.addAllowedApplication(service.packageName)
         if (Build.VERSION.SDK_INT >= 29) builder.setMetered(false)
+        check(LanRoutes.excludesRfc1918()) { "VPN routes must leave RFC1918 LAN addresses on the local network." }
         for ((host, prefix) in LanRoutes.publicV4()) builder.addRoute(host, prefix)
         for (dns in next.dns) {
             val literal = dns.substringBefore("%").trim()
             if (LanRoutes.parse(literal) == null) continue
-            if (LanRoutes.isPrivateV4(literal)) builder.addRoute(literal, 32)
+            if (LanRoutes.isPrivateV4(literal)) continue
             runCatching { builder.addDnsServer(literal) }
         }
         runCatching {

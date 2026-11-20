@@ -15,6 +15,7 @@
         android:focusable="true"
         android:gravity="center"
         android:paddingHorizontal="18dp"
+        android:nextFocusDown="@id/list"
         android:text="@string/back"
         android:textColor="@color/text_primary"
         android:textSize="16sp" />
@@ -52,5 +53,6 @@
         android:layout_height="0dp"
         android:layout_marginTop="12dp"
         android:layout_weight="1"
-        android:descendantFocusability="afterDescendants" />
+        android:descendantFocusability="afterDescendants"
+        android:nextFocusUp="@id/btnBack" />
 </LinearLayout>

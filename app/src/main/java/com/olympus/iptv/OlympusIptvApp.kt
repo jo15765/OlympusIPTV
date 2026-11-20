@@ -1,6 +1,9 @@
 package com.olympus.iptv
 
+import android.app.Activity
 import android.app.Application
+import android.os.Bundle
+import android.view.View
 import coil.Coil
 import coil.ImageLoader
 import coil.disk.DiskCache
@@ -162,6 +165,20 @@ class OlympusIptvApp : Application() {
 
     @Volatile private var warmed = false
 
+    private val overscan = object : ActivityLifecycleCallbacks {
+        override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {
+            if (activity is com.olympus.iptv.ui.player.PlayerActivity) return
+            val content = activity.findViewById<View>(android.R.id.content) ?: return
+            content.post { com.olympus.iptv.ui.InsetsPad.ensureOverscan(content) }
+        }
+        override fun onActivityStarted(activity: Activity) = Unit
+        override fun onActivityResumed(activity: Activity) = Unit
+        override fun onActivityPaused(activity: Activity) = Unit
+        override fun onActivityStopped(activity: Activity) = Unit
+        override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) = Unit
+        override fun onActivityDestroyed(activity: Activity) = Unit
+    }
+
     /** Disk and catalog warm-up runs after the first frame, never inside onCreate. */
     fun warmAfterFirstFrame() {
         if (warmed) return
@@ -175,6 +192,8 @@ class OlympusIptvApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        com.olympus.iptv.playlist.HttpClients.install(this)
+        registerActivityLifecycleCallbacks(overscan)
         AppLog.install(this)
         playlistStore = PlaylistStore(this)
         android.os.Looper.myQueue().addIdleHandler {

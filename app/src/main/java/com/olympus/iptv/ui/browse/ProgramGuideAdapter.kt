@@ -24,8 +24,9 @@ class ProgramGuideAdapter(
     context: Context,
     private val onPlay: (Channel, EpgProgram?) -> Unit,
     private val onScroll: (Int) -> Unit,
-    private val onFocus: (Channel, EpgProgram?) -> Unit = { _, _ -> }
-) : RecyclerView.Adapter<ProgramGuideAdapter.Holder>() {
+    private val onFocus: (Channel, EpgProgram?) -> Unit = { _, _ -> },
+    private val onHold: (Channel, EpgProgram?) -> Unit = { _, _ -> }
+) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     data class Slot(val row: Int, val column: Int)
 
@@ -163,13 +164,16 @@ class ProgramGuideAdapter(
 
     override fun getItemCount(): Int = channels.size
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder {
+    override fun getItemViewType(position: Int): Int = VIEW_PROGRAM
+
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
         val view = LayoutInflater.from(parent.context).inflate(R.layout.item_program_row, parent, false)
         return Holder(view)
     }
 
-    override fun onBindViewHolder(holder: Holder, position: Int) {
-        holder.bind(channels[position], position)
+    override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
+        val row = holder as? Holder ?: return
+        row.bind(channels[position], position)
     }
 
     private fun dp(value: Int): Int = (value * density).toInt()
@@ -399,6 +403,10 @@ class ProgramGuideAdapter(
             view.layoutParams = layout
             shiftLabel(view, left, width)
             view.setOnClickListener { onPlay(channel, program) }
+            view.setOnLongClickListener {
+                onHold(channel, program)
+                true
+            }
             view.setOnFocusChangeListener { _, hasFocus ->
                 view.background = backgroundFor(kind, hasFocus)
                 view.setTextColor(if (hasFocus) ink else primary)
@@ -485,7 +493,8 @@ class ProgramGuideAdapter(
 
     private data class Block(val program: EpgProgram, val left: Int, val width: Int)
 
-    private companion object {
+    companion object {
+        const val VIEW_PROGRAM = 20
         private val wordBreaks = Regex("[^a-z0-9]+")
         private val fillerWords = setOf(
             "programming", "program", "programs", "programmes", "programme",

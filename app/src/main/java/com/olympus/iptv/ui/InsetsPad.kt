@@ -56,6 +56,24 @@ object InsetsPad {
         ViewCompat.requestApplyInsets(view)
     }
 
+    /** At least 28dp on every edge for older TVs. Phone layouts are left alone. */
+    fun ensureOverscan(content: View) {
+        if (DeviceForm.isTouchPrimary(content.context)) return
+        val child = (content as? ViewGroup)?.getChildAt(0) ?: content
+        val min = (28 * content.resources.displayMetrics.density).toInt()
+        if (child.paddingLeft >= min && child.paddingTop >= min &&
+            child.paddingRight >= min && child.paddingBottom >= min
+        ) {
+            return
+        }
+        child.setPadding(
+            maxOf(child.paddingLeft, min),
+            maxOf(child.paddingTop, min),
+            maxOf(child.paddingRight, min),
+            maxOf(child.paddingBottom, min)
+        )
+    }
+
     fun systemBars(view: View): Insets =
         ViewCompat.getRootWindowInsets(view)?.getInsets(WindowInsetsCompat.Type.systemBars())
             ?: Insets.NONE

@@ -57,7 +57,15 @@ class LibraryActivity : AppCompatActivity(), LibraryHost {
             .forEach { FocusMotion.bind(it, enabled = !com.olympus.iptv.ui.DeviceForm.isTouchPrimary(this)) }
         val start = savedInstanceState?.getInt(STATE_TAB) ?: intent.getIntExtra(EXTRA_TAB, 0)
         showTab(start)
-        binding.pillQueue.post { binding.pillQueue.requestFocus() }
+        binding.libraryHost.post {
+            if (tab == 1) {
+                val focused = (supportFragmentManager.findFragmentByTag(TAGS[1]) as? FreshFragment)
+                    ?.focusFirstCard() == true
+                if (!focused) focusPill()
+            } else {
+                focusPill()
+            }
+        }
     }
 
     override fun onSaveInstanceState(outState: Bundle) {

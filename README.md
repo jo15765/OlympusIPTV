@@ -6,7 +6,7 @@
 
 ### For the latest and greatest, build your own APK from this code.
 
-The latest signed file is **0.2.72** (versionCode 73). **One APK** installs on Android TV / set-top boxes and on phones and tablets. It includes the 0.2.71 guide work, and Live TV groups now paint from the category table instead of waiting on a full-channel country scan. Optional keys in `local.properties`: `tmdb.apiKey`, `watchmode.apiKey`, `opensubtitles.apiKey`, `sendgrid.apiKey` + `sendgrid.fromEmail`.
+The latest signed file is **0.2.75** (versionCode 76). **One APK** installs on Android TV / set-top boxes and on phones and tablets. It includes the 0.2.71 guide work, Live TV groups from the category table, and the 0.2.75 player, search, and first-run work below. Optional keys in `local.properties`: `tmdb.apiKey`, `watchmode.apiKey`, `opensubtitles.apiKey`, `sendgrid.apiKey` + `sendgrid.fromEmail`.
 
 **This is a player only. You must provide your own streams.**
 
@@ -66,14 +66,14 @@ Olympus-IPTV is one APK for Android TV / set-top boxes and for phones and tablet
 
 | | |
 | --- | --- |
-| Signed file | `C:\Users\chalu\Downloads\olympus-iptv-0.2.72.apk` |
-| What that file is | versionName **0.2.72**, versionCode **73** |
-| Source in this tree | versionName **0.2.72**, versionCode **73** |
-| What to run | Install the signed 0.2.72 APK, or build this source |
+| Signed file | `C:\Users\chalu\Downloads\olympus-iptv-0.2.75.apk` |
+| What that file is | versionName **0.2.75**, versionCode **76** |
+| Source in this tree | versionName **0.2.75**, versionCode **76** |
+| What to run | Install the signed 0.2.75 APK, or build this source |
 | Install | Over the existing copy (TV or phone). Uninstalling wipes the saved account, playlist, and favorites. Downloader works with the same file. |
 | Launcher name | Two centered lines: Olympus over IPTV |
 
-**0.2.72** is the current release. Live TV groups appear from the category table first. Admin and EPG tools stay inside Browse. Queue, New, and Reminders stay loaded in My Library. Live drops reconnect in place. Left rewinds catch-up. Fresh shows a hero as focus moves.
+**0.2.75** is the current release. The guide screen is a thin host: movies and shows, the left rail, and the program grid each have their own coordinator. A stalled stream reconnects, then can fall back to the software decoder. Search uses FTS5, or FTS4 when the device has no FTS5. First run is playlist, phone QR, then favorites.
 
 ### What’s new since 0.2.56 (enhancements)
 
@@ -111,6 +111,12 @@ Olympus-IPTV is one APK for Android TV / set-top boxes and for phones and tablet
 | Remote tip | TV Browse and player show a translucent OK / Hold OK / Menu footer that fades after 4 seconds |
 | Metadata throttle | At most three TMDB/Watchmode lookups at once; a miss is remembered for 7 days so missing titles are not requested again every visit |
 | Catalog batches | Xtream live, movie, and series JSON is streamed and written in batches of 500 rows |
+| Stalled streams | After 10 seconds of buffering the player reconnects (1s, 2s, 4s). The next stall rebuilds the player on the software decoder |
+| Up next | In the last 25 seconds of a movie or episode, an Up Next card counts down and can start the next title |
+| Last channel | Mini-guide **Last**, or a second Back within half a second on a live channel |
+| A–Z jump | Hold Up or Down for 1.2 seconds on a long channel list, or press Right past a movie or show column |
+| First run | Step 1 playlist, Step 2 pairing QR, Step 3 favorites |
+| Guide crash | Channel rows and program rows no longer share one recycled-view pool, so a row cannot be bound as the wrong kind |
 
 ---
 
@@ -120,7 +126,7 @@ Olympus-IPTV is one APK for Android TV / set-top boxes and for phones and tablet
 
 </div>
 
-There is **no separate mobile APK**. The same `olympus-iptv-0.2.72.apk` detects whether it is running on a television (Leanback / UI mode) or a touch-first phone or tablet.
+There is **no separate mobile APK**. The same `olympus-iptv-0.2.75.apk` detects whether it is running on a television (Leanback / UI mode) or a touch-first phone or tablet.
 
 | On phones and tablets | What changed |
 | --- | --- |
@@ -557,7 +563,7 @@ tmdb.apiKey=YOUR_TMDB_V3_API_KEY
 
 5. Rebuild the app. `app/build.gradle.kts` maps that property to `buildConfigField("String", "TMDB_API_KEY", ...)`. Without the key, the browse score chip, ratings sheet, player caption scores, and **Trailer** stay empty or unavailable; the rest of the player still works. See [Where ratings appear](#where-ratings-appear).
 
-The latest signed release is `C:\Users\chalu\Downloads\olympus-iptv-0.2.72.apk`.
+The latest signed release is `C:\Users\chalu\Downloads\olympus-iptv-0.2.75.apk`.
 
 Android Studio: use a 1920×1080 Google TV emulator. Apply Changes does not pick up new screens. Stop the app, then Debug. Click the emulator window before the arrow keys. The emulator is a different device from a Shield or an Onn box, so it does not have that box’s account, playlist, or favorites.
 
@@ -644,6 +650,27 @@ clearcast-tuner/
 ## Version history
 
 </div>
+
+### 0.2.75
+
+- Browse is a lifecycle host. Movies and shows, the left rail, and the live guide each live in their own coordinator. Channel rows and program rows use separate recycled-view pools, so the guide no longer crashes by binding one row type as the other.
+- A stream that stays buffering for 10 seconds reconnects with a 1s / 2s / 4s wait. If it stalls again, playback rebuilds on the software decoder. In the last 25 seconds of a movie or episode, Up Next counts down. Live: mini-guide **Last**, or a second Back within half a second, returns to the previous channel. Home still opens picture-in-picture.
+- Search uses FTS5 when the device has it, and FTS4 otherwise. After a catalog refresh the database runs `PRAGMA optimize` and an incremental vacuum. Xtream JSON is still streamed and committed 500 rows at a time.
+- The VPN tunnel does not take `10.0.0.0/8`, `172.16.0.0/12`, or `192.168.0.0/16`, so the phone-to-TV page stays on the local network. First run is three steps: playlist, pairing QR, favorites. The web backup buttons are **Export backup (.json)** and **Import backup (.json)**.
+- Holding Up or Down for 1.2 seconds on a long channel list opens the A–Z jump. On Movies or Shows, Right past the column does the same.
+- Signed APK: `C:\Users\chalu\Downloads\olympus-iptv-0.2.75.apk` (versionCode 76). Install over 0.2.74 — same signing key, account and playlist data kept.
+
+### 0.2.74
+
+- New / Just Added is a poster grid again. The 196dp hero and the second header were covering the cards inside My Library, and the D-pad trap kept focus from moving through the grid or back to the Queue / New / Reminders pills.
+- The focused title is a single compact line above the posters. Up from the first row returns to the library pills. Opening a title still shows the detail and episode list.
+- Signed APK: `C:\Users\chalu\Downloads\olympus-iptv-0.2.74.apk` (versionCode 75). Install over 0.2.73 — same signing key, account and playlist data kept.
+
+### 0.2.73
+
+- Live folders that are not a country, including provider 24/7 groups, stay on the Live list. 0.2.72 dropped them after the country pass because a folder with no country was treated as foreign.
+- A few channels tagged with a country no longer reclassify the whole folder. The folder name still wins when it names a country.
+- Signed APK: `C:\Users\chalu\Downloads\olympus-iptv-0.2.73.apk` (versionCode 74). Install over 0.2.72 — same signing key, account and playlist data kept.
 
 ### 0.2.72
 
@@ -1058,7 +1085,7 @@ clearcast-tuner/
 
 - This is a player only. You must provide your own streams. The app does not ship channels, movies, shows, or playlist credentials.
 - It is a beta. Feedback is greatly appreciated.
-- **0.2.72** is the latest signed file in Downloads (`olympus-iptv-0.2.72.apk`, versionCode 73).
+- **0.2.75** is the latest signed file in Downloads (`olympus-iptv-0.2.75.apk`, versionCode 76).
 - `portal/data/store.json` is for the Node portal on a PC only — it is not packaged in the APK.
 - Chromecast often cannot play provider IPTV/HLS the way the in-app player can; the Cast button warns before connecting.
 - Ratings, trailers, and New this week need the matching keys in `local.properties` at build time (`tmdb.apiKey`, `watchmode.apiKey`).

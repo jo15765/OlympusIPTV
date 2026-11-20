@@ -52,6 +52,7 @@
             android:layout_width="wrap_content"
             android:layout_marginEnd="8dp"
             android:minWidth="120dp"
+            android:nextFocusDown="@id/libraryHost"
             android:text="@string/nav_queue" />
 
         <TextView
@@ -60,6 +61,7 @@
             android:layout_width="wrap_content"
             android:layout_marginEnd="8dp"
             android:minWidth="120dp"
+            android:nextFocusDown="@id/libraryHost"
             android:text="@string/nav_fresh" />
 
         <TextView
@@ -67,6 +69,7 @@
             style="@style/OlympusIptvNavItem"
             android:layout_width="wrap_content"
             android:minWidth="120dp"
+            android:nextFocusDown="@id/libraryHost"
             android:text="@string/nav_reminders" />
     </LinearLayout>
 
@@ -75,5 +78,7 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_marginTop="14dp"
-        android:layout_weight="1" />
+        android:layout_weight="1"
+        android:descendantFocusability="afterDescendants"
+        android:nextFocusUp="@id/libraryPills" />
 </LinearLayout>

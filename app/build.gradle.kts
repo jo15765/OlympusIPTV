@@ -22,14 +22,14 @@ val tmdbKey = localProperty("tmdb.apiKey")
 
 android {
     namespace = "com.olympus.iptv"
-    compileSdk = 35
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.olympus.iptv"
         minSdk = 24
         targetSdk = 35
-        versionCode = 73
-        versionName = "0.2.72"
+        versionCode = 76
+        versionName = "0.2.75"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "WATCHMODE_API_KEY", "\"$watchmodeKey\"")
         buildConfigField("String", "OPENSUBTITLES_API_KEY", "\"$opensubtitlesKey\"")

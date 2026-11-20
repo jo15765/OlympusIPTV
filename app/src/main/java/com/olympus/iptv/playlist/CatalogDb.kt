@@ -40,6 +40,7 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
 
     override fun onConfigure(db: SQLiteDatabase) {
         super.onConfigure(db)
+        applyPragma(db, "PRAGMA auto_vacuum=INCREMENTAL")
         applyPragma(db, "PRAGMA synchronous=NORMAL")
         applyPragma(db, "PRAGMA temp_store=MEMORY")
         applyPragma(db, "PRAGMA busy_timeout=3000")
@@ -1238,8 +1239,17 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         )
     }
 
+    fun maintainAfterRefresh() {
+        val db = writableDatabase
+        runCatching { db.rawQuery("PRAGMA optimize", null).use { } }
+        runCatching { db.execSQL("PRAGMA incremental_vacuum(200)") }
+    }
+
     private fun ensureSearch(db: SQLiteDatabase) {
-        if (!fts5Available(db)) return
+        if (!fts5Available(db)) {
+            ensureFts4(db)
+            return
+        }
         db.execSQL(
             """
             CREATE VIRTUAL TABLE IF NOT EXISTS channels_fts USING fts5(
@@ -1278,6 +1288,43 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
             """.trimIndent()
         )
         db.execSQL("INSERT INTO channels_fts(channels_fts) VALUES('rebuild')")
+    }
+
+    private fun ensureFts4(db: SQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE VIRTUAL TABLE IF NOT EXISTS channels_fts USING fts4(
+                content='channels',
+                name,
+                group_title
+            )
+            """.trimIndent()
+        )
+        db.execSQL(
+            """
+            CREATE TRIGGER IF NOT EXISTS channels_fts_insert AFTER INSERT ON channels BEGIN
+                INSERT INTO channels_fts(docid, name, group_title)
+                VALUES (new.rowid, new.name, new.group_title);
+            END
+            """.trimIndent()
+        )
+        db.execSQL(
+            """
+            CREATE TRIGGER IF NOT EXISTS channels_fts_delete BEFORE DELETE ON channels BEGIN
+                DELETE FROM channels_fts WHERE docid = old.rowid;
+            END
+            """.trimIndent()
+        )
+        db.execSQL(
+            """
+            CREATE TRIGGER IF NOT EXISTS channels_fts_update AFTER UPDATE ON channels BEGIN
+                DELETE FROM channels_fts WHERE docid = old.rowid;
+                INSERT INTO channels_fts(docid, name, group_title)
+                VALUES (new.rowid, new.name, new.group_title);
+            END
+            """.trimIndent()
+        )
+        runCatching { db.execSQL("INSERT INTO channels_fts(channels_fts) VALUES('rebuild')") }
     }
 
     data class DashboardGroup(
@@ -1420,27 +1467,36 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         val best = HashMap<String, String>()
         val votes = HashMap<String, Int>()
         read {
+            val blank = HashMap<String, Int>()
             readableDatabase.rawQuery(
                 """
-                SELECT category_id, country_id, COUNT(*)
+                SELECT category_id, IFNULL(country_id, ''), COUNT(*)
                 FROM channels
                 WHERE playlist_id=? AND bucket=?
                   AND category_id IS NOT NULL AND category_id!=''
-                  AND country_id IS NOT NULL AND country_id!=''
-                GROUP BY category_id, country_id
+                GROUP BY category_id, IFNULL(country_id, '')
                 """.trimIndent(),
                 arrayOf(playlistId, LIVE)
             ).use { cursor ->
                 while (cursor.moveToNext()) {
                     val id = cursor.getString(0) ?: continue
-                    val country = cursor.getString(1) ?: continue
-                    if (id.isEmpty() || country.isEmpty()) continue
+                    if (id.isEmpty()) continue
+                    val country = cursor.getString(1).orEmpty()
                     val count = cursor.getInt(2)
+                    if (country.isEmpty()) {
+                        blank[id] = (blank[id] ?: 0) + count
+                        continue
+                    }
                     if (count > (votes[id] ?: 0)) {
                         votes[id] = count
                         best[id] = country
                     }
                 }
+            }
+            // A handful of tagged rows must not mark a whole 24/7 folder as foreign.
+            val ids = best.keys.toList()
+            for (id in ids) {
+                if ((votes[id] ?: 0) <= (blank[id] ?: 0)) best.remove(id)
             }
         }
         fastCountryHold = FastCountryHold(playlistId, stamp, best)

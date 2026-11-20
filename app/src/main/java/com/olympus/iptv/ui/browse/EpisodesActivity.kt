@@ -72,6 +72,12 @@ class EpisodesActivity : AppCompatActivity() {
         binding.episodeList.setHasFixedSize(true)
         binding.episodeList.adapter = adapter
         binding.markSeason.setOnClickListener { toggleSeason(season) }
+        binding.playNextUnwatched.setOnClickListener {
+            val shown = episodes.filter { (it.season ?: 1) == season }
+            val next = shown.firstOrNull { it.id !in watched } ?: shown.firstOrNull() ?: return@setOnClickListener
+            play(next)
+        }
+        binding.playNextUnwatched.nextFocusUpId = binding.seasonList.id
         bindArt(binding.showArt, showLogo, 56, 84)
         lifecycleScope.launch { loadEpisodes() }
     }

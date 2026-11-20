@@ -40,6 +40,11 @@
             android:screenOrientation="landscape" />
 
         <activity
+            android:name=".ui.login.PairingStepActivity"
+            android:exported="false"
+            android:screenOrientation="landscape" />
+
+        <activity
             android:name=".ui.home.HomeActivity"
             android:exported="false"
             android:screenOrientation="landscape" />

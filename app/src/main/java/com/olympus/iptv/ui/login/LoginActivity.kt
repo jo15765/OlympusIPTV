@@ -60,6 +60,7 @@ class LoginActivity : AppCompatActivity() {
             button.isFocusableInTouchMode = true
         }
         binding.btnM3u.post { binding.btnM3u.requestFocus() }
+        binding.onboardingStep.text = getString(R.string.onboarding_step, 1, getString(R.string.onboarding_playlist))
         listOf(binding.inputEmail, binding.inputUrl, binding.inputUser, binding.inputPass, binding.inputZip)
             .forEach { SoftKeyboard.showWhenFocused(this, it) }
 
@@ -294,7 +295,7 @@ class LoginActivity : AppCompatActivity() {
             Intent(this, BrowseActivity::class.java)
                 .putExtra(BrowseActivity.EXTRA_PLAYLIST_ID, playlistId)
         } else {
-            Intent(this, FavoritesSetupActivity::class.java)
+            Intent(this, PairingStepActivity::class.java)
                 .putExtra(FavoritesSetupActivity.EXTRA_PLAYLIST_ID, playlistId)
         }
         startActivity(next)

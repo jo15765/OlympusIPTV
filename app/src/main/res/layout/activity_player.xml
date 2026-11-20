@@ -27,6 +27,61 @@
     </LinearLayout>
 
     <LinearLayout
+        android:id="@+id/miniGuide"
+        android:layout_width="340dp"
+        android:layout_height="match_parent"
+        android:layout_gravity="start"
+        android:background="#E6101820"
+        android:orientation="vertical"
+        android:padding="12dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/miniGuideTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingBottom="8dp"
+            android:text="@string/mini_guide_title"
+            android:textColor="@color/accent"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/miniGuideLast"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:layout_marginBottom="8dp"
+            android:background="@drawable/bg_nav"
+            android:focusable="true"
+            android:gravity="center"
+            android:nextFocusDown="@id/miniGuideList"
+            android:text="@string/last_channel"
+            android:textColor="@color/text_primary"
+            android:textSize="15sp" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/miniGuideList"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:descendantFocusability="afterDescendants" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/playerDial"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="end|top"
+        android:layout_margin="24dp"
+        android:background="@drawable/bg_login_card"
+        android:paddingHorizontal="22dp"
+        android:paddingVertical="10dp"
+        android:textColor="@color/accent"
+        android:textSize="42sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+    <LinearLayout
         android:id="@+id/overlay"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

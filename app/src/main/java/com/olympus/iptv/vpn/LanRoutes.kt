@@ -8,6 +8,24 @@ object LanRoutes {
 
     fun publicV4(): List<Pair<String, Int>> = publicRoutes
 
+    /** True when 10/8, 172.16/12, and 192.168/16 are absent from the VPN route table. */
+    fun excludesRfc1918(): Boolean {
+        val samples = listOf("10.1.2.3", "172.16.0.1", "172.31.255.9", "192.168.1.20")
+        if (samples.any { !isPrivateV4(it) }) return false
+        return samples.none { host -> routed(host) }
+    }
+
+    private fun routed(host: String): Boolean {
+        val addr = parse(host) ?: return true
+        for ((baseText, prefix) in publicRoutes) {
+            val base = parse(baseText) ?: continue
+            if (prefix <= 0) return true
+            val shift = 32 - prefix
+            if ((addr ushr shift) == (base ushr shift)) return true
+        }
+        return false
+    }
+
     fun isPrivateV4(host: String): Boolean {
         val addr = parse(host) ?: return false
         return !contains(addr)

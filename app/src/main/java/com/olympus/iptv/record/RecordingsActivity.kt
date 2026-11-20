@@ -50,6 +50,11 @@ class RecordingsActivity : AppCompatActivity() {
         binding.btnBack.setOnClickListener { finish() }
     }
 
+    override fun onPause() {
+        if (::binding.isInitialized) binding.list.removeCallbacks(sizeLoop)
+        super.onPause()
+    }
+
     override fun onResume() {
         super.onResume()
         reload()
@@ -74,12 +79,26 @@ class RecordingsActivity : AppCompatActivity() {
                     is Row.Item -> {
                         val status = statusLabel(row.recording.status)
                         val whenLabel = format.format(Date(row.recording.start()))
-                        "$status  ${row.recording.channelName.orEmpty()}  ${row.recording.title.orEmpty()}  $whenLabel"
+                        val grown = localSize(row.recording)
+                        "$status  ${row.recording.channelName.orEmpty()}  ${row.recording.title.orEmpty()}  $whenLabel$grown"
                     }
                 }
             }
             binding.list.adapter = RecordingRows(labels) { index -> open(rows[index]) }
+            val capturing = items.any { it.status == Recording.RECORDING }
+            binding.list.removeCallbacks(sizeLoop)
+            if (capturing && !isDestroyed) binding.list.postDelayed(sizeLoop, 3_000L)
         }
+    }
+
+    private val sizeLoop = Runnable { if (!isDestroyed) reload() }
+
+    private fun localSize(item: Recording): String {
+        if (item.destination == Recording.SMB) return ""
+        val name = item.fileName?.takeIf { it.isNotBlank() } ?: return ""
+        val file = RecordingFiles.file(this, name)
+        if (!file.exists() || file.length() <= 0L) return ""
+        return "  ·  ${formatBytes(file.length())}"
     }
 
     private fun paintStorage() {

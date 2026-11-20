@@ -34,3 +34,6 @@ keystore.properties
 # OS files
 .DS_Store
 Thumbs.db
+
+# Local portal snapshots are not source. Keep clones and archives small.
+portal/data/*.json

@@ -33,7 +33,6 @@ import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.datasource.HttpDataSource
-import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.analytics.AnalyticsListener
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
@@ -83,13 +82,15 @@ import kotlinx.coroutines.plus
 import kotlinx.coroutines.withContext
 
 class PlayerActivity : AppCompatActivity() {
-    private lateinit var binding: ActivityPlayerBinding
-    private var player: ExoPlayer? = null
+    internal lateinit var binding: ActivityPlayerBinding
+    internal fun tracksReady(): Boolean = ::binding.isInitialized
+    private lateinit var miniGuide: PlayerMiniGuide
+    internal var player: ExoPlayer? = null
 
     private var queue: List<Channel> = emptyList()
     private var index: Int = 0
-    private var current: Channel? = null
-    private var playlistId: String? = null
+    internal var current: Channel? = null
+    internal var playlistId: String? = null
     private var zapMode: String = ZAP_LIST
     private var categoryId: String? = null
     private var stepping = false
@@ -105,26 +106,26 @@ class PlayerActivity : AppCompatActivity() {
     private var countdownJob: Job? = null
     private var nextLookup: Job? = null
     private var introJob: Job? = null
-    private var subtitleJob: Job? = null
+    internal var subtitleJob: Job? = null
     /** Cancels in-flight EPG / catch-up / subtitle work when the user zaps away. */
     private var channelJob = SupervisorJob()
     private val zapEpgPrefetch = object : LinkedHashMap<String, EpgNowNext>(8, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, EpgNowNext>?): Boolean = size > 8
     }
-    private var sidecar: MediaItem.SubtitleConfiguration? = null
-    private var pendingLanguage: String? = null
-    private var preferredAudio: String = PlaylistStore.DEFAULT_AUDIO_LANGUAGE
-    private var audioAppliedFor: String? = null
-    private var preferredSubtitle: String = PlaylistStore.SUBTITLE_OFF
-    private var subtitleAppliedFor: String? = null
+    internal var sidecar: MediaItem.SubtitleConfiguration? = null
+    internal var pendingLanguage: String? = null
+    internal var preferredAudio: String = PlaylistStore.DEFAULT_AUDIO_LANGUAGE
+    internal var audioAppliedFor: String? = null
+    internal var preferredSubtitle: String = PlaylistStore.SUBTITLE_OFF
+    internal var subtitleAppliedFor: String? = null
     private var nextIsEpisode = false
-    private var panelEmbedded = emptyList<StreamChoice>()
+    internal var panelEmbedded = emptyList<StreamChoice>()
     private var pendingNext: Channel? = null
     private var resolvedSeries: List<Channel>? = null
     private var countdownFor: String? = null
     private var nextHanded = false
     private var advancing = false
-    private var playbackReady = false
+    internal var playbackReady = false
     private var playbackToken = 0
     private var recoverAttempt = 0
     private var hadPlaybackReady = false
@@ -141,15 +142,17 @@ class PlayerActivity : AppCompatActivity() {
     private var hiddenCountries = emptySet<String>()
     private var includeInternational = false
     private var cachedPlaylist: SavedPlaylist? = null
-    private var pictureMode = PlaylistStore.PICTURE_FIT
+    internal var pictureMode = PlaylistStore.PICTURE_FIT
     private var multiViewEnabled = false
     private var secondaryPlayer: ExoPlayer? = null
     private var seekDragging = false
     private var seekJob: Job? = null
-    private var touchPrimary = false
+    internal var touchPrimary = false
     private var menuBaseBottom = 0
     private var overlayBaseTop = 0
-    private var sleepMinutes = 0
+    internal var sleepMinutes = 0
+    private var lastBackAt = 0L
+    private var upNextToken = 0
     private var skipIntroSeries = emptySet<String>()
     private var videoDecoder = PlayerDecoder.HARDWARE
     private var playersDecoder = PlayerDecoder.HARDWARE
@@ -168,7 +171,7 @@ class PlayerActivity : AppCompatActivity() {
     private var inPip = false
     private var pipPending = false
     private var enterPipOnReady = false
-    private val sleepFire = Runnable {
+    internal val sleepFire = Runnable {
         if (!isDestroyed) {
             player?.playWhenReady = false
             finish()
@@ -177,7 +180,7 @@ class PlayerActivity : AppCompatActivity() {
     private val epgRepo: EpgRepository
         get() = (application as OlympusIptvApp).epgRepository
 
-    private val hideHandler = Handler(Looper.getMainLooper())
+    internal val hideHandler = Handler(Looper.getMainLooper())
     private val hideOverlay = Runnable { hideTransportChrome(animated = true) }
     private val seekTick = object : Runnable {
         override fun run() {
@@ -210,6 +213,21 @@ class PlayerActivity : AppCompatActivity() {
         setContentView(binding.root)
         binding.root.post {
             com.olympus.iptv.ui.RemoteTip.show(this, getString(R.string.remote_tip_player), binding.root as? android.view.ViewGroup)
+        }
+        miniGuide = PlayerMiniGuide(
+            binding.miniGuide,
+            binding.miniGuideList,
+            channels = { queue },
+            onTune = { position ->
+                if (position in queue.indices) {
+                    index = position
+                    playCurrent()
+                }
+            }
+        )
+        binding.miniGuideLast.setOnClickListener {
+            miniGuide.hide()
+            toggleLastChannel()
         }
         binding.playerView.useController = false
         binding.playerView.setKeepContentOnPlayerReset(true)
@@ -465,7 +483,7 @@ class PlayerActivity : AppCompatActivity() {
         setPhoneSystemBarsHidden(true)
     }
 
-    private fun setPhoneSystemBarsHidden(hide: Boolean) {
+    internal fun setPhoneSystemBarsHidden(hide: Boolean) {
         if (!touchPrimary) return
         val controller = WindowCompat.getInsetsController(window, window.decorView)
         controller.systemBarsBehavior =
@@ -588,6 +606,10 @@ class PlayerActivity : AppCompatActivity() {
         ::binding.isInitialized && binding.playbackErrorCard.visibility == View.VISIBLE
 
     private fun handlePlayerBack() {
+        if (::miniGuide.isInitialized && miniGuide.isOpen()) {
+            miniGuide.hide()
+            return
+        }
         if (binding.subtitlePanel.visibility == View.VISIBLE) {
             closeSubtitlePanel()
             return
@@ -602,6 +624,26 @@ class PlayerActivity : AppCompatActivity() {
             hideTransportChrome(animated = false)
             return
         }
+        val now = android.os.SystemClock.uptimeMillis()
+        val live = current?.kind == ContentKind.LIVE && current?.seriesId.isNullOrBlank()
+        if (live) {
+            if (now - lastBackAt <= 450L) {
+                hideHandler.removeCallbacks(leaveAfterBack)
+                lastBackAt = 0L
+                toggleLastChannel()
+                return
+            }
+            lastBackAt = now
+            hideHandler.removeCallbacks(leaveAfterBack)
+            hideHandler.postDelayed(leaveAfterBack, 450L)
+            return
+        }
+        armBrowseBack()
+        finish()
+    }
+
+    private val leaveAfterBack = Runnable {
+        if (isDestroyed) return@Runnable
         armBrowseBack()
         finish()
     }
@@ -616,9 +658,11 @@ class PlayerActivity : AppCompatActivity() {
         countdownJob?.cancel()
         introJob?.cancel()
         recoverJob?.cancel()
+        countdownFor = null
+        upNextToken += 1
     }
 
-    private fun channelScope() = lifecycleScope + channelJob
+    internal fun channelScope() = lifecycleScope + channelJob
 
     private fun playCurrent(seedMeta: String? = null, seedNext: String? = null, startAt: Long? = null) {
         val seed = current ?: queue.getOrNull(index)
@@ -658,6 +702,7 @@ class PlayerActivity : AppCompatActivity() {
             val app = application as OlympusIptvApp
             app.lastPlayed = channel
             app.lastPlayedPlaylistId = playlistId
+            app.appScope.launch { WatchNext.publish(app, channel, playlistId) }
             hadPlaybackReady = false
             bufferStartedAt = 0L
             bufferWatchToken += 1
@@ -778,7 +823,7 @@ class PlayerActivity : AppCompatActivity() {
         return "${program.timeRangeLabel()}  ${aliasProgram(program.title, raw, alias)}"
     }
 
-    private fun mediaItem(channel: Channel, title: String = lineupName(channel, channel)): MediaItem {
+    internal fun mediaItem(channel: Channel, title: String = lineupName(channel, channel)): MediaItem {
         val builder = MediaItem.Builder()
             .setUri(channel.streamUrl)
             .setMediaMetadata(
@@ -801,11 +846,7 @@ class PlayerActivity : AppCompatActivity() {
         val mode = PlayerDecoder.normalize(videoDecoder)
         playersDecoder = mode
         decoderDirty = false
-        val control = DefaultLoadControl.Builder()
-            .setBufferDurationsMs(2_500, 15_000, 1_000, 2_000)
-            .setTargetBufferBytes(6 * 1024 * 1024)
-            .setPrioritizeTimeOverSizeThresholds(true)
-            .build()
+        val control = PlayerBuffers.live()
         val http = DefaultHttpDataSource.Factory()
             .setUserAgent("Olympus-IPTV")
             .setConnectTimeoutMs(15_000)
@@ -905,6 +946,7 @@ class PlayerActivity : AppCompatActivity() {
                 if (state == Player.STATE_READY && exo.playWhenReady) {
                     playbackReady = true
                     recoverAttempt = 0
+                    armUpNext(exo, channel)
                     refreshStreamTracks()
                     if (binding.channelMeta.text == getString(R.string.playback_reconnecting)) {
                         refreshEpgQuietly()
@@ -978,6 +1020,24 @@ class PlayerActivity : AppCompatActivity() {
             if (active.playbackState != Player.STATE_BUFFERING || active.isPlaying) return@postDelayed
             paintConnectingBadge(SystemClock.elapsedRealtime() - started)
         }, 2_000L)
+        hideHandler.postDelayed({
+            if (isDestroyed || token != bufferWatchToken) return@postDelayed
+            val active = player ?: return@postDelayed
+            if (active.playbackState != Player.STATE_BUFFERING || active.isPlaying) return@postDelayed
+            val channel = current ?: return@postDelayed
+            if (recoverAttempt >= 2 && videoDecoder != PlayerDecoder.SOFTWARE) {
+                videoDecoder = PlayerDecoder.SOFTWARE
+                decoderDirty = true
+                recoverAttempt = 0
+                runCatching { active.stop() }
+                discardSparePlayers()
+                runCatching { active.release() }
+                if (player === active) player = null
+                playCurrent()
+                return@postDelayed
+            }
+            recoverLive(active, channel, null)
+        }, 10_000L)
     }
 
     private fun onBufferingEnded() {
@@ -1457,6 +1517,25 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
+    private fun tickUpNext(token: Int) {
+        if (token != upNextToken) return
+        val exo = player ?: return
+        val channel = current ?: return
+        if (!exo.isPlaying) return
+        if (channel.kind == ContentKind.LIVE && channel.seriesId.isNullOrBlank()) return
+        val duration = exo.duration
+        val left = if (duration > 0L) duration - exo.currentPosition else Long.MAX_VALUE
+        if (duration > 0L && left <= 25_000L) offerNext(channel)
+        else hideHandler.postDelayed({ tickUpNext(token) }, 1_000L)
+    }
+
+    private fun armUpNext(exo: ExoPlayer, channel: Channel?) {
+        val token = ++upNextToken
+        if (channel == null) return
+        if (channel.kind == ContentKind.LIVE && channel.seriesId.isNullOrBlank()) return
+        hideHandler.postDelayed({ tickUpNext(token) }, 1_000L)
+    }
+
     private fun offerNext(channel: Channel) {
         if (countdownFor == channel.id) return
         saveWatch(channel)
@@ -1838,7 +1917,7 @@ class PlayerActivity : AppCompatActivity() {
 
     private var swallowMenuClick = false
 
-    private fun menuButtonFocused(): Boolean =
+    internal fun menuButtonFocused(): Boolean =
         binding.btnMenuBack.isFocused ||
             binding.btnAudio.isFocused ||
             binding.btnSubtitles.isFocused ||
@@ -1920,469 +1999,6 @@ class PlayerActivity : AppCompatActivity() {
         if (!::binding.isInitialized) return
         binding.playbackMenu.visibility = View.GONE
         if (touchPrimary && binding.overlay.visibility != View.VISIBLE) setPhoneSystemBarsHidden(true)
-    }
-
-    private fun openAudio() {
-        val exo = player ?: return
-        if (touchPrimary) setPhoneSystemBarsHidden(false)
-        binding.subtitleHeading.setText(R.string.audio)
-        binding.subtitlePanel.visibility = View.VISIBLE
-        binding.subtitleRows.removeAllViews()
-        val choices = streamChoices(exo, C.TRACK_TYPE_AUDIO)
-        binding.subtitleStatus.text = if (choices.isEmpty()) getString(R.string.audio_none) else ""
-        choices.forEach { choice ->
-            addSubtitleRow(choice.label) {
-                selectTrack(choice, C.TRACK_TYPE_AUDIO)
-                rememberAudio(choice)
-                closeSubtitlePanel()
-            }
-        }
-        binding.subtitleRows.getChildAt(0)?.requestFocus()
-    }
-
-    private fun openSleepTimer() {
-        if (touchPrimary) setPhoneSystemBarsHidden(false)
-        binding.subtitleHeading.setText(R.string.sleep_timer)
-        binding.subtitlePanel.visibility = View.VISIBLE
-        binding.subtitleRows.removeAllViews()
-        binding.subtitleStatus.text = if (sleepMinutes > 0) {
-            getString(R.string.sleep_armed)
-        } else {
-            ""
-        }
-        val choices = listOf(
-            0 to R.string.sleep_off,
-            30 to R.string.sleep_30,
-            60 to R.string.sleep_60,
-            90 to R.string.sleep_90
-        )
-        var focusIndex = 0
-        choices.forEachIndexed { index, (minutes, label) ->
-            val text = if (minutes == sleepMinutes) {
-                getString(R.string.track_on, getString(label))
-            } else {
-                getString(label)
-            }
-            if (minutes == sleepMinutes) focusIndex = index
-            addSubtitleRow(text) {
-                armSleepTimer(minutes)
-                closeSubtitlePanel()
-            }
-        }
-        if (touchPrimary) {
-            addSubtitleRow(
-                getString(
-                    if (rememberedPhoneOrientation() == ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED) {
-                        R.string.player_orientation_lock
-                    } else {
-                        R.string.player_orientation_free
-                    }
-                )
-            ) {
-                togglePhoneOrientationLock()
-                closeSubtitlePanel()
-            }
-        }
-        binding.subtitleRows.getChildAt(focusIndex)?.requestFocus()
-    }
-
-    private fun armSleepTimer(minutes: Int) {
-        hideHandler.removeCallbacks(sleepFire)
-        sleepMinutes = minutes
-        if (minutes <= 0) {
-            paintSleepLabel()
-            return
-        }
-        hideHandler.postDelayed(sleepFire, minutes * 60_000L)
-        paintSleepLabel()
-        Toast.makeText(this, R.string.sleep_armed, Toast.LENGTH_SHORT).show()
-    }
-
-    private fun paintSleepLabel() {
-        if (!::binding.isInitialized) return
-        binding.btnSleep.text = if (sleepMinutes > 0) {
-            getString(R.string.sleep_timer) + " · " + sleepMinutes
-        } else {
-            getString(R.string.sleep_timer)
-        }
-    }
-
-    private fun playerPrefs() = getSharedPreferences("olympus_player", MODE_PRIVATE)
-
-    private fun rememberedPhoneOrientation(): Int {
-        val locked = playerPrefs().getInt("phone_orientation", ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED)
-        return if (locked == ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT ||
-            locked == ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-        ) {
-            locked
-        } else {
-            ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-        }
-    }
-
-    private fun togglePhoneOrientationLock() {
-        val prefs = playerPrefs()
-        val current = rememberedPhoneOrientation()
-        val next = when {
-            current != ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED ->
-                ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-            resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT ->
-                ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
-            else -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-        }
-        prefs.edit().putInt("phone_orientation", next).apply()
-        requestedOrientation = next
-    }
-
-    private fun openPicture() {
-        if (touchPrimary) setPhoneSystemBarsHidden(false)
-        binding.subtitleHeading.setText(R.string.picture)
-        binding.subtitlePanel.visibility = View.VISIBLE
-        binding.subtitleRows.removeAllViews()
-        binding.subtitleStatus.text = ""
-        val choices = listOf(
-            PlaylistStore.PICTURE_FIT to R.string.picture_fit,
-            PlaylistStore.PICTURE_FILL to R.string.picture_fill,
-            PlaylistStore.PICTURE_STRETCH to R.string.picture_stretch
-        )
-        var focusIndex = 0
-        choices.forEachIndexed { index, (mode, label) ->
-            val text = if (mode == pictureMode) {
-                getString(R.string.track_on, getString(label))
-            } else {
-                getString(label)
-            }
-            if (mode == pictureMode) focusIndex = index
-            addSubtitleRow(text) {
-                pictureMode = mode
-                applyPicture(mode)
-                lifecycleScope.launch(Dispatchers.IO) {
-                    (application as OlympusIptvApp).playlistStore.savePictureMode(mode)
-                }
-                closeSubtitlePanel()
-            }
-        }
-        binding.subtitleRows.getChildAt(focusIndex)?.requestFocus()
-    }
-
-    private fun applyPicture(mode: String) {
-        if (!::binding.isInitialized) return
-        val resize = when (mode) {
-            PlaylistStore.PICTURE_FILL -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
-            PlaylistStore.PICTURE_STRETCH -> AspectRatioFrameLayout.RESIZE_MODE_FILL
-            else -> AspectRatioFrameLayout.RESIZE_MODE_FIT
-        }
-        binding.playerView.resizeMode = resize
-    }
-
-    private fun openSubtitles() {
-        val channel = current ?: return
-        val exo = player
-        val series = !channel.seriesId.isNullOrBlank() && channel.streamUrl.isNotBlank()
-        panelEmbedded = if (exo == null) emptyList() else streamChoices(exo, C.TRACK_TYPE_TEXT)
-        if (touchPrimary) setPhoneSystemBarsHidden(false)
-        binding.subtitleHeading.setText(R.string.subtitles)
-        binding.subtitlePanel.visibility = View.VISIBLE
-        if (!series) {
-            subtitleJob?.cancel()
-            showSubtitleHits(emptyList(), waiting = false)
-            if (panelEmbedded.isEmpty() && sidecar == null) {
-                binding.subtitleStatus.text = getString(R.string.subtitles_none)
-            }
-            return
-        }
-        binding.subtitleStatus.text = getString(R.string.subtitles_searching)
-        showSubtitleHits(emptyList(), waiting = true)
-        subtitleJob?.cancel()
-        subtitleJob = channelScope().launch {
-            val savedId = playlistId
-            val seriesId = channel.seriesId
-            val show = withContext(Dispatchers.IO) {
-                if (savedId.isNullOrBlank() || seriesId.isNullOrBlank()) channel.name
-                else {
-                    (application as OlympusIptvApp).catalogDb
-                        .readChannel(savedId, CatalogDb.SERIES, seriesId)?.name ?: channel.name
-                }
-            }
-            val query = Subtitles.query(show, channel)
-            if (query == null || !isActive) {
-                binding.subtitleStatus.text = if (panelEmbedded.isEmpty()) getString(R.string.subtitles_none) else ""
-                return@launch
-            }
-            val opened = async(Dispatchers.IO) { Subtitles.openSearch(query) }
-            val listed = async(Dispatchers.IO) { Subtitles.tvSearch(filesDir, query) }
-            val first = opened.await()
-            if (!isActive) return@launch
-            showSubtitleHits(first, waiting = true)
-            val rest = listed.await()
-            if (!isActive) return@launch
-            showSubtitleHits(first + rest, waiting = false)
-        }
-    }
-
-    private fun showSubtitleHits(hits: List<Subtitles.Hit>, waiting: Boolean) {
-        binding.subtitleRows.removeAllViews()
-        panelEmbedded.forEach { choice ->
-            addSubtitleRow(choice.label) { chooseEmbeddedText(choice) }
-        }
-        if (sidecar != null || panelEmbedded.any { it.selected }) {
-            addSubtitleRow(getString(R.string.subtitles_off)) { disableText() }
-        }
-        hits.forEach { hit -> addSubtitleRow(hit.label) { chooseSubtitle(hit) } }
-        binding.subtitleStatus.text = when {
-            hits.isEmpty() && waiting -> getString(R.string.subtitles_searching)
-            hits.isEmpty() && panelEmbedded.isEmpty() && sidecar == null -> getString(R.string.subtitles_none)
-            else -> ""
-        }
-        if (binding.subtitleRows.childCount > 0) {
-            binding.subtitleRows.getChildAt(0)?.requestFocus()
-        }
-    }
-
-    private fun chooseEmbeddedText(choice: StreamChoice) {
-        pendingLanguage = choice.language
-        rememberSubtitle(choice.language)
-        if (sidecar != null) {
-            clearSidecar()
-            return
-        }
-        selectTrack(choice, C.TRACK_TYPE_TEXT)
-        closeSubtitlePanel()
-    }
-
-    private fun disableText() {
-        pendingLanguage = null
-        rememberSubtitle(PlaylistStore.SUBTITLE_OFF)
-        val exo = player ?: return
-        exo.trackSelectionParameters = exo.trackSelectionParameters.buildUpon()
-            .clearOverridesOfType(C.TRACK_TYPE_TEXT)
-            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
-            .build()
-        if (sidecar != null) clearSidecar() else closeSubtitlePanel()
-    }
-
-    private fun selectTrack(choice: StreamChoice, type: Int) {
-        val exo = player ?: return
-        exo.trackSelectionParameters = exo.trackSelectionParameters.buildUpon()
-            .setTrackTypeDisabled(type, false)
-            .setOverrideForType(TrackSelectionOverride(choice.group.mediaTrackGroup, listOf(choice.index)))
-            .build()
-    }
-
-    private fun refreshStreamTracks() {
-        val exo = player ?: return
-        val channel = current
-        val audio = streamChoices(exo, C.TRACK_TYPE_AUDIO)
-        val text = streamChoices(exo, C.TRACK_TYPE_TEXT)
-        val series = channel != null && !channel.seriesId.isNullOrBlank() && channel.streamUrl.isNotBlank()
-        binding.btnAudio.visibility = if (audio.isNotEmpty()) View.VISIBLE else View.GONE
-        binding.btnSubtitles.visibility = if (series || text.isNotEmpty()) View.VISIBLE else View.GONE
-        if (binding.playbackMenu.visibility == View.VISIBLE && !menuButtonFocused()) {
-            listOf(
-                binding.btnAudio,
-                binding.btnSubtitles,
-                binding.btnRecord,
-                binding.btnPicture,
-                binding.btnLast,
-                binding.btnGoLive,
-                binding.btnMultiView
-            )
-                .firstOrNull { it.visibility == View.VISIBLE }
-                ?.requestFocus()
-        }
-        applyPreferredAudio(channel, audio)
-        applyPreferredSubtitle(channel, text)
-        val wanted = pendingLanguage ?: return
-        val match = text.firstOrNull { it.language == wanted } ?: return
-        pendingLanguage = null
-        selectTrack(match, C.TRACK_TYPE_TEXT)
-    }
-
-    private fun applyPreferredAudio(channel: Channel?, audio: List<StreamChoice>) {
-        if (audio.isEmpty() || channel == null || channel.id.isBlank()) return
-        if (audioAppliedFor == channel.id) return
-        audioAppliedFor = channel.id
-        lifecycleScope.launch {
-            val store = (application as OlympusIptvApp).playlistStore
-            val channelLang = withContext(Dispatchers.IO) { store.audioForChannel(channel.id) }
-            val global = preferredAudio.ifBlank {
-                withContext(Dispatchers.IO) { store.audioLanguage() }.also { preferredAudio = it }
-            }
-            val match = pickAudio(audio, channelLang ?: global) ?: return@launch
-            if (!match.selected) selectTrack(match, C.TRACK_TYPE_AUDIO)
-        }
-    }
-
-    private fun applyPreferredSubtitle(channel: Channel?, text: List<StreamChoice>) {
-        if (text.isEmpty() || channel == null || channel.id.isBlank()) return
-        if (subtitleAppliedFor == channel.id) return
-        subtitleAppliedFor = channel.id
-        lifecycleScope.launch {
-            val store = (application as OlympusIptvApp).playlistStore
-            val channelLang = withContext(Dispatchers.IO) { store.subtitleForChannel(channel.id) }
-            val global = preferredSubtitle.ifBlank {
-                withContext(Dispatchers.IO) { store.subtitleLanguage() }.also { preferredSubtitle = it }
-            }
-            val wanted = channelLang ?: global
-            if (wanted.isBlank() || wanted == PlaylistStore.SUBTITLE_OFF) {
-                val exo = player ?: return@launch
-                exo.trackSelectionParameters = exo.trackSelectionParameters.buildUpon()
-                    .clearOverridesOfType(C.TRACK_TYPE_TEXT)
-                    .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
-                    .build()
-                return@launch
-            }
-            val match = pickAudio(text, wanted) ?: return@launch
-            if (!match.selected) selectTrack(match, C.TRACK_TYPE_TEXT)
-        }
-    }
-
-    private fun rememberAudio(choice: StreamChoice) {
-        val language = choice.language?.trim().orEmpty()
-        if (language.isBlank()) return
-        preferredAudio = language
-        audioAppliedFor = current?.id
-        val channelId = current?.id.orEmpty()
-        lifecycleScope.launch(Dispatchers.IO) {
-            val store = (application as OlympusIptvApp).playlistStore
-            if (channelId.isNotBlank()) store.saveAudioForChannel(channelId, language)
-            else store.saveAudioLanguage(language)
-        }
-    }
-
-    private fun rememberSubtitle(language: String?) {
-        val chosen = language?.trim().orEmpty().ifBlank { PlaylistStore.SUBTITLE_OFF }
-        preferredSubtitle = chosen
-        subtitleAppliedFor = current?.id
-        val channelId = current?.id.orEmpty()
-        lifecycleScope.launch(Dispatchers.IO) {
-            val store = (application as OlympusIptvApp).playlistStore
-            if (channelId.isNotBlank()) store.saveSubtitleForChannel(channelId, chosen)
-            else store.saveSubtitleLanguage(chosen)
-        }
-    }
-
-    private fun pickAudio(choices: List<StreamChoice>, wanted: String): StreamChoice? {
-        val prefs = linkedSetOf(wanted, PlaylistStore.DEFAULT_AUDIO_LANGUAGE, "en", "eng")
-        for (pref in prefs) {
-            choices.firstOrNull { languageMatches(it.language, pref) }?.let { return it }
-        }
-        return null
-    }
-
-    private fun languageMatches(track: String?, want: String): Boolean {
-        if (track.isNullOrBlank() || want.isBlank()) return false
-        val a = track.replace('_', '-').lowercase(Locale.US)
-        val b = want.replace('_', '-').lowercase(Locale.US)
-        if (a == b) return true
-        if (a.startsWith("$b-") || b.startsWith("$a-")) return true
-        return a.substringBefore('-') == b.substringBefore('-')
-    }
-
-    private fun streamChoices(exo: Player, type: Int): List<StreamChoice> {
-        val out = ArrayList<StreamChoice>()
-        for (group in exo.currentTracks.groups) {
-            if (group.type != type) continue
-            for (index in 0 until group.length) {
-                if (!group.isTrackSupported(index)) continue
-                val format = group.getTrackFormat(index)
-                val language = format.language?.takeIf { it.isNotBlank() && !it.equals("und", true) }
-                val spoken = language?.let { Locale.forLanguageTag(it).displayLanguage }?.takeIf { it.isNotBlank() }
-                val extra = format.label?.takeIf { label ->
-                    label.isNotBlank() && !label.equals(spoken, true) && !label.equals(language, true)
-                }
-                val base = listOfNotNull(spoken, extra).joinToString(" · ").ifBlank {
-                    getString(R.string.track_n, out.size + 1)
-                }
-                val label = if (group.isTrackSelected(index)) getString(R.string.track_on, base) else base
-                out += StreamChoice(group, index, label, language ?: format.label, group.isTrackSelected(index))
-            }
-        }
-        return out
-    }
-
-    private data class StreamChoice(
-        val group: Tracks.Group,
-        val index: Int,
-        val label: String,
-        val language: String?,
-        val selected: Boolean
-    )
-
-    private fun addSubtitleRow(label: String, onPick: () -> Unit) {
-        val row = Button(this).apply {
-            text = label
-            isAllCaps = false
-            gravity = Gravity.START or Gravity.CENTER_VERTICAL
-            setTextColor(getColor(R.color.text_primary))
-            background = getDrawable(R.drawable.bg_focusable)
-            textSize = 15f
-            isFocusable = true
-            setPadding(24, 12, 24, 12)
-            setOnClickListener { onPick() }
-        }
-        val margin = (6 * resources.displayMetrics.density).toInt()
-        row.layoutParams = LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply { topMargin = margin }
-        binding.subtitleRows.addView(row)
-    }
-
-    private fun chooseSubtitle(hit: Subtitles.Hit) {
-        binding.subtitleStatus.text = getString(R.string.subtitles_saving)
-        subtitleJob?.cancel()
-        subtitleJob = channelScope().launch {
-            val saved = withContext(Dispatchers.IO) { Subtitles.download(filesDir, hit) }
-            if (!isActive) return@launch
-            if (saved == null) {
-                binding.subtitleStatus.text = getString(R.string.subtitles_failed)
-                return@launch
-            }
-            rememberSubtitle("en")
-            applySidecar(saved)
-            closeSubtitlePanel()
-            Toast.makeText(this@PlayerActivity, R.string.subtitles_added, Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    private fun applySidecar(saved: Subtitles.Saved) {
-        val exo = player ?: return
-        val channel = current ?: return
-        val at = exo.currentPosition.coerceAtLeast(0L)
-        playbackReady = false
-        sidecar = MediaItem.SubtitleConfiguration.Builder(Uri.fromFile(saved.file))
-            .setMimeType(saved.mime)
-            .setLanguage("en")
-            .setSelectionFlags(androidx.media3.common.C.SELECTION_FLAG_DEFAULT)
-            .build()
-        exo.setMediaItem(mediaItem(channel), at)
-        exo.prepare()
-        exo.playWhenReady = true
-    }
-
-    private fun clearSidecar() {
-        val exo = player ?: return
-        val channel = current ?: return
-        val at = exo.currentPosition.coerceAtLeast(0L)
-        playbackReady = false
-        sidecar = null
-        exo.setMediaItem(mediaItem(channel), at)
-        exo.prepare()
-        exo.playWhenReady = true
-        closeSubtitlePanel()
-    }
-
-    private fun closeSubtitlePanel() {
-        subtitleJob?.cancel()
-        if (::binding.isInitialized) binding.subtitlePanel.visibility = View.GONE
-        if (touchPrimary &&
-            ::binding.isInitialized &&
-            binding.playbackMenu.visibility != View.VISIBLE &&
-            binding.overlay.visibility != View.VISIBLE
-        ) {
-            setPhoneSystemBarsHidden(true)
-        }
     }
 
     private fun offerRecording() {
@@ -2660,10 +2276,18 @@ class PlayerActivity : AppCompatActivity() {
             }
         }
         if (centerKey(event.keyCode)) {
+            if (::miniGuide.isInitialized && miniGuide.isOpen()) {
+                if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) miniGuide.tune()
+                return true
+            }
             if (binding.subtitlePanel.visibility == View.VISIBLE) return super.dispatchKeyEvent(event)
             if (menuButtonFocused() || binding.btnSeekPlay.isFocused) {
                 swallowMenuClick = false
                 return super.dispatchKeyEvent(event)
+            }
+            if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount >= 8) {
+                showPlayingActions()
+                return true
             }
             if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
                 if (binding.playbackMenu.visibility == View.VISIBLE) {
@@ -2684,6 +2308,30 @@ class PlayerActivity : AppCompatActivity() {
             }
         }
         return super.dispatchKeyEvent(event)
+    }
+
+    private fun openMiniGuide() {
+        if (!::miniGuide.isInitialized) return
+        hideTransportChrome(animated = false)
+        miniGuide.show(current?.id)
+    }
+
+    private fun showPlayingActions() {
+        val channel = current ?: return
+        val labels = listOf(
+            getString(R.string.player_channels),
+            getString(R.string.record),
+            getString(R.string.audio),
+            getString(R.string.subtitles)
+        )
+        com.olympus.iptv.ui.GuideActionSheet.show(this, channel.name, labels) { which ->
+            when (which) {
+                0 -> openMiniGuide()
+                1 -> binding.btnRecord.performClick()
+                2 -> binding.btnAudio.performClick()
+                3 -> binding.btnSubtitles.performClick()
+            }
+        }
     }
 
     private fun centerKey(keyCode: Int): Boolean =
@@ -2709,12 +2357,28 @@ class PlayerActivity : AppCompatActivity() {
         return when (keyCode) {
             KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_CHANNEL_UP -> {
                 if (binding.subtitlePanel.visibility == View.VISIBLE) return false
+                if (::miniGuide.isInitialized && miniGuide.isOpen()) {
+                    miniGuide.move(-1)
+                    return true
+                }
                 if (binding.playbackMenu.visibility == View.VISIBLE) return true
+                if (transportShowing()) {
+                    openMiniGuide()
+                    return true
+                }
                 previousChannel(); true
             }
             KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_CHANNEL_DOWN -> {
                 if (binding.subtitlePanel.visibility == View.VISIBLE) return false
+                if (::miniGuide.isInitialized && miniGuide.isOpen()) {
+                    miniGuide.move(1)
+                    return true
+                }
                 if (binding.playbackMenu.visibility == View.VISIBLE) return true
+                if (transportShowing()) {
+                    openMiniGuide()
+                    return true
+                }
                 nextChannel(); true
             }
             KeyEvent.KEYCODE_DPAD_LEFT -> {
@@ -2748,8 +2412,52 @@ class PlayerActivity : AppCompatActivity() {
                 if (binding.playbackMenu.visibility == View.VISIBLE) hidePlaybackMenu()
                 toggleLastChannel(); true
             }
-            else -> super.onKeyDown(keyCode, event)
+            else -> {
+                val digit = when (keyCode) {
+                    in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9 -> keyCode - KeyEvent.KEYCODE_0
+                    in KeyEvent.KEYCODE_NUMPAD_0..KeyEvent.KEYCODE_NUMPAD_9 -> keyCode - KeyEvent.KEYCODE_NUMPAD_0
+                    else -> -1
+                }
+                if (digit >= 0 && current?.kind == ContentKind.LIVE) {
+                    onPlayerDigit(digit)
+                    true
+                } else {
+                    super.onKeyDown(keyCode, event)
+                }
+            }
         }
+    }
+
+    private var dialDigits = ""
+    private val tuneDial = Runnable { tuneDialedNumber() }
+    private val clearDialHud = Runnable {
+        dialDigits = ""
+        if (::binding.isInitialized) binding.playerDial.visibility = View.GONE
+    }
+
+    private fun onPlayerDigit(digit: Int) {
+        if (dialDigits.length >= 4) dialDigits = ""
+        dialDigits += digit.toString()
+        binding.playerDial.text = dialDigits
+        binding.playerDial.visibility = View.VISIBLE
+        hideHandler.removeCallbacks(tuneDial)
+        hideHandler.removeCallbacks(clearDialHud)
+        hideHandler.postDelayed(tuneDial, 1_200L)
+    }
+
+    private fun tuneDialedNumber() {
+        val typed = dialDigits
+        dialDigits = ""
+        val number = typed.toIntOrNull() ?: 0
+        val at = queue.indexOfFirst { it.number == number }
+        if (at !in queue.indices) {
+            binding.playerDial.text = typed
+            hideHandler.postDelayed(clearDialHud, 900L)
+            return
+        }
+        binding.playerDial.visibility = View.GONE
+        index = at
+        playCurrent()
     }
 
     private fun canEnterPip(): Boolean {

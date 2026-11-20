@@ -32,7 +32,7 @@ class ChannelAdapter(
     private val onFavorite: (Channel) -> Unit,
     private val onRecord: (Channel) -> Unit,
     private val epgProvider: (Channel) -> EpgNowNext?
-) : RecyclerView.Adapter<ChannelAdapter.Holder>() {
+) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     private val items = mutableListOf<Channel>()
     private val cleanedNames = HashMap<String, Pair<String, String>>()
@@ -159,7 +159,7 @@ class ChannelAdapter(
     private fun holderMatchesMode(holder: Holder): Boolean =
         if (posterMode) holder is PosterHolder else holder is RowHolder
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder {
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
         val inflater = LayoutInflater.from(parent.context)
         return if (viewType == VIEW_POSTER) {
             PosterHolder(ItemPosterBinding.inflate(inflater, parent, false))
@@ -168,17 +168,19 @@ class ChannelAdapter(
         }
     }
 
-    override fun onBindViewHolder(holder: Holder, position: Int) {
-        if (!holderMatchesMode(holder)) return
-        holder.bind(items[position], position, full = true)
+    override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
+        val row = holder as? Holder ?: return
+        if (!holderMatchesMode(row)) return
+        row.bind(items[position], position, full = true)
     }
 
-    override fun onBindViewHolder(holder: Holder, position: Int, payloads: MutableList<Any>) {
-        if (!holderMatchesMode(holder)) return
+    override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int, payloads: MutableList<Any>) {
+        val row = holder as? Holder ?: return
+        if (!holderMatchesMode(row)) return
         when {
-            payloads.contains(PAYLOAD_EPG) -> holder.bindEpg(items[position])
-            payloads.contains(PAYLOAD_FAVORITE) -> holder.bindFavorite(items[position])
-            payloads.contains(PAYLOAD_LOGO) -> holder.bindLogo(items[position])
+            payloads.contains(PAYLOAD_EPG) -> row.bindEpg(items[position])
+            payloads.contains(PAYLOAD_FAVORITE) -> row.bindFavorite(items[position])
+            payloads.contains(PAYLOAD_LOGO) -> row.bindLogo(items[position])
             else -> super.onBindViewHolder(holder, position, payloads)
         }
     }
@@ -347,7 +349,7 @@ class ChannelAdapter(
         }
     }
 
-    override fun onViewRecycled(holder: Holder) {
+    override fun onViewRecycled(holder: RecyclerView.ViewHolder) {
         super.onViewRecycled(holder)
         val logo = holder.itemView.findViewById<android.widget.ImageView>(R.id.logo) ?: return
         logo.setTag(R.id.logo, null)
