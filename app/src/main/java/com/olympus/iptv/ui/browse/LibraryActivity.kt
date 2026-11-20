@@ -55,7 +55,8 @@ class LibraryActivity : AppCompatActivity(), LibraryHost {
         binding.pillReminders.setOnClickListener { showTab(2) }
         listOf(binding.pillQueue, binding.pillFresh, binding.pillReminders, binding.libraryBack)
             .forEach { FocusMotion.bind(it, enabled = !com.olympus.iptv.ui.DeviceForm.isTouchPrimary(this)) }
-        showTab(savedInstanceState?.getInt(STATE_TAB, 0) ?: 0)
+        val start = savedInstanceState?.getInt(STATE_TAB) ?: intent.getIntExtra(EXTRA_TAB, 0)
+        showTab(start)
         binding.pillQueue.post { binding.pillQueue.requestFocus() }
     }
 
@@ -124,10 +125,13 @@ class LibraryActivity : AppCompatActivity(), LibraryHost {
 
     companion object {
         private const val EXTRA_PLAYLIST_ID = "playlist_id"
+        private const val EXTRA_TAB = "library_tab_start"
         private const val STATE_TAB = "library_tab"
         private val TAGS = arrayOf("library_queue", "library_fresh", "library_reminders")
 
-        fun intent(context: Context, playlistId: String): Intent =
-            Intent(context, LibraryActivity::class.java).putExtra(EXTRA_PLAYLIST_ID, playlistId)
+        fun intent(context: Context, playlistId: String, tab: Int = 0): Intent =
+            Intent(context, LibraryActivity::class.java)
+                .putExtra(EXTRA_PLAYLIST_ID, playlistId)
+                .putExtra(EXTRA_TAB, tab)
     }
 }

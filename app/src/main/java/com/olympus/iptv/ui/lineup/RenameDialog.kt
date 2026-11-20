@@ -15,7 +15,7 @@ object RenameDialog {
         val dialog = Dialog(activity)
         dialog.setContentView(binding.root)
         dialog.window?.apply {
-            setBackgroundDrawableResource(R.drawable.bg_panel)
+            setBackgroundDrawableResource(R.drawable.bg_login_card)
             setLayout(
                 (activity.resources.displayMetrics.widthPixels * 0.62f).toInt(),
                 WindowManager.LayoutParams.WRAP_CONTENT

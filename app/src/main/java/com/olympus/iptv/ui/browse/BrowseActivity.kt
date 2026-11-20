@@ -26,6 +26,7 @@ import com.olympus.iptv.BuildConfig
 import androidx.transition.AutoTransition
 import androidx.transition.TransitionManager
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
@@ -75,7 +76,6 @@ import com.olympus.iptv.playlist.TitleRatings
 import com.olympus.iptv.playlist.XtreamClient
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.olympus.iptv.record.RecordActivity
-import com.olympus.iptv.remind.RemindersActivity
 import com.olympus.iptv.record.RecordPrompt
 import com.olympus.iptv.record.RecordingService
 import com.olympus.iptv.ui.FocusMotion
@@ -322,6 +322,10 @@ class BrowseActivity : AppCompatActivity(), ToolHost {
         binding.root.post {
             com.olympus.iptv.ui.RemoteTip.show(this, getString(R.string.remote_tip_browse), binding.root as? android.view.ViewGroup)
         }
+        binding.root.post {
+            reportFullyDrawn()
+            (application as OlympusIptvApp).warmAfterFirstFrame()
+        }
         browseToolHost = BrowseToolHost(this, binding.toolOverlay)
         supportFragmentManager.setFragmentResultListener(EpgEditsFragment.RESULT_KEY, this) { _, _ ->
             showBlank()
@@ -454,11 +458,11 @@ class BrowseActivity : AppCompatActivity(), ToolHost {
         binding.tabShows.setOnClickListener { openSection(GuideSection.SHOWS) }
         binding.btnQueue.setOnClickListener {
             val saved = playlist ?: return@setOnClickListener
-            startActivity(QueueActivity.intent(this, saved.id))
+            startActivity(LibraryActivity.intent(this, saved.id, tab = 0))
         }
         binding.btnFresh.setOnClickListener {
             val saved = playlist ?: return@setOnClickListener
-            startActivity(FreshActivity.intent(this, saved.id))
+            startActivity(LibraryActivity.intent(this, saved.id, tab = 1))
         }
         binding.btnLibrary.setOnClickListener {
             val saved = playlist ?: return@setOnClickListener
@@ -470,7 +474,8 @@ class BrowseActivity : AppCompatActivity(), ToolHost {
             startActivity(RecordActivity.intent(this, saved.id))
         }
         binding.btnRemind.setOnClickListener {
-            startActivity(RemindersActivity.intent(this))
+            val saved = playlist ?: return@setOnClickListener
+            startActivity(LibraryActivity.intent(this, saved.id, tab = 2))
         }
         binding.guideNow.setOnClickListener { jumpGuideToNow() }
         binding.btnParental.setOnClickListener {
@@ -2244,6 +2249,27 @@ class BrowseActivity : AppCompatActivity(), ToolHost {
         Toast.makeText(this, R.string.admin_backup_detail, Toast.LENGTH_LONG).show()
     }
 
+    private fun showLetterJump() {
+        val letters = ('A'..'Z').map { it.toString() } + "#"
+        val dialog = AlertDialog.Builder(this)
+            .setTitle(R.string.letter_jump_title)
+            .setItems(letters.toTypedArray()) { _, which ->
+                val letter = letters[which]
+                val index = visibleChannels.indexOfFirst { channel ->
+                    val mark = channel.name.trim().firstOrNull()?.uppercaseChar()
+                    if (letter == "#") mark == null || !mark.isLetter() else mark.toString() == letter
+                }
+                if (index < 0) return@setItems
+                binding.channelList.scrollToPosition(index)
+                binding.channelList.post {
+                    if (!isDestroyed) focusRowAt(binding.channelList, index, R.id.playTarget)
+                }
+            }
+            .create()
+        com.olympus.iptv.ui.DialogChrome.dress(dialog)
+        dialog.show()
+    }
+
     private fun paintNowPlayingBar() {
         if (!::binding.isInitialized) return
         val app = application as OlympusIptvApp
@@ -3173,6 +3199,15 @@ class BrowseActivity : AppCompatActivity(), ToolHost {
         }
         if (onGroupPinKey(event)) return true
         if (onDialKey(event)) return true
+        if (event.action == KeyEvent.ACTION_DOWN &&
+            event.repeatCount == 16 &&
+            (event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN || event.keyCode == KeyEvent.KEYCODE_DPAD_UP) &&
+            focusIsIn(binding.channelList) &&
+            visibleChannels.size > 40
+        ) {
+            showLetterJump()
+            return true
+        }
         if (event.action == KeyEvent.ACTION_DOWN &&
             (event.keyCode == KeyEvent.KEYCODE_BACK ||
                 event.keyCode == KeyEvent.KEYCODE_ESCAPE ||

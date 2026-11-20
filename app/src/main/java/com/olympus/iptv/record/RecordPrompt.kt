@@ -34,14 +34,16 @@ object RecordPrompt {
             Toast.makeText(activity, R.string.record_no_program, Toast.LENGTH_SHORT).show()
             return
         }
-        AlertDialog.Builder(activity)
+        val dialog = AlertDialog.Builder(activity)
             .setTitle(R.string.record_pick)
             .setItems(choices.map { it.first }.toTypedArray()) { _, which ->
                 val choice = choices[which].second
                 askDestination(activity, playlistId, channel, choice.program, choice.series)
             }
             .setNegativeButton(android.R.string.cancel, null)
-            .show()
+            .create()
+        com.olympus.iptv.ui.DialogChrome.dress(dialog)
+        dialog.show()
     }
 
     fun askDestination(
@@ -51,7 +53,7 @@ object RecordPrompt {
         program: EpgProgram,
         series: Boolean = false
     ) {
-        AlertDialog.Builder(activity)
+        val dialog = AlertDialog.Builder(activity)
             .setTitle(R.string.record_where)
             .setItems(arrayOf(activity.getString(R.string.record_local), activity.getString(R.string.record_smb))) { _, which ->
                 val destination = if (which == 0) Recording.LOCAL else Recording.SMB
@@ -60,7 +62,9 @@ object RecordPrompt {
                 }
             }
             .setNegativeButton(android.R.string.cancel, null)
-            .show()
+            .create()
+        com.olympus.iptv.ui.DialogChrome.dress(dialog)
+        dialog.show()
     }
 
     private suspend fun prepareSchedule(
@@ -101,7 +105,7 @@ object RecordPrompt {
         }
         val conflict = preview.conflict
         if (conflict != null) {
-            AlertDialog.Builder(activity)
+            val overlap = AlertDialog.Builder(activity)
                 .setTitle(R.string.record_overlap_title)
                 .setMessage(
                     activity.getString(
@@ -117,7 +121,9 @@ object RecordPrompt {
                     }
                 }
                 .setNegativeButton(android.R.string.cancel, null)
-                .show()
+                .create()
+            com.olympus.iptv.ui.DialogChrome.dress(overlap)
+            overlap.show()
             return
         }
         val message = withContext(Dispatchers.IO) {
@@ -130,6 +136,12 @@ object RecordPrompt {
         val failed = message == activity.getString(R.string.record_share_needed) ||
             message == activity.getString(R.string.record_overlap) ||
             message == activity.getString(R.string.record_no_program)
+        if (!failed && destination == Recording.LOCAL) {
+            val free = com.olympus.iptv.record.RecordingFiles.directory(activity).usableSpace
+            if (free < 2L * 1024L * 1024L * 1024L) {
+                Toast.makeText(activity, R.string.record_storage_low_warn, Toast.LENGTH_LONG).show()
+            }
+        }
         if (!failed) RecordingService.start(activity)
         Toast.makeText(activity, message, Toast.LENGTH_SHORT).show()
     }

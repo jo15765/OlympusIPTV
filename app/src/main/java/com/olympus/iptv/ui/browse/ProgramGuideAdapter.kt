@@ -385,7 +385,10 @@ class ProgramGuideAdapter(
             view.tag = slot
             view.background = backgroundFor(kind, focused = false)
             view.setTextColor(primary)
-            view.text = label(title, time, kind, false)
+            val catchupPast = program != null &&
+                program.endMillis < System.currentTimeMillis() &&
+                channel.supportsCatchup()
+            view.text = label(title, time, kind, false, catchupPast)
             val layout = view.layoutParams as? FrameLayout.LayoutParams
                 ?: FrameLayout.LayoutParams(width, ViewGroup.LayoutParams.MATCH_PARENT)
             layout.width = width
@@ -399,7 +402,7 @@ class ProgramGuideAdapter(
             view.setOnFocusChangeListener { _, hasFocus ->
                 view.background = backgroundFor(kind, hasFocus)
                 view.setTextColor(if (hasFocus) ink else primary)
-                view.text = label(title, time, kind, hasFocus)
+                view.text = label(title, time, kind, hasFocus, catchupPast)
                 if (hasFocus) {
                     reveal(view)
                     onFocus(channel, program)
@@ -408,13 +411,19 @@ class ProgramGuideAdapter(
             if (hadFocus) {
                 view.background = backgroundFor(kind, true)
                 view.setTextColor(ink)
-                view.text = label(title, time, kind, true)
+                view.text = label(title, time, kind, true, catchupPast)
             }
         }
 
-        private fun label(title: String, time: String?, kind: EpgKind, focused: Boolean): CharSequence {
+        private fun label(
+            title: String,
+            time: String?,
+            kind: EpgKind,
+            focused: Boolean,
+            catchupPast: Boolean = false
+        ): CharSequence {
             val pill = EpgProgramStyle.pill(kind)
-            val headline = if (pill == null) title else "[$pill] $title"
+            val headline = (if (catchupPast) "↺ " else "") + if (pill == null) title else "[$pill] $title"
             if (time.isNullOrBlank()) return headline
             val text = SpannableString("$headline\n$time")
             val start = headline.length + 1

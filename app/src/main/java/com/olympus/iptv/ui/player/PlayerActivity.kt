@@ -1049,25 +1049,26 @@ class PlayerActivity : AppCompatActivity() {
         val hardFail = http == 401 || http == 403 || recoverAttempt >= MAX_LIVE_RECOVER
         if (hardFail) {
             runCatching { exo.stop() }
+            showConnectingBadge(false)
             toastPlaybackIssue(error)
             return
         }
         if (playbackErrorOpen()) return
         binding.channelMeta.text = getString(R.string.playback_reconnecting)
+        binding.connectingBadge.setText(R.string.playback_reconnecting_pill)
+        binding.connectingBadge.visibility = View.VISIBLE
+        val wait = 1_000L shl (recoverAttempt - 1).coerceAtMost(3)
         recoverJob = lifecycleScope.launch {
-            delay((600L + (recoverAttempt - 1) * 400L).coerceAtMost(3_000L))
+            delay(wait.coerceAtMost(8_000L))
             if (token != playbackToken || player !== exo || isDestroyed) return@launch
             hadPlaybackReady = false
             bufferStartedAt = 0L
             bufferWatchToken += 1
             exo.playWhenReady = true
-            if (behind) {
+            if (behind || channel.kind == ContentKind.LIVE) {
                 exo.seekToDefaultPosition()
-                exo.prepare()
-            } else {
-                exo.setMediaItem(mediaItem(channel))
-                exo.prepare()
             }
+            exo.prepare()
             exo.playWhenReady = true
         }
     }
@@ -2509,6 +2510,35 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
+    private fun rewindLiveFive(): Boolean {
+        if (!isLiveNow()) return false
+        if (nudgeTimeshift(-5 * 60_000L)) return true
+        val channel = current ?: return false
+        if (!channel.supportsCatchup()) return false
+        val savedId = playlistId ?: return false
+        lifecycleScope.launch {
+            val playlist = savedPlaylist(savedId) ?: return@launch
+            val now = System.currentTimeMillis()
+            val epg = runCatching { epgRepo.nowNext(playlist, channel) }.getOrNull()?.now
+            val start = (epg?.startMillis ?: (now - 5 * 60_000L)).coerceAtMost(now - 60_000L)
+            val end = epg?.endMillis ?: (now + 30 * 60_000L)
+            val program = com.olympus.iptv.data.EpgProgram(
+                title = epg?.title ?: channel.name,
+                startMillis = start,
+                endMillis = end,
+                description = epg?.description
+            )
+            val url = com.olympus.iptv.playlist.CatchupUrls.url(playlist, channel, program) ?: return@launch
+            val exo = player ?: return@launch
+            binding.connectingBadge.setText(R.string.playback_catchup_rewind)
+            binding.connectingBadge.visibility = View.VISIBLE
+            exo.setMediaItem(mediaItem(channel.copy(streamUrl = url)))
+            exo.prepare()
+            exo.playWhenReady = true
+        }
+        return true
+    }
+
     private fun nudgeTimeshift(deltaMs: Long): Boolean {
         val exo = player ?: return false
         if (!isLiveNow()) return false
@@ -2690,6 +2720,7 @@ class PlayerActivity : AppCompatActivity() {
             KeyEvent.KEYCODE_DPAD_LEFT -> {
                 if (binding.subtitlePanel.visibility == View.VISIBLE) return false
                 if (binding.playbackMenu.visibility == View.VISIBLE) return false
+                if (!transportShowing() && rewindLiveFive()) return true
                 if (nudgeTimeshift(-10_000L)) return true
                 requestChannelReturn()
                 armBrowseBack()
@@ -2907,7 +2938,7 @@ class PlayerActivity : AppCompatActivity() {
         private const val REBUFFER_BADGE_MS = 1_200L
         private const val LIVE_REBUFFER_BADGE_MS = 4_500L
         private const val STILL_SPOOL_MS = 2_500L
-        private const val MAX_LIVE_RECOVER = 3
+        private const val MAX_LIVE_RECOVER = 4
         private const val TRANSPORT_HIDE_MS = 3_000L
         private const val EXTRA_ID = "id"
         private const val EXTRA_NAME = "name"

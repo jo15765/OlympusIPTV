@@ -28,8 +28,8 @@ android {
         applicationId = "com.olympus.iptv"
         minSdk = 24
         targetSdk = 35
-        versionCode = 71
-        versionName = "0.2.70"
+        versionCode = 72
+        versionName = "0.2.71"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "WATCHMODE_API_KEY", "\"$watchmodeKey\"")
         buildConfigField("String", "OPENSUBTITLES_API_KEY", "\"$opensubtitlesKey\"")

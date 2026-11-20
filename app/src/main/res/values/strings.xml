@@ -549,6 +549,11 @@
     <string name="catalog_stats">%1$s Live Channels\n%2$s VOD Movies\n%3$s VOD TV Shows</string>
     <string name="catalog_percent">%1$d%%</string>
     <string name="playback_reconnecting">Reconnecting…</string>
+    <string name="playback_reconnecting_pill">Reconnecting stream…</string>
+    <string name="playback_catchup_rewind">Rewinding on catch-up…</string>
+    <string name="record_storage_low">Recordings use %1$s · %2$s free · under 2 GB</string>
+    <string name="record_storage_low_warn">Less than 2 GB free. This recording may stop early.</string>
+    <string name="letter_jump_title">Jump to</string>
     <string name="favorites_setup_zip_title">Enter your ZIP code</string>
     <string name="favorites_setup_zip_message">No local stations matched this connection. Enter a ZIP code and the closest broadcast market will be used.</string>
     <string name="favorites_setup_zip_hint">ZIP code</string>

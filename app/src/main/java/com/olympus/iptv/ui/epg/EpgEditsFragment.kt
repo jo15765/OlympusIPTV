@@ -13,7 +13,6 @@ import androidx.activity.OnBackPressedCallback
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import com.olympus.iptv.ui.browse.ToolHost
-import com.olympus.iptv.ui.countries.CountriesActivity
 import com.olympus.iptv.ui.countries.CountriesFragment
 import com.olympus.iptv.ui.exitToolHost
 import com.olympus.iptv.ui.viewActive
@@ -337,32 +336,17 @@ class EpgEditsFragment : Fragment() {
 
     private fun openCountries() {
         val host = toolHost()
-        if (host != null) {
-            host.showTool(CountriesFragment.newInstance(playlistId))
-        } else {
-            startActivity(
-                Intent(requireContext(), CountriesActivity::class.java)
-                    .putExtra(CountriesActivity.EXTRA_PLAYLIST_ID, playlistId)
-            )
-        }
+        host?.showTool(CountriesFragment.newInstance(playlistId))
     }
 
     private fun openSanitize() {
         val host = toolHost()
-        if (host != null) {
-            host.showTool(SanitizeFragment.newInstance(playlistId))
-        } else {
-            startActivity(SanitizeActivity.intent(requireContext(), playlistId))
-        }
+        host?.showTool(SanitizeFragment.newInstance(playlistId))
     }
 
     private fun openParental() {
         val host = toolHost()
-        if (host != null) {
-            host.showTool(ParentalFragment.newInstance(playlistId))
-        } else {
-            startActivity(ParentalActivity.intent(requireContext(), playlistId))
-        }
+        host?.showTool(ParentalFragment.newInstance(playlistId))
     }
 
     private fun openLineup() {
@@ -372,20 +356,12 @@ class EpgEditsFragment : Fragment() {
 
     private fun openStrip() {
         val host = toolHost()
-        if (host != null) {
-            host.showTool(StripNamesFragment.newInstance(playlistId))
-        } else {
-            startActivity(StripNamesActivity.intent(requireContext(), playlistId))
-        }
+        host?.showTool(StripNamesFragment.newInstance(playlistId))
     }
 
     private fun openGroupRename() {
         val host = toolHost()
-        if (host != null) {
-            host.showTool(GroupRenameFragment.newInstance(playlistId))
-        } else {
-            startActivity(GroupRenameActivity.intent(requireContext(), playlistId))
-        }
+        host?.showTool(GroupRenameFragment.newInstance(playlistId))
     }
 
     private fun confirmParse() {

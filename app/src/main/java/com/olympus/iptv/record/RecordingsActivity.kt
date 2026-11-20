@@ -86,8 +86,9 @@ class RecordingsActivity : AppCompatActivity() {
         val dir = RecordingFiles.directory(this)
         val used = RecordingFiles.usedBytes(this)
         val free = dir.usableSpace
+        val low = free < 2L * 1024L * 1024L * 1024L
         binding.storageGauge.text = getString(
-            R.string.record_storage,
+            if (low) R.string.record_storage_low else R.string.record_storage,
             formatBytes(used),
             formatBytes(free)
         )

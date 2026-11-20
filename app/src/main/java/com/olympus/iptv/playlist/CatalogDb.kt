@@ -14,7 +14,7 @@ import java.io.File
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
-class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext, "olympus-iptv.db", null, 11) {
+class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext, "olympus-iptv.db", null, 12) {
     private val filesDir = context.applicationContext.filesDir
     private val writer = ReentrantLock()
     private val dashLock = Any()
@@ -44,7 +44,8 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         applyPragma(db, "PRAGMA busy_timeout=3000")
         applyPragma(db, "PRAGMA cache_size=-16384")
         applyPragma(db, "PRAGMA mmap_size=33554432")
-        db.setMaxSqlCacheSize(50)
+        db.enableWriteAheadLogging()
+        db.setMaxSqlCacheSize(64)
         db.execSQL(
             "CREATE TABLE IF NOT EXISTS library_meta (playlist_id TEXT PRIMARY KEY, stamp INTEGER NOT NULL)"
         )
@@ -1159,6 +1160,10 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         if (oldVersion < 9) ensureCatchupColumns(db)
         if (oldVersion < 10) ensureIndexes(db)
         if (oldVersion < 11) ensureMetaMissTable(db)
+        if (oldVersion < 12) {
+            ensureIndexes(db)
+            ensureGuideTables(db)
+        }
     }
 
     private fun ensureCatchupColumns(db: SQLiteDatabase) {
@@ -1183,6 +1188,9 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
                 PRIMARY KEY (playlist_id, channel_id)
             )
             """.trimIndent()
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS idx_epg_cache_channel ON epg_cache(channel_id, fetched_at)"
         )
         db.execSQL(
             """
@@ -1218,6 +1226,11 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         )
         db.execSQL(
             "CREATE INDEX IF NOT EXISTS idx_channels_country ON channels(playlist_id, bucket, country_id, number, name COLLATE NOCASE, id)"
+        )
+        // Group + channel number is the scroll order. EPG rows live inside epg_cache.payload
+        // (one JSON blob per channel), so start/end cannot be indexed as their own columns.
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS idx_channels_group_order ON channels(playlist_id, bucket, group_title, number, name COLLATE NOCASE)"
         )
     }
 

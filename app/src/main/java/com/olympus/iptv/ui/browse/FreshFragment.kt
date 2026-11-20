@@ -38,6 +38,7 @@ import com.olympus.iptv.ui.player.SeriesPlay
 import com.olympus.iptv.ui.prefetchLogos
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -57,6 +58,7 @@ class FreshFragment : Fragment() {
     private var seasonNumbers = emptyList<Int>()
     private var season = 1
     private var seriesJob: Job? = null
+    private var heroJob: Job? = null
     private var seasonSwitchToken = 0
     private var listFocusPos = 0
     private lateinit var cacheFile: File
@@ -261,6 +263,42 @@ class FreshFragment : Fragment() {
             activity is LibraryHost -> (activity as LibraryHost).onFreshExit()
             hostedInFreshActivity() -> requireActivity().finish()
             else -> requireActivity().onBackPressedDispatcher.onBackPressed()
+        }
+    }
+
+    private fun queueHero(title: CatalogDb.FreshTitle) {
+        heroJob?.cancel()
+        heroJob = viewLifecycleOwner.lifecycleScope.launch {
+            delay(120)
+            if (_binding == null) return@launch
+            val preferTv = title.bucket == CatalogDb.SERIES
+            val bundle = withContext(Dispatchers.IO) {
+                com.olympus.iptv.playlist.TitleRatings.peek(title.name, preferTv)
+            }
+            val year = Regex("""\b(19|20)\d{2}\b""").find(title.name)?.value
+            val rating = bundle?.ratings?.firstOrNull()?.scoreLabel
+                ?.substringBefore('/')?.substringBefore('%')?.trim()
+            val kind = if (preferTv) "Series" else "Movie"
+            binding.freshHero.visibility = View.VISIBLE
+            binding.freshHeroTitle.text = title.name
+            binding.freshHeroMeta.text = listOfNotNull(
+                rating?.let { "★ $it" },
+                year,
+                title.service.ifBlank { null },
+                kind
+            ).joinToString(" • ")
+            val plot = bundle?.overview?.takeIf { it.isNotBlank() } ?: title.detail
+            binding.freshHeroPlot.text = plot
+            binding.freshHeroPlot.visibility = if (plot.isBlank()) View.GONE else View.VISIBLE
+            if (title.logoUrl.isNullOrBlank()) {
+                binding.freshHeroArt.setImageResource(R.drawable.ic_channel_placeholder)
+            } else {
+                binding.freshHeroArt.load(title.logoUrl) {
+                    scale(Scale.FILL)
+                    placeholder(R.drawable.ic_channel_placeholder)
+                    error(R.drawable.ic_channel_placeholder)
+                }
+            }
         }
     }
 
@@ -703,7 +741,10 @@ class FreshFragment : Fragment() {
                 rowBinding.root.setOnFocusChangeListener { _, hasFocus ->
                     if (hasFocus) {
                         val pos = bindingAdapterPosition
-                        if (pos != RecyclerView.NO_POSITION) listFocusPos = pos
+                        if (pos != RecyclerView.NO_POSITION) {
+                            listFocusPos = pos
+                            queueHero(title)
+                        }
                     }
                 }
                 rowBinding.root.setOnClickListener {

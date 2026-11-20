@@ -19,7 +19,7 @@ object RemindPrompt {
         program: EpgProgram
     ) {
         val labels = leads.map { activity.getString(R.string.remind_before, it) }.toTypedArray()
-        AlertDialog.Builder(activity)
+        val dialog = AlertDialog.Builder(activity)
             .setTitle(program.title)
             .setItems(labels) { _, which ->
                 val fire = program.startMillis - leads[which] * 60_000L
@@ -39,6 +39,8 @@ object RemindPrompt {
                 Toast.makeText(activity, R.string.remind_set, Toast.LENGTH_SHORT).show()
             }
             .setNegativeButton(android.R.string.cancel, null)
-            .show()
+            .create()
+        com.olympus.iptv.ui.DialogChrome.dress(dialog)
+        dialog.show()
     }
 }

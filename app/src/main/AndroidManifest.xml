@@ -68,56 +68,15 @@
             android:screenOrientation="landscape" />
 
         <activity
-            android:name=".ui.browse.FreshActivity"
-            android:exported="false"
-            android:screenOrientation="landscape" />
-
-        <activity
-            android:name=".ui.browse.QueueActivity"
-            android:exported="false"
-            android:screenOrientation="landscape" />
-
-        <activity
             android:name=".ui.browse.LibraryActivity"
             android:exported="false"
             android:screenOrientation="landscape" />
-
-        <activity
-            android:name=".ui.countries.CountriesActivity"
-            android:exported="false"
-            android:screenOrientation="landscape"
-            android:windowSoftInputMode="adjustResize" />
 
         <activity
             android:name=".ui.lineup.LineupActivity"
             android:exported="false"
             android:screenOrientation="landscape"
             android:windowSoftInputMode="adjustResize" />
-
-        <activity
-            android:name=".ui.epg.EpgEditsActivity"
-            android:exported="false"
-            android:screenOrientation="landscape" />
-
-        <activity
-            android:name=".ui.epg.StripNamesActivity"
-            android:exported="false"
-            android:screenOrientation="landscape" />
-
-        <activity
-            android:name=".ui.epg.GroupRenameActivity"
-            android:exported="false"
-            android:screenOrientation="landscape" />
-
-        <activity
-            android:name=".ui.epg.SanitizeActivity"
-            android:exported="false"
-            android:screenOrientation="landscape" />
-
-        <activity
-            android:name=".ui.epg.ParentalActivity"
-            android:exported="false"
-            android:screenOrientation="landscape" />
 
         <activity
             android:name=".ui.search.SearchActivity"
@@ -172,11 +131,6 @@
             android:launchMode="singleTask"
             android:screenOrientation="landscape"
             android:theme="@style/Theme.OlympusIptv.Reminder" />
-
-        <activity
-            android:name=".remind.RemindersActivity"
-            android:exported="false"
-            android:screenOrientation="landscape" />
 
         <receiver
             android:name=".remind.ReminderAlarm"

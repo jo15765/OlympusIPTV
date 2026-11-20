@@ -160,12 +160,27 @@ class OlympusIptvApp : Application() {
     @Volatile var warmPlayer: androidx.media3.exoplayer.ExoPlayer? = null
     @Volatile var warmChannelId: String? = null
 
+    @Volatile private var warmed = false
+
+    /** Disk and catalog warm-up runs after the first frame, never inside onCreate. */
+    fun warmAfterFirstFrame() {
+        if (warmed) return
+        warmed = true
+        appScope.launch {
+            runCatching { com.olympus.iptv.playlist.TitleRatings.init(this@OlympusIptvApp, catalogDb) }
+            runCatching { playlistStore.videoDecoder() }
+            runCatching { catalogDb.channelCount("") }
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
         AppLog.install(this)
         playlistStore = PlaylistStore(this)
-        com.olympus.iptv.playlist.TitleRatings.init(this, catalogDb)
-        appScope.launch { runCatching { playlistStore.videoDecoder() } }
+        android.os.Looper.myQueue().addIdleHandler {
+            warmAfterFirstFrame()
+            false
+        }
         playlistStore.onLineupSaved = { id, config ->
             stagedLineup = id to config
             android.os.Handler(mainLooper).post {
