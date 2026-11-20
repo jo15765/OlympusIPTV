@@ -6,7 +6,7 @@
 
 ### For the latest and greatest, build your own APK from this code.
 
-The latest signed file is **0.2.65** (versionCode 66). **One APK** installs on Android TV / set-top boxes and on phones and tablets. Includes playlist reorder, Top 10 watched favorites, video decoder modes, phone PiP gestures, Chromecast (with IPTV caveat), multi-source VOD ratings/reviews (TMDB + Watchmode), YouTube trailers, Simkl/Trakt scrobble (mutex), New/Just Added playable-only + D-pad focus trap, player play/pause + progress auto-hide (3 s), parental Remove lock, plus performance caches and release R8 minify. Optional keys in `local.properties`: `tmdb.apiKey`, `watchmode.apiKey`, `opensubtitles.apiKey`, `sendgrid.apiKey` + `sendgrid.fromEmail`.
+The latest signed file is **0.2.66** (versionCode 67). **One APK** installs on Android TV / set-top boxes and on phones and tablets. Includes playlist reorder, Top 10 watched favorites, video decoder modes, phone PiP gestures, Chromecast (with IPTV caveat), multi-source VOD ratings/reviews (TMDB + Watchmode), YouTube trailers, Simkl/Trakt scrobble (mutex), New/Just Added playable-only + D-pad focus trap, player play/pause + progress auto-hide (3 s), parental Remove lock, plus Fresh/player/ratings performance opts and release R8 minify. Optional keys in `local.properties`: `tmdb.apiKey`, `watchmode.apiKey`, `opensubtitles.apiKey`, `sendgrid.apiKey` + `sendgrid.fromEmail`.
 
 **This is a player only. You must provide your own streams.**
 
@@ -66,14 +66,14 @@ Olympus-IPTV is one APK for Android TV / set-top boxes and for phones and tablet
 
 | | |
 | --- | --- |
-| Signed file | `C:\Users\chalu\Downloads\olympus-iptv-0.2.65.apk` |
-| What that file is | versionName **0.2.65**, versionCode **66** |
-| Source in this tree | versionName **0.2.65**, versionCode **66** |
-| What to run | Install the signed 0.2.65 APK, or build this source |
+| Signed file | `C:\Users\chalu\Downloads\olympus-iptv-0.2.66.apk` |
+| What that file is | versionName **0.2.66**, versionCode **67** |
+| Source in this tree | versionName **0.2.66**, versionCode **67** |
+| What to run | Install the signed 0.2.66 APK, or build this source |
 | Install | Over the existing copy (TV or phone). Uninstalling wipes the saved account, playlist, and favorites. Downloader works with the same file. |
 | Launcher name | Two centered lines: Olympus over IPTV |
 
-**0.2.65** is the current release: New screen keeps D-pad focus (Back exits), player play/pause + progress auto-hide after 3 seconds (center shows again), plus the 0.2.64 crash/New/playable fixes.
+**0.2.66** is the current release: Fresh opens without blocking on warm, playable checks skip when the library stamp is unchanged, ratings/trailer/seek and browse paging are leaner, plus 0.2.65 focus/chrome behavior.
 
 ### What’s new since 0.2.56 (enhancements)
 
@@ -84,13 +84,14 @@ Olympus-IPTV is one APK for Android TV / set-top boxes and for phones and tablet
 | Video decoder | EPG edits — Hardware / Hardware+extensions / Failsafe / Software prefer |
 | Phone PiP | Player **PiP**, long-press **Open in PiP**, swipe up on a title, leave player for Home (Admin **PiP gestures**) |
 | Chromecast | Player **Cast** — shows a format/codec disclaimer first; many IPTV HLS links still fail on the default receiver |
-| Ratings & reviews | Long-press Movies/Shows → **Ratings & reviews** (TMDB + Watchmode scores + TMDB review snippets) |
+| Ratings & reviews | See [Where ratings appear](#where-ratings-appear) — browse chip, long-press sheet, player caption (TMDB + Watchmode) |
 | TMDB items limit | EPG edits — how many TMDB search hits to keep (5 / 10 / 20 / 40) |
 | YouTube trailers | Player **Trailer**, or from the ratings sheet (needs `tmdb.apiKey`) |
 | Simkl / Trakt | EPG edits **Scrobbler** — only one provider at a time; paste token (+ optional client id) |
 | New playable-only | New/Just Added only lists premieres that have a playable stream (series season must exist) |
 | New focus trap | On New/detail, D-pad stays on the page; **Back** is the exit |
 | Player chrome | Play/Pause + progress show briefly, then hide after **3 seconds**; center/tap shows them again; **Info** / phone **Menu** opens the full row |
+| Faster Fresh open | New opens from cache without waiting on warm; playable re-check skipped when the library stamp is unchanged |
 
 ---
 
@@ -100,7 +101,7 @@ Olympus-IPTV is one APK for Android TV / set-top boxes and for phones and tablet
 
 </div>
 
-There is **no separate mobile APK**. The same `olympus-iptv-0.2.65.apk` detects whether it is running on a television (Leanback / UI mode) or a touch-first phone or tablet.
+There is **no separate mobile APK**. The same `olympus-iptv-0.2.66.apk` detects whether it is running on a television (Leanback / UI mode) or a touch-first phone or tablet.
 
 | On phones and tablets | What changed |
 | --- | --- |
@@ -209,7 +210,19 @@ Movies are video-on-demand titles that are not part of a series. Shows are serie
 
 Opening a show keeps seasons as a horizontal strip across the top and that season’s episodes listed underneath. It does not start playing on its own. A season chip is checked when every episode in it has been watched. Changing the season refreshes the episode list under it. Each episode shows its description and length when the provider sends them. An episode title is the season and episode code plus the episode name, such as `S02-E01 - Episode Name`. The series name is not repeated. An episode is checked when playback passes 95 percent. Hold the center button on an episode to check or clear that episode. **Mark this season watched** checks every episode in the open season. Hold the center button on a season chip to do the same thing. When that season is already checked, the control clears the checks. Back from the show returns to the previous screen.
 
-When the provider sends them, a movie or episode shows a short line with plot, year, and length before it plays. With a TMDB key built in, focusing a title can also show a short rating chip (scores only while you browse). Long-press → **Ratings & reviews** opens the full sheet: TMDB and Watchmode scores, overview, and up to three TMDB review snippets, plus **Trailer** and **Play**. **TMDB items limit** on EPG edits controls how many search hits to keep for that lookup.
+When the provider sends them, a movie or episode shows a short line with plot, year, and length before it plays.
+
+### Where ratings appear
+
+With `tmdb.apiKey` built in (and `watchmode.apiKey` for Watchmode scores on the sheet):
+
+| Place | What you see |
+| --- | --- |
+| Movies / Shows browse | After focus settles on a title, a short score line under it (e.g. `TMDB 7.4`), scores only — no reviews while scrolling |
+| Long-press → **Ratings & reviews** | Full sheet: TMDB and Watchmode scores, overview, up to three TMDB review snippets, plus **Trailer** and **Play** |
+| Player caption | While watching Movies/Shows, the top meta line can append the same short score chip when data is cached or fetched |
+
+**TMDB items limit** on EPG edits controls how many search hits to keep for that lookup. Without the TMDB key, chips and the sheet stay empty; the rest of the player still works.
 
 When an episode ends, the player counts down from 10. At 0 it plays the next episode in that season, then the first episode of the next season. **Skip intro** starts that episode about one minute in, or jumps a minute ahead if the theme is already playing. The last episode of a show does not loop back to the first. Back during the countdown leaves the player. Up or Down also leaves the countdown and changes episode.
 
@@ -224,7 +237,7 @@ When an episode ends, the player counts down from 10. At 0 it plays the next epi
 | What gets a poster | Only a premiere that matches a title in your Movies or TV Shows **and** has a playable stream. Series premieres for a season that is not in your library yet are left off. Exact matches, the same title with a year or season on the end, and shared short heads still count for matching. |
 | The grid | Four posters per row. Each card shows the whole poster, the title, and the service underneath. The artwork is the same poster used in Movies or Shows. The list scrolls. D-pad focus stays on this page; **Back** leaves. |
 | Select a poster | Opens the poster, service, day, and description on one detail card. A movie keeps Play there. A series keeps that card and adds seasons in a horizontal strip under it; choosing a season lists that season’s playable episodes underneath with a thumbnail, description, length, and Play. Focus stays on seasons/episodes (edges do not drop focus); **Back** returns to the grid, then to Live TV. Hold the center button to add it to Queue. |
-| Refresh | The week is prepared in the background when the app opens and again after the catalog is on the device, so the grid is ready when you open New. Playable checks re-run on warm so a season that was missing can appear later. |
+| Refresh | The week is prepared in the background when the app opens and again after the catalog is on the device. Opening New uses the cached list immediately (it does not wait on warm). Playable checks re-run on warm when the library stamp changes, so a season that was missing can appear later. |
 | Key | `watchmode.apiKey` in `local.properties` (see [Build and run](#build-and-run)). Without it, the screen says the releases cannot load. Watchmode ratings in the VOD sheet use the same key. |
 
 A movie or episode you left in the middle shows Continue and the minute you reached, both on its poster and in the Continue group. A spot under 15 seconds, or within 20 seconds of the end, starts from the beginning and is left out of Continue. Live TV does not resume a minute mark, and opening the app does not start the last channel. It opens on the group cards.
@@ -523,9 +536,9 @@ The debug APK is `app/build/outputs/apk/debug/app-debug.apk`. Optional keys go i
 tmdb.apiKey=YOUR_TMDB_V3_API_KEY
 ```
 
-5. Rebuild the app. `app/build.gradle.kts` maps that property to `buildConfigField("String", "TMDB_API_KEY", ...)`. Without the key, ratings chips, the reviews sheet, and **Trailer** stay empty or unavailable; the rest of the player still works.
+5. Rebuild the app. `app/build.gradle.kts` maps that property to `buildConfigField("String", "TMDB_API_KEY", ...)`. Without the key, the browse score chip, ratings sheet, player caption scores, and **Trailer** stay empty or unavailable; the rest of the player still works. See [Where ratings appear](#where-ratings-appear).
 
-The latest signed release is `C:\Users\chalu\Downloads\olympus-iptv-0.2.65.apk`.
+The latest signed release is `C:\Users\chalu\Downloads\olympus-iptv-0.2.66.apk`.
 
 Android Studio: use a 1920×1080 Google TV emulator. Apply Changes does not pick up new screens. Stop the app, then Debug. Click the emulator window before the arrow keys. The emulator is a different device from a Shield or an Onn box, so it does not have that box’s account, playlist, or favorites.
 
@@ -612,11 +625,20 @@ clearcast-tuner/
 
 </div>
 
+### 0.2.66
+
+- New/Just Added opens from cache without waiting on background warm; playable re-checks skip when the week and library stamp are unchanged.
+- Series detail and playable matching prefer the episode cache; Fresh posters share the same logo loader as the rest of the guide.
+- Ratings sheet and trailers are leaner (shared TMDB client, score cache reuse, disk writes less often).
+- Player seek updates slower while paused; Watchmode plot text prefers the week cache; browse paging appends without copying the full channel list.
+- README documents where TMDB/Watchmode ratings appear (browse chip, long-press sheet, player caption).
+- Signed APK: `C:\Users\chalu\Downloads\olympus-iptv-0.2.66.apk` (versionCode 67). Install over the existing release — same signing key, account/playlist data kept.
+
 ### 0.2.65
 
 - New/Just Added keeps D-pad focus on the page; only Back leaves (no focus loss at list/grid edges).
 - Player play/pause + progress auto-hide after 3 seconds; center or tap shows them again (center again toggles pause). Full menu via Info / phone Menu.
-- Signed APK: `C:\Users\chalu\Downloads\olympus-iptv-0.2.65.apk` (versionCode 66). Install over the existing release — same signing key, account/playlist data kept.
+- Signed APK: `C:\Users\chalu\Downloads\olympus-iptv-0.2.65.apk` (versionCode 66).
 
 ### 0.2.64
 
@@ -970,7 +992,7 @@ clearcast-tuner/
 
 - This is a player only. You must provide your own streams. The app does not ship channels, movies, shows, or playlist credentials.
 - It is a beta. Feedback is greatly appreciated.
-- **0.2.65** is the latest signed file in Downloads (`olympus-iptv-0.2.65.apk`, versionCode 66).
+- **0.2.66** is the latest signed file in Downloads (`olympus-iptv-0.2.66.apk`, versionCode 67).
 - Chromecast often cannot play provider IPTV/HLS the way the in-app player can; the Cast button warns before connecting.
 - Ratings, trailers, and New this week need the matching keys in `local.properties` at build time (`tmdb.apiKey`, `watchmode.apiKey`).
 - Live groups follow the provider’s category ids. Olympus does not split or merge folders by display name; a huge 24/7 card is usually one panel category.

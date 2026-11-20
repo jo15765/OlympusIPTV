@@ -92,8 +92,13 @@ object Watchmode {
     }
 
     fun synopsis(cacheFile: File, id: Int): String? {
+        if (id <= 0) return null
+        val cached = peek(cacheFile)?.firstOrNull { it.id == id }?.plot?.trim()?.takeIf { it.isNotBlank() }
+        if (!cached.isNullOrBlank()) {
+            return if (cached.endsWith(".")) cached else "$cached."
+        }
         val key = BuildConfig.WATCHMODE_API_KEY.trim()
-        if (key.isEmpty() || id <= 0) return null
+        if (key.isEmpty()) return null
         val details = runCatching { details(key, id) }.getOrNull() ?: return null
         val plot = details.first?.trim()?.takeIf { it.isNotBlank() } ?: return null
         val body = if (plot.endsWith(".")) plot else "$plot."

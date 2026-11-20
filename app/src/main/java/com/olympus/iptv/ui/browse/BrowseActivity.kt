@@ -155,7 +155,7 @@ class BrowseActivity : AppCompatActivity() {
     private var liveById: Map<String, Channel> = emptyMap()
     private var vodById: Map<String, Channel> = emptyMap()
     private var seriesById: Map<String, Channel> = emptyMap()
-    private var visibleChannels: List<Channel> = emptyList()
+    private val visibleChannels = ArrayList<Channel>()
     private var pageCursor: CatalogDb.PageCursor? = null
     private var pageExhausted = false
     private var emptyPageSkips = 0
@@ -1321,7 +1321,7 @@ class BrowseActivity : AppCompatActivity() {
         val named = prepareGroup(incoming.filter { it.id !in seen }, activeConfig)
         if (named.isEmpty()) return
         channelAdapter.append(named)
-        visibleChannels = visibleChannels + named
+        visibleChannels.addAll(named)
         binding.errorText.visibility = View.GONE
         binding.libraryStatus.visibility = View.GONE
     }
@@ -5199,7 +5199,7 @@ class BrowseActivity : AppCompatActivity() {
         pageCursor = null
         pageExhausted = false
         pageLoading = false
-        visibleChannels = emptyList()
+        visibleChannels.clear()
         channelAdapter.submit(emptyList(), null)
         binding.channelList.scrollToPosition(0)
         binding.libraryStatus.visibility = View.VISIBLE
@@ -5208,7 +5208,8 @@ class BrowseActivity : AppCompatActivity() {
     }
 
     private fun publishChannels(channels: List<Channel>, scrollTop: Boolean) {
-        visibleChannels = channels
+        visibleChannels.clear()
+        visibleChannels.addAll(channels)
         channelAdapter.submit(
             channels,
             groupLabel(selectedCategoryId),
@@ -5238,7 +5239,7 @@ class BrowseActivity : AppCompatActivity() {
         if (first >= 0) groupScrollOffset[categoryId] = first
         // Drop huge in-memory pages when returning to the groups list.
         if (visibleChannels.size > 400) {
-            visibleChannels = emptyList()
+            visibleChannels.clear()
             channelAdapter.submit(emptyList(), null)
             pageCursor = null
             pageExhausted = false
@@ -5355,7 +5356,7 @@ class BrowseActivity : AppCompatActivity() {
                         binding.channelList.post { loadGroupPage(reset = false) }
                     } else {
                         pageExhausted = true
-                        visibleChannels = emptyList()
+                        visibleChannels.clear()
                         showChannelSkeleton(false)
                         channelAdapter.submit(emptyList(), groupLabel(categoryId), sequentialNumbers = false)
                         finishChannelPane(emptyList())
@@ -5363,7 +5364,8 @@ class BrowseActivity : AppCompatActivity() {
                     }
                     return@launch
                 }
-                visibleChannels = named
+                visibleChannels.clear()
+                visibleChannels.addAll(named)
                 showChannelSkeleton(false)
                 channelAdapter.submit(named, groupLabel(categoryId), sequentialNumbers = false)
                 val restoreId = returnChannelId ?: holdChannelId
@@ -5383,7 +5385,7 @@ class BrowseActivity : AppCompatActivity() {
                 binding.channelList.post { maybePrefetchGroupPage(binding.channelList) }
             } else if (named.isNotEmpty()) {
                 if (visibleChannels.isEmpty()) {
-                    visibleChannels = named
+                    visibleChannels.addAll(named)
                     showChannelSkeleton(false)
                     channelAdapter.submit(named, groupLabel(categoryId), sequentialNumbers = false)
                     binding.channelList.scrollToPosition(0)
@@ -5394,7 +5396,7 @@ class BrowseActivity : AppCompatActivity() {
                     val fresh = named.filter { it.id !in seen }
                     if (fresh.isNotEmpty()) {
                         channelAdapter.append(fresh)
-                        visibleChannels = visibleChannels + fresh
+                        visibleChannels.addAll(fresh)
                         scheduleEpisodePrefetch()
                     }
                 }
@@ -5927,7 +5929,7 @@ class BrowseActivity : AppCompatActivity() {
         }
         invalidateTopWatchedCache()
         if (!adding && selectedCategoryId == PlaylistLoader.FAVORITES_ID) {
-            visibleChannels = visibleChannels.filter { it.id != channel.id }
+            visibleChannels.removeAll { it.id == channel.id }
             channelAdapter.remove(channel.id)
             if (visibleChannels.isEmpty()) finishChannelPane(emptyList())
         } else {

@@ -178,9 +178,14 @@ class PlayerActivity : AppCompatActivity() {
             val liveBehind = binding.btnGoLive.visibility == View.VISIBLE
             if (seekOpen) paintSeekBar()
             if (seekOpen || binding.playbackMenu.visibility == View.VISIBLE) paintGoLive()
-            if (seekOpen || liveBehind || binding.playbackMenu.visibility == View.VISIBLE) {
-                hideHandler.postDelayed(this, 750L)
+            val playing = player?.isPlaying == true
+            // Tick slower while paused; ExoPlayer listener drives updates while playing.
+            val delay = when {
+                !seekOpen && !liveBehind && binding.playbackMenu.visibility != View.VISIBLE -> return
+                !playing || seekDragging -> 1_500L
+                else -> 1_000L
             }
+            hideHandler.postDelayed(this, delay)
         }
     }
 
@@ -827,6 +832,10 @@ class PlayerActivity : AppCompatActivity() {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 if (player !== exo) return
                 if (isPlaying) onBufferingEnded()
+                if (transportSeekVisible()) {
+                    paintSeekBar()
+                    paintSeekPlayLabel()
+                }
             }
 
             override fun onRenderedFirstFrame() {

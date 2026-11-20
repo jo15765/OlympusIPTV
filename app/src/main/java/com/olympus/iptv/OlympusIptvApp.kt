@@ -104,8 +104,12 @@ class OlympusIptvApp : Application() {
             return
         }
         val disk = readFreshFile(playlistId, week)
-        // Always re-check playable streams when warming — season premieres can land in Watchmode
-        // before the provider has the episodes.
+        if (disk != null && disk.stamp == stamp && !Watchmode.needsRefresh(cacheFile)) {
+            // Same week + library: keep playable-filtered cards; skip Xtream episode re-checks.
+            freshHold = disk
+            freshFailure = null
+            return
+        }
         if (disk != null) freshHold = disk
         try {
             val premieres = if (Watchmode.needsRefresh(cacheFile)) {

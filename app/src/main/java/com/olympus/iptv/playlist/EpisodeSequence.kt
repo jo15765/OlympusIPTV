@@ -12,8 +12,17 @@ import java.io.File
 object EpisodeSequence {
     const val INTRO_MS = 60_000L
 
-    fun ordered(episodes: List<Channel>): List<Channel> =
-        episodes.sortedWith(compareBy({ it.season ?: 1 }, { it.number ?: Int.MAX_VALUE }, { it.id }))
+    fun ordered(episodes: List<Channel>): List<Channel> {
+        if (episodes.size <= 1) return episodes
+        // Identity-keyed soft cache: same list instance reused across skip/next in one session.
+        val cached = orderedCache
+        if (cached != null && cached.first === episodes) return cached.second
+        val rows = episodes.sortedWith(compareBy({ it.season ?: 1 }, { it.number ?: Int.MAX_VALUE }, { it.id }))
+        orderedCache = episodes to rows
+        return rows
+    }
+
+    @Volatile private var orderedCache: Pair<List<Channel>, List<Channel>>? = null
 
     fun nextAfter(episodes: List<Channel>, current: Channel): Channel? {
         val rows = ordered(episodes)

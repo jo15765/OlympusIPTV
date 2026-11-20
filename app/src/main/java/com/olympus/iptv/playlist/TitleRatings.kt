@@ -6,7 +6,8 @@ import com.google.gson.JsonParser
 import com.olympus.iptv.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.Request
 import java.io.File
@@ -46,6 +47,7 @@ object TitleRatings {
     private val http get() = HttpClients.shared
     private const val CACHE_CAP = 80
     private val TTL_MS = TimeUnit.HOURS.toMillis(24)
+    private val PERSIST_DEBOUNCE_MS = TimeUnit.SECONDS.toMillis(45)
     private val lock = Any()
     private val scoreCache = object : LinkedHashMap<String, CacheEntry>(CACHE_CAP, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, CacheEntry>?): Boolean =
@@ -153,7 +155,7 @@ object TitleRatings {
     }
 
     /** Full sheet path — parallel TMDB + Watchmode, reviews on demand. */
-    fun loadFull(name: String, preferTv: Boolean, tmdbLimit: Int = 10): TitleRatingsBundle {
+    suspend fun loadFull(name: String, preferTv: Boolean, tmdbLimit: Int = 10): TitleRatingsBundle {
         val clean = cleanTitle(name)
         if (clean.isBlank()) {
             return TitleRatingsBundle(title = name, overview = "", ratings = emptyList(), reviews = emptyList())
@@ -165,13 +167,14 @@ object TitleRatings {
                 ?.let { return it.bundle }
         }
 
-        return runBlocking {
+        return coroutineScope {
             val tmdbKey = BuildConfig.TMDB_API_KEY.trim()
             val watchKey = BuildConfig.WATCHMODE_API_KEY.trim()
+            val client = if (tmdbKey.isNotBlank()) TmdbClient(tmdbKey, http) else null
             val tmdbDef = async(Dispatchers.IO) {
-                if (tmdbKey.isBlank()) null
+                if (client == null) null
                 else runCatching {
-                    TmdbClient(tmdbKey, http).searchTitle(clean, preferTv, tmdbLimit.coerceIn(1, 50)).firstOrNull()
+                    client.searchTitle(clean, preferTv, tmdbLimit.coerceIn(1, 50)).firstOrNull()
                 }.getOrNull()
             }
             val watchDef = async(Dispatchers.IO) {
@@ -180,8 +183,10 @@ object TitleRatings {
             }
             val tmdb = tmdbDef.await()
             val watch = watchDef.await()
-            val reviews = if (tmdb != null && tmdbKey.isNotBlank()) {
-                runCatching { tmdbReviews(tmdbKey, tmdb.tmdbId, tmdb.mediaType) }.getOrDefault(emptyList())
+            val reviews = if (tmdb != null && client != null) {
+                withContext(Dispatchers.IO) {
+                    runCatching { tmdbReviews(tmdbKey, tmdb.tmdbId, tmdb.mediaType) }.getOrDefault(emptyList())
+                }
             } else emptyList()
             val bundle = assemble(clean, tmdb, watch, reviews, hasReviews = true)
             putFull(key, bundle)
@@ -190,20 +195,25 @@ object TitleRatings {
         }
     }
 
-    fun load(name: String, preferTv: Boolean, tmdbLimit: Int = 10): TitleRatingsBundle =
+    suspend fun load(name: String, preferTv: Boolean, tmdbLimit: Int = 10): TitleRatingsBundle =
         loadFull(name, preferTv, tmdbLimit)
 
     fun trailerFor(name: String, preferTv: Boolean): TmdbTrailer? {
         val key = BuildConfig.TMDB_API_KEY.trim()
         if (key.isBlank()) return null
+        val client = TmdbClient(key, http)
         val cached = peek(name, preferTv)
         val tmdbId = cached?.tmdbId
         val mediaType = cached?.mediaType
         if (tmdbId != null && !mediaType.isNullOrBlank()) {
-            return runCatching { TmdbClient(key, http).trailer(tmdbId, mediaType) }.getOrNull()
+            return runCatching { client.trailer(tmdbId, mediaType) }.getOrNull()
         }
-        val hit = TmdbClient(key, http).ratingsFor(cleanTitle(name), preferTv) ?: return null
-        return TmdbClient(key, http).trailer(hit.tmdbId, hit.mediaType)
+        val hit = runCatching { client.ratingsFor(cleanTitle(name), preferTv) }.getOrNull() ?: return null
+        putScore(
+            cacheKey(cleanTitle(name), preferTv),
+            assemble(cleanTitle(name), hit, watch = null, reviews = emptyList(), hasReviews = false)
+        )
+        return runCatching { client.trailer(hit.tmdbId, hit.mediaType) }.getOrNull()
     }
 
     private fun putScore(key: String, bundle: TitleRatingsBundle) {
@@ -225,7 +235,8 @@ object TitleRatings {
     private fun maybePersist() {
         val file = diskFile ?: return
         val now = System.currentTimeMillis()
-        if (!diskDirty || now - lastPersistAt < 2_000L) return
+        // Debounce full-blob rewrites while browsing (focus-driven score loads).
+        if (!diskDirty || now - lastPersistAt < PERSIST_DEBOUNCE_MS) return
         val blob = synchronized(lock) {
             if (!diskDirty) return
             diskDirty = false

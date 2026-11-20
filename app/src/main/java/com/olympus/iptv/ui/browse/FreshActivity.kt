@@ -33,6 +33,7 @@ import com.olympus.iptv.playlist.EpisodeSequence
 import com.olympus.iptv.playlist.Watchmode
 import com.olympus.iptv.playlist.WatchmodeException
 import com.olympus.iptv.playlist.XtreamClient
+import com.olympus.iptv.ui.channelLogo
 import com.olympus.iptv.ui.player.PlayerActivity
 import com.olympus.iptv.ui.player.SeriesPlay
 import com.olympus.iptv.ui.prefetchLogos
@@ -242,19 +243,36 @@ class FreshActivity : AppCompatActivity() {
         try {
             val ready = withContext(Dispatchers.IO) { app.freshCards(playlistId) }
             if (isDestroyed) return
-            if (!ready.isNullOrEmpty()) showCards(ready)
+            if (!ready.isNullOrEmpty()) {
+                showCards(ready)
+            } else {
+                showStatus(R.string.fresh_loading)
+            }
+            // Warm in background — do not block the grid on Watchmode / playable checks.
             app.warmFresh(playlistId)
-            app.freshJob?.join()
-            if (isDestroyed) return
-            val latest = withContext(Dispatchers.IO) { app.freshCards(playlistId) }
-            if (isDestroyed) return
-            when {
-                !latest.isNullOrEmpty() -> showCards(latest)
-                rows.isNotEmpty() -> return
-                app.freshFailure == WatchmodeException.Kind.MISSING_KEY -> showStatus(R.string.fresh_need_key)
-                app.freshFailure == WatchmodeException.Kind.REJECTED -> showStatus(R.string.fresh_rejected)
-                app.freshFailure != null -> showStatus(R.string.fresh_failed)
-                else -> showStatus(R.string.fresh_empty)
+            val job = app.freshJob
+            if (job != null) {
+                lifecycleScope.launch {
+                    job.join()
+                    if (isDestroyed) return@launch
+                    val latest = withContext(Dispatchers.IO) { app.freshCards(playlistId) }
+                    if (isDestroyed) return@launch
+                    when {
+                        !latest.isNullOrEmpty() -> showCards(latest)
+                        rows.isNotEmpty() -> return@launch
+                        app.freshFailure == WatchmodeException.Kind.MISSING_KEY -> showStatus(R.string.fresh_need_key)
+                        app.freshFailure == WatchmodeException.Kind.REJECTED -> showStatus(R.string.fresh_rejected)
+                        app.freshFailure != null -> showStatus(R.string.fresh_failed)
+                        else -> showStatus(R.string.fresh_empty)
+                    }
+                }
+            } else if (ready.isNullOrEmpty()) {
+                when {
+                    app.freshFailure == WatchmodeException.Kind.MISSING_KEY -> showStatus(R.string.fresh_need_key)
+                    app.freshFailure == WatchmodeException.Kind.REJECTED -> showStatus(R.string.fresh_rejected)
+                    app.freshFailure != null -> showStatus(R.string.fresh_failed)
+                    else -> showStatus(R.string.fresh_empty)
+                }
             }
         } catch (_: OutOfMemoryError) {
             runCatching { app.catalogDb.releaseSearchExport() }
@@ -421,29 +439,30 @@ class FreshActivity : AppCompatActivity() {
                 runCatching { app.playlistStore.account(playlistId) }.getOrNull()
             }
             if (saved == null || isDestroyed || shown?.id != title.id) return@launch
-            val cached = withContext(Dispatchers.IO) {
-                runCatching { EpisodeCache.peek(filesDir, playlistId, seriesId) }.getOrNull()
-            }
-            if (!cached.isNullOrEmpty() && shown?.id == title.id) {
-                presentSeries(cached, focusSeasons = true)
-            }
-            val fresh = withContext(Dispatchers.IO) {
-                runCatching { EpisodeSequence.fetch(saved, seriesId) }.getOrDefault(emptyList())
+            val loaded = withContext(Dispatchers.IO) {
+                runCatching {
+                    EpisodeSequence.load(filesDir, saved, seriesId, refresh = lifecycleScope)
+                }.getOrDefault(emptyList())
             }
             if (isDestroyed || shown?.id != title.id) return@launch
-            if (fresh.isEmpty()) {
-                if (seriesEpisodes.isEmpty()) {
-                    binding.detailEpisodeStatus.visibility = View.VISIBLE
-                    binding.detailEpisodeStatus.text = getString(R.string.episodes_none)
-                }
+            if (loaded.isEmpty()) {
+                binding.detailEpisodeStatus.visibility = View.VISIBLE
+                binding.detailEpisodeStatus.text = getString(R.string.episodes_none)
                 return@launch
             }
-            withContext(Dispatchers.IO) {
-                runCatching { EpisodeCache.store(filesDir, playlistId, seriesId, fresh) }
-            }
-            if (shown?.id == title.id) {
-                val hadList = seriesEpisodes.isNotEmpty()
-                presentSeries(fresh, focusSeasons = !hadList)
+            presentSeries(loaded, focusSeasons = true)
+            // If a background refresh lands, refresh the open detail once.
+            lifecycleScope.launch(Dispatchers.IO) {
+                kotlinx.coroutines.delay(2_500L)
+                val refreshed = runCatching {
+                    EpisodeCache.peek(filesDir, playlistId, seriesId)
+                }.getOrNull()
+                if (refreshed.isNullOrEmpty()) return@launch
+                withContext(Dispatchers.Main) {
+                    if (!isDestroyed && shown?.id == title.id && refreshed.size != seriesEpisodes.size) {
+                        presentSeries(refreshed, focusSeasons = false)
+                    }
+                }
             }
         }
     }
@@ -600,11 +619,9 @@ class FreshActivity : AppCompatActivity() {
             return
         }
         val density = view.resources.displayMetrics.density
+        val px = (widthDp.coerceAtLeast(heightDp) * density).toInt().coerceAtLeast(1)
         view.load(url) {
-            size(
-                (widthDp * density).toInt().coerceAtLeast(1),
-                (heightDp * density).toInt().coerceAtLeast(1)
-            )
+            channelLogo(px)
             scale(Scale.FIT)
             placeholder(R.drawable.ic_channel_placeholder)
             error(R.drawable.ic_channel_placeholder)
