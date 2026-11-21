@@ -1020,7 +1020,7 @@ internal fun BrowseActivity.sectionButton(): View = when (section) {
 
 internal fun BrowseActivity.cardIcon(category: Category): Int = when (category.id) {
         PlaylistLoader.RECENT_ID, PlaylistLoader.CONTINUE_ID, PlaylistLoader.TOP_WATCHED_ID,
-        PlaylistLoader.FOR_YOU_ID ->
+        PlaylistLoader.FOR_YOU_ID, PlaylistLoader.LIVE_EVENTS_ID ->
             R.drawable.ic_card_play
         PlaylistLoader.FAVORITES_ID -> R.drawable.ic_star
         PlaylistLoader.ALL_ID -> R.drawable.ic_nav_tv
@@ -1065,6 +1065,7 @@ internal fun BrowseActivity.cardDetail(category: Category): String {
             }
             PlaylistLoader.TOP_WATCHED_ID -> getString(R.string.top_watched_card)
             PlaylistLoader.FOR_YOU_ID -> getString(R.string.for_you_detail)
+            PlaylistLoader.LIVE_EVENTS_ID -> "All live sports & events airing now"
             PlaylistLoader.FAVORITES_ID -> {
                 val prefix = favoriteSection(section) + ":"
                 val label = if (titles) R.string.group_titles else R.string.group_channels
@@ -1111,7 +1112,7 @@ internal fun BrowseActivity.warmGroupNow(categories: List<Category>) {
                 category.id != PlaylistLoader.CONTINUE_ID &&
                 category.id != PlaylistLoader.FOR_YOU_ID &&
                 category.id != PlaylistLoader.TOP_WATCHED_ID
-        }.take(12)
+        }.take(6)
         groupNowJob?.cancel()
         val favorites = if (wanted.any { it.id == PlaylistLoader.FAVORITES_ID }) {
             favoriteIds.map { it.substringAfter(':') }.take(8)

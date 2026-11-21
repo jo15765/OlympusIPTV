@@ -118,7 +118,7 @@ class EpgRepository(
         val stored = if (playlistId.isNullOrBlank()) null else disk?.readEpg(playlistId, channel.epgChannelId ?: channel.id)
         if (stored != null) {
             putCache(key, stored.second)
-            val freshEnough = System.currentTimeMillis() - stored.first < HOUR_MS
+            val freshEnough = System.currentTimeMillis() - stored.first < STALE_MS
             if (!freshEnough) refreshScope?.launch { refresh(playlist, channel, key) }
             return stored.second
         }
@@ -197,8 +197,15 @@ class EpgRepository(
         return "${playlist?.id.orEmpty()}::$epgId"
     }
 
+    fun evictExpired(now: Long = System.currentTimeMillis()) {
+        windows.evictAll()
+        cache.entries.removeIf { (_, list) ->
+            list.isEmpty() || list.any { it.endMillis <= now }
+        }
+    }
+
     private companion object {
-        private const val HOUR_MS = 60L * 60L * 1000L
+        private const val STALE_MS = 5L * 60L * 1000L
         private const val CACHE_CAP = 256
         private const val PARSED_NAMES_CAP = 2_000
     }

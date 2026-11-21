@@ -829,6 +829,17 @@
                     android:descendantFocusability="afterDescendants"
                     android:focusable="false" />
 
+                <TextView
+                    android:id="@+id/programEmptyText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:gravity="center"
+                    android:padding="32dp"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="17sp"
+                    android:visibility="gone" />
+
                 <View
                     android:id="@+id/programNowLine"
                     android:layout_width="3dp"

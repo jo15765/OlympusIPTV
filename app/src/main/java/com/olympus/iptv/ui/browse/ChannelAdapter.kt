@@ -360,16 +360,9 @@ class ChannelAdapter(
             binding.name.setTextColor(
                 ctx.getColor(if (active) R.color.accent else R.color.text_primary)
             )
-            if (active) {
-                val d = ctx.resources.displayMetrics.density
-                binding.root.background = GradientDrawable().apply {
-                    cornerRadius = 4f * d
-                    setColor(ctx.getColor(R.color.bg_elevated))
-                    setStroke((1 * d).toInt().coerceAtLeast(1), ctx.getColor(R.color.accent_dim))
-                }
-            } else {
-                binding.root.background = null
-            }
+            // Never draw a focus rectangle around the channel name row in the live EPG grid.
+            binding.root.background = null
+            binding.playTarget.background = null
         }
 
         private fun hideActions() {

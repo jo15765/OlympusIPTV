@@ -14,7 +14,7 @@ import java.io.File
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
-class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext, "olympus-iptv.db", null, 13) {
+class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext, "olympus-iptv.db", null, 14) {
     private val filesDir = context.applicationContext.filesDir
     private val writer = ReentrantLock()
     private val dashLock = Any()
@@ -98,6 +98,76 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
             while (cursor.moveToNext()) ids.add(cursor.getString(0))
         }
         ids
+    }
+
+    /** Returns all currently airing or T-30m sports/event feeds across every provider for the Live Games Hub. */
+    fun readLiveEventsHub(
+        playlistId: String,
+        hiddenChannels: Set<String>,
+        now: Long = System.currentTimeMillis()
+    ): List<com.olympus.iptv.data.Channel> = read {
+        val out = ArrayList<com.olympus.iptv.data.Channel>()
+        val db = readableDatabase
+        val epgNowByChannel = HashMap<String, Triple<String, Long, Long>>()
+        runCatching {
+            db.rawQuery(
+                "SELECT channel_id, payload FROM epg_cache WHERE playlist_id=?",
+                arrayOf(playlistId)
+            ).use { cur ->
+                while (cur.moveToNext()) {
+                    val cid = cur.getString(0) ?: continue
+                    val payload = cur.getString(1) ?: continue
+                    val programs = decodeEpg(payload)
+                    val current = programs.firstOrNull { now >= it.startMillis && now < it.endMillis }
+                        ?: programs.firstOrNull { it.startMillis > now }
+                    if (current != null) {
+                        epgNowByChannel[cid] = Triple(current.title, current.startMillis, current.endMillis)
+                    }
+                }
+            }
+        }
+        db.query(
+            "channels",
+            LIST_COLUMNS,
+            """
+            playlist_id=? AND bucket=?
+            AND UPPER(name) NOT LIKE '%: NO EVENT%'
+            AND UPPER(name) NOT LIKE '%| NO EVENT%'
+            AND RTRIM(name) NOT LIKE '%:'
+            AND RTRIM(name) NOT LIKE '%-'
+            """.trimIndent(),
+            arrayOf(playlistId, LIVE),
+            null,
+            null,
+            "name COLLATE NOCASE"
+        ).use { cursor ->
+            while (cursor.moveToNext()) {
+                val ch = listRow(cursor)
+                if (ch.id in hiddenChannels) continue
+                val cachedEpg = epgNowByChannel[ch.epgChannelId ?: ch.id] ?: epgNowByChannel[ch.id]
+                val status = NameStrip.inspect(
+                    rawChannel = ch.name,
+                    groupTitle = ch.groupTitle,
+                    epgChannelId = ch.epgChannelId,
+                    nowTitle = cachedEpg?.first,
+                    nowStartMs = cachedEpg?.second ?: 0L,
+                    nowEndMs = cachedEpg?.third ?: 0L
+                )
+                if (!status.isVisibleAt(now)) continue
+                val eventTitle = status.airingEvent ?: cachedEpg?.first ?: status.cleanChannel
+                val isSportsOrEvent = status.isEventSlot ||
+                    com.olympus.iptv.ui.browse.SportsEvent.isMatchup(eventTitle) ||
+                    com.olympus.iptv.ui.browse.SportsEvent.isMatchup(ch.groupTitle.orEmpty())
+                if (!isSportsOrEvent) continue
+                val display = if (!status.airingEvent.isNullOrBlank()) {
+                    "${status.airingEvent} (${status.cleanChannel})"
+                } else {
+                    status.cleanChannel
+                }
+                out.add(ch.copy(name = display))
+            }
+        }
+        out
     }
 
     fun sampleChannelIds(playlistId: String, group: String, limit: Int = 8): List<String> = read {
@@ -315,15 +385,20 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         hiddenChannels: Set<String> = emptySet()
     ): VisiblePage = read {
         val db = readableDatabase
+        val liveNoEventSql = if (bucket == LIVE) {
+            " AND UPPER(name) NOT LIKE '%: NO EVENT%' AND UPPER(name) NOT LIKE '%| NO EVENT%'"
+        } else {
+            ""
+        }
         val hide = if (hiddenChannels.isEmpty()) {
-            SqlFilter("", emptyList())
+            SqlFilter(liveNoEventSql, emptyList())
         } else {
             val ids = hiddenChannels.filter { it.isNotBlank() }.take(400)
             if (ids.isEmpty()) {
-                SqlFilter("", emptyList())
+                SqlFilter(liveNoEventSql, emptyList())
             } else {
                 SqlFilter(
-                    " AND id NOT IN (${ids.joinToString(",") { "?" }})",
+                    "$liveNoEventSql AND id NOT IN (${ids.joinToString(",") { "?" }})",
                     ids
                 )
             }
@@ -861,8 +936,9 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
                 INSERT OR IGNORE INTO channels (
                     playlist_id, bucket, id, name, stream_url, logo_url, group_title, category_id,
                     kind, container_extension, epg_channel_id, country_id, country_label, number, series_id,
-                    catchup_type, catchup_source, catchup_days, tv_archive, tv_archive_duration
-                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    catchup_type, catchup_source, catchup_days, tv_archive, tv_archive_duration,
+                    is_event_slot, event_start_ms, event_end_ms
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """.trimIndent()
             )
             val replaceTeam = db.compileStatement(
@@ -898,6 +974,12 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
                 if (channel.number == null) channelStmt.bindNull(14) else channelStmt.bindLong(14, channel.number.toLong())
                 bindOptional(channelStmt, 15, channel.seriesId)
                 bindCatchup(channelStmt, 16, channel)
+                val evStatus = if (bucket == LIVE) {
+                    NameStrip.inspect(channel.name, channel.groupTitle, channel.epgChannelId)
+                } else null
+                channelStmt.bindLong(21, if (evStatus?.isEventSlot == true) 1L else 0L)
+                channelStmt.bindLong(22, evStatus?.eventStartMs ?: 0L)
+                channelStmt.bindLong(23, evStatus?.eventEndMs ?: 0L)
                 val inserted = channelStmt.executeInsert() != -1L
                 val teamGroup = channel.groupTitle?.contains("Teams", ignoreCase = true) == true
                 if (inserted) {
@@ -1217,6 +1299,9 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
                 catchup_days INTEGER,
                 tv_archive INTEGER,
                 tv_archive_duration INTEGER,
+                is_event_slot INTEGER DEFAULT 0,
+                event_start_ms INTEGER DEFAULT 0,
+                event_end_ms INTEGER DEFAULT 0,
                 PRIMARY KEY (playlist_id, bucket, id)
             )
             """.trimIndent()
@@ -1241,6 +1326,10 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
             ensureIndexes(db)
             ensureGuideTables(db)
         }
+        if (oldVersion < 14) {
+            ensureEventWindowColumns(db)
+            ensureIndexes(db)
+        }
     }
 
     private fun ensureCatchupColumns(db: SQLiteDatabase) {
@@ -1252,6 +1341,18 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         add("catchup_days", "INTEGER")
         add("tv_archive", "INTEGER")
         add("tv_archive_duration", "INTEGER")
+    }
+
+    private fun ensureEventWindowColumns(db: SQLiteDatabase) {
+        fun add(column: String, type: String) {
+            runCatching { db.execSQL("ALTER TABLE channels ADD COLUMN $column $type") }
+        }
+        add("is_event_slot", "INTEGER DEFAULT 0")
+        add("event_start_ms", "INTEGER DEFAULT 0")
+        add("event_end_ms", "INTEGER DEFAULT 0")
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS idx_channels_live_event_window ON channels(playlist_id, bucket, is_event_slot, event_start_ms, event_end_ms, category_id)"
+        )
     }
 
     private fun ensureGuideTables(db: SQLiteDatabase) {
@@ -1518,7 +1619,77 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         return String(chars, 0, index + 1)
     }
 
+    fun activeLiveCategoryCounts(
+        playlistId: String,
+        hiddenChannels: Set<String>,
+        now: Long = System.currentTimeMillis()
+    ): Map<String, Int> = read {
+        val map = HashMap<String, Int>()
+        var totalActive = 0
+        val db = readableDatabase
+        // Load active EPG titles from epg_cache so cached "No EVENT Today" / "Signing Off" / "Live in X hours"
+        // are respected in category counts identically to prepareGroup()!
+        val epgNowByChannel = HashMap<String, Triple<String, Long, Long>>()
+        runCatching {
+            db.rawQuery(
+                "SELECT channel_id, payload FROM epg_cache WHERE playlist_id=?",
+                arrayOf(playlistId)
+            ).use { cur ->
+                while (cur.moveToNext()) {
+                    val cid = cur.getString(0) ?: continue
+                    val payload = cur.getString(1) ?: continue
+                    val programs = decodeEpg(payload)
+                    val current = programs.firstOrNull { now >= it.startMillis && now < it.endMillis }
+                        ?: programs.firstOrNull { it.startMillis > now }
+                    if (current != null) {
+                        epgNowByChannel[cid] = Triple(current.title, current.startMillis, current.endMillis)
+                    }
+                }
+            }
+        }
+        db.rawQuery(
+            """
+            SELECT id, COALESCE(NULLIF(category_id, ''), group_title), name, group_title, epg_channel_id
+            FROM channels
+            WHERE playlist_id=? AND bucket=?
+              AND COALESCE(NULLIF(category_id, ''), group_title) IS NOT NULL
+              AND COALESCE(NULLIF(category_id, ''), group_title) != ''
+              AND UPPER(name) NOT LIKE '%: NO EVENT%'
+              AND UPPER(name) NOT LIKE '%| NO EVENT%'
+              AND RTRIM(name) NOT LIKE '%:'
+              AND RTRIM(name) NOT LIKE '%-'
+            """.trimIndent(),
+            arrayOf(playlistId, LIVE)
+        ).use { cursor ->
+            while (cursor.moveToNext()) {
+                val id = cursor.getString(0) ?: continue
+                if (id in hiddenChannels) continue
+                val catId = cursor.getString(1) ?: continue
+                val name = cursor.getString(2) ?: continue
+                val groupTitle = cursor.getString(3)
+                val epgId = cursor.getString(4)
+                val cachedEpg = epgNowByChannel[epgId ?: id] ?: epgNowByChannel[id]
+                val status = NameStrip.inspect(
+                    rawChannel = name,
+                    groupTitle = groupTitle,
+                    epgChannelId = epgId,
+                    nowTitle = cachedEpg?.first,
+                    nowStartMs = cachedEpg?.second ?: 0L,
+                    nowEndMs = cachedEpg?.third ?: 0L
+                )
+                if (!status.isVisibleAt(now)) continue
+                map[catId] = (map[catId] ?: 0) + 1
+                totalActive += 1
+            }
+        }
+        map[PlaylistLoader.ALL_ID] = totalActive
+        map
+    }
+
     fun categoryCounts(playlistId: String, bucket: String): Map<String, Int> = read {
+        if (bucket == LIVE) {
+            return@read activeLiveCategoryCounts(playlistId, emptySet())
+        }
         val map = HashMap<String, Int>()
         val db = readableDatabase
         db.rawQuery(

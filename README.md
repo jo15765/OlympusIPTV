@@ -6,7 +6,7 @@
 
 ### For the latest and greatest, build your own APK from this code.
 
-The latest signed file is **0.2.83** (versionCode 84): `C:\Users\chalu\Downloads\olympus-iptv-0.2.83.apk`. **One APK** installs on Android TV / set-top boxes and on phones and tablets. Install it over 0.2.82. The signing key is the same, so the saved account and playlist stay.
+The latest signed file is **0.2.86** (versionCode 87): `C:\Users\chalu\Downloads\olympus-iptv-0.2.86.apk`. **One APK** installs on Android TV / set-top boxes and on phones and tablets. Install it over 0.2.85. The signing key is the same, so the saved account and playlist stay.
 
 **This is a player only. You must provide your own streams.**
 
@@ -23,6 +23,7 @@ Olympus-IPTV does not include channels, movies, shows, or stream addresses. It p
 </div>
 
 - [Start here](#start-here)
+- [What's in 0.2.86](#whats-in-0286)
 - [What's in 0.2.83](#whats-in-0283)
 - [Phones and tablets](#phones-and-tablets)
 - [Video walkthrough](#video-walkthrough)
@@ -52,14 +53,33 @@ Olympus-IPTV is one APK for Android TV / set-top boxes and for phones and tablet
 
 | | |
 | --- | --- |
-| Signed file | `C:\Users\chalu\Downloads\olympus-iptv-0.2.83.apk` |
-| What that file is | versionName **0.2.83**, versionCode **84** |
-| Source in this tree | versionName **0.2.83**, versionCode **84** |
-| What to run | Install the signed 0.2.83 APK, or build this source |
+| Signed file | `C:\Users\chalu\Downloads\olympus-iptv-0.2.86.apk` |
+| What that file is | versionName **0.2.86**, versionCode **87** |
+| Source in this tree | versionName **0.2.86**, versionCode **87** |
+| What to run | Install the signed 0.2.86 APK, or build this source |
 | Install | Over the existing copy (TV or phone). Uninstalling wipes the saved account, playlist, and favorites. Downloader works with the same file. |
 | Launcher name | Two centered lines: Olympus over IPTV |
 
-**0.2.83** is the current signed release. It keeps the 0.2.82 behavior (Got it takes the remote, the Continue strip stays hidden, Admin is the image cards, leaving the app closes provider connections unless picture-in-picture is playing) and adds the phone layout, guide clock, and player changes under [What's in 0.2.83](#whats-in-0283). Sticks with a small heap still use the 16 MB image cache, RGB_565 posters, and a 10 second buffer. Larger boxes pre-warm only the next channel.
+**0.2.86** is the current signed release. The release copy in Downloads is the signed APK only. It keeps the 0.2.83 phone layout, guide clock, and player changes, and adds the live-games list, off-air hiding, and the shorter guide under [What's in 0.2.86](#whats-in-0286). Sticks with a small heap still use the 16 MB image cache, RGB_565 posters, and a 10 second buffer. Larger boxes pre-warm only the next channel.
+
+---
+
+<div align="center">
+
+## What's in 0.2.86
+
+</div>
+
+- **Live Games Now** sits on Live TV after For You. It gathers sports and event feeds that are on now, or start within 30 minutes, from every live group. The same event is listed together, with 4K and 1080 feeds first.
+- Numbered event slots, and any live feed whose guide says No Event, Off Air, TBA, No Game Today, or a similar placeholder, stay off the list until 30 minutes before the listed start. They come back for the event and drop off when it ends. Group counts follow the channels that are actually showing. An empty live group says so in the guide pane.
+- The live timeline is 90 minutes from the current half hour. A row shows the program on now and anything that starts in the next 30 minutes. Visible rows refresh about every 30 seconds as a program ends or is about to start. A saved guide row is refreshed after 5 minutes.
+- A local name such as `NE | Lincoln | FOX KFXL` shows as `FOX KFXL (Lincoln, NE)`. A numbered slot keeps the slot and the event. Superscript marks such as HD, 4K, and Live are removed. A guide title that repeats the channel name drops that prefix.
+- Event times understand Atlantic, UK, and Central European zones along with US zones. A slot with nothing in the next 30 minutes reads “No live event right now.” One that starts inside that window reads “Starting soon.”
+- Search turns short sports names into the full name: Bucs, Pats, Niners, EPL, UCL, F1, and the other nicknames in that list.
+- A live stream that is still buffering after about 6.5 seconds tries another feed of the same channel, including the same event on another provider. East and West labels are ignored when those feeds are matched.
+- Group cards are 3 across on TV, 2 across from 600dp, and 1 across on a narrower phone. Cards use the group icon. The channel row does not draw a focus box.
+- On the guide, Left from the current program returns to the group cards. Up and Down on the group grid stay on the cards.
+- The library database is schema 14. An existing install adds the event-window columns. The account, favorites, and catalog stay.
 
 ---
 
@@ -92,9 +112,9 @@ There is **no separate mobile APK**. Compact means a touch device whose smallest
 | On phones and tablets | What this source does |
 | --- | --- |
 | Guide chrome | Compact phones: top **Back**, title, **About**, **Search**, and **Cast**. **Admin** is not on that top bar. Bottom tabs are **Live**, **Movies**, **Shows**, **Library**, and **Admin**. The left TV rail stays hidden. Tablets keep the group list beside the channels. A wide TV uses a flexible group column, not the tablet layout’s fixed 260dp column |
-| Columns | Category and poster grids follow the width: 2 columns under 600dp, 3 from 600dp, 4 from 900dp. TV stays at 5, or 6 at 1200dp and wider |
+| Columns | Category and poster grids follow the width: 1 column under 600dp, 2 from 600dp, 3 from 900dp. TV stays at 3 |
 | Group filter | Typeahead under Groups. Portrait Live also shows group chips |
-| Now playing | After leaving the player, a resume strip shows the last title. Live shows **LIVE • Return to Fullscreen** |
+| Now playing | The resume strip above the groups stays hidden. The live channel you were watching stays marked in the list. Search can still show that stream |
 | Live “now” | A portrait phone shows the current title, a gold progress bar, and the next title on the row. A landscape phone and a TV keep the hour-by-hour guide |
 | Pull to refresh | Swipe down on the groups list or the channel list to refresh quietly |
 | Haptics | Light feedback on Play, group open, PIN set / unlock / wrong PIN, pull to refresh, and the player gesture pill |
@@ -151,11 +171,11 @@ It walks through enabling unknown sources on an Onn box, installing Downloader b
 
 </div>
 
-When an account is already saved, the app opens on the rail and the group cards. The channel list and the hour-by-hour guide stay hidden until a card is opened. It does not start the last channel. The rail title is **Olympus IPTV** on one line. Above the group cards, Live TV shows the current date and time (`MM/DD/YYYY  hh:mm AM/PM`).
+When an account is already saved, the app opens on the rail and the group cards. The channel list and the guide stay hidden until a card is opened. It does not start the last channel. The rail title is **Olympus IPTV** on one line. Above the group cards, Live TV shows the current date and time (`MM/DD/YYYY  hh:mm AM/PM`).
 
-1. **TV, Movies, or Shows.** Group cards fill the space beside the rail. The number of cards in a row follows the screen: 5 on a TV, 6 when the TV is 1200dp or wider, and fewer on a phone (see [Phones and tablets](#phones-and-tablets)). A card shows the group name and, once counted, how many channels or titles it holds. Moving across the cards does not load channels.
+1. **TV, Movies, or Shows.** Group cards fill the space beside the rail. The number of cards in a row follows the screen: 3 on a TV, and fewer on a phone (see [Phones and tablets](#phones-and-tablets)). Live TV also has **Live Games Now** after For You. A card shows the group name and, once counted, how many channels or titles it holds. Live counts leave out hidden channels and event slots that are off air. Moving across the cards does not load channels.
 2. **OK on a card**, or Right from a card on the right edge, opens that group. On TV, and on a landscape phone, a Live group under 250 channels opens the side-by-side EPG and lands on the program that is on now. A portrait phone opens the channel list, with now and next on each row. A Live group with **250 or more** channels still opens the guide, but fills it with **hour blocks of each channel name** (no provider EPG download). Channels page in **20** at a time. Movies and Shows land on the first title.
-3. **Right** from a channel moves into the guide and later in time. **Left** from the first time slot returns to the channel list.
+3. **Right** from a channel moves into the guide and later in time. **Left** from the program on now returns to the group cards.
 4. **Back** from the channel list or the guide returns to the group cards. Back from the cards returns to the rail. Back on the rail does not quit the app.
 5. **Left** during full-screen playback returns to the channel list, or steps live timeshift when the stream allows it. **Back** during live playback returns to the channel and guide.
 
@@ -173,7 +193,7 @@ OK on a past program plays catch-up when the provider marked that channel for ar
 
 There is no auto-preview on phones. On TV, the focused live channel can warm quietly. After **Back** from live playback, that stream keeps running in the bottom-right guide corner with **LIVE • Return to Fullscreen**. Search can show the same stream in a muted dock.
 
-**Recently watched** is the first group on TV, Movies, and Shows. **Top 10 watched** appears when you have favorites and watch history. **Favorites** lists only the favorites for that section. The Continue watching strip above the groups is hidden, and Movies and Shows do not add a Continue group card. A movie or episode you left in the middle still resumes from its poster and from Recently watched. A spot under 15 seconds, or within 20 seconds of the end, starts from the beginning. **Guide density** on EPG edits switches Comfortable or Compact row height.
+On Live TV the first cards are **For You**, **Live Games Now**, then **Recently watched**. Movies and Shows still open with Recently watched. **Top 10 watched** appears when you have favorites and watch history. **Favorites** lists only the favorites for that section. The Continue watching strip above the groups is hidden, and Movies and Shows do not add a Continue group card. A movie or episode you left in the middle still resumes from its poster and from Recently watched. A spot under 15 seconds, or within 20 seconds of the end, starts from the beginning. **Guide density** on EPG edits switches Comfortable or Compact row height.
 
 ---
 
@@ -358,7 +378,7 @@ Parental controls list the Live TV groups that are visible on the guide. Set PIN
 </div>
 
 - Up and Down stay in the current list, or change channel in the player.
-- Left and Right move across the group cards. On the program guide, Right moves later and Left moves back, until the first slot, which returns to the channel list.
+- Left and Right move across the group cards. On the program guide, Right moves later and Left moves back. Left from the program on now returns to the group cards. Up and Down on the cards stay in the grid.
 - OK on a group card opens it. OK on a program plays it. In the player, OK shows play/pause and progress for 3 seconds. Info opens the full menu.
 - Hold OK on live TV for favorites, move up, move down, record, and Remind me. Hold OK on a movie or show for favorites, record, Add to Queue, and Ratings & reviews.
 - On the channel list or the program guide, number keys open the Channel dial.
@@ -375,7 +395,7 @@ Parental controls list the Live TV groups that are visible on the guide. Set PIN
 
 DataStore `olympus_iptv` holds the playlist, the session, favorites, the Queue, the device id, lineup edits, the last live channel, watch history (up to 60 rows per playlist), recordings plus SMB settings, picture mode, audio and subtitle language, guide density, quiet hours, parental unlock minutes, multi-view, the video decoder, the TMDB limit, PiP gestures, Scrobbler tokens, and per-channel lip-sync offsets. Reminders are in `reminders.json`. Admin → Web-UI → Remove playlist clears that account data and the SQLite library, keeps the device id, and returns to sign-in.
 
-The library is SQLite `olympus-iptv.db` (schema version 13): categories, channels, a disk cache of guide rows, and watched episodes. Stream addresses stay in that database. They are not published to the dashboard. Once a day, guide rows older than 24 hours are deleted, then the database is vacuumed and the WAL is truncated.
+The library is SQLite `olympus-iptv.db` (schema version 14): categories, channels, a disk cache of guide rows, watched episodes, and event-window columns used to hide off-air slots. Stream addresses stay in that database. They are not published to the dashboard. Once a day, guide rows older than 24 hours are deleted, then the database is vacuumed and the WAL is truncated. Installing 0.2.86 adds those columns on the existing database.
 
 The SMB password, playlist password, and Scrobbler tokens stay on the device. Do not commit `local.properties`, the DataStore file, or a dashboard export that still has secrets.
 
@@ -409,7 +429,7 @@ The debug APK is `app/build/outputs/apk/debug/app-debug.apk`. Optional keys go i
 | `opensubtitles.apiKey` | OpenSubtitles under player Subtitles |
 | `sendgrid.apiKey` + `sendgrid.fromEmail` | Email after two wrong parental PINs |
 
-Release builds use R8, resource shrinking, and optimized resource shrinking. They keep `armeabi-v7a` and `arm64-v8a` only, and English resources only. A baseline profile covers the guide and the player. Gradle is set to work offline. The latest signed release is `C:\Users\chalu\Downloads\olympus-iptv-0.2.83.apk`.
+Release builds use R8, resource shrinking, and optimized resource shrinking. They keep `armeabi-v7a` and `arm64-v8a` only, and English resources only. A baseline profile covers the guide and the player. Gradle is set to work offline. The latest signed release is `C:\Users\chalu\Downloads\olympus-iptv-0.2.86.apk`.
 
 Libraries: Kotlin, AndroidX, ViewBinding, Media3 ExoPlayer (HLS and DASH), OkHttp, Gson, DataStore, Coil, profileinstaller, Google Cast / MediaRouter, and SMBJ. WorkManager is not a dependency. The dashboard is a page in the APK.
 
@@ -480,7 +500,7 @@ clearcast-tuner/
 
 - This is a player only. You must provide your own streams.
 - It is a beta.
-- **0.2.83** is the latest signed file (`olympus-iptv-0.2.83.apk`, versionCode 84). Install it over 0.2.82.
+- **0.2.86** is the latest signed file (`olympus-iptv-0.2.86.apk`, versionCode 87). Install it over 0.2.85.
 - `portal/data/store.json` is for the Node portal on a PC. It is not packaged in the APK.
 - Chromecast often cannot play provider IPTV/HLS. The Cast button warns before connecting.
 - Ratings, trailers, and New this week need the matching keys in `local.properties` at build time.

@@ -266,6 +266,7 @@ class PlaylistLoader(
         const val CONTINUE_ID = "__continue__"
         const val TOP_WATCHED_ID = "__top_watched__"
         const val FOR_YOU_ID = "__for_you__"
+        const val LIVE_EVENTS_ID = "__live_events__"
 
         fun isSeriesName(name: String?): Boolean {
             if (name.isNullOrBlank()) return false

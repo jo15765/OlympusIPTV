@@ -42,10 +42,10 @@ object DeviceForm {
     fun contentColumns(context: Context): Int {
         val width = context.resources.configuration.screenWidthDp
         return when {
-            isTelevision(context) -> if (width >= 1200) 6 else 5
-            width >= 900 -> 4
-            width >= 600 -> 3
-            else -> 2
+            isTelevision(context) -> 3
+            width >= 900 -> 3
+            width >= 600 -> 2
+            else -> 1
         }
     }
 

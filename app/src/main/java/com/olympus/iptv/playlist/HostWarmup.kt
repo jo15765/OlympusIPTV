@@ -5,7 +5,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.net.URI
 
-/** Pulls the first few favorite stream hosts and warms DNS plus HTTP keep-alive. */
+/** Pulls the first few favorite stream hosts and warms DNS plus HTTP keep-alive in a single batch DB lookup. */
 object HostWarmup {
     @Volatile private var warmedFor: String? = null
 
@@ -14,13 +14,19 @@ object HostWarmup {
         if (MeteredNetwork.limited(app)) return
         warmedFor = playlistId
         app.appScope.launch(Dispatchers.IO) {
+            val liveIds = favoriteKeys.asSequence()
+                .filter { it.startsWith("live:") }
+                .map { it.substringAfter(':') }
+                .filter { it.isNotBlank() }
+                .distinct()
+                .take(6)
+                .toList()
+            if (liveIds.isEmpty()) return@launch
+            val channels = runCatching {
+                app.catalogDb.readChannelsByIds(playlistId, CatalogDb.LIVE, liveIds)
+            }.getOrDefault(emptyList())
             val hosts = ArrayList<String>(3)
-            for (key in favoriteKeys) {
-                if (!key.startsWith("live:")) continue
-                val id = key.substringAfter(':')
-                val channel = runCatching {
-                    app.catalogDb.readChannel(playlistId, CatalogDb.LIVE, id)
-                }.getOrNull() ?: continue
+            for (channel in channels) {
                 val host = runCatching { URI(channel.streamUrl).host }.getOrNull()
                     ?.takeIf { it.isNotBlank() } ?: continue
                 if (host !in hosts) hosts.add(host)

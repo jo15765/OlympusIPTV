@@ -300,16 +300,7 @@ internal fun BrowseActivity.hostOnCreate(savedInstanceState: Bundle?) {
             if (touchPrimary) 4 else 8
         binding.channelList.recycledViewPool.setMaxRecycledViews(0, if (touchPrimary) 16 else 32)
         binding.channelList.recycledViewPool.setMaxRecycledViews(1, if (touchPrimary) 8 else 16)
-        Looper.myQueue().addIdleHandler {
-            if (!isDestroyed && !lowRamDevice) {
-                runCatching {
-                    panes.ensureAdmin()
-                    panes.ensureRefresh()
-                    panes.ensureVpn()
-                }
-            }
-            false
-        }
+        // Lazy panes stay deferred until opened so cold start renders groups immediately.
         setupPipSwipeOpen()
         lifecycleScope.launch {
             pipGestures = withContext(Dispatchers.IO) {
@@ -352,9 +343,60 @@ internal fun BrowseActivity.hostOnCreate(savedInstanceState: Bundle?) {
         })
         focusHandler.postDelayed(object : Runnable {
             override fun run() {
+                if (!isDestroyed && section == GuideSection.TV &&
+                    (binding.groupColumn.visibility == View.VISIBLE || binding.programPane.visibility == View.VISIBLE)
+                ) {
+                    refreshGroupCounts()
+                }
                 if (binding.programPane.visibility == View.VISIBLE) {
+                    val now = com.olympus.iptv.playlist.EpgUtils.now()
+                    val start = GuideMetrics.start(now, halfHourMs)
+                    if (programAdapter.setWindow(start, GuideMetrics.end(start))) {
+                        buildProgramHeader()
+                    }
+                    epgRepo.evictExpired(now)
                     positionNowLine(programAdapter.scrollX)
                     if (binding.guideDate.visibility == View.VISIBLE) tickGuideHeader()
+                    // Refresh any visible rows whose current program has ended or is about to start
+                    val layout = binding.programList.layoutManager as? LinearLayoutManager
+                    if (layout != null && visibleChannels.isNotEmpty()) {
+                        val first = layout.findFirstVisibleItemPosition().coerceAtLeast(0)
+                        val last = layout.findLastVisibleItemPosition().coerceAtMost(visibleChannels.lastIndex)
+                        if (last >= first) {
+                            val staleChannels = ArrayList<Channel>()
+                            for (idx in first..last) {
+                                val ch = visibleChannels[idx]
+                                val list = programAdapter.programsFor(ch.id)
+                                val hasEndedOrStarting = list == null ||
+                                    list.any { it.endMillis <= now || (it.startMillis <= now && it.endMillis - now <= 60_000L) }
+                                if (hasEndedOrStarting) {
+                                    epgCache.remove(ch.id)
+                                    staleChannels.add(ch)
+                                }
+                            }
+                            if (staleChannels.isNotEmpty()) {
+                                val saved = playlist
+                                if (saved != null) {
+                                    lifecycleScope.launch {
+                                        for (ch in staleChannels) {
+                                            val updated = runCatching { epgRepo.upcoming(saved, ch) }.getOrNull()
+                                            if (updated != null && !isDestroyed) {
+                                                programAdapter.put(ch.id, updated)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    // Auto-restore streams that entered the 30-minute pre-event window or remove ended events
+                    if (section == GuideSection.TV && selectedCategoryId != null && selectedCategoryId != PlaylistLoader.FAVORITES_ID) {
+                        val beforeCount = visibleChannels.size
+                        val refreshed = prepareGroup(visibleChannels.toList(), activeConfig)
+                        if (refreshed.size != beforeCount) {
+                            showChannels()
+                        }
+                    }
                 }
                 focusHandler.postDelayed(this, 30_000)
             }
@@ -1198,6 +1240,12 @@ internal fun BrowseActivity.hostDispatchKey(event: KeyEvent): Boolean {
                 KeyEvent.KEYCODE_DPAD_LEFT -> {
                     if (slot != null && slot.column > 0) {
                         focusProgram(slot.row, slot.column - 1)
+                    } else if (slot != null && slot.column == 0) {
+                        landOnOpened = false
+                        rememberGroupScroll()
+                        showMenu(GuideMenu.GROUPS)
+                        armGroupFocus()
+                        focusGroups()
                     }
                     return true
                 }
@@ -1246,18 +1294,22 @@ internal fun BrowseActivity.hostDispatchKey(event: KeyEvent): Boolean {
                 }
             }
         }
-        if (event.action == KeyEvent.ACTION_DOWN &&
-            focusIsIn(binding.shortcutRow) &&
-            event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN &&
-            binding.homeContinue.visibility == View.VISIBLE
-        ) {
-            binding.homeContinuePlay.requestFocus()
-            return true
+        if (event.action == KeyEvent.ACTION_DOWN && focusIsIn(binding.shortcutRow)) {
+            if (event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                if (binding.homeContinue.visibility == View.VISIBLE) {
+                    binding.homeContinuePlay.requestFocus()
+                } else {
+                    focusGroups()
+                }
+                return true
+            }
+            if (event.keyCode == KeyEvent.KEYCODE_DPAD_UP) return true
         }
         if (event.action == KeyEvent.ACTION_DOWN && focusIsIn(binding.categoryList)) {
             val item = binding.categoryList.findContainingItemView(currentFocus ?: binding.categoryList)
             val pos = if (item == null) -1 else binding.categoryList.getChildAdapterPosition(item)
             val span = (binding.categoryList.layoutManager as? androidx.recyclerview.widget.GridLayoutManager)?.spanCount ?: CARD_SPAN
+            val total = categoryAdapter.itemCount
             when (event.keyCode) {
                 KeyEvent.KEYCODE_DPAD_LEFT -> {
                     if (pos < 0 || pos % span == 0) {
@@ -1269,10 +1321,23 @@ internal fun BrowseActivity.hostDispatchKey(event: KeyEvent): Boolean {
                     }
                 }
                 KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                    val last = categoryAdapter.itemCount - 1
+                    val last = total - 1
                     if (pos >= 0 && (pos % span == span - 1 || pos == last)) {
                         val category = categoryAdapter.categories().getOrNull(pos) ?: return true
                         selectCategory(category, true)
+                        return true
+                    }
+                }
+                KeyEvent.KEYCODE_DPAD_DOWN -> {
+                    if (pos >= 0 && total > 0) {
+                        val nextPos = pos + span
+                        if (nextPos < total) {
+                            binding.categoryList.scrollToPosition(nextPos)
+                            binding.categoryList.post {
+                                binding.categoryList.findViewHolderForAdapterPosition(nextPos)?.itemView?.requestFocus()
+                            }
+                        }
+                        // Never allow D-pad DOWN to fall through to Android's geometric focusSearch (which jumps to navRail!)
                         return true
                     }
                 }
@@ -1290,6 +1355,14 @@ internal fun BrowseActivity.hostDispatchKey(event: KeyEvent): Boolean {
                                 return true
                             }
                         }
+                        return true
+                    } else if (pos >= span) {
+                        val prevPos = pos - span
+                        binding.categoryList.scrollToPosition(prevPos)
+                        binding.categoryList.post {
+                            binding.categoryList.findViewHolderForAdapterPosition(prevPos)?.itemView?.requestFocus()
+                        }
+                        return true
                     }
                 }
             }
@@ -1793,6 +1866,23 @@ internal suspend fun BrowseActivity.fetchGuidePrograms(saved: SavedPlaylist, cha
                     }
                 }.awaitAll()
             }.forEach { (id, list) ->
+                val nowNext = com.olympus.iptv.playlist.EpgUtils.nowNext(list)
+                epgCache[id] = nowNext
+                val firstTitle = nowNext.now?.title ?: list.firstOrNull()?.title
+                if (com.olympus.iptv.data.NameStrip.isPlaceholderEvent(firstTitle) &&
+                    !firstTitle.isNullOrBlank() &&
+                    section == GuideSection.TV &&
+                    selectedCategoryId != null &&
+                    selectedCategoryId != PlaylistLoader.FAVORITES_ID
+                ) {
+                    visibleChannels.removeAll { it.id == id }
+                    channelAdapter.remove(id)
+                    programAdapter.submit(visibleChannels)
+                    if (visibleChannels.isEmpty()) {
+                        finishChannelPane(emptyList())
+                    }
+                    return@forEach
+                }
                 val slot = currentFocus?.tag as? ProgramGuideAdapter.Slot
                 val keep = slot != null && visibleChannels.getOrNull(slot.row)?.id == id
                 programAdapter.put(id, list)

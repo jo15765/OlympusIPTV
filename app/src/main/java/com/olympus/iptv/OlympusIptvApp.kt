@@ -190,7 +190,14 @@ class OlympusIptvApp : Application() {
         appScope.launch {
             runCatching { com.olympus.iptv.playlist.TitleRatings.init(this@OlympusIptvApp, catalogDb) }
             runCatching { playlistStore.videoDecoder() }
-            runCatching { catalogDb.channelCount("") }
+            runCatching {
+                val saved = playlistStore.opening().first
+                if (saved != null) {
+                    catalogDb.warmDashboard(saved.id)
+                } else {
+                    catalogDb.channelCount("")
+                }
+            }
         }
     }
 
@@ -207,7 +214,7 @@ class OlympusIptvApp : Application() {
             )
         }
         MemoryTrim.install(this)
-        com.olympus.iptv.data.AvSyncStore.warm(this)
+        appScope.launch { com.olympus.iptv.data.AvSyncStore.warm(this@OlympusIptvApp) }
         registerActivityLifecycleCallbacks(overscan)
         AppLog.install(this)
         playlistStore = PlaylistStore(this)
@@ -226,8 +233,10 @@ class OlympusIptvApp : Application() {
                 lineupListeners.forEach { listener -> listener(id) }
             }
         }
-        com.olympus.iptv.remind.ReminderClock.start(this)
-        com.olympus.iptv.playlist.CatalogSyncWorker.schedule(this)
+        appScope.launch {
+            com.olympus.iptv.remind.ReminderClock.start(this@OlympusIptvApp)
+            com.olympus.iptv.playlist.CatalogSyncWorker.schedule(this@OlympusIptvApp)
+        }
         registerActivityLifecycleCallbacks(object : android.app.Application.ActivityLifecycleCallbacks {
             override fun onActivityResumed(activity: android.app.Activity) {
                 if (activity is com.olympus.iptv.remind.ReminderActivity) return
@@ -242,8 +251,9 @@ class OlympusIptvApp : Application() {
             override fun onActivityDestroyed(activity: android.app.Activity) = Unit
         })
         epgRepository.attach(catalogDb, appScope)
-        DashboardHost.start(this)
         appScope.launch {
+            DashboardHost.start(this@OlympusIptvApp)
+            delay(45_000L)
             while (isActive) {
                 runCatching { catalogDb.maintainDaily() }
                 delay(6L * 60L * 60L * 1000L)
@@ -256,6 +266,7 @@ class OlympusIptvApp : Application() {
         val imageBytes = if (lowRam) 16L * 1024 * 1024 else 64L * 1024 * 1024
         Coil.setImageLoader(
             ImageLoader.Builder(this)
+                .okHttpClient { com.olympus.iptv.playlist.HttpClients.shared }
                 .crossfade(false)
                 .bitmapConfig(
                     if (lowRam) android.graphics.Bitmap.Config.RGB_565

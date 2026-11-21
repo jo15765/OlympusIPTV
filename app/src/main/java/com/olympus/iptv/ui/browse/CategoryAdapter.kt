@@ -232,25 +232,10 @@ class CategoryAdapter(
         }
 
         private fun bindPreviews(item: Category) {
-            val urls = previewLogos(item).filter { it.isNotBlank() }.distinct().take(3)
-            val views = listOf(binding.preview0, binding.preview1, binding.preview2)
-            if (urls.isEmpty()) {
-                binding.icon.visibility = View.VISIBLE
-                views.forEach { it.visibility = View.GONE }
-                return
-            }
-            binding.icon.visibility = View.GONE
-            val px = (28 * binding.root.resources.displayMetrics.density).toInt().coerceAtLeast(1)
-            for (index in views.indices) {
-                val view = views[index]
-                val url = urls.getOrNull(index)
-                if (url == null) {
-                    view.visibility = View.GONE
-                    continue
-                }
-                view.visibility = View.VISIBLE
-                loadPreview(view, url, px)
-            }
+            binding.icon.visibility = View.VISIBLE
+            binding.preview0.visibility = View.GONE
+            binding.preview1.visibility = View.GONE
+            binding.preview2.visibility = View.GONE
         }
 
         private fun loadPreview(view: ImageView, url: String, px: Int) {

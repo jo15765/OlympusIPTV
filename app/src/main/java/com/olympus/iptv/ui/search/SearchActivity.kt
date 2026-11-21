@@ -468,8 +468,13 @@ class SearchActivity : AppCompatActivity() {
         else searchHandler.postDelayed(run, 150L)
     }
 
+    private fun expandSportsAlias(raw: String): String {
+        val key = raw.trim().lowercase(Locale.US)
+        return SPORTS_ALIASES[key] ?: raw.trim()
+    }
+
     private fun showMatches(rawQuery: String) {
-        val query = rawQuery.trim()
+        val query = expandSportsAlias(rawQuery)
         searchJob?.cancel()
         if (query.isEmpty()) {
             adapter.submit(emptyList())
@@ -625,5 +630,36 @@ class SearchActivity : AppCompatActivity() {
     companion object {
         private const val PER_SECTION = 40
         private val WHITESPACE = Regex("\\s+")
+        private val SPORTS_ALIASES = mapOf(
+            "bucs" to "Buccaneers",
+            "pats" to "Patriots",
+            "niners" to "49ers",
+            "fins" to "Dolphins",
+            "bolts" to "Chargers",
+            "jags" to "Jaguars",
+            "pack" to "Packers",
+            "hawks" to "Seahawks",
+            "avs" to "Avalanche",
+            "habs" to "Canadiens",
+            "leafs" to "Maple Leafs",
+            "pens" to "Penguins",
+            "caps" to "Capitals",
+            "wings" to "Red Wings",
+            "isles" to "Islanders",
+            "canes" to "Hurricanes",
+            "preds" to "Predators",
+            "yanks" to "Yankees",
+            "sox" to "Red Sox",
+            "cards" to "Cardinals",
+            "man city" to "Manchester City",
+            "man utd" to "Manchester United",
+            "barca" to "Barcelona",
+            "real" to "Real Madrid",
+            "juve" to "Juventus",
+            "epl" to "Premier League",
+            "ucl" to "Champions League",
+            "uel" to "Europa League",
+            "f1" to "Formula 1"
+        )
     }
 }

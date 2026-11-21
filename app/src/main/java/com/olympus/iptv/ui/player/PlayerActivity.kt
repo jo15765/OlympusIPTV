@@ -1114,6 +1114,17 @@ class PlayerActivity : AppCompatActivity() {
             if (active.playbackState != Player.STATE_BUFFERING || active.isPlaying) return@postDelayed
             paintConnectingBadge(SystemClock.elapsedRealtime() - started)
         }, 2_000L)
+        if (live) {
+            hideHandler.postDelayed({
+                if (isDestroyed || token != bufferWatchToken) return@postDelayed
+                val active = player ?: return@postDelayed
+                if (active.playbackState != Player.STATE_BUFFERING || active.isPlaying) return@postDelayed
+                if (recoverAttempt == 0) {
+                    recoverAttempt = 1
+                    switchToBackup()
+                }
+            }, 6_500L)
+        }
         hideHandler.postDelayed({
             if (isDestroyed || token != bufferWatchToken) return@postDelayed
             val active = player ?: return@postDelayed

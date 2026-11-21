@@ -22,6 +22,16 @@ val sendgridKey = localProperty("sendgrid.apiKey")
 val sendgridFrom = localProperty("sendgrid.fromEmail")
 val tmdbKey = localProperty("tmdb.apiKey")
 
+fun signingValue(key: String): String {
+    val file = File(System.getProperty("user.home"), "olympus-iptv-signing.txt")
+    if (!file.exists()) return ""
+    return file.readLines()
+        .firstOrNull { it.substringBefore("=").trim() == key }
+        ?.substringAfter("=", "")
+        ?.trim()
+        .orEmpty()
+}
+
 android {
     namespace = "com.olympus.iptv"
     compileSdk = 37
@@ -30,8 +40,8 @@ android {
         applicationId = "com.olympus.iptv"
         minSdk = 24
         targetSdk = 35
-        versionCode = 84
-        versionName = "0.2.83"
+        versionCode = 87
+        versionName = "0.2.86"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "WATCHMODE_API_KEY", "\"$watchmodeKey\"")
         buildConfigField("String", "OPENSUBTITLES_API_KEY", "\"$opensubtitlesKey\"")
@@ -41,9 +51,22 @@ android {
     }
 
     // Release stays a single APK. TV sticks only need ARM. Debug keeps every ABI so the emulator still runs.
+    // Passwords stay in the home-folder signing file. They are not written into the project.
+
+    signingConfigs {
+        if (signingValue("keystore").isNotBlank()) {
+            create("release") {
+                storeFile = file(signingValue("keystore"))
+                storePassword = signingValue("storePassword")
+                keyAlias = signingValue("alias")
+                keyPassword = signingValue("keyPassword")
+            }
+        }
+    }
 
     buildTypes {
         release {
+            signingConfigs.findByName("release")?.let { signingConfig = it }
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
@@ -68,6 +91,10 @@ android {
     buildFeatures {
         viewBinding = true
         buildConfig = true
+    }
+
+    lint {
+        checkReleaseBuilds = false
     }
 
     // Never ship portal/data (e.g. store.json ~48MB) or Node portal trees inside the APK.
@@ -143,6 +170,27 @@ val gzipDashboardHtml = tasks.register("gzipDashboardHtml") {
             html.asFile.inputStream().use { it.copyTo(gzip) }
         }
     }
+}
+
+val publishReleaseApk = tasks.register("publishReleaseApk") {
+    group = "build"
+    description = "Copy the signed release APK into the user Downloads folder."
+    val releaseName = android.defaultConfig.versionName.orEmpty()
+    val apk = layout.buildDirectory.file("outputs/apk/release/app-release.apk")
+    inputs.file(apk)
+    outputs.upToDateWhen { false }
+    doLast {
+        if (releaseName.isBlank() || !apk.get().asFile.exists()) return@doLast
+        val downloads = File(System.getProperty("user.home"), "Downloads")
+        downloads.mkdirs()
+        val dest = File(downloads, "olympus-iptv-$releaseName.apk")
+        apk.get().asFile.copyTo(dest, overwrite = true)
+        logger.lifecycle("Release APK: ${dest.absolutePath}")
+    }
+}
+
+tasks.matching { it.name == "assembleRelease" }.configureEach {
+    finalizedBy(publishReleaseApk)
 }
 
 tasks.named("preBuild").configure {

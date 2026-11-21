@@ -73,14 +73,30 @@ object DummyEpg {
             )
         }
         val end = start + EVENT_MS
-        return listOf(
-            EpgProgram("Upcoming: $title", start - UPCOMING_MS, start),
-            EpgProgram(title, start, end),
-            EpgProgram("Ended: $title", end, end + ENDED_MS)
-        )
+        val thirtyMinMs = 30L * 60L * 1000L
+        if (now in start until end) {
+            return listOf(EpgProgram(title, start, end))
+        }
+        if (start > now && start - now <= thirtyMinMs) {
+            return listOf(
+                EpgProgram("Starting soon: $title", now, start),
+                EpgProgram(title, start, end)
+            )
+        }
+        val day = startOfLocalDay(now)
+        return listOf(EpgProgram("No live event right now", day, day + DAY_MS))
     }
 
     private data class Parsed(val title: String, val startMillis: Long?)
+
+    fun parseEventStartMillis(channelName: String, now: Long = System.currentTimeMillis()): Long? {
+        val raw = channelName.trim()
+        if (raw.isEmpty()) return null
+        val lastAt = raw.lastIndexOf('@')
+        val slice = if (lastAt >= 0) raw.substring(lastAt) else raw
+        val timed = atTime.find(slice) ?: atTime.find(raw) ?: parenMonth.find(raw) ?: parenDot.find(raw) ?: return null
+        return matchStart(timed, now)
+    }
 
     private fun parse(channelName: String, now: Long): Parsed {
         val raw = channelName.trim()
@@ -169,6 +185,9 @@ object DummyEpg {
             "CT", "CST", "CDT" -> "America/Chicago"
             "MT", "MST", "MDT" -> "America/Denver"
             "PT", "PST", "PDT" -> "America/Los_Angeles"
+            "AST", "ADT" -> "America/Halifax"
+            "UK", "BST", "WET", "WEST" -> "Europe/London"
+            "CET", "CEST" -> "Europe/Berlin"
             "GMT", "UTC" -> "UTC"
             else -> return TimeZone.getDefault()
         }

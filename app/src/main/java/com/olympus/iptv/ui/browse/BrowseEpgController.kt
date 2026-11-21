@@ -81,16 +81,23 @@ class BrowseEpgController(
         positionNowLine(programAdapter.scrollX)
     }
 
+    private var lastNowX: Float = Float.NaN
+
     fun positionNowLine(scrollX: Int) {
         val line = binding.programNowLine
         val x = programAdapter.pxFor(EpgUtils.now()) - scrollX
         val width = binding.programList.width
         if (width > 0 && x in 0..width) {
-            line.visibility = View.VISIBLE
-            line.translationX = (x - 1).toFloat()
-            line.alpha = 1f
+            val targetX = (x - 1).toFloat()
+            if (line.visibility != View.VISIBLE) line.visibility = View.VISIBLE
+            if (lastNowX != targetX) {
+                lastNowX = targetX
+                line.translationX = targetX
+            }
+            if (line.alpha != 1f) line.alpha = 1f
         } else {
-            line.visibility = View.INVISIBLE
+            lastNowX = Float.NaN
+            if (line.visibility != View.INVISIBLE) line.visibility = View.INVISIBLE
         }
     }
 

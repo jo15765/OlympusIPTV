@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/card"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -7,27 +8,27 @@
     android:background="@drawable/bg_focusable"
     android:focusable="true"
     android:focusableInTouchMode="true"
-    android:minHeight="72dp">
+    android:minHeight="84dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingStart="12dp"
-        android:paddingTop="8dp"
-        android:paddingEnd="36dp"
-        android:paddingBottom="8dp">
+        android:paddingStart="14dp"
+        android:paddingTop="12dp"
+        android:paddingEnd="14dp"
+        android:paddingBottom="12dp">
 
         <FrameLayout
             android:id="@+id/logoStack"
-            android:layout_width="44dp"
-            android:layout_height="36dp">
+            android:layout_width="28dp"
+            android:layout_height="28dp">
 
             <ImageView
                 android:id="@+id/preview2"
-                android:layout_width="28dp"
-                android:layout_height="28dp"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
                 android:layout_gravity="end|bottom"
                 android:background="@color/bg_elevated"
                 android:contentDescription="@null"
@@ -36,8 +37,8 @@
 
             <ImageView
                 android:id="@+id/preview1"
-                android:layout_width="28dp"
-                android:layout_height="28dp"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
                 android:layout_gravity="center"
                 android:background="@color/bg_elevated"
                 android:contentDescription="@null"
@@ -46,8 +47,8 @@
 
             <ImageView
                 android:id="@+id/preview0"
-                android:layout_width="28dp"
-                android:layout_height="28dp"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
                 android:layout_gravity="start|top"
                 android:background="@color/bg_elevated"
                 android:contentDescription="@null"
@@ -56,9 +57,9 @@
 
             <ImageView
                 android:id="@+id/icon"
-                android:layout_width="28dp"
-                android:layout_height="28dp"
-                android:layout_gravity="center_vertical|start"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_gravity="center"
                 android:contentDescription="@null"
                 android:tint="@color/accent" />
         </FrameLayout>
@@ -66,7 +67,7 @@
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="10dp"
+            android:layout_marginStart="12dp"
             android:layout_weight="1"
             android:orientation="vertical">
 
@@ -84,8 +85,12 @@
                     android:ellipsize="end"
                     android:maxLines="2"
                     android:textColor="@color/text_primary"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    app:autoSizeMaxTextSize="15sp"
+                    app:autoSizeMinTextSize="11sp"
+                    app:autoSizeStepGranularity="1sp"
+                    app:autoSizeTextType="uniform" />
 
                 <TextView
                     android:id="@+id/liveBadge"
@@ -95,6 +100,7 @@
                     android:background="@drawable/bg_pill"
                     android:paddingHorizontal="6dp"
                     android:paddingVertical="2dp"
+                    android:singleLine="true"
                     android:text="@string/group_live_badge"
                     android:textColor="@color/accent"
                     android:textSize="10sp"
@@ -106,20 +112,24 @@
                 android:id="@+id/detail"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
+                android:layout_marginTop="4dp"
                 android:ellipsize="end"
                 android:maxLines="2"
                 android:textColor="@color/text_secondary"
-                android:textSize="12sp" />
+                android:textSize="12sp"
+                app:autoSizeMaxTextSize="12sp"
+                app:autoSizeMinTextSize="10sp"
+                app:autoSizeStepGranularity="1sp"
+                app:autoSizeTextType="uniform" />
         </LinearLayout>
     </LinearLayout>
 
     <ImageView
         android:id="@+id/lock"
-        android:layout_width="22dp"
-        android:layout_height="22dp"
+        android:layout_width="18dp"
+        android:layout_height="18dp"
         android:layout_gravity="top|end"
-        android:layout_margin="8dp"
+        android:layout_margin="6dp"
         android:contentDescription="@string/group_locked"
         android:src="@drawable/ic_lock"
         android:visibility="gone" />

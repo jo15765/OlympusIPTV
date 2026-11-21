@@ -971,33 +971,11 @@ internal fun BrowseActivity.showLetterJump() {
 
 internal fun BrowseActivity.paintNowPlayingBar() {
         if (!viewReady()) return
+        binding.nowPlayingBar.visibility = View.GONE
         val app = application as OlympusIptvApp
         val channel = app.lastPlayed
         val match = channel != null && app.lastPlayedPlaylistId == playlist?.id
-        if (!match || channel == null) {
-            binding.nowPlayingBar.visibility = View.GONE
-            return
-        }
-        val live = channel.kind == ContentKind.LIVE && channel.seriesId.isNullOrBlank()
-        binding.nowPlayingLabel.text = if (live) {
-            getString(R.string.now_playing_live_badge)
-        } else {
-            getString(R.string.now_playing)
-        }
-        binding.nowPlayingTitle.text = channel.name
-        binding.nowPlayingResume.text = if (live) {
-            getString(R.string.now_playing_fullscreen)
-        } else {
-            getString(R.string.now_playing_resume)
-        }
-        // Phone strip always; TV also shows when corner PiP is active so users can return.
-        val show = if (touchPrimary) {
-            binding.groupColumn.visibility == View.VISIBLE
-        } else {
-            binding.previewCard.visibility == View.VISIBLE || binding.groupColumn.visibility == View.VISIBLE
-        }
-        binding.nowPlayingBar.visibility = if (show) View.VISIBLE else View.GONE
-        channelAdapter.setPlaying(if (match && channel.kind == ContentKind.LIVE) channel.id else null)
+        channelAdapter.setPlaying(if (match && channel?.kind == ContentKind.LIVE) channel.id else null)
     }
 
 internal fun BrowseActivity.resumeNowPlaying() {
@@ -1518,10 +1496,13 @@ internal fun BrowseActivity.refreshGroupCounts() {
         }
         val token = ++groupCountToken
         val app = application as OlympusIptvApp
+        val hiddenChannels = activeConfig.hiddenChannels.orEmpty().toSet()
+        val now = System.currentTimeMillis()
+        val minuteBucket = if (bucket == CatalogDb.LIVE) now / 60_000L else 0L
         lifecycleScope.launch {
             val stamp = withContext(Dispatchers.IO) { app.catalogDb.libraryStamp(saved.id) }
             if (token != groupCountToken || isDestroyed) return@launch
-            val key = saved.id + "\u0000" + bucket + "\u0000" + stamp
+            val key = saved.id + "\u0000" + bucket + "\u0000" + stamp + "\u0000" + minuteBucket + "\u0000" + hiddenChannels.hashCode()
             val cached = groupCountCache[key]
             if (cached != null) {
                 val changed = groupCounts != cached
@@ -1531,7 +1512,13 @@ internal fun BrowseActivity.refreshGroupCounts() {
                 if (hideEmptyGroups) render(restoreFocus = false, reloadChannels = false)
                 return@launch
             }
-            val counts = withContext(Dispatchers.IO) { app.catalogDb.categoryCounts(saved.id, bucket) }
+            val counts = withContext(Dispatchers.IO) {
+                if (bucket == CatalogDb.LIVE) {
+                    app.catalogDb.activeLiveCategoryCounts(saved.id, hiddenChannels, now)
+                } else {
+                    app.catalogDb.categoryCounts(saved.id, bucket)
+                }
+            }
             if (token != groupCountToken || isDestroyed) return@launch
             if (groupCountCache.size > 9) groupCountCache.clear()
             groupCountCache[key] = counts
@@ -1560,7 +1547,8 @@ internal fun BrowseActivity.render(restoreFocus: Boolean = false, reloadChannels
                     base
                 }
                 val spotlight = Category(PlaylistLoader.FOR_YOU_ID, getString(R.string.for_you), kind)
-                listOf(spotlight) + withRecent(listOf(favorites) + withAll)
+                val liveEvents = Category(PlaylistLoader.LIVE_EVENTS_ID, "Live Games Now", kind)
+                listOf(spotlight, liveEvents) + withRecent(listOf(favorites) + withAll)
             }
             GuideSection.MOVIES -> withContinue(
                 listOf(favorites) + withoutEmptyGroups(visibleGroups(data.vodCategories, config))
@@ -1614,6 +1602,15 @@ internal fun BrowseActivity.showChannels() {
                 val channels = withContext(Dispatchers.IO) { forYouChannels(config) }
                 if (!stillShowing(query, sectionNow, categoryId)) return@launch
                 channels.firstOrNull()?.logoUrl?.let { glowFrom(it) }
+                publishChannels(channels, scrollTop = true)
+            }
+            return
+        }
+        if (categoryId == PlaylistLoader.LIVE_EVENTS_ID) {
+            binding.libraryStatus.visibility = View.GONE
+            channelJob = lifecycleScope.launch {
+                val channels = withContext(Dispatchers.IO) { liveEventsHubChannels(config) }
+                if (!stillShowing(query, sectionNow, categoryId)) return@launch
                 publishChannels(channels, scrollTop = true)
             }
             return
@@ -1676,6 +1673,7 @@ internal fun BrowseActivity.showChannelWait(text: String) {
         binding.libraryStatus.visibility = View.VISIBLE
         binding.libraryStatusText.text = text
         binding.errorText.visibility = View.GONE
+        binding.programEmptyText.visibility = View.GONE
     }
 
 internal fun BrowseActivity.publishChannels(channels: List<Channel>, scrollTop: Boolean) {
@@ -1762,6 +1760,7 @@ internal fun BrowseActivity.loadGroupPage(reset: Boolean) {
             // First page paints as soon as DB returns — no blank “updating” flash.
             binding.libraryStatus.visibility = View.GONE
             binding.errorText.visibility = View.GONE
+            binding.programEmptyText.visibility = View.GONE
             if (visibleChannels.isEmpty()) {
                 channelAdapter.submit(emptyList(), groupLabel(selectedCategoryId), sequentialNumbers = false)
                 showChannelSkeleton(true)
@@ -1826,6 +1825,16 @@ internal fun BrowseActivity.loadGroupPage(reset: Boolean) {
                         hiddenCountries,
                         config.includeInternational
                     )
+                }
+            }
+            if (sectionNow == GuideSection.TV && page.channels.isNotEmpty()) {
+                withContext(Dispatchers.IO) {
+                    val db = (application as OlympusIptvApp).catalogDb
+                    for (ch in page.channels) {
+                        if (epgCache.containsKey(ch.id)) continue
+                        val cached = db.readEpg(saved.id, ch.epgChannelId ?: ch.id) ?: continue
+                        epgCache[ch.id] = com.olympus.iptv.playlist.EpgUtils.nowNext(cached.second)
+                    }
                 }
             }
             val named = prepareGroup(page.channels, config)
@@ -1926,10 +1935,13 @@ internal fun BrowseActivity.finishChannelPane(channels: List<Channel>) {
         binding.libraryStatus.visibility = View.GONE
         showChannelSkeleton(false)
         if (channels.isEmpty()) {
-            binding.errorText.visibility = View.VISIBLE
+            if (section == GuideSection.TV && selectedCategoryId != null && selectedCategoryId != PlaylistLoader.FAVORITES_ID) {
+                groupCountCache.clear()
+                refreshGroupCounts()
+            }
             val favoritesEmpty = selectedCategoryId == PlaylistLoader.FAVORITES_ID
             val continueEmpty = selectedCategoryId == PlaylistLoader.CONTINUE_ID
-            binding.errorText.text = when {
+            val message = when {
                 section == GuideSection.MOVIES && !movieError.isNullOrBlank() && source?.vodChannels.isNullOrEmpty() ->
                     getString(R.string.movies_failed, movieError)
                 section == GuideSection.SHOWS && !showError.isNullOrBlank() && source?.seriesChannels.isNullOrEmpty() ->
@@ -1938,9 +1950,28 @@ internal fun BrowseActivity.finishChannelPane(channels: List<Channel>) {
                 continueEmpty -> getString(R.string.empty_continue_cta)
                 else -> getString(R.string.no_channels)
             }
+            val showInProgramPane = section == GuideSection.TV && binding.programPane.visibility == View.VISIBLE
+            if (showInProgramPane) {
+                binding.errorText.visibility = View.GONE
+                binding.programNowLine.visibility = View.INVISIBLE
+                binding.programEmptyText.text = message
+                binding.programEmptyText.visibility = View.VISIBLE
+                val params = binding.contentColumn.layoutParams as LinearLayout.LayoutParams
+                val minCol = (180 * resources.displayMetrics.density).toInt()
+                if (params.width < minCol) {
+                    params.width = minCol
+                    params.weight = 0f
+                    binding.contentColumn.layoutParams = params
+                }
+            } else {
+                binding.programEmptyText.visibility = View.GONE
+                binding.errorText.visibility = View.VISIBLE
+                binding.errorText.text = message
+            }
             val emptyCta = touchPrimary && (favoritesEmpty || continueEmpty)
+            val targetView = if (showInProgramPane) binding.programEmptyText else binding.errorText
             if (emptyCta) {
-                binding.errorText.setOnClickListener {
+                targetView.setOnClickListener {
                     when {
                         favoritesEmpty -> openFavoritesSetup()
                         continueEmpty -> openSection(
@@ -1950,13 +1981,14 @@ internal fun BrowseActivity.finishChannelPane(channels: List<Channel>) {
                     }
                 }
             } else {
-                binding.errorText.setOnClickListener(null)
+                targetView.setOnClickListener(null)
             }
-            binding.errorText.isClickable = emptyCta
-            binding.errorText.isFocusable = false
-            binding.errorText.isFocusableInTouchMode = false
+            targetView.isClickable = emptyCta
+            targetView.isFocusable = false
+            targetView.isFocusableInTouchMode = false
         } else {
             binding.errorText.visibility = View.GONE
+            binding.programEmptyText.visibility = View.GONE
             binding.errorText.setOnClickListener(null)
             binding.errorText.isClickable = false
             binding.errorText.isFocusable = false

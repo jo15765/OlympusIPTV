@@ -202,8 +202,12 @@ class ProgramGuideAdapter(
         if (channel.kind != ContentKind.LIVE || loaded == null || windowEnd <= windowStart) return emptyList()
         val name = channel.name.trim()
         if (name.isEmpty()) return emptyList()
+        val now = System.currentTimeMillis()
+        val maxUpcomingStart = now + 30L * 60L * 1000L
         val clipped = ArrayList<EpgProgram>(loaded.size)
         for (program in loaded) {
+            if (program.endMillis <= now) continue
+            if (program.startMillis > maxUpcomingStart) continue
             val start = program.startMillis.coerceAtLeast(windowStart)
             val end = program.endMillis.coerceAtMost(windowEnd)
             if (end > start) clipped.add(program.copy(startMillis = start, endMillis = end))
@@ -251,6 +255,7 @@ class ProgramGuideAdapter(
     }
 
     private fun isChannelFiller(title: String, channelName: String): Boolean {
+        if (com.olympus.iptv.data.NameStrip.isPlaceholderEvent(title)) return true
         val program = normalize(title)
         if (program.isEmpty() || program in emptyGuide) return true
         val channel = normalize(channelName)
