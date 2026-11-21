@@ -13,12 +13,18 @@ object ChannelFailover {
             .replace(Regex("""\s+"""), " ")
             .trim()
 
-    fun alternate(current: Channel, siblings: List<Channel>): Channel? {
+    fun alternate(
+        current: Channel,
+        siblings: List<Channel>,
+        skip: Set<String> = emptySet()
+    ): Channel? {
         val key = stem(current.name)
         if (key.length >= 3) {
             siblings.firstOrNull { other ->
                 other.id != current.id &&
+                    other.id !in skip &&
                     other.streamUrl.isNotBlank() &&
+                    other.streamUrl != current.streamUrl &&
                     stem(other.name) == key
             }?.let { return it }
         }
@@ -26,7 +32,8 @@ object ChannelFailover {
         val eventKey = SimilarChannels.key(status.airingEvent)
         if (eventKey.length >= 6) {
             return siblings.firstOrNull { other ->
-                if (other.id == current.id || other.streamUrl.isBlank()) return@firstOrNull false
+                if (other.id == current.id || other.id in skip || other.streamUrl.isBlank()) return@firstOrNull false
+                if (other.streamUrl == current.streamUrl) return@firstOrNull false
                 val otherStatus = NameStrip.inspect(other.name, other.groupTitle, other.epgChannelId)
                 SimilarChannels.key(otherStatus.airingEvent) == eventKey
             }

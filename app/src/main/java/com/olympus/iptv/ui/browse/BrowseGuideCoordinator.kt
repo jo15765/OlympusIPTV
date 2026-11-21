@@ -484,6 +484,101 @@ internal suspend fun BrowseActivity.resolveAccount(): SavedPlaylist? {
         return saved
     }
 
+internal fun BrowseActivity.showSavedGroups(
+        categories: List<com.olympus.iptv.data.Category>,
+        counts: Map<String, Int>
+    ) {
+        if (categories.isEmpty() || isDestroyed) return
+        val fetched = LoadedPlaylist(liveCategories = categories, liveChannels = emptyList())
+        source = fetched
+        loaded = fetched
+        if (counts.isNotEmpty()) groupCounts = counts
+        selectedCategoryId = PlaylistLoader.FAVORITES_ID
+        section = GuideSection.TV
+        kind = ContentKind.LIVE
+        showGuide()
+        showLoading(false)
+        binding.tabLive.isSelected = true
+        binding.tabVod.isSelected = false
+        binding.tabShows.isSelected = false
+        if (binding.groupColumn.visibility == View.VISIBLE) render(restoreFocus = landOnGroups)
+    }
+
+internal fun BrowseActivity.rememberGuideGroups(
+        playlistId: String,
+        categories: List<com.olympus.iptv.data.Category>
+    ) {
+        if (playlistId.isBlank() || categories.isEmpty()) return
+        val app = application as OlympusIptvApp
+        app.appScope.launch(Dispatchers.IO) {
+            val text = buildString {
+                append(playlistId)
+                append('\n')
+                for (category in categories.take(400)) {
+                    append(category.id.replace('\t', ' ').replace('\n', ' '))
+                    append('\t')
+                    append(category.name.replace('\t', ' ').replace('\n', ' '))
+                    append('\n')
+                }
+            }
+            runCatching { java.io.File(app.filesDir, "guide-groups.txt").writeText(text) }
+        }
+    }
+
+internal fun BrowseActivity.rememberGuideCounts(playlistId: String, counts: Map<String, Int>) {
+        if (playlistId.isBlank() || counts.isEmpty()) return
+        val app = application as OlympusIptvApp
+        app.appScope.launch(Dispatchers.IO) {
+            val text = buildString {
+                append(playlistId)
+                append('\n')
+                var written = 0
+                for ((id, count) in counts) {
+                    if (written++ == 400) break
+                    append(id.replace('\t', ' ').replace('\n', ' '))
+                    append('\t')
+                    append(count)
+                    append('\n')
+                }
+            }
+            runCatching { java.io.File(app.filesDir, "guide-counts.txt").writeText(text) }
+        }
+    }
+
+internal fun BrowseActivity.readGuideOpen(
+        playlistId: String
+    ): Pair<List<com.olympus.iptv.data.Category>, Map<String, Int>>? {
+        val dir = (application as OlympusIptvApp).filesDir
+        val groups = java.io.File(dir, "guide-groups.txt")
+        if (!groups.exists()) return null
+        val lines = runCatching { groups.readLines() }.getOrNull() ?: return null
+        if (lines.firstOrNull() != playlistId) return null
+        val categories = ArrayList<com.olympus.iptv.data.Category>()
+        for (line in lines.drop(1)) {
+            val tab = line.indexOf('\t')
+            if (tab <= 0) continue
+            categories.add(
+                com.olympus.iptv.data.Category(
+                    id = line.substring(0, tab),
+                    name = line.substring(tab + 1)
+                )
+            )
+        }
+        if (categories.isEmpty()) return null
+        val counts = HashMap<String, Int>()
+        val countFile = java.io.File(dir, "guide-counts.txt")
+        val countLines = runCatching { countFile.readLines() }.getOrNull().orEmpty()
+        if (countLines.firstOrNull() == playlistId) {
+            for (line in countLines.drop(1)) {
+                val tab = line.indexOf('\t')
+                if (tab <= 0) continue
+                val count = line.substring(tab + 1).toIntOrNull() ?: continue
+                counts[line.substring(0, tab)] = count
+            }
+        }
+        return categories to counts
+    }
+
 internal suspend fun BrowseActivity.bootstrap(savedIn: SavedPlaylist) {
         val app = application as OlympusIptvApp
         val store = app.playlistStore
@@ -531,27 +626,30 @@ internal suspend fun BrowseActivity.bootstrap(savedIn: SavedPlaylist) {
                 pendingDeviceId = deviceId
                 panes.deviceOrNull?.deviceIdValue?.text = deviceId
             }
+            val savedGroups = withContext(Dispatchers.IO) { readGuideOpen(saved.id) }
+            if (savedGroups != null && !isDestroyed) {
+                showSavedGroups(savedGroups.first, savedGroups.second)
+            }
             val liveCategories = liveJob.await()
             val catalogJob = app.catalogRefresh
+            val localLineup = lineupJob.await()
+            applyFavorites(favoritesJob.await())
+            activeConfig = localLineup
             if (liveCategories.isNotEmpty()) {
                 moviesPending = true
                 showsPending = true
                 loadingFromDb = true
                 showCatalog(
                     LoadedPlaylist(liveCategories = liveCategories, liveChannels = emptyList()),
-                    LineupConfig(),
+                    localLineup,
                     openGuide = true
                 )
                 showLoading(false)
-                val local = lineupJob.await()
-                applyFavorites(favoritesJob.await())
-                activeConfig = local
-                if (binding.groupColumn.visibility == View.VISIBLE) render(restoreFocus = landOnGroups)
-                loadSavedBuckets(saved.id, db)
+                rememberGuideGroups(saved.id, liveCategories)
                 if (catalogJob?.isActive == true) {
                     launch {
                         catalogJob.join()
-                        if (!isDestroyed) loadSavedBuckets(saved.id, db)
+                        if (!isDestroyed && savedBucketsLoaded) ensureSavedBuckets(true)
                     }
                 }
             } else {
@@ -571,10 +669,10 @@ internal suspend fun BrowseActivity.bootstrap(savedIn: SavedPlaylist) {
                             local,
                             openGuide = true
                         )
-                        loadSavedBuckets(saved.id, db)
+                        rememberGuideGroups(saved.id, categories)
                         launch {
                             catalogJob.join()
-                            if (!isDestroyed) loadSavedBuckets(saved.id, db)
+                            if (!isDestroyed && savedBucketsLoaded) ensureSavedBuckets(true)
                         }
                     } else {
                         moviesPending = true
@@ -594,19 +692,14 @@ internal suspend fun BrowseActivity.bootstrap(savedIn: SavedPlaylist) {
                     loadingFromDb = true
                     showCatalog(
                         LoadedPlaylist(liveCategories = emptyList(), liveChannels = emptyList()),
-                        LineupConfig(),
+                        localLineup,
                         openGuide = true
                     )
                     showLoading(false)
-                    val local = lineupJob.await()
-                    applyFavorites(favoritesJob.await())
-                    activeConfig = local
-                    if (binding.groupColumn.visibility == View.VISIBLE) render(restoreFocus = landOnGroups)
-                    loadSavedBuckets(saved.id, db)
                     if (catalogJob?.isActive == true) {
                         launch {
                             catalogJob.join()
-                            if (!isDestroyed) loadSavedBuckets(saved.id, db)
+                            if (!isDestroyed && savedBucketsLoaded) ensureSavedBuckets(true)
                         }
                     }
                 }
@@ -640,6 +733,7 @@ internal fun BrowseActivity.syncSharedLineup() {
         if (email.isBlank()) return
         val app = application as OlympusIptvApp
         app.appScope.launch {
+            delay(8_000L)
             val client = LineupClient(screen())
             val deviceId: String
             val local: LineupConfig
@@ -1857,16 +1951,25 @@ internal fun BrowseActivity.syncProgramGuide() {
 
 internal fun BrowseActivity.loadVisibleGuidePrograms() {
         if (section != GuideSection.TV || binding.programPane.visibility != View.VISIBLE) return
+        val channels = visibleChannels
+        if (channels.isEmpty()) return
+        val stamp = "${selectedCategoryId}|${channels.size}|${channels.first().id}|${channels.last().id}"
+        val covered = stamp == guideEpgStamp &&
+            (guideJob?.isActive == true || channels.none {
+                it.kind == ContentKind.LIVE && programAdapter.programsFor(it.id) == null
+            })
+        if (covered) return
+        guideEpgStamp = stamp
         val layout = binding.programList.layoutManager as? LinearLayoutManager
-            ?: binding.channelList.layoutManager as? LinearLayoutManager
-            ?: return
-        val first = layout.findFirstVisibleItemPosition().coerceAtLeast(0)
-        val lastVisible = layout.findLastVisibleItemPosition()
-        val last = if (lastVisible < first + 12) first + 23 else lastVisible
-        val from = (first - 4).coerceAtLeast(0)
-        val to = (last + 12).coerceAtMost(visibleChannels.lastIndex)
-        if (to < from) return
-        loadGuidePrograms(visibleChannels.subList(from, to + 1))
+        val first = layout?.findFirstVisibleItemPosition()?.coerceAtLeast(0) ?: 0
+        val ordered = ArrayList<Channel>(channels.size)
+        if (first in channels.indices) {
+            ordered.addAll(channels.subList(first, channels.size))
+            if (first > 0) ordered.addAll(channels.subList(0, first))
+        } else {
+            ordered.addAll(channels)
+        }
+        loadGuidePrograms(ordered)
     }
 
 internal fun BrowseActivity.nameOnlyGuideGroup(): Boolean {
@@ -1876,24 +1979,12 @@ internal fun BrowseActivity.nameOnlyGuideGroup(): Boolean {
     }
 
 internal fun BrowseActivity.loadGuidePrograms(channels: List<Channel>) {
+        guideEpgBusy.clear()
         val missing = channels.filter { channel ->
-            channel.kind == ContentKind.LIVE &&
-                programAdapter.programsFor(channel.id) == null &&
-                guideEpgBusy.add(channel.id)
+            channel.kind == ContentKind.LIVE && programAdapter.programsFor(channel.id) == null
         }
+        missing.forEach { guideEpgBusy.add(it.id) }
         if (missing.isEmpty()) {
-            binding.programList.post {
-                lastLabelShiftScroll = programAdapter.scrollX
-                applyGuideRowHeight(programAdapter.refreshLabelShift(binding.programList))
-            }
-            return
-        }
-        // Mega Live folders (24/7, etc.): hour blocks of the channel name — skip provider EPG.
-        if (nameOnlyGuideGroup()) {
-            for (channel in missing) {
-                programAdapter.put(channel.id, emptyList())
-                guideEpgBusy.remove(channel.id)
-            }
             binding.programList.post {
                 lastLabelShiftScroll = programAdapter.scrollX
                 applyGuideRowHeight(programAdapter.refreshLabelShift(binding.programList))
@@ -1902,14 +1993,42 @@ internal fun BrowseActivity.loadGuidePrograms(channels: List<Channel>) {
         }
         val saved = playlist ?: run {
             missing.forEach { guideEpgBusy.remove(it.id) }
+            guideEpgStamp = ""
             return
         }
+        val generation = guideEpgStamp
+        guideJob?.cancel()
         guideJob = lifecycleScope.launch {
             try {
-                fetchGuidePrograms(saved, missing.take(12), 6)
-                fetchGuidePrograms(saved, missing.drop(12), 4)
+                val ids = ArrayList<String>(missing.size * 2)
+                for (channel in missing) {
+                    ids.add(channel.id)
+                    val epgId = channel.epgChannelId
+                    if (!epgId.isNullOrBlank() && epgId != channel.id) ids.add(epgId)
+                }
+                val cached = withContext(Dispatchers.IO) {
+                    (application as OlympusIptvApp).catalogDb.readEpgForChannels(saved.id, ids)
+                }
+                if (generation != guideEpgStamp || isDestroyed) return@launch
+                val now = com.olympus.iptv.playlist.EpgUtils.now()
+                val still = ArrayList<Channel>()
+                for (channel in missing) {
+                    val list = cached[channel.epgChannelId ?: channel.id] ?: cached[channel.id]
+                    if (list == null) {
+                        still.add(channel)
+                        continue
+                    }
+                    val upcoming = list.filter { it.endMillis > now }.sortedBy { it.startMillis }.take(96)
+                    epgCache[channel.id] = com.olympus.iptv.playlist.EpgUtils.nowNext(upcoming)
+                    programAdapter.put(channel.id, upcoming)
+                    guideEpgBusy.remove(channel.id)
+                }
+                fetchGuidePrograms(saved, still.take(24), 8)
+                if (generation == guideEpgStamp && !isDestroyed) {
+                    fetchGuidePrograms(saved, still.drop(24), 6)
+                }
             } finally {
-                missing.forEach { guideEpgBusy.remove(it.id) }
+                if (generation == guideEpgStamp) missing.forEach { guideEpgBusy.remove(it.id) }
             }
             if (isDestroyed) return@launch
             binding.programList.post {

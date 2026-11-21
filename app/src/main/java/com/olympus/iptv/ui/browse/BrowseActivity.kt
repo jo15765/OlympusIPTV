@@ -625,6 +625,8 @@ class BrowseActivity : AppCompatActivity(), ToolHost {
     internal lateinit var programAdapter: ProgramGuideAdapter
 
     internal var guideJob: Job? = null
+    internal var guideEpgStamp: String = ""
+    internal var savedBucketsLoaded = false
     internal val guideEpgBusy = HashSet<String>()
     internal val unhealthyIds = HashSet<String>()
 

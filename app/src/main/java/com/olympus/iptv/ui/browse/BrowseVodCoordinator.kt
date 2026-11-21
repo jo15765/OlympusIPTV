@@ -144,6 +144,13 @@ internal fun BrowseActivity.updateGroupClock(force: Boolean = false) {
         binding.groupClock.visibility = View.VISIBLE
     }
 
+internal fun BrowseActivity.ensureSavedBuckets(force: Boolean) {
+        if (savedBucketsLoaded && !force) return
+        val id = playlist?.id ?: return
+        savedBucketsLoaded = true
+        loadSavedBuckets(id, (application as OlympusIptvApp).catalogDb)
+    }
+
 internal fun BrowseActivity.loadSavedBuckets(playlistId: String, db: CatalogDb) {
         lifecycleScope.launch {
             coroutineScope {
@@ -783,7 +790,10 @@ internal fun BrowseActivity.showCatalog(fetched: LoadedPlaylist, config: LineupC
         }
         com.olympus.iptv.portal.DashboardHost.clearGuideCache()
         publishGuide()
-        app.appScope.launch(Dispatchers.IO) { app.catalogDb.maintainAfterRefresh() }
+        app.appScope.launch(Dispatchers.IO) {
+            delay(20_000L)
+            app.catalogDb.maintainAfterRefresh()
+        }
         if (epgRepo.useNameEpg(config.nameEpg == true)) epgCache.clear()
         val savedId = playlist?.id
         if (!savedId.isNullOrBlank()) {
@@ -799,7 +809,7 @@ internal fun BrowseActivity.showCatalog(fetched: LoadedPlaylist, config: LineupC
                         runCatching { appJobs.catalogDb.cleanGroupImages(savedId) }
                     }
                 } else {
-                    val warmDelay = 2_000L
+                    val warmDelay = 12_000L
                     appJobs.appScope.launch {
                         delay(warmDelay)
                         if (isDestroyed) return@launch
@@ -1564,6 +1574,7 @@ internal fun BrowseActivity.refreshGroupCounts() {
             val changed = groupCounts != counts
             if (!changed) return@launch
             groupCounts = counts
+            if (bucket == CatalogDb.LIVE) rememberGuideCounts(saved.id, counts)
             categoryAdapter.refreshDetails()
             if (hideEmptyGroups) render(restoreFocus = false, reloadChannels = false)
         }

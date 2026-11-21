@@ -294,7 +294,7 @@ class ProgramGuideAdapter(
             if (trackParams == null || trackParams.width != width) {
                 track.layoutParams = FrameLayout.LayoutParams(width, ViewGroup.LayoutParams.MATCH_PARENT)
             }
-            val loaded = programs[channel.id]
+            val loaded = programs[channel.id] ?: emptyList()
             val blocks = cachedBlocks(channel, loaded)
             val needed = if (blocks.isEmpty()) 1 else blocks.size
             while (track.childCount > needed) {
@@ -310,9 +310,7 @@ class ProgramGuideAdapter(
                     view = track.getChildAt(0) as TextView,
                     channel = channel,
                     program = null,
-                    title = itemView.context.getString(
-                        if (loaded == null) R.string.epg_loading else R.string.epg_none
-                    ),
+                    title = itemView.context.getString(R.string.epg_none),
                     time = null,
                     left = 0,
                     width = width,

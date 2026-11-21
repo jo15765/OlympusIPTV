@@ -6,7 +6,7 @@
 
 ### For the latest and greatest, build your own APK from this code.
 
-The latest signed file is **0.2.92** (versionCode 93): `C:\Users\chalu\Downloads\olympus-iptv-0.2.92.apk`. **One APK** installs on Android TV / set-top boxes and on phones and tablets. Install it over 0.2.91. The signing key is the same, so the saved account and playlist stay.
+The latest signed file is **0.2.99** (versionCode 99): `C:\Users\chalu\Downloads\olympus-iptv-0.2.99.apk`. **One APK** installs on Android TV / set-top boxes and on phones and tablets. Install it over 0.2.98. The signing key is the same, so the saved account and playlist stay.
 
 **This is a player only. You must provide your own streams.**
 
@@ -54,14 +54,14 @@ Olympus-IPTV is one APK for Android TV / set-top boxes and for phones and tablet
 
 | | |
 | --- | --- |
-| Signed file | `C:\Users\chalu\Downloads\olympus-iptv-0.2.92.apk` |
-| What that file is | versionName **0.2.92**, versionCode **93** |
-| Source in this tree | versionName **0.2.92**, versionCode **93** |
-| What to run | Install the signed 0.2.92 APK, or run this source from Android Studio |
+| Signed file | `C:\Users\chalu\Downloads\olympus-iptv-0.2.99.apk` |
+| What that file is | versionName **0.2.99**, versionCode **99** |
+| Source in this tree | versionName **0.2.99**, versionCode **99** |
+| What to run | Install the signed 0.2.99 APK, or run this source from Android Studio |
 | Install | Over the existing copy (TV or phone). Uninstalling wipes the saved account, playlist, and favorites. Downloader works with the same file. |
 | Launcher name | Two centered lines: Olympus over IPTV |
 
-**0.2.92** is the current signed release. The release copy in Downloads is the signed APK only. Movies and shows open the title page under [What's in 0.2.92](#whats-in-0292). It also restores cloud lineup push, the remote lineup revision, and recording sync, and keeps the live-games list, off-air hiding, and the shorter guide under [What's in 0.2.86](#whats-in-0286). Live Games Now skips 24/7 replay channels. Group counts use the stored event window and still leave out hidden channels. Two wrong parental PINs can email through Mailgun when that is configured. Sticks with a small heap still use the 16 MB image cache, RGB_565 posters, and a 10 second buffer. Larger boxes pre-warm only the next channel.
+**0.2.99** is the current signed release. A frozen or stuttering live channel reloads itself, then switches to another feed of that same channel. The guide still paints the last group list immediately. Movies, shows, cloud sync, ratings, and the dashboard snapshot wait until that grid is up. The release copy in Downloads is the signed APK only. Movies and shows open the title page under [What's in 0.2.92](#whats-in-0292). It also restores cloud lineup push, the remote lineup revision, and recording sync, and keeps the live-games list, off-air hiding, and the shorter guide under [What's in 0.2.86](#whats-in-0286). Live Games Now skips 24/7 replay channels. Group counts use the stored event window and still leave out hidden channels. Two wrong parental PINs can email through Mailgun when that is configured. Sticks with a small heap still use the 16 MB image cache, RGB_565 posters, and a 10 second buffer. Larger boxes pre-warm only the next channel.
 
 ---
 
@@ -442,7 +442,7 @@ The debug APK is `app/build/outputs/apk/debug/app-debug.apk`. Optional keys go i
 | `opensubtitles.apiKey` | OpenSubtitles under player Subtitles |
 | `mailgun.apiKey` + `mailgun.domain` + `mailgun.fromEmail` | Email after two wrong parental PINs |
 
-Release builds use R8, resource shrinking, and optimized resource shrinking. They keep `armeabi-v7a` and `arm64-v8a` only, and English resources only. A baseline profile covers the guide and the player. Gradle is set to work offline. The latest signed release is `C:\Users\chalu\Downloads\olympus-iptv-0.2.92.apk`.
+Release builds use R8, resource shrinking, and optimized resource shrinking. They keep `armeabi-v7a` and `arm64-v8a` only, and English resources only. A baseline profile covers the guide and the player. Gradle is set to work offline. The latest signed release is `C:\Users\chalu\Downloads\olympus-iptv-0.2.99.apk`.
 
 Libraries: Kotlin, AndroidX, ViewBinding, Media3 ExoPlayer (HLS and DASH), OkHttp, Gson, DataStore, Coil, profileinstaller, Google Cast / MediaRouter, and SMBJ. WorkManager is not a dependency. The dashboard is a page in the APK.
 
@@ -513,7 +513,7 @@ clearcast-tuner/
 
 - This is a player only. You must provide your own streams.
 - It is a beta.
-- **0.2.92** is the latest signed file (`olympus-iptv-0.2.92.apk`, versionCode 93). Install it over 0.2.91.
+- **0.2.99** is the latest signed file (`olympus-iptv-0.2.99.apk`, versionCode 99). Install it over 0.2.98.
 - `portal/data/store.json` is for the Node portal on a PC. It is not packaged in the APK.
 - Chromecast often cannot play provider IPTV/HLS. The Cast button warns before connecting.
 - Ratings, trailers, and New this week need the matching keys in `local.properties` at build time.

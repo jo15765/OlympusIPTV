@@ -35,6 +35,61 @@
             android:src="@drawable/ic_play_triangle"
             app:tint="@color/text_primary" />
 
+        <!-- Focus/Hover Emby Overlay: bottom-right quick action buttons -->
+        <FrameLayout
+            android:id="@+id/epHoverOverlay"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#550E1116"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom|end"
+                android:layout_margin="6dp"
+                android:orientation="horizontal">
+
+                <ImageButton
+                    android:id="@+id/btnEpWatched"
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:background="@drawable/bg_circle_action"
+                    android:contentDescription="Mark watched"
+                    android:focusable="false"
+                    android:padding="6dp"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/ic_check"
+                    app:tint="@color/text_primary" />
+
+                <ImageButton
+                    android:id="@+id/btnEpFavorite"
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:layout_marginStart="4dp"
+                    android:background="@drawable/bg_circle_action"
+                    android:contentDescription="@string/favorites"
+                    android:focusable="false"
+                    android:padding="6dp"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/ic_heart_outline"
+                    app:tint="@color/text_primary" />
+
+                <ImageButton
+                    android:id="@+id/btnEpMore"
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:layout_marginStart="4dp"
+                    android:background="@drawable/bg_circle_action"
+                    android:contentDescription="More options"
+                    android:focusable="false"
+                    android:padding="6dp"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/ic_more_dots"
+                    app:tint="@color/text_primary" />
+            </LinearLayout>
+        </FrameLayout>
+
         <ImageView
             android:id="@+id/epWatchedBadge"
             android:layout_width="26dp"

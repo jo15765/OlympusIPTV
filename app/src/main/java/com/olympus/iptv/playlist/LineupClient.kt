@@ -10,8 +10,8 @@ import com.olympus.iptv.data.LineupConfig
 import com.olympus.iptv.data.RecordingBook
 import com.olympus.iptv.data.WatchEntry
 import com.olympus.iptv.portal.DashboardHost
-import com.olympus.iptv.remind.ShowReminder
 import java.io.BufferedReader
+import java.io.File
 import java.io.IOException
 import java.io.InputStreamReader
 import java.net.URLEncoder
@@ -22,9 +22,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import java.io.File
 import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.asRequestBody
@@ -129,6 +127,28 @@ class LineupClient(
         }
     }
 
+    fun remoteLineup(email: String, deviceId: String): LineupConfig? {
+        val token = ensureDeviceToken(email, deviceId)
+        val url = "${baseUrl()}/api/lineup?email=${enc(email)}&deviceId=${enc(deviceId)}"
+        return getJson(url, token, deviceId)?.getAsJsonObject("lineup")?.let {
+            gson.fromJson(it, LineupConfig::class.java)
+        }
+    }
+
+    fun push(email: String, deviceId: String, local: LineupConfig, baseRevision: Long = 0L): LineupConfig {
+        val token = ensureDeviceToken(email, deviceId)
+        val payload = JsonObject().apply {
+            addProperty("email", email)
+            addProperty("deviceId", deviceId)
+            add("lineup", gson.toJsonTree(local))
+            if (baseRevision > 0L) addProperty("baseRevision", baseRevision)
+        }
+        val pushed = postJson("${baseUrl()}/api/lineup", payload, token, deviceId)?.getAsJsonObject("lineup")?.let {
+            gson.fromJson(it, LineupConfig::class.java)
+        }
+        return pushed ?: local
+    }
+
     fun reconcile(email: String, deviceId: String, local: LineupConfig): LineupConfig {
         val token = ensureDeviceToken(email, deviceId)
         val url = "${baseUrl()}/api/lineup?email=${enc(email)}&deviceId=${enc(deviceId)}"
@@ -217,32 +237,22 @@ class LineupClient(
         return out
     }
 
-    fun remoteLineup(email: String, deviceId: String): LineupConfig? {
+    fun uploadRecording(email: String, deviceId: String, recordingId: String, file: File): Boolean {
+        if (!file.isFile) return false
         val token = ensureDeviceToken(email, deviceId)
-        val url = "${baseUrl()}/api/lineup?email=${enc(email)}&deviceId=${enc(deviceId)}"
-        val obj = getJson(url, token, deviceId)?.getAsJsonObject("lineup") ?: return null
-        return runCatching { gson.fromJson(obj, LineupConfig::class.java) }.getOrNull()
+        val url = "${baseUrl()}/api/recordings/file?email=${enc(email)}&deviceId=${enc(deviceId)}&id=${enc(recordingId)}"
+        val builder = Request.Builder()
+            .url(url)
+            .header("X-Device-Id", deviceId)
+            .put(file.asRequestBody("video/mp2t".toMediaType()))
+        if (!token.isNullOrBlank()) builder.header("X-Device-Token", token)
+        return runCatching {
+            http.newCall(builder.build()).execute().use { it.isSuccessful }
+        }.getOrDefault(false)
     }
 
-    fun push(
-        email: String,
-        deviceId: String,
-        local: LineupConfig,
-        baseRevision: Long = local.revision ?: 0L
-    ): LineupConfig {
-        val token = ensureDeviceToken(email, deviceId)
-        val payload = JsonObject().apply {
-            addProperty("email", email)
-            addProperty("deviceId", deviceId)
-            addProperty("baseRevision", baseRevision)
-            add("lineup", gson.toJsonTree(local))
-        }
-        return runCatching {
-            postJson("${baseUrl()}/api/lineup", payload, token, deviceId)
-                ?.getAsJsonObject("lineup")
-                ?.let { gson.fromJson(it, LineupConfig::class.java) }
-        }.getOrNull() ?: local
-    }
+    fun pushRecordings(email: String, deviceId: String, book: RecordingBook): RecordingBook =
+        syncRecordings(email, deviceId, book)
 
     fun syncRecordings(email: String, deviceId: String, local: RecordingBook): RecordingBook {
         val token = ensureDeviceToken(email, deviceId)
@@ -267,39 +277,23 @@ class LineupClient(
         }.getOrNull() ?: local
     }
 
-    fun pushRecordings(email: String, deviceId: String, local: RecordingBook): RecordingBook =
-        syncRecordings(email, deviceId, local)
+    data class RemoteReminder(
+        val id: String = "",
+        val channelId: String = "",
+        val channelNumber: Int = 0,
+        val channelName: String = "",
+        val title: String = "",
+        val startMillis: Long = 0L,
+        val leadMinutes: Int = 15
+    )
 
-    fun uploadRecording(email: String, deviceId: String, id: String, file: File): Boolean {
-        if (!file.exists() || file.length() <= 0L) return false
-        val token = ensureDeviceToken(email, deviceId)
-        val body = MultipartBody.Builder()
-            .setType(MultipartBody.FORM)
-            .addFormDataPart("email", email)
-            .addFormDataPart("deviceId", deviceId)
-            .addFormDataPart("id", id)
-            .addFormDataPart("file", file.name, file.asRequestBody("application/octet-stream".toMediaType()))
-            .build()
-        return runCatching {
-            val request = Request.Builder()
-                .url("${baseUrl()}/api/recordings/file")
-                .post(body)
-                .apply {
-                    if (!token.isNullOrBlank()) header("X-Device-Token", token)
-                    if (deviceId.isNotBlank()) header("X-Device-Id", deviceId)
-                }
-                .build()
-            http.newCall(request).execute().use { it.isSuccessful }
-        }.getOrDefault(false)
-    }
-
-    fun fetchRemoteReminders(email: String, deviceId: String): List<ShowReminder> {
+    fun fetchRemoteReminders(email: String, deviceId: String): List<RemoteReminder> {
         val token = ensureDeviceToken(email, deviceId)
         val url = "${baseUrl()}/api/reminders?email=${enc(email)}&deviceId=${enc(deviceId)}"
         val arr = getJson(url, token, deviceId)?.getAsJsonArray("reminders") ?: return emptyList()
-        val out = ArrayList<ShowReminder>(arr.size())
+        val out = ArrayList<RemoteReminder>(arr.size())
         for (el in arr) {
-            runCatching { out.add(gson.fromJson(el, ShowReminder::class.java)) }
+            runCatching { out.add(gson.fromJson(el, RemoteReminder::class.java)) }
         }
         return out
     }

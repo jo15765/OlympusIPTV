@@ -71,6 +71,7 @@ import com.olympus.iptv.playlist.Scrobbler
 import com.olympus.iptv.playlist.Subtitles
 import com.olympus.iptv.playlist.TitleRatings
 import com.olympus.iptv.playlist.LineupApplier
+import java.util.ArrayDeque
 import java.util.Locale
 import com.olympus.iptv.playlist.EpgUtils
 import com.olympus.iptv.vpn.AppTunnel
@@ -134,6 +135,17 @@ class PlayerActivity : AppCompatActivity() {
     internal var playbackReady = false
     private var playbackToken = 0
     private var recoverAttempt = 0
+    private var stallJob: Job? = null
+    private var stallMarkPosition = Long.MIN_VALUE
+    private var stallMarkAt = 0L
+    private var stallHealthySince = 0L
+    private var stallStrikes = 0
+    private var stallBusyUntil = 0L
+    private var stallFamily: String? = null
+    private val stallTried = LinkedHashSet<String>()
+    private val rebufferAt = ArrayDeque<Long>()
+    private var lastVideoFrameAt = 0L
+    private var watchingCatchup = false
     private var hadPlaybackReady = false
     private var bufferStartedAt = 0L
     private var bufferWatchToken = 0
@@ -735,13 +747,19 @@ class PlayerActivity : AppCompatActivity() {
         countdownJob?.cancel()
         introJob?.cancel()
         recoverJob?.cancel()
+        stallJob?.cancel()
         countdownFor = null
         upNextToken += 1
     }
 
     internal fun channelScope() = lifecycleScope + channelJob
 
-    internal fun playCurrent(seedMeta: String? = null, seedNext: String? = null, startAt: Long? = null) {
+    internal fun playCurrent(
+        seedMeta: String? = null,
+        seedNext: String? = null,
+        startAt: Long? = null,
+        failover: Boolean = false
+    ) {
         val seed = current ?: queue.getOrNull(index)
         if (seed == null) {
             finish()
@@ -759,6 +777,18 @@ class PlayerActivity : AppCompatActivity() {
         closeSubtitlePanel()
         playbackToken += 1
         recoverAttempt = 0
+        if (!failover) {
+            stallTried.clear()
+            stallFamily = null
+        }
+        stallStrikes = 0
+        stallMarkPosition = Long.MIN_VALUE
+        stallMarkAt = 0L
+        stallHealthySince = 0L
+        rebufferAt.clear()
+        lastVideoFrameAt = 0L
+        watchingCatchup = false
+        stallBusyUntil = SystemClock.elapsedRealtime() + 6_000L
         clearSpare(1)
         clearSpare(-1)
         playJob = lifecycleScope.launch {
@@ -814,7 +844,7 @@ class PlayerActivity : AppCompatActivity() {
             binding.btnGoLive.visibility = View.GONE
             subtitleAppliedFor = null
             binding.channelName.text = alias
-            binding.channelMeta.text = aliasCaption(seedMeta, loaded.name, alias).ifBlank { "Loading EPG…" }
+            binding.channelMeta.text = aliasCaption(seedMeta, loaded.name, alias)
             binding.channelNext.text = aliasCaption(seedNext, loaded.name, alias)
             binding.overlayLogo.load(channel.logoUrl) {
                 channelLogo((64 * resources.displayMetrics.density).toInt().coerceAtLeast(1))
@@ -873,6 +903,10 @@ class PlayerActivity : AppCompatActivity() {
             configureSeekPane(channel)
             syncMultiView(channel)
             watchPlayback(channel)
+            val family = com.olympus.iptv.playlist.ChannelFailover.stem(channel.name).ifBlank { channel.id }
+            stallFamily = family
+            if (failover) stallTried.add(channel.id)
+            if (channel.kind == ContentKind.LIVE && channel.seriesId.isNullOrBlank()) armStallWatch()
             binding.channelName.text = lineupName(loaded, seed)
             preloadAround(channel.id)
             } finally {
@@ -1005,6 +1039,7 @@ class PlayerActivity : AppCompatActivity() {
 
             override fun onRenderedFirstFrame() {
                 if (player !== exo) return
+                lastVideoFrameAt = SystemClock.elapsedRealtime()
                 onBufferingEnded()
             }
 
@@ -1052,6 +1087,16 @@ class PlayerActivity : AppCompatActivity() {
             }
         }
         val analytics = object : AnalyticsListener {
+            override fun onVideoFrameProcessingOffset(
+                eventTime: AnalyticsListener.EventTime,
+                totalProcessingOffsetUs: Long,
+                frameCount: Int
+            ) {
+                if (player === exo && frameCount > 0) {
+                    lastVideoFrameAt = SystemClock.elapsedRealtime()
+                }
+            }
+
             override fun onLoadError(
                 eventTime: AnalyticsListener.EventTime,
                 loadEventInfo: LoadEventInfo,
@@ -1084,6 +1129,17 @@ class PlayerActivity : AppCompatActivity() {
         val token = ++bufferWatchToken
         val started = bufferStartedAt
         val live = current?.kind == ContentKind.LIVE && current?.seriesId.isNullOrBlank()
+        if (live && hadPlaybackReady && SystemClock.elapsedRealtime() >= stallBusyUntil) {
+            val now = SystemClock.elapsedRealtime()
+            rebufferAt.addLast(now)
+            while (rebufferAt.isNotEmpty() && now - rebufferAt.first() > 20_000L) rebufferAt.removeFirst()
+            if (rebufferAt.size >= 3) {
+                rebufferAt.clear()
+                val active = player
+                val channel = current
+                if (active != null && channel != null) recoverFrozenLive(active, channel)
+            }
+        }
         // After first paint, live rebuffers constantly — do not cover a working picture.
         // Initial connect also waits briefly so READY/first-frame can clear without a flash.
         val pictureUp = hadPlaybackReady && live && player?.videoFormat != null
@@ -1119,23 +1175,15 @@ class PlayerActivity : AppCompatActivity() {
             if (active.playbackState != Player.STATE_BUFFERING || active.isPlaying) return@postDelayed
             paintConnectingBadge(SystemClock.elapsedRealtime() - started)
         }, 2_000L)
-        if (live) {
-            hideHandler.postDelayed({
-                if (isDestroyed || token != bufferWatchToken) return@postDelayed
-                val active = player ?: return@postDelayed
-                if (active.playbackState != Player.STATE_BUFFERING || active.isPlaying) return@postDelayed
-                if (recoverAttempt == 0) {
-                    recoverAttempt = 1
-                    switchToBackup()
-                }
-            }, 6_500L)
-        }
         hideHandler.postDelayed({
             if (isDestroyed || token != bufferWatchToken) return@postDelayed
             val active = player ?: return@postDelayed
             if (active.playbackState != Player.STATE_BUFFERING || active.isPlaying) return@postDelayed
-            if (live && active.videoFormat != null) return@postDelayed
             val channel = current ?: return@postDelayed
+            if (live && active.videoFormat != null) {
+                recoverFrozenLive(active, channel)
+                return@postDelayed
+            }
             if (recoverAttempt >= 2 && videoDecoder != PlayerDecoder.SOFTWARE) {
                 videoDecoder = PlayerDecoder.SOFTWARE
                 decoderDirty = true
@@ -1332,25 +1380,147 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
-    private fun switchToBackup() {
-        val channel = current ?: return
-        val savedId = playlistId ?: return
+    private fun armStallWatch() {
+        stallJob?.cancel()
+        stallMarkPosition = Long.MIN_VALUE
+        stallMarkAt = 0L
+        stallHealthySince = 0L
+        val watchedId = current?.id
+        stallJob = lifecycleScope.launch {
+            while (isActive) {
+                delay(1_000L)
+                val exo = player ?: continue
+                val channel = current ?: continue
+                if (channel.id != watchedId) return@launch
+                if (!isLiveNow(channel) || !exo.playWhenReady || playbackErrorOpen()) {
+                    stallMarkPosition = Long.MIN_VALUE
+                    stallMarkAt = 0L
+                    stallHealthySince = 0L
+                    continue
+                }
+                val now = SystemClock.elapsedRealtime()
+                if (now < stallBusyUntil) {
+                    stallMarkPosition = exo.currentPosition
+                    stallMarkAt = now
+                    continue
+                }
+                val pos = exo.currentPosition
+                val advanced = stallMarkPosition != Long.MIN_VALUE && pos >= stallMarkPosition + 400L
+                val framesMoving = lastVideoFrameAt > 0L && now - lastVideoFrameAt < 1_500L
+                val healthy = exo.playbackState == Player.STATE_READY && exo.isPlaying && (advanced || framesMoving)
+                if (healthy) {
+                    if (stallHealthySince == 0L) stallHealthySince = now
+                    stallMarkPosition = pos
+                    stallMarkAt = now
+                    if (now - stallHealthySince >= 15_000L) stallStrikes = 0
+                    continue
+                }
+                stallHealthySince = 0L
+                val frameFrozen = hadPlaybackReady &&
+                    !radioOn &&
+                    !watchingCatchup &&
+                    exo.videoFormat != null &&
+                    lastVideoFrameAt > 0L &&
+                    now - lastVideoFrameAt >= LIVE_STALL_MS
+                if (stallMarkAt == 0L || advanced) {
+                    stallMarkPosition = pos
+                    stallMarkAt = now
+                    if (!frameFrozen) continue
+                }
+                val stuckMs = now - stallMarkAt
+                val frozen = frameFrozen ||
+                    exo.playbackState == Player.STATE_BUFFERING ||
+                    exo.playbackState == Player.STATE_IDLE ||
+                    exo.playbackState == Player.STATE_ENDED ||
+                    (exo.playbackState == Player.STATE_READY && !exo.isPlaying)
+                val limit = if (hadPlaybackReady) LIVE_STALL_MS else 8_000L
+                if (frozen && (frameFrozen || stuckMs >= limit)) recoverFrozenLive(exo, channel)
+            }
+        }
+    }
+
+    private fun recoverFrozenLive(exo: ExoPlayer, channel: Channel) {
+        val now = SystemClock.elapsedRealtime()
+        if (now < stallBusyUntil || player !== exo || current?.id != channel.id || isDestroyed) return
+        if (!exo.playWhenReady || !isLiveNow(channel)) return
+        stallBusyUntil = now + 8_000L
+        stallStrikes += 1
+        stallMarkAt = now
+        stallMarkPosition = exo.currentPosition
+        stallTried.add(channel.id)
+        PlaybackTrace.recover(channel, stallStrikes, behindLive = true)
+        if (::binding.isInitialized) {
+            binding.channelMeta.text = getString(R.string.playback_reconnecting)
+            binding.connectingBadge.setText(R.string.playback_reconnecting_pill)
+            binding.connectingBadge.visibility = View.VISIBLE
+        }
+        if (!watchingCatchup && stallStrikes >= 2) {
+            switchToBackup(stallTried) { switched ->
+                if (!switched && !isDestroyed && player === exo && current?.id == channel.id) {
+                    reloadLiveEdge(exo, channel)
+                }
+            }
+            return
+        }
+        reloadLiveEdge(exo, channel)
+    }
+
+    private fun reloadLiveEdge(exo: ExoPlayer, channel: Channel) {
+        if (player !== exo || isDestroyed) return
+        runCatching {
+            val item = exo.currentMediaItem ?: mediaItem(channel)
+            exo.stop()
+            exo.setMediaItem(item)
+            if (!watchingCatchup) exo.seekToDefaultPosition()
+            exo.prepare()
+            exo.playWhenReady = true
+        }.onFailure { error ->
+            PlaybackTrace.loadFailed(channel, null, error.message)
+        }
+    }
+
+    private fun switchToBackup(skip: Set<String> = emptySet(), onResult: ((Boolean) -> Unit)? = null) {
+        val channel = current ?: run {
+            onResult?.invoke(false)
+            return
+        }
+        val savedId = playlistId ?: run {
+            onResult?.invoke(false)
+            return
+        }
         lifecycleScope.launch(Dispatchers.IO) {
             val db = (application as OlympusIptvApp).catalogDb
-            val group = channel.groupTitle ?: channel.categoryId ?: return@launch
-            val siblings = db.readCategoryChannels(savedId, CatalogDb.LIVE, group)
-            val backup = com.olympus.iptv.playlist.ChannelFailover.alternate(channel, siblings) ?: return@launch
+            val group = channel.groupTitle ?: channel.categoryId
+            val siblings = if (group.isNullOrBlank()) {
+                emptyList()
+            } else {
+                db.readCategoryChannels(savedId, CatalogDb.LIVE, group)
+            }
+            var backup = com.olympus.iptv.playlist.ChannelFailover.alternate(channel, siblings, skip)
+            if (backup == null && skip.size > 1) {
+                backup = com.olympus.iptv.playlist.ChannelFailover.alternate(channel, siblings, setOf(channel.id))
+            }
+            if (backup == null) {
+                withContext(Dispatchers.Main) { onResult?.invoke(false) }
+                return@launch
+            }
             withContext(Dispatchers.Main) {
-                if (isDestroyed || current?.id != channel.id) return@withContext
+                if (isDestroyed || current?.id != channel.id) {
+                    onResult?.invoke(false)
+                    return@withContext
+                }
                 val found = queue.indexOfFirst { it.id == backup.id }
                 if (found >= 0) index = found
+                stallTried.add(channel.id)
+                stallTried.add(backup.id)
                 current = backup
-                playCurrent()
+                playCurrent(failover = true)
                 Toast.makeText(
                     this@PlayerActivity,
                     getString(R.string.failover_switched, backup.name),
                     Toast.LENGTH_SHORT
                 ).show()
+                onResult?.invoke(true)
             }
         }
     }
@@ -2050,6 +2220,7 @@ class PlayerActivity : AppCompatActivity() {
     private fun goLive() {
         val exo = player ?: return
         if (!isLiveNow()) return
+        watchingCatchup = false
         exo.seekToDefaultPosition()
         exo.playWhenReady = true
         paintGoLive()
@@ -2101,6 +2272,7 @@ class PlayerActivity : AppCompatActivity() {
         binding.catchupStart.visibility = View.GONE
         binding.connectingBadge.setText(R.string.playback_catchup_rewind)
         binding.connectingBadge.visibility = View.VISIBLE
+        watchingCatchup = true
         exo.setMediaItem(mediaItem(channel.copy(streamUrl = url)))
         exo.prepare()
         exo.playWhenReady = true
@@ -2248,6 +2420,7 @@ class PlayerActivity : AppCompatActivity() {
             val exo = player ?: return@launch
             binding.connectingBadge.setText(R.string.playback_catchup_rewind)
             binding.connectingBadge.visibility = View.VISIBLE
+            watchingCatchup = true
             exo.setMediaItem(mediaItem(channel.copy(streamUrl = url)))
             exo.prepare()
             exo.playWhenReady = true
@@ -2793,6 +2966,7 @@ class PlayerActivity : AppCompatActivity() {
         private const val REBUFFER_LOG_MS = 400L
         private const val INITIAL_BADGE_MS = 450L
         private const val REBUFFER_BADGE_MS = 1_200L
+        private const val LIVE_STALL_MS = 4_000L
         private const val LIVE_REBUFFER_BADGE_MS = 4_500L
         private const val STILL_SPOOL_MS = 2_500L
         private const val MAX_LIVE_RECOVER = 4

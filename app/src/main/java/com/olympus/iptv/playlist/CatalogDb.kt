@@ -1340,8 +1340,12 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         }
         if (oldVersion < 16) {
             ensureEventWindowColumns(db)
-            recomputeEventWindows(db)
             ensureIndexes(db)
+            // Filling event windows touches every live row. Doing that inside this
+            // upgrade transaction locks the database, so the guide spinner and the
+            // dashboard both wait. The columns default to "showing"; catchUpEventWindows
+            // fills the real windows after the first screen is up.
+            runCatching { File(filesDir, "event-windows.pending").writeText("1") }
         }
     }
 
@@ -1632,9 +1636,12 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         return String(chars, 0, index + 1)
     }
 
-    private fun recomputeEventWindows(db: SQLiteDatabase) {
-        val updates = ArrayList<Array<Any>>()
-        db.rawQuery(
+    /** Runs after upgrade, off the database-open path, so the guide and dashboard stay responsive. */
+    fun catchUpEventWindows() {
+        val marker = File(filesDir, "event-windows.pending")
+        if (!marker.exists()) return
+        val slots = ArrayList<Array<Any>>()
+        readableDatabase.rawQuery(
             "SELECT playlist_id, id, name, group_title, epg_channel_id FROM channels WHERE bucket=?",
             arrayOf(LIVE)
         ).use { cur ->
@@ -1643,28 +1650,80 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
                 val id = cur.getString(1) ?: continue
                 val name = cur.getString(2) ?: continue
                 val status = NameStrip.inspect(name, cur.getString(3), cur.getString(4))
-                updates.add(arrayOf(pid, id, if (status.isEventSlot) 1L else 0L, status.eventStartMs, status.eventEndMs))
+                if (!status.isEventSlot && status.eventStartMs <= 0L && status.eventEndMs <= 0L) continue
+                slots.add(arrayOf(pid, id, if (status.isEventSlot) 1L else 0L, status.eventStartMs, status.eventEndMs))
             }
         }
-        if (updates.isEmpty()) return
-        db.beginTransaction()
-        try {
-            val stmt = db.compileStatement(
-                "UPDATE channels SET is_event_slot=?, event_start_ms=?, event_end_ms=? WHERE playlist_id=? AND bucket=? AND id=?"
-            )
-            for (row in updates) {
-                stmt.clearBindings()
-                stmt.bindLong(1, row[2] as Long)
-                stmt.bindLong(2, row[3] as Long)
-                stmt.bindLong(3, row[4] as Long)
-                stmt.bindString(4, row[0] as String)
-                stmt.bindString(5, LIVE)
-                stmt.bindString(6, row[1] as String)
-                stmt.executeUpdateDelete()
+        write {
+            val db = writableDatabase
+            db.beginTransaction()
+            try {
+                // Name and group do not change, so the FTS update trigger would only
+                // rewrite the search index for every live row and stall readers.
+                db.execSQL("DROP TRIGGER IF EXISTS channels_fts_update")
+                db.execSQL(
+                    "UPDATE channels SET is_event_slot=0, event_start_ms=0, event_end_ms=0 WHERE bucket=?",
+                    arrayOf(LIVE)
+                )
+                if (slots.isNotEmpty()) {
+                    val stmt = db.compileStatement(
+                        "UPDATE channels SET is_event_slot=?, event_start_ms=?, event_end_ms=? WHERE playlist_id=? AND bucket=? AND id=?"
+                    )
+                    for (row in slots) {
+                        stmt.clearBindings()
+                        stmt.bindLong(1, row[2] as Long)
+                        stmt.bindLong(2, row[3] as Long)
+                        stmt.bindLong(3, row[4] as Long)
+                        stmt.bindString(4, row[0] as String)
+                        stmt.bindString(5, LIVE)
+                        stmt.bindString(6, row[1] as String)
+                        stmt.executeUpdateDelete()
+                    }
+                }
+                restoreFtsUpdateTrigger(db)
+                db.setTransactionSuccessful()
+            } finally {
+                db.endTransaction()
+                runCatching { restoreFtsUpdateTrigger(db) }
             }
-            db.setTransactionSuccessful()
-        } finally {
-            db.endTransaction()
+        }
+        runCatching { marker.delete() }
+    }
+
+    private fun restoreFtsUpdateTrigger(db: SQLiteDatabase) {
+        val fts5 = db.rawQuery(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='channels_fts' AND sql LIKE '%fts5%'",
+            null
+        ).use { it.moveToFirst() }
+        if (!fts5 && !db.rawQuery(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='channels_fts'",
+                null
+            ).use { it.moveToFirst() }
+        ) {
+            return
+        }
+        db.execSQL("DROP TRIGGER IF EXISTS channels_fts_update")
+        if (fts5) {
+            db.execSQL(
+                """
+                CREATE TRIGGER IF NOT EXISTS channels_fts_update AFTER UPDATE ON channels BEGIN
+                    INSERT INTO channels_fts(channels_fts, rowid, name, group_title)
+                    VALUES ('delete', old.rowid, old.name, old.group_title);
+                    INSERT INTO channels_fts(rowid, name, group_title)
+                    VALUES (new.rowid, new.name, new.group_title);
+                END
+                """.trimIndent()
+            )
+        } else {
+            db.execSQL(
+                """
+                CREATE TRIGGER IF NOT EXISTS channels_fts_update AFTER UPDATE ON channels BEGIN
+                    DELETE FROM channels_fts WHERE docid = old.rowid;
+                    INSERT INTO channels_fts(docid, name, group_title)
+                    VALUES (new.rowid, new.name, new.group_title);
+                END
+                """.trimIndent()
+            )
         }
     }
 
@@ -2262,6 +2321,34 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         runCatching { File(filesDir, "group-images.stamp").writeText("$playlistId\n$stamp") }
     }
 
+    fun readEpgForChannels(
+        playlistId: String,
+        ids: Collection<String>
+    ): Map<String, List<com.olympus.iptv.data.EpgProgram>> = read {
+        if (playlistId.isBlank() || ids.isEmpty()) return@read emptyMap()
+        val out = HashMap<String, List<com.olympus.iptv.data.EpgProgram>>()
+        val db = readableDatabase
+        val freshAfter = System.currentTimeMillis() - 6L * 3_600_000L
+        for (chunk in ids.asSequence().filter { it.isNotBlank() }.distinct().chunked(200)) {
+            val marks = chunk.joinToString(",") { "?" }
+            val args = ArrayList<String>(chunk.size + 1)
+            args.add(playlistId)
+            args.addAll(chunk)
+            db.rawQuery(
+                "SELECT channel_id, payload, fetched_at FROM epg_cache WHERE playlist_id=? AND channel_id IN ($marks)",
+                args.toTypedArray()
+            ).use { cursor ->
+                while (cursor.moveToNext()) {
+                    if (cursor.getLong(2) < freshAfter) continue
+                    val id = cursor.getString(0) ?: continue
+                    val payload = cursor.getString(1) ?: continue
+                    out[id] = decodeEpg(payload)
+                }
+            }
+        }
+        out
+    }
+
     fun readEpg(playlistId: String, channelId: String): Pair<Long, List<com.olympus.iptv.data.EpgProgram>>? = read {
         readableDatabase.query(
             "epg_cache",
@@ -2381,6 +2468,8 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
             arrayOf(playlistId, VOD, SERIES)
         ).use { cursor ->
             while (cursor.moveToNext()) {
+                val id = cursor.getString(0) ?: continue
+                val bucket = cursor.getString(3) ?: continue
                 val group = cursor.getString(4)
                 val category = cursor.getString(5)
                 val service = serviceOf(group, category, cursor.getString(1) ?: "") ?: continue
@@ -2389,8 +2478,8 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
                 val detail = if (episode != null) episode else NameImages.strip(category.ifBlank { group })
                 rows.add(
                     FreshTitle(
-                        id = cursor.getString(0),
-                        bucket = cursor.getString(3),
+                        id = id,
+                        bucket = bucket,
                         name = name,
                         logoUrl = cursor.getString(2),
                         service = service,

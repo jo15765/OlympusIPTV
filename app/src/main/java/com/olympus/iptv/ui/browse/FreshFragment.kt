@@ -48,6 +48,7 @@ class FreshFragment : Fragment() {
     private val playlistId: String
         get() = arguments?.getString(EXTRA_PLAYLIST_ID).orEmpty()
     private val rows = ArrayList<CatalogDb.FreshTitle>()
+    private val favoriteKeys = HashSet<String>()
     private val adapter = FreshAdapter()
     private val seasonAdapter = SeasonAdapter()
     private val episodeAdapter = EpisodeAdapter()
@@ -310,6 +311,9 @@ class FreshFragment : Fragment() {
     private suspend fun load() {
         val app = requireActivity().application as OlympusIptvApp
         try {
+            val favs = withContext(Dispatchers.IO) { app.playlistStore.favoriteIds(playlistId) }
+            favoriteKeys.clear()
+            favoriteKeys.addAll(favs)
             val ready = withContext(Dispatchers.IO) { app.freshCards(playlistId) }
             if (!viewActive()) return
             if (!ready.isNullOrEmpty()) {
@@ -350,10 +354,15 @@ class FreshFragment : Fragment() {
 
     private fun showCards(found: List<CatalogDb.FreshTitle>) {
         if (!viewActive()) return
-        val same = rows.size == found.size && rows.indices.all { rows[it] == found[it] }
+        val usable = ArrayList<CatalogDb.FreshTitle>(found.size)
+        for (row in found) {
+            if (row.id.isNullOrEmpty() || row.bucket.isNullOrEmpty()) continue
+            usable.add(row)
+        }
+        val same = rows.size == usable.size && rows.indices.all { rows[it] == usable[it] }
         if (!same) {
             rows.clear()
-            rows.addAll(found)
+            rows.addAll(usable)
             adapter.notifyDataSetChanged()
         }
         binding.freshStatus.visibility = View.GONE
@@ -884,6 +893,30 @@ class FreshFragment : Fragment() {
         }
     }
 
+    private fun toggleFavorite(title: CatalogDb.FreshTitle) {
+        val app = requireActivity().application as OlympusIptvApp
+        val key = if (title.bucket == CatalogDb.SERIES) "series:${title.id}" else "vod:${title.id}"
+        val adding = key !in favoriteKeys
+        if (adding) favoriteKeys.add(key) else favoriteKeys.remove(key)
+        adapter.notifyDataSetChanged()
+        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
+            app.playlistStore.setFavorite(playlistId, key, adding)
+        }
+        Toast.makeText(
+            requireContext(),
+            if (adding) R.string.pill_favorite_add else R.string.pill_favorite_remove,
+            Toast.LENGTH_SHORT
+        ).show()
+    }
+
+    private fun markWatched(title: CatalogDb.FreshTitle) {
+        val app = requireActivity().application as OlympusIptvApp
+        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
+            app.catalogDb.markWatched(playlistId, title.id, if (title.bucket == CatalogDb.SERIES) title.id else null, title.season)
+        }
+        Toast.makeText(requireContext(), R.string.marked_watched, Toast.LENGTH_SHORT).show()
+    }
+
     private inner class FreshAdapter : RecyclerView.Adapter<FreshAdapter.Holder>() {
         init {
             setHasStableIds(true)
@@ -891,7 +924,7 @@ class FreshFragment : Fragment() {
 
         override fun getItemId(position: Int): Long {
             val row = rows.getOrNull(position) ?: return position.toLong()
-            return (row.bucket + '\u0000' + row.id + '\u0000' + row.service).hashCode().toLong()
+            return stableRowId(row.bucket, row.id, row.service)
         }
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder {
@@ -907,7 +940,7 @@ class FreshFragment : Fragment() {
 
         inner class Holder(private val rowBinding: ItemFreshBinding) : RecyclerView.ViewHolder(rowBinding.root) {
             fun bind(title: CatalogDb.FreshTitle) {
-                rowBinding.freshTitle.text = title.name
+                rowBinding.freshTitle.text = com.olympus.iptv.data.Titles.clean(title.name).ifBlank { title.name }
                 rowBinding.freshService.text = if (title.day.isBlank()) {
                     title.service
                 } else {
@@ -921,11 +954,41 @@ class FreshFragment : Fragment() {
                     val service = rowBinding.freshService.text
                     rowBinding.freshService.text = "★ $number  $service"
                 }
+
+                // Top-right green pill badge (episode/season count or NEW)
+                val badgeNum = Regex("\\d+").find(title.detail)?.value
+                when {
+                    !badgeNum.isNullOrBlank() -> {
+                        rowBinding.freshCountBadge.visibility = View.VISIBLE
+                        rowBinding.freshCountBadge.text = badgeNum
+                    }
+                    title.bucket == CatalogDb.SERIES -> {
+                        rowBinding.freshCountBadge.visibility = View.VISIBLE
+                        rowBinding.freshCountBadge.text = "NEW"
+                    }
+                    else -> rowBinding.freshCountBadge.visibility = View.GONE
+                }
+
+                val key = if (title.bucket == CatalogDb.SERIES) "series:${title.id}" else "vod:${title.id}"
+                val isFav = key in favoriteKeys
+                rowBinding.btnCardFavorite.setImageResource(
+                    if (isFav) R.drawable.ic_heart_filled else R.drawable.ic_heart_outline
+                )
+                rowBinding.btnCardFavorite.setOnClickListener { toggleFavorite(title) }
+                rowBinding.btnCardWatched.setOnClickListener { markWatched(title) }
+                rowBinding.btnCardMore.setOnClickListener { showDetail(title) }
+
                 bindArt(rowBinding.freshPoster, title.logoUrl, 160, 220)
+
+                val touch = com.olympus.iptv.ui.DeviceForm.isTouchPrimary(requireContext())
                 rowBinding.root.setOnFocusChangeListener { _, hasFocus ->
+                    rowBinding.freshHoverOverlay.visibility = if (hasFocus) View.VISIBLE else View.GONE
                     if (hasFocus) {
                         val pos = bindingAdapterPosition
                         if (pos != RecyclerView.NO_POSITION) listFocusPos = pos
+                        if (!touch) com.olympus.iptv.ui.FocusMotion.animate(rowBinding.root, true)
+                    } else {
+                        if (!touch) com.olympus.iptv.ui.FocusMotion.animate(rowBinding.root, false)
                     }
                 }
                 rowBinding.root.setOnClickListener {
@@ -1008,7 +1071,7 @@ class FreshFragment : Fragment() {
         }
 
         override fun getItemId(position: Int): Long =
-            items.getOrNull(position)?.id?.hashCode()?.toLong() ?: position.toLong()
+            stableRowId(items.getOrNull(position)?.id)
 
         init {
             setHasStableIds(true)

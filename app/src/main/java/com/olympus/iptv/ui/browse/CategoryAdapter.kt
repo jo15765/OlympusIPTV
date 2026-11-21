@@ -152,7 +152,7 @@ class CategoryAdapter(
         }, true).dispatchUpdatesTo(this)
     }
 
-    override fun getItemId(position: Int): Long = items[position].id.hashCode().toLong()
+    override fun getItemId(position: Int): Long = stableRowId(items.getOrNull(position)?.id)
 
     private fun preservesOrder(list: List<Category>): Boolean {
         var index = 0

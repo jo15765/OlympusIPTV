@@ -23,6 +23,19 @@ import com.olympus.iptv.data.EpgNowNext
 import com.olympus.iptv.databinding.ItemChannelBinding
 import com.olympus.iptv.databinding.ItemPosterBinding
 
+internal fun stableRowId(vararg parts: String?): Long {
+    var hash = 1125899906842597L
+    for (part in parts) {
+        if (part == null) {
+            hash = 31L * hash + 1L
+            continue
+        }
+        for (index in 0 until part.length) hash = 31L * hash + part[index].code
+        hash *= 31L
+    }
+    return hash
+}
+
 class ChannelAdapter(
     private val onClick: (Channel) -> Unit,
     private val onLongClick: (Channel) -> Boolean = { false },
@@ -215,9 +228,7 @@ class ChannelAdapter(
     override fun getItemCount(): Int = items.size
 
     override fun getItemId(position: Int): Long {
-        var hash = 1125899906842597L
-        val id = items[position].id
-        for (index in id.indices) hash = 31L * hash + id[index].code
+        val hash = stableRowId(items.getOrNull(position)?.id)
         return if (posterMode) hash xor 1L else hash
     }
 

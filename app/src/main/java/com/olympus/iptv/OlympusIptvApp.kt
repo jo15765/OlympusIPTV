@@ -26,8 +26,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.SupervisorJob
 import java.io.File
@@ -189,14 +189,12 @@ class OlympusIptvApp : Application() {
         if (warmed) return
         warmed = true
         appScope.launch {
+            // The guide's first queries own the database. Ratings, event windows,
+            // and the dashboard snapshot wait until that grid is on screen.
+            delay(12_000L)
             runCatching { com.olympus.iptv.playlist.TitleRatings.init(this@OlympusIptvApp, catalogDb) }
             runCatching { playlistStore.videoDecoder() }
-            runCatching { catalogDb.channelCount("") }
-            delay(8_000L)
-            runCatching {
-                val saved = playlistStore.opening().first
-                if (saved != null) catalogDb.warmDashboard(saved.id)
-            }
+            runCatching { catalogDb.catchUpEventWindows() }
         }
     }
 
@@ -300,7 +298,10 @@ class OlympusIptvApp : Application() {
             override fun onActivityDestroyed(activity: android.app.Activity) = Unit
         })
         epgRepository.attach(catalogDb, appScope)
-        startCloudRealtimeSync()
+        appScope.launch {
+            delay(8_000L)
+            startCloudRealtimeSync()
+        }
         appScope.launch {
             DashboardHost.start(this@OlympusIptvApp)
             delay(45_000L)

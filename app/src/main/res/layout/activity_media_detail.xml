@@ -32,7 +32,7 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <!-- Top Bar: Back arrow on left, Cast & Profile/Settings icons on right -->
+            <!-- Top Bar: Back arrow on left, Cast, User Profile & Settings gear icons on right -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="56dp"
@@ -64,6 +64,32 @@
                     android:focusable="true"
                     android:src="@drawable/ic_cast"
                     app:tint="@color/text_primary" />
+
+                <ImageButton
+                    android:id="@+id/btnDetailUser"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:layout_marginStart="8dp"
+                    android:background="@drawable/bg_circle_action"
+                    android:contentDescription="User profile"
+                    android:focusable="true"
+                    android:padding="9dp"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/ic_person_placeholder"
+                    app:tint="@color/text_primary" />
+
+                <ImageButton
+                    android:id="@+id/btnDetailSettings"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:layout_marginStart="8dp"
+                    android:background="@drawable/bg_circle_action"
+                    android:contentDescription="@string/nav_admin"
+                    android:focusable="true"
+                    android:padding="9dp"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/ic_settings"
+                    app:tint="@color/text_primary" />
             </LinearLayout>
 
             <!-- Hero Split Section: Poster Card on Left + Logo/Metadata/Action Pills/Overview on Right -->
@@ -76,15 +102,16 @@
                 android:paddingTop="10dp"
                 android:paddingBottom="24dp">
 
-                <!-- Left Poster Card with Play Overlay -->
+                <!-- Left Poster Card with "TV Series" Banner & Play Overlay -->
                 <FrameLayout
                     android:id="@+id/posterCard"
                     android:layout_width="210dp"
                     android:layout_height="310dp"
-                    android:background="@drawable/bg_poster_image"
+                    android:background="@drawable/bg_focusable"
                     android:clickable="true"
                     android:clipToOutline="true"
-                    android:focusable="true">
+                    android:focusable="true"
+                    android:padding="2dp">
 
                     <ImageView
                         android:id="@+id/heroPoster"
@@ -93,6 +120,19 @@
                         android:contentDescription="@null"
                         android:scaleType="centerCrop"
                         android:src="@drawable/ic_channel_placeholder" />
+
+                    <!-- Banner tag at top of poster (Image 2) -->
+                    <TextView
+                        android:id="@+id/heroBannerTag"
+                        android:layout_width="match_parent"
+                        android:layout_height="26dp"
+                        android:layout_gravity="top"
+                        android:background="#882A2E6B"
+                        android:gravity="center"
+                        android:text="TV Series"
+                        android:textColor="#E8EAF6"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
 
                     <ImageView
                         android:layout_width="52dp"
@@ -268,7 +308,7 @@
                 </LinearLayout>
             </LinearLayout>
 
-            <!-- Scroll-Down Section 1: Season Dropdown + Horizontal Episode Cards (Screen 2) -->
+            <!-- Scroll-Down Section 1: Season Dropdown + Horizontal Episode Cards (Image 1) -->
             <LinearLayout
                 android:id="@+id/episodesSection"
                 android:layout_width="match_parent"
@@ -301,7 +341,7 @@
                     android:paddingHorizontal="36dp" />
             </LinearLayout>
 
-            <!-- Scroll-Down Section 2: Cast & Crew Horizontal Portrait Cards (Screen 2) -->
+            <!-- Scroll-Down Section 2: Cast & Crew Horizontal Portrait Cards (Image 1) -->
             <LinearLayout
                 android:id="@+id/castSection"
                 android:layout_width="match_parent"

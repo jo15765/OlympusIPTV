@@ -107,7 +107,7 @@ class FreshActivity : AppCompatActivity() {
                 return@launch
             }
             binding.freshStatus.visibility = View.VISIBLE
-            binding.freshStatus.text = getString(R.string.fresh_loading)
+            binding.freshStatus.text = getString(R.string.loading)
             val loaded = withContext(Dispatchers.IO) {
                 val file = File(filesDir, "watchmode-week.json")
                 val premieres = if (Watchmode.needsRefresh(file)) Watchmode.refresh(file) else Watchmode.load(file)
@@ -118,12 +118,12 @@ class FreshActivity : AppCompatActivity() {
                 else FreshPlayable.filter(filesDir, account, app.catalogDb, matched)
             }
             if (isDestroyed) return@launch
-            binding.freshStatus.visibility = View.GONE
             cards = loaded
             if (cards.isEmpty()) {
                 binding.freshStatus.visibility = View.VISIBLE
                 binding.freshStatus.text = getString(R.string.fresh_empty)
             } else {
+                binding.freshStatus.visibility = View.GONE
                 adapter.submit(cards)
             }
         }
@@ -177,7 +177,7 @@ class FreshActivity : AppCompatActivity() {
             kind = ContentKind.VOD,
             seriesId = if (card.bucket == CatalogDb.SERIES) card.id else null
         )
-        val options = arrayOf("Open Details", "Add to Watch Queue")
+        val options = arrayOf(getString(R.string.open), getString(R.string.fresh_queue_add))
         AlertDialog.Builder(this)
             .setTitle(Titles.clean(card.name))
             .setItems(options) { _, which ->

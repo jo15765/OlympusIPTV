@@ -54,21 +54,35 @@ class EpgEditsFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        val note = android.widget.TextView(requireContext())
-        note.setTextColor(0xFF9A948A.toInt())
-        note.textSize = 14f
-        (binding.root as? ViewGroup)?.addView(note, 0)
-        viewLifecycleOwner.lifecycleScope.launch {
-            val count = withContext(Dispatchers.IO) {
-                (requireActivity().application as OlympusIptvApp).catalogDb.deadChannelIds(playlistId).size
-            }
-            if (!isAdded) return@launch
-            note.text = getString(R.string.dead_feeds, count)
-        }
         if (playlistId.isBlank()) {
             closeEdits()
             return
         }
+
+        // Side Tab Category Selection
+        val tabs = listOf(
+            binding.tabPlayback to binding.panelPlayback,
+            binding.tabCuration to binding.panelCuration,
+            binding.tabSecurity to binding.panelSecurity,
+            binding.tabServices to binding.panelServices
+        )
+
+        fun selectTab(selectedTab: View) {
+            tabs.forEach { (tab, panel) ->
+                val active = tab === selectedTab
+                tab.isSelected = active
+                tab.setBackgroundResource(if (active) R.drawable.bg_button else R.drawable.bg_nav)
+                tab.setTextColor(if (active) requireContext().getColor(R.color.bg) else requireContext().getColor(R.color.text_primary))
+                panel.visibility = if (active) View.VISIBLE else View.GONE
+            }
+        }
+
+        tabs.forEach { (tab, _) ->
+            tab.setOnClickListener { selectTab(tab) }
+            tab.setOnFocusChangeListener { _, focused -> if (focused) selectTab(tab) }
+        }
+
+        selectTab(binding.tabPlayback)
 
         binding.cardCountries.setOnClickListener { openCountries() }
         binding.cardLineup.setOnClickListener { openLineup() }
@@ -88,31 +102,8 @@ class EpgEditsFragment : Fragment() {
         binding.cardScrobbler.setOnClickListener { cycleScrobbler() }
         binding.cardPip.setOnClickListener { togglePip() }
         binding.btnBack.setOnClickListener { closeEdits() }
-        val details = listOf(
-            binding.cardCountries to R.string.epg_card_countries_detail,
-            binding.cardLineup to R.string.epg_card_lineup_detail,
-            binding.cardReset to R.string.epg_card_reset_detail,
-            binding.cardStrip to R.string.epg_card_strip_detail,
-            binding.cardGroups to R.string.epg_card_groups_detail,
-            binding.cardSanitize to R.string.epg_card_sanitize_detail,
-            binding.cardParse to R.string.epg_card_parse_detail,
-            binding.cardImages to R.string.epg_card_images_detail,
-            binding.cardParental to R.string.epg_card_parental_detail,
-            binding.cardAutoClean to R.string.epg_card_auto_clean_detail,
-            binding.cardHideEmpty to R.string.epg_card_hide_empty_detail,
-            binding.cardDensity to R.string.epg_card_density_detail,
-            binding.cardPinTimeout to R.string.epg_card_pin_timeout_detail,
-            binding.cardDecoder to R.string.epg_card_decoder_detail,
-            binding.cardTmdb to R.string.epg_card_tmdb_detail,
-            binding.cardScrobbler to R.string.epg_card_scrobbler_detail,
-            binding.cardPip to R.string.epg_card_pip_detail
-        )
-        details.forEach { (card, detail) ->
-            card.setOnFocusChangeListener { _, focused ->
-                if (focused) binding.cardDetail.setText(detail)
-            }
-        }
-        binding.cardCountries.requestFocus()
+
+        binding.tabPlayback.requestFocus()
         requireActivity().onBackPressedDispatcher.addCallback(
             viewLifecycleOwner,
             object : OnBackPressedCallback(true) {
@@ -333,24 +324,18 @@ class EpgEditsFragment : Fragment() {
                         store.saveTraktCredentials(tokenValue, clientValue)
                     }
                     showScrobbler(provider)
-                    Toast.makeText(
-                        requireContext(),
-                        getString(R.string.scrobbler_saved, label),
-                        Toast.LENGTH_SHORT
-                    ).show()
+                    Toast.makeText(requireContext(), R.string.scrobbler_saved, Toast.LENGTH_SHORT).show()
                 }
             }
             .show()
     }
 
     private fun showScrobbler(provider: String) {
-        binding.scrobblerState.setText(
-            when (provider) {
-                ScrobblerIds.SIMKL -> R.string.scrobbler_simkl
-                ScrobblerIds.TRAKT -> R.string.scrobbler_trakt
-                else -> R.string.scrobbler_none
-            }
-        )
+        binding.scrobblerState.text = when (provider) {
+            ScrobblerIds.SIMKL -> getString(R.string.scrobbler_simkl)
+            ScrobblerIds.TRAKT -> getString(R.string.scrobbler_trakt)
+            else -> getString(R.string.scrobbler_none)
+        }
     }
 
     private fun togglePip() {
@@ -361,7 +346,7 @@ class EpgEditsFragment : Fragment() {
             showPip(next)
             Toast.makeText(
                 requireContext(),
-                if (next) R.string.pip_home_on else R.string.pip_home_off,
+                if (next) R.string.epg_short_hide_empty_on else R.string.epg_short_hide_empty_off,
                 Toast.LENGTH_SHORT
             ).show()
         }
@@ -373,92 +358,109 @@ class EpgEditsFragment : Fragment() {
         )
     }
 
-    private fun toolHost(): ToolHost? = activity as? ToolHost
-
     private fun openCountries() {
-        val host = toolHost()
-        host?.showTool(CountriesFragment.newInstance(playlistId))
-    }
-
-    private fun openSanitize() {
-        val host = toolHost()
-        host?.showTool(SanitizeFragment.newInstance(playlistId))
-    }
-
-    private fun openParental() {
-        val host = toolHost()
-        host?.showTool(ParentalFragment.newInstance(playlistId))
+        parentFragmentManager.beginTransaction()
+            .replace((requireView().parent as View).id, CountriesFragment.newInstance(playlistId))
+            .addToBackStack("countries")
+            .commit()
     }
 
     private fun openLineup() {
-        if ((requireActivity().application as OlympusIptvApp).guideSource == null) return
         startActivity(LineupActivity.intent(requireContext(), playlistId, kind, includeVod))
     }
 
     private fun openStrip() {
-        val host = toolHost()
-        host?.showTool(StripNamesFragment.newInstance(playlistId))
+        parentFragmentManager.beginTransaction()
+            .replace(
+                (requireView().parent as View).id,
+                StripNamesFragment.newInstance(playlistId)
+            )
+            .addToBackStack("strip")
+            .commit()
     }
 
     private fun openGroupRename() {
-        val host = toolHost()
-        host?.showTool(GroupRenameFragment.newInstance(playlistId))
+        parentFragmentManager.beginTransaction()
+            .replace(
+                (requireView().parent as View).id,
+                GroupRenameFragment.newInstance(playlistId)
+            )
+            .addToBackStack("groups")
+            .commit()
+    }
+
+    private fun openSanitize() {
+        parentFragmentManager.beginTransaction()
+            .replace(
+                (requireView().parent as View).id,
+                SanitizeFragment.newInstance(playlistId)
+            )
+            .addToBackStack("sanitize")
+            .commit()
+    }
+
+    private fun openParental() {
+        parentFragmentManager.beginTransaction()
+            .replace((requireView().parent as View).id, ParentalFragment.newInstance(playlistId))
+            .addToBackStack("parental")
+            .commit()
+    }
+
+    private fun confirmReset() {
+        AlertDialog.Builder(requireContext())
+            .setTitle(R.string.epg_reset_title)
+            .setMessage(R.string.epg_reset_message)
+            .setPositiveButton(R.string.epg_reset_confirm) { _, _ ->
+                val app = requireActivity().application as OlympusIptvApp
+                viewLifecycleOwner.lifecycleScope.launch {
+                    val store = app.playlistStore
+                    val blank = LineupConfig(revision = System.currentTimeMillis())
+                    config = blank
+                    app.stagedLineup = playlistId to blank
+                    withContext(Dispatchers.IO) {
+                        store.saveLineup(playlistId, blank)
+                        val email = store.session.first()?.email
+                        if (!email.isNullOrBlank()) {
+                            runCatching { LineupClient(app).push(email, store.deviceId(), blank) }
+                        }
+                    }
+                    showAutoClean(true)
+                    Toast.makeText(requireContext(), R.string.epg_reset_done, Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     private fun confirmParse() {
         AlertDialog.Builder(requireContext())
             .setTitle(R.string.epg_parse_title)
             .setMessage(R.string.epg_parse_message)
-            .setPositiveButton(R.string.epg_parse_confirm) { _, _ -> parseVisibleNames() }
+            .setPositiveButton(R.string.epg_parse_confirm) { _, _ ->
+                val app = requireActivity().application as OlympusIptvApp
+                viewLifecycleOwner.lifecycleScope.launch {
+                    val parsed = withContext(Dispatchers.IO) {
+                        app.catalogDb.parseVisibleNames(playlistId, config)
+                    }
+                    app.epgRepository.installNameEpg(playlistId, parsed.programs)
+                    val next = config.copy(nameEpg = true, revision = System.currentTimeMillis())
+                    config = next
+                    app.stagedLineup = playlistId to next
+                    withContext(Dispatchers.IO) {
+                        app.playlistStore.saveLineup(playlistId, next)
+                        val email = app.playlistStore.session.first()?.email
+                        if (!email.isNullOrBlank()) {
+                            runCatching { LineupClient(app).push(email, app.playlistStore.deviceId(), next) }
+                        }
+                    }
+                    Toast.makeText(
+                        requireContext(),
+                        getString(R.string.epg_parse_done, parsed.programs.size),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
             .setNegativeButton(android.R.string.cancel, null)
-            .show()
-    }
-
-    private fun parseVisibleNames() {
-        if (!binding.cardParse.isEnabled) return
-        binding.cardParse.isEnabled = false
-        binding.cardDetail.setText(R.string.epg_parse_working)
-        val app = requireActivity().application as OlympusIptvApp
-        viewLifecycleOwner.lifecycleScope.launch {
-            val parsed = withContext(Dispatchers.IO) {
-                app.catalogDb.parseVisibleNames(playlistId, config)
-            }
-            val next = config.copy(nameEpg = true, revision = System.currentTimeMillis())
-            config = next
-            app.stagedLineup = playlistId to next
-            app.epgRepository.installNameEpg(playlistId, parsed.programs)
-            app.appScope.launch {
-                runCatching { app.playlistStore.saveLineup(playlistId, next) }
-                val email = app.playlistStore.session.first()?.email
-                if (!email.isNullOrBlank()) {
-                    runCatching { LineupClient(app).push(email, app.playlistStore.deviceId(), next) }
-                }
-            }
-            binding.cardParse.isEnabled = true
-            val message = getString(R.string.epg_parse_done, parsed.programs.size)
-            binding.cardDetail.text = message
-            if (viewActive()) showParseExamples(parsed.programs.size, parsed.examples)
-        }
-    }
-
-    private fun showParseExamples(count: Int, examples: List<Pair<String, String>>) {
-        val body = if (examples.isEmpty()) {
-            getString(R.string.epg_parse_same)
-        } else {
-            buildString {
-                append(getString(R.string.epg_parse_examples))
-                examples.forEach { (before, after) ->
-                    append("\n\n")
-                    append(getString(R.string.epg_parse_before, before))
-                    append("\n")
-                    append(getString(R.string.epg_parse_after, after))
-                }
-            }
-        }
-        AlertDialog.Builder(requireContext())
-            .setTitle(getString(R.string.epg_parse_done, count))
-            .setMessage(body)
-            .setPositiveButton(android.R.string.ok, null)
             .show()
     }
 
@@ -466,127 +468,77 @@ class EpgEditsFragment : Fragment() {
         AlertDialog.Builder(requireContext())
             .setTitle(R.string.epg_images_title)
             .setMessage(R.string.epg_images_message)
-            .setPositiveButton(R.string.epg_images_confirm) { _, _ -> stripImages() }
+            .setPositiveButton(R.string.epg_images_confirm) { _, _ ->
+                val app = requireActivity().application as OlympusIptvApp
+                viewLifecycleOwner.lifecycleScope.launch {
+                    val result = withContext(Dispatchers.IO) {
+                        app.catalogDb.stripImageNames(playlistId)
+                    }
+                    val next = config.copy(
+                        channelNames = config.channelNames.orEmpty().mapValues { NameImages.strip(it.value) },
+                        groupNames = config.groupNames.orEmpty().mapValues { NameImages.strip(it.value) },
+                        revision = System.currentTimeMillis()
+                    )
+                    config = next
+                    app.stagedLineup = playlistId to next
+                    withContext(Dispatchers.IO) {
+                        app.playlistStore.saveLineup(playlistId, next)
+                        val email = app.playlistStore.session.first()?.email
+                        if (!email.isNullOrBlank()) {
+                            runCatching { LineupClient(app).push(email, app.playlistStore.deviceId(), next) }
+                        }
+                    }
+                    Toast.makeText(
+                        requireContext(),
+                        getString(R.string.epg_images_done, result.first),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
     }
 
-    private fun stripImages() {
-        if (!binding.cardImages.isEnabled) return
-        binding.cardImages.isEnabled = false
-        binding.cardDetail.setText(R.string.epg_images_working)
-        val app = requireActivity().application as OlympusIptvApp
-        viewLifecycleOwner.lifecycleScope.launch {
-            val result = withContext(Dispatchers.IO) {
-                val stripped = app.catalogDb.stripImages(playlistId)
-                val groupNames = config.groupNames.orEmpty().mapValues { (_, name) -> NameImages.strip(name) }
-                val channelNames = config.channelNames.orEmpty().mapValues { (_, name) -> NameImages.strip(name) }
-                val overlayChanges = (config.groupNames.orEmpty().count { NameImages.strip(it.value) != it.value }) +
-                    config.channelNames.orEmpty().count { NameImages.strip(it.value) != it.value }
-                Triple(stripped, groupNames, channelNames) to overlayChanges
-            }
-            val stripped = result.first.first
-            val groupNames = result.first.second
-            val channelNames = result.first.third
-            val changed = stripped.changed + result.second
-            if (changed > 0) {
-                val next = config.copy(
-                    groupNames = groupNames,
-                    channelNames = channelNames,
-                    revision = System.currentTimeMillis()
-                )
-                config = next
-                app.stagedLineup = playlistId to next
-                app.appScope.launch {
-                    runCatching { app.playlistStore.saveLineup(playlistId, next) }
-                    val email = app.playlistStore.session.first()?.email
-                    if (!email.isNullOrBlank()) {
-                        runCatching { LineupClient(app).push(email, app.playlistStore.deviceId(), next) }
-                    }
-                }
-            }
-            binding.cardImages.isEnabled = true
-            if (!viewActive()) return@launch
-            val title = if (changed == 0) {
-                getString(R.string.epg_images_none)
-            } else {
-                getString(R.string.epg_images_done, changed)
-            }
-            binding.cardDetail.text = title
-            val builder = AlertDialog.Builder(requireContext()).setTitle(title)
-            if (stripped.examples.isEmpty()) {
-                builder.setPositiveButton(android.R.string.ok, null).show()
-            } else {
-                val body = buildString {
-                    append(getString(R.string.epg_images_examples))
-                    stripped.examples.forEach { (before, after) ->
-                        append("\n\n")
-                        append(getString(R.string.group_rename_before, before))
-                        append("\n")
-                        append(getString(R.string.group_rename_after, after))
-                    }
-                }
-                builder.setMessage(body).setPositiveButton(android.R.string.ok, null).show()
-            }
-        }
-    }
-
-    private fun confirmReset() {
-        AlertDialog.Builder(requireContext())
-            .setTitle(R.string.epg_reset_title)
-            .setMessage(R.string.epg_reset_message)
-            .setPositiveButton(R.string.epg_reset_confirm) { _, _ -> resetVisibility() }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
-    }
-
-    private fun resetVisibility() {
-        val next = config.copy(
-            hiddenCountries = emptyList(),
-            hiddenGroups = emptyList(),
-            hiddenChannels = emptyList(),
-            revision = System.currentTimeMillis()
-        )
-        config = next
-        val app = requireActivity().application as OlympusIptvApp
-        app.stagedLineup = playlistId to next
-        app.appScope.launch {
-            runCatching { app.playlistStore.saveLineup(playlistId, next) }
-            val email = app.playlistStore.session.first()?.email
-            if (!email.isNullOrBlank()) {
-                runCatching { LineupClient(app).push(email, app.playlistStore.deviceId(), next) }
-            }
-        }
-        Toast.makeText(requireContext(), R.string.epg_reset_done, Toast.LENGTH_SHORT).show()
-    }
-
-    fun closeFromBrowseBack() {
-        closeEdits()
-    }
+    fun closeFromBrowseBack() = closeEdits()
 
     private fun closeEdits() {
-        parentFragmentManager.setFragmentResult(RESULT_KEY, Bundle.EMPTY)
-        exitToolHost()
+        if (!viewActive()) return
+        parentFragmentManager.setFragmentResult(RESULT_KEY, Bundle())
+        val host = activity as? ToolHost
+        if (host != null) {
+            exitToolHost()
+            return
+        }
+        if (parentFragment != null) {
+            parentFragmentManager.popBackStack()
+        } else {
+            requireActivity().finish()
+        }
     }
 
     override fun onDestroyView() {
-        _binding = null
         super.onDestroyView()
+        _binding = null
     }
 
     companion object {
-        const val RESULT_KEY = "epg_edits_result"
-        const val EXTRA_PLAYLIST_ID = "playlist_id"
-        const val EXTRA_KIND = "kind"
-        const val EXTRA_INCLUDE_VOD = "include_vod"
+        const val RESULT_KEY = "epg_edits"
+        private const val EXTRA_PLAYLIST_ID = "playlist_id"
+        private const val EXTRA_KIND = "kind"
+        private const val EXTRA_INCLUDE_VOD = "include_vod"
 
-        fun newInstance(playlistId: String, kind: ContentKind, includeVod: Boolean): EpgEditsFragment =
-            EpgEditsFragment().apply {
-                arguments = Bundle().apply {
-                    putString(EXTRA_PLAYLIST_ID, playlistId)
-                    putString(EXTRA_KIND, kind.name)
-                    putBoolean(EXTRA_INCLUDE_VOD, includeVod)
-                }
+        fun newInstance(
+            playlistId: String,
+            kind: ContentKind = ContentKind.LIVE,
+            includeVod: Boolean = false
+        ): EpgEditsFragment {
+            val fragment = EpgEditsFragment()
+            fragment.arguments = Bundle().apply {
+                putString(EXTRA_PLAYLIST_ID, playlistId)
+                putString(EXTRA_KIND, kind.name)
+                putBoolean(EXTRA_INCLUDE_VOD, includeVod)
             }
+            return fragment
+        }
     }
 }

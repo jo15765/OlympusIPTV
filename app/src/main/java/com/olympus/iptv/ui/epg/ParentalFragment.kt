@@ -9,6 +9,7 @@ import android.view.ViewTreeObserver
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
+import com.olympus.iptv.ui.browse.stableRowId
 import com.olympus.iptv.ui.exitToolHost
 import com.olympus.iptv.ui.viewActive
 import androidx.recyclerview.widget.GridLayoutManager
@@ -601,7 +602,7 @@ class ParentalFragment : Fragment() {
             setHasStableIds(true)
         }
 
-        override fun getItemId(position: Int): Long = groups[position].id.hashCode().toLong()
+        override fun getItemId(position: Int): Long = stableRowId(groups.getOrNull(position)?.id)
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder {
             val item = ItemParentalBinding.inflate(LayoutInflater.from(parent.context), parent, false)

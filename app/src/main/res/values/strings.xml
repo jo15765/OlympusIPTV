@@ -81,6 +81,7 @@
     <string name="library_reminders_hint">Programs you asked to be reminded about</string>
     <string name="library_open">Open</string>
     <string name="group_live_badge">Live</string>
+    <string name="marked_watched">Marked watched</string>
     <string name="copy_tv_url">Copy TV URL</string>
     <string name="copy_tv_url_done">Copied</string>
     <string name="breadcrumb_live">Live TV</string>

@@ -231,6 +231,7 @@ internal fun BrowseActivity.openSection(next: GuideSection) {
     }
 
 internal fun BrowseActivity.setSection(next: GuideSection) {
+        if (next != GuideSection.TV) ensureSavedBuckets(false)
         landOnOpened = false
         guideMenu = GuideMenu.GROUPS
         previousMenu = GuideMenu.GROUPS

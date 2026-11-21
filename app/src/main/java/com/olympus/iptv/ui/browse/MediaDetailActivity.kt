@@ -73,6 +73,9 @@ class MediaDetailActivity : AppCompatActivity() {
         }
 
         val isSeries = bucket == CatalogDb.SERIES
+        binding.heroBannerTag.text = if (isSeries) "TV Series" else "Movie"
+        binding.heroBannerTag.visibility = View.VISIBLE
+
         val cleanTitle = Titles.clean(rawName).ifBlank { rawName }
         binding.heroTitleText.text = cleanTitle
         binding.metaLine.text = serviceHint
@@ -87,6 +90,7 @@ class MediaDetailActivity : AppCompatActivity() {
 
         binding.btnDetailBack.setOnClickListener { finish() }
         binding.btnDetailCast.setOnClickListener { CastBridge.showChooser(this, channel) }
+        binding.btnDetailSettings.setOnClickListener { finish() }
         binding.posterCard.setOnClickListener { playPrimary() }
         binding.btnHeroPlay.setOnClickListener { playPrimary() }
         binding.btnHeroTrailer.setOnClickListener { openTrailer() }
@@ -338,6 +342,10 @@ class MediaDetailActivity : AppCompatActivity() {
             val heading: TextView = view.findViewById(R.id.epHeading)
             val meta: TextView = view.findViewById(R.id.epMeta)
             val overview: TextView = view.findViewById(R.id.epOverview)
+            val hoverOverlay: View? = view.findViewById(R.id.epHoverOverlay)
+            val btnWatched: View? = view.findViewById(R.id.btnEpWatched)
+            val btnFavorite: View? = view.findViewById(R.id.btnEpFavorite)
+            val btnMore: View? = view.findViewById(R.id.btnEpMore)
         }
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
@@ -366,6 +374,9 @@ class MediaDetailActivity : AppCompatActivity() {
             holder.still.load(img) {
                 placeholder(R.drawable.ic_channel_placeholder)
                 error(R.drawable.ic_channel_placeholder)
+            }
+            holder.itemView.setOnFocusChangeListener { _, hasFocus ->
+                holder.hoverOverlay?.visibility = if (hasFocus) View.VISIBLE else View.GONE
             }
             holder.itemView.setOnClickListener { onPlayEpisode(ep) }
         }
