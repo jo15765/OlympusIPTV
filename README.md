@@ -6,7 +6,7 @@
 
 ### For the latest and greatest, build your own APK from this code.
 
-The latest signed file is **0.2.82** (versionCode 83): `C:\Users\chalu\Downloads\olympus-iptv-0.2.82.apk`. This source tree uses the same version numbers and has not been packed into a new APK. **One APK** installs on Android TV / set-top boxes and on phones and tablets.
+The latest signed file is **0.2.83** (versionCode 84): `C:\Users\chalu\Downloads\olympus-iptv-0.2.83.apk`. **One APK** installs on Android TV / set-top boxes and on phones and tablets. Install it over 0.2.82. The signing key is the same, so the saved account and playlist stay.
 
 **This is a player only. You must provide your own streams.**
 
@@ -23,7 +23,7 @@ Olympus-IPTV does not include channels, movies, shows, or stream addresses. It p
 </div>
 
 - [Start here](#start-here)
-- [This source](#this-source)
+- [What's in 0.2.83](#whats-in-0283)
 - [Phones and tablets](#phones-and-tablets)
 - [Video walkthrough](#video-walkthrough)
 - [What it does](#what-it-does)
@@ -52,22 +52,20 @@ Olympus-IPTV is one APK for Android TV / set-top boxes and for phones and tablet
 
 | | |
 | --- | --- |
-| Signed file | `C:\Users\chalu\Downloads\olympus-iptv-0.2.82.apk` |
-| What that file is | versionName **0.2.82**, versionCode **83** |
-| Source in this tree | versionName **0.2.82**, versionCode **83** |
-| What to run | Install the signed file for the last packed release, or build this source |
+| Signed file | `C:\Users\chalu\Downloads\olympus-iptv-0.2.83.apk` |
+| What that file is | versionName **0.2.83**, versionCode **84** |
+| Source in this tree | versionName **0.2.83**, versionCode **84** |
+| What to run | Install the signed 0.2.83 APK, or build this source |
 | Install | Over the existing copy (TV or phone). Uninstalling wipes the saved account, playlist, and favorites. Downloader works with the same file. |
 | Launcher name | Two centered lines: Olympus over IPTV |
 
-The signed 0.2.82 file puts the first-run remote on Got it, hides the Continue watching strip, restores the Admin image cards, closes provider connections when you leave the app (picture-in-picture keeps playing), and adds an Active Streams card on the phone dashboard. Sticks with a small heap still use the 16 MB image cache, RGB_565 posters, and a 10 second buffer. Larger boxes pre-warm only the next channel.
-
-Everything under [This source](#this-source) is in the tree and is not in that signed file until you build it.
+**0.2.83** is the current signed release. It keeps the 0.2.82 behavior (Got it takes the remote, the Continue strip stays hidden, Admin is the image cards, leaving the app closes provider connections unless picture-in-picture is playing) and adds the phone layout, guide clock, and player changes under [What's in 0.2.83](#whats-in-0283). Sticks with a small heap still use the 16 MB image cache, RGB_565 posters, and a 10 second buffer. Larger boxes pre-warm only the next channel.
 
 ---
 
 <div align="center">
 
-## This source
+## What's in 0.2.83
 
 </div>
 
@@ -79,7 +77,7 @@ Everything under [This source](#this-source) is in the tree and is not in that s
 - A new recording starts **2 minutes early**. You pick an ending **5, 15, or 30 minutes** after the guide time. A finished recording remembers where you stopped.
 - On a low-memory stick, a memory warning clears the logo cache and the in-memory guide. The guide on disk stays. Debug builds log main-thread disk reads. Release builds do not.
 - The dashboard Backup button downloads one JSON file: favorites, group renames, parental PINs, strip rules, the rest of the lineup, and per-channel audio offsets. `portal/data/store.json` is not in a source zip made with `archive-source.ps1`.
-- Phone and tablet layout, gestures, cellular limits, and the 6-hour Wi-Fi catalog job are described under [Phones and tablets](#phones-and-tablets).
+- Phone and tablet layout, gestures, cellular limits, and the 6-hour Wi-Fi catalog job are described under [Phones and tablets](#phones-and-tablets). Those are in this signed file.
 
 ---
 
@@ -411,7 +409,7 @@ The debug APK is `app/build/outputs/apk/debug/app-debug.apk`. Optional keys go i
 | `opensubtitles.apiKey` | OpenSubtitles under player Subtitles |
 | `sendgrid.apiKey` + `sendgrid.fromEmail` | Email after two wrong parental PINs |
 
-Release builds use R8, resource shrinking, and optimized resource shrinking. They keep `armeabi-v7a` and `arm64-v8a` only, and English resources only. A baseline profile covers the guide and the player. Gradle is set to work offline. The latest signed release is `C:\Users\chalu\Downloads\olympus-iptv-0.2.82.apk`.
+Release builds use R8, resource shrinking, and optimized resource shrinking. They keep `armeabi-v7a` and `arm64-v8a` only, and English resources only. A baseline profile covers the guide and the player. Gradle is set to work offline. The latest signed release is `C:\Users\chalu\Downloads\olympus-iptv-0.2.83.apk`.
 
 Libraries: Kotlin, AndroidX, ViewBinding, Media3 ExoPlayer (HLS and DASH), OkHttp, Gson, DataStore, Coil, profileinstaller, Google Cast / MediaRouter, and SMBJ. WorkManager is not a dependency. The dashboard is a page in the APK.
 
@@ -482,7 +480,7 @@ clearcast-tuner/
 
 - This is a player only. You must provide your own streams.
 - It is a beta.
-- **0.2.82** is the latest signed file. This source has the same version numbers and has not been packed into a new APK.
+- **0.2.83** is the latest signed file (`olympus-iptv-0.2.83.apk`, versionCode 84). Install it over 0.2.82.
 - `portal/data/store.json` is for the Node portal on a PC. It is not packaged in the APK.
 - Chromecast often cannot play provider IPTV/HLS. The Cast button warns before connecting.
 - Ratings, trailers, and New this week need the matching keys in `local.properties` at build time.
