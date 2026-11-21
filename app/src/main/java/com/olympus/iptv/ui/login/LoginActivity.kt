@@ -32,11 +32,27 @@ import java.util.concurrent.TimeUnit
 class LoginActivity : AppCompatActivity() {
     private lateinit var binding: ActivityLoginBinding
     private var mode: PlaylistType? = null
+    private var connecting = false
     private var passwordVisible = false
     private val loader = PlaylistLoader()
     private val http = OkHttpClient.Builder().callTimeout(8, TimeUnit.SECONDS).build()
 
     private val store get() = (application as OlympusIptvApp).playlistStore
+
+    private fun pasteInto(field: android.widget.EditText) {
+        val clip = getSystemService(android.content.ClipboardManager::class.java)?.primaryClip
+        val text = if (clip != null && clip.itemCount > 0) {
+            clip.getItemAt(0).coerceToText(this)?.toString()?.trim().orEmpty()
+        } else {
+            ""
+        }
+        if (text.isBlank()) {
+            android.widget.Toast.makeText(this, R.string.paste_empty, android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
+        field.setText(text)
+        field.setSelection(text.length)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -63,6 +79,10 @@ class LoginActivity : AppCompatActivity() {
         binding.onboardingStep.text = getString(R.string.onboarding_step, 1, getString(R.string.onboarding_playlist))
         listOf(binding.inputEmail, binding.inputUrl, binding.inputUser, binding.inputPass, binding.inputZip)
             .forEach { SoftKeyboard.showWhenFocused(this, it) }
+        if (com.olympus.iptv.ui.DeviceForm.isTouchPrimary(this)) {
+            binding.btnPasteUrl.visibility = View.VISIBLE
+            binding.btnPasteUrl.setOnClickListener { pasteInto(binding.inputUrl) }
+        }
 
         com.olympus.iptv.portal.DashboardHost.addUrlListener(dashboardUrls)
         runCatching {
@@ -78,7 +98,7 @@ class LoginActivity : AppCompatActivity() {
         }
         lifecycleScope.launch {
             store.session.collect { saved ->
-                if (saved != null && !saved.email.isNullOrBlank() && !isFinishing) {
+                if (!connecting && saved != null && !saved.email.isNullOrBlank() && !isFinishing) {
                     openBrowse(saved.id)
                 }
             }
@@ -179,10 +199,12 @@ class LoginActivity : AppCompatActivity() {
         }
 
         val includeVod = binding.checkVod.isChecked
+        connecting = true
         setBusy(true)
         lifecycleScope.launch {
             val home = withContext(Dispatchers.IO) { lookupZip(zip) }
             if (home == null) {
+                connecting = false
                 setBusy(false)
                 showError(getString(R.string.login_zip_invalid))
                 return@launch
@@ -197,6 +219,7 @@ class LoginActivity : AppCompatActivity() {
             try {
                 val ok = loader.validate(playlist)
                 if (!ok) {
+                    connecting = false
                     showError(getString(R.string.error_load))
                     return@launch
                 }
@@ -210,7 +233,10 @@ class LoginActivity : AppCompatActivity() {
                     )
                 )
                 openGuide(playlist.id)
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
+                connecting = false
                 showError(e.message ?: getString(R.string.error_load))
             } finally {
                 setBusy(false)
@@ -294,6 +320,9 @@ class LoginActivity : AppCompatActivity() {
         val next = if (skip) {
             Intent(this, BrowseActivity::class.java)
                 .putExtra(BrowseActivity.EXTRA_PLAYLIST_ID, playlistId)
+        } else if (com.olympus.iptv.ui.DeviceForm.isTouchPrimary(this)) {
+            Intent(this, FavoritesSetupActivity::class.java)
+                .putExtra(FavoritesSetupActivity.EXTRA_PLAYLIST_ID, playlistId)
         } else {
             Intent(this, PairingStepActivity::class.java)
                 .putExtra(FavoritesSetupActivity.EXTRA_PLAYLIST_ID, playlistId)

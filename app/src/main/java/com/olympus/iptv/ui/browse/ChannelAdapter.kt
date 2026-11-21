@@ -6,6 +6,7 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
+import android.graphics.drawable.GradientDrawable
 import android.view.ViewOutlineProvider
 import coil.dispose
 import coil.load
@@ -47,6 +48,8 @@ class ChannelAdapter(
     var continueLabel: (Channel) -> String? = { null }
     var playingId: String? = null
         private set
+    var focusedId: String? = null
+        private set
     /** 0..1000 watch progress for poster gold bar; null hides. */
     var continueProgress: (Channel) -> Int? = { null }
     var posterRating: (Channel) -> String? = { null }
@@ -74,6 +77,21 @@ class ChannelAdapter(
         if (playingId == id) return
         playingId = id
         if (items.isNotEmpty() && !posterMode) notifyItemRangeChanged(0, items.size)
+    }
+
+    fun setGuideFocused(id: String?) {
+        if (focusedId == id) return
+        val prev = focusedId
+        focusedId = id
+        if (posterMode || items.isEmpty()) return
+        if (prev != null) {
+            val oldIdx = items.indexOfFirst { it.id == prev }
+            if (oldIdx >= 0) notifyItemChanged(oldIdx, PAYLOAD_GUIDE_FOCUS)
+        }
+        if (id != null) {
+            val newIdx = items.indexOfFirst { it.id == id }
+            if (newIdx >= 0) notifyItemChanged(newIdx, PAYLOAD_GUIDE_FOCUS)
+        }
     }
 
     fun submit(list: List<Channel>, groupLabel: String? = null, sequentialNumbers: Boolean = false) {
@@ -188,6 +206,7 @@ class ChannelAdapter(
             payloads.contains(PAYLOAD_EPG) -> row.bindEpg(items[position])
             payloads.contains(PAYLOAD_FAVORITE) -> row.bindFavorite(items[position])
             payloads.contains(PAYLOAD_LOGO) -> row.bindLogo(items[position])
+            payloads.contains(PAYLOAD_GUIDE_FOCUS) -> (row as? RowHolder)?.bindGuideHighlight(items[position])
             else -> super.onBindViewHolder(holder, position, payloads)
         }
     }
@@ -276,18 +295,24 @@ class ChannelAdapter(
 
         override fun bind(item: Channel, position: Int, full: Boolean) {
             if (full) {
-                if (guideRowHeight > 0) {
-                    val params = binding.root.layoutParams
-                    if (params != null && params.height != guideRowHeight) {
-                        params.height = guideRowHeight
+                val portraitCard = DeviceForm.isCompact(binding.root.context) &&
+                    DeviceForm.isPortrait(binding.root.context)
+                val params = binding.root.layoutParams
+                if (portraitCard && params != null) {
+                    val wrap = ViewGroup.LayoutParams.WRAP_CONTENT
+                    if (params.height != wrap) {
+                        params.height = wrap
                         binding.root.layoutParams = params
                     }
+                } else if (guideRowHeight > 0 && params != null && params.height != guideRowHeight) {
+                    params.height = guideRowHeight
+                    binding.root.layoutParams = params
                 }
                 binding.number.visibility = View.VISIBLE
                 binding.number.text = (position + 1).toString()
                 binding.logo.background = null
                 binding.logo.setPadding(0, 0, 0, 0)
-                binding.name.text = com.olympus.iptv.data.NameStrip.shown(item.name)
+                binding.name.text = com.olympus.iptv.data.NameStrip.shown(item.name, item.groupTitle)
                 binding.name.maxLines = if (guideRowHeight > 0) 2 else 1
                 binding.name.textSize = if (guideRowHeight > 0) 13f else 15f
                 binding.root.alpha = if (unhealthy(item)) 0.45f else 1f
@@ -302,6 +327,7 @@ class ChannelAdapter(
                 binding.logo.layoutParams.height = logo
                 bindLogo(item)
                 bindEpg(item)
+                bindGuideHighlight(item)
                 com.olympus.iptv.ui.LiveBars.show(binding.liveBars, item.id == playingId)
                 binding.playTarget.isFocusable = guideRowsFocusable
                 binding.playTarget.isFocusableInTouchMode = guideRowsFocusable
@@ -314,6 +340,27 @@ class ChannelAdapter(
                     if (!touch && guideRowsFocusable) FocusMotion.animate(binding.playTarget, hasFocus)
                     if (hasFocus) onFocused(item)
                 }
+            }
+        }
+
+        fun bindGuideHighlight(item: Channel) {
+            val ctx = binding.root.context
+            val active = !guideRowsFocusable && item.id == focusedId
+            binding.number.setTextColor(
+                ctx.getColor(if (active) R.color.accent else R.color.text_secondary)
+            )
+            binding.name.setTextColor(
+                ctx.getColor(if (active) R.color.accent else R.color.text_primary)
+            )
+            if (active) {
+                val d = ctx.resources.displayMetrics.density
+                binding.root.background = GradientDrawable().apply {
+                    cornerRadius = 4f * d
+                    setColor(ctx.getColor(R.color.bg_elevated))
+                    setStroke((1 * d).toInt().coerceAtLeast(1), ctx.getColor(R.color.accent_dim))
+                }
+            } else {
+                binding.root.background = null
             }
         }
 
@@ -345,18 +392,44 @@ class ChannelAdapter(
         }
 
         override fun bindEpg(item: Channel) {
-            val touch = DeviceForm.isTouchPrimary(binding.root.context)
-            if (!touch || item.kind != ContentKind.LIVE || !item.seriesId.isNullOrBlank()) {
-                binding.epgNow.visibility = View.GONE
+            val context = binding.root.context
+            val card = DeviceForm.isCompact(context) &&
+                DeviceForm.isPortrait(context) &&
+                item.kind == ContentKind.LIVE &&
+                item.seriesId.isNullOrBlank()
+            if (!card) {
+                binding.epgProgress.visibility = View.GONE
+                binding.epgNext.visibility = View.GONE
+                val touch = DeviceForm.isTouchPrimary(context)
+                if (!touch || item.kind != ContentKind.LIVE || !item.seriesId.isNullOrBlank()) {
+                    binding.epgNow.visibility = View.GONE
+                    return
+                }
+                val line = epgProvider(item)?.nowLine().orEmpty()
+                binding.epgNow.text = line
+                binding.epgNow.visibility = if (line.isBlank()) View.GONE else View.VISIBLE
                 return
             }
-            val line = epgProvider(item)?.nowLine().orEmpty()
-            if (line.isBlank()) {
+            val info = epgProvider(item)
+            val now = info?.now
+            if (now == null) {
                 binding.epgNow.visibility = View.GONE
+                binding.epgProgress.visibility = View.GONE
             } else {
-                binding.epgNow.text = line
+                binding.epgNow.text = now.title
                 binding.epgNow.visibility = View.VISIBLE
+                val span = now.endMillis - now.startMillis
+                val fraction = if (span > 0L) {
+                    ((System.currentTimeMillis() - now.startMillis) * 1000L / span).toInt()
+                } else {
+                    0
+                }
+                binding.epgProgress.progress = fraction.coerceIn(0, 1000)
+                binding.epgProgress.visibility = View.VISIBLE
             }
+            val next = info?.nextLine().orEmpty()
+            binding.epgNext.text = next
+            binding.epgNext.visibility = if (next.isBlank()) View.GONE else View.VISIBLE
         }
     }
 
@@ -388,7 +461,9 @@ class ChannelAdapter(
         }
         view.setTag(R.id.logo, key)
         view.scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
-        val px = logoPx(view, sizeDp)
+        val px = logoPx(view, sizeDp).let { size ->
+            if (poster && DeviceForm.powerSave(view.context)) size.coerceAtMost(320) else size
+        }
         view.load(key) {
             channelLogo(px)
             if (poster && cornerPx > 0f) transformations(RoundedCornersTransformation(cornerPx))
@@ -403,6 +478,7 @@ class ChannelAdapter(
         private const val PAYLOAD_EPG = "epg"
         private const val PAYLOAD_FAVORITE = "favorite"
         private const val PAYLOAD_LOGO = "logo"
+        private const val PAYLOAD_GUIDE_FOCUS = "guide_focus"
 
         private fun logoPx(view: android.view.View, dp: Int): Int {
             val fromDp = (dp * view.resources.displayMetrics.density).toInt().coerceAtLeast(1)
@@ -411,5 +487,5 @@ class ChannelAdapter(
         }
     }
 
-    private fun displayName(item: Channel): String = com.olympus.iptv.data.NameStrip.shown(item.name)
+    private fun displayName(item: Channel): String = com.olympus.iptv.data.NameStrip.shown(item.name, item.groupTitle)
 }

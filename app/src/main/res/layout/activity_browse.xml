@@ -87,6 +87,20 @@
             android:paddingHorizontal="12dp"
             android:text="@string/search"
             android:textColor="@color/text_primary"
+            android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/mobileCast"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/bg_nav"
+            android:clickable="true"
+            android:focusable="false"
+            android:gravity="center"
+            android:paddingHorizontal="12dp"
+            android:text="@string/cast"
+            android:textColor="@color/text_primary"
             android:textSize="14sp"
             android:textStyle="bold" />
     </LinearLayout>
@@ -689,14 +703,21 @@
                 android:layout_height="0dp"
                 android:layout_weight="1">
 
-                <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/channelList"
+                <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+                    android:id="@+id/channelRefresh"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:clipToPadding="false"
-                    android:descendantFocusability="afterDescendants"
-                    android:focusable="false"
-                    android:paddingBottom="0dp" />
+                    android:enabled="false">
+
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/channelList"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:clipToPadding="false"
+                        android:descendantFocusability="afterDescendants"
+                        android:focusable="false"
+                        android:paddingBottom="0dp" />
+                </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
                 <LinearLayout
                     android:id="@+id/libraryStatus"
@@ -907,7 +928,7 @@
             android:gravity="center"
             android:text="@string/nav_tv"
             android:textColor="@color/text_primary"
-            android:textSize="14sp"
+            android:textSize="12sp"
             android:textStyle="bold" />
 
         <TextView
@@ -921,7 +942,7 @@
             android:gravity="center"
             android:text="@string/vod"
             android:textColor="@color/text_primary"
-            android:textSize="14sp"
+            android:textSize="12sp"
             android:textStyle="bold" />
 
         <TextView
@@ -935,7 +956,35 @@
             android:gravity="center"
             android:text="@string/nav_shows"
             android:textColor="@color/text_primary"
-            android:textSize="14sp"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/bottomTabLibrary"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@drawable/bg_nav"
+            android:clickable="true"
+            android:focusable="false"
+            android:gravity="center"
+            android:text="@string/nav_library"
+            android:textColor="@color/text_primary"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/bottomTabAdmin"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@drawable/bg_nav"
+            android:clickable="true"
+            android:focusable="false"
+            android:gravity="center"
+            android:text="@string/nav_admin"
+            android:textColor="@color/text_primary"
+            android:textSize="12sp"
             android:textStyle="bold" />
     </LinearLayout>
     </LinearLayout>

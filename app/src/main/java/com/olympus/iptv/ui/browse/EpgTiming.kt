@@ -1,5 +1,7 @@
 package com.olympus.iptv.ui.browse
 
+import com.olympus.iptv.playlist.DummyEpg
+
 /** Labels for programs that are about to end or about to start. */
 object EpgTiming {
     fun tag(now: Long, start: Long, end: Long): String? {
@@ -17,10 +19,9 @@ object EpgTiming {
 
     fun dress(program: com.olympus.iptv.data.EpgProgram, now: Long): com.olympus.iptv.data.EpgProgram {
         if (program.guideClock.isNotEmpty()) return program
-        val badge = SportsEvent.badge(program.title, now, program.startMillis, program.endMillis)
+        val cleanTitle = DummyEpg.stripChannelNumber(program.title).ifBlank { program.title }
         val timing = tag(now, program.startMillis, program.endMillis)
-        val marked = listOfNotNull(badge, timing).joinToString(" · ")
-        val title = if (marked.isBlank()) program.title else "$marked  ${program.title}"
+        val title = if (timing.isNullOrBlank()) cleanTitle else "$timing · $cleanTitle"
         val clock = clock(program.startMillis) + " – " + clock(program.endMillis)
         return program.copy(guideTitle = title, guideClock = clock)
     }

@@ -21,16 +21,16 @@ object EpgProgramStyle {
         val hay = "${program.title} ${channel.name} ${channel.groupTitle.orEmpty()}".lowercase(Locale.US)
         if (SPORTS.any { it in hay }) return EpgKind.SPORTS
         if (MOVIE.any { it in hay }) return EpgKind.MOVIE
-        if (NEW.any { it in hay } || episodeBadge(program.title) != null && "new" in hay) return EpgKind.NEW
+        if (NEW.any { it in hay } || (episodeBadge(program.title) != null && "new" in hay)) return EpgKind.NEW
         if (now >= program.startMillis && now < program.endMillis) return EpgKind.LIVE
         return EpgKind.OTHER
     }
 
     fun pill(kind: EpgKind): String? = when (kind) {
-        EpgKind.LIVE -> "Live"
-        EpgKind.NEW -> "New"
-        EpgKind.SPORTS -> "Sports"
-        EpgKind.MOVIE -> "Movie"
+        EpgKind.LIVE -> "LIVE"
+        EpgKind.NEW -> "NEW"
+        EpgKind.SPORTS -> "SPORTS"
+        EpgKind.MOVIE -> "MOVIE"
         EpgKind.OTHER -> null
     }
 
@@ -50,7 +50,7 @@ object EpgProgramStyle {
                 EpgKind.NEW -> R.color.epg_new
                 EpgKind.SPORTS -> R.color.epg_sports
                 EpgKind.MOVIE -> R.color.epg_movie
-                EpgKind.OTHER -> R.color.bg_panel
+                EpgKind.OTHER -> R.color.bg_elevated
             }
         )
     }
@@ -76,5 +76,5 @@ object EpgProgramStyle {
         "soccer", "football", "baseball", "hockey", "tennis", "golf", "f1", "racing"
     )
     private val MOVIE = listOf("movie", "film", "cinema", "feature")
-    private val NEW = listOf("premiere", "new episode", "season premiere", "series premiere", " brand new")
+    private val NEW = listOf("premiere", "new episode", "season premiere", "series premiere", "brand new")
 }

@@ -2,28 +2,47 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginBottom="4dp"
+    android:layout_marginBottom="8dp"
     android:background="@drawable/bg_fresh_focusable"
     android:clickable="true"
     android:focusable="true"
     android:focusableInTouchMode="true"
     android:gravity="center_vertical"
     android:orientation="horizontal"
-    android:padding="6dp">
+    android:padding="8dp">
 
-    <ImageView
-        android:id="@+id/episodeArt"
-        android:layout_width="128dp"
-        android:layout_height="72dp"
-        android:background="@color/bg_elevated"
-        android:contentDescription="@null"
-        android:scaleType="fitCenter"
-        android:src="@drawable/ic_channel_placeholder" />
+    <FrameLayout
+        android:layout_width="116dp"
+        android:layout_height="66dp"
+        android:background="@color/bg_elevated">
+
+        <ImageView
+            android:id="@+id/episodeArt"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:contentDescription="@null"
+            android:scaleType="centerCrop"
+            android:src="@drawable/ic_channel_placeholder" />
+
+        <TextView
+            android:id="@+id/episodeRuntimeBadge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|end"
+            android:layout_margin="4dp"
+            android:background="#CC141210"
+            android:paddingHorizontal="5dp"
+            android:paddingVertical="1dp"
+            android:textColor="@color/text_primary"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+    </FrameLayout>
 
     <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginStart="14dp"
+        android:layout_marginStart="12dp"
         android:layout_weight="1"
         android:orientation="vertical">
 
@@ -32,9 +51,9 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:ellipsize="end"
-            android:maxLines="2"
+            android:maxLines="1"
             android:textColor="@color/text_primary"
-            android:textSize="18sp"
+            android:textSize="16sp"
             android:textStyle="bold" />
 
         <TextView
@@ -44,34 +63,34 @@
             android:layout_marginTop="2dp"
             android:ellipsize="end"
             android:maxLines="1"
-            android:textColor="@color/text_secondary"
-            android:textSize="13sp"
+            android:textColor="@color/accent"
+            android:textSize="12sp"
             android:visibility="gone" />
 
         <TextView
             android:id="@+id/episodePlot"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
+            android:layout_marginTop="2dp"
             android:ellipsize="end"
             android:maxLines="2"
             android:textColor="@color/text_secondary"
-            android:textSize="14sp"
+            android:textSize="13sp"
             android:visibility="gone" />
     </LinearLayout>
 
     <TextView
         android:id="@+id/episodePlay"
         android:layout_width="wrap_content"
-        android:layout_height="44dp"
-        android:layout_marginStart="12dp"
+        android:layout_height="38dp"
+        android:layout_marginStart="10dp"
         android:background="@drawable/bg_button"
         android:clickable="true"
         android:focusable="false"
         android:gravity="center"
-        android:paddingHorizontal="20dp"
+        android:paddingHorizontal="16dp"
         android:text="@string/fresh_play"
         android:textColor="@color/bg"
-        android:textSize="15sp"
+        android:textSize="14sp"
         android:textStyle="bold" />
 </LinearLayout>

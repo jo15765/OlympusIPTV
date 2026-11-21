@@ -10,6 +10,7 @@ fun ImageRequest.Builder.channelLogo(sizePx: Int): ImageRequest.Builder =
     size(sizePx)
         .bitmapConfig(Bitmap.Config.RGB_565)
         .crossfade(false)
+        .allowHardware(true)
         .memoryCachePolicy(CachePolicy.ENABLED)
         .diskCachePolicy(CachePolicy.ENABLED)
 

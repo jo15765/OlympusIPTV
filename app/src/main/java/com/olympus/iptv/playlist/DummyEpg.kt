@@ -29,7 +29,10 @@ object DummyEpg {
         """\(\s*([A-Za-z]{3,9})\s+(\d{1,2})(?:\s+(\d{4}))?\s+(\d{1,2}):(\d{2})\s*(AM|PM)?\s*([A-Za-z]{2,4})?\s*\)""",
         RegexOption.IGNORE_CASE
     )
-    private val indexPrefix = Regex("""^[A-Za-z][A-Za-z0-9 &'+\-]{0,24}\s+\d{2}:\s+""")
+    private val indexPrefix = Regex("""^[A-Za-z][A-Za-z0-9 &'+\-]{0,24}\s+\d{1,4}\s*[:|\-–—]\s*""")
+    private val leadingChannelNum = Regex("""^(?:(?:ch(?:annel)?\.?\s*)|#)?\d{1,4}\s*[:|\-–—.]\s*""", RegexOption.IGNORE_CASE)
+    private val leadingHashNum = Regex("""^(?:(?:ch(?:annel)?\.?\s*)|#)\d{1,4}\s+""", RegexOption.IGNORE_CASE)
+    private val trailingChannelNum = Regex("""\s*(?:\[(?:ch(?:annel)?\.?\s*)?#?\d{1,4}\]|\((?:ch(?:annel)?\.?\s*)?#?\d{1,4}\)|[|:\-–—]\s*(?:ch(?:annel)?\.?\s*)?#?\d{1,4}|\s+#\d{1,4})\s*$""", RegexOption.IGNORE_CASE)
     private val countryPrefix = Regex("""^[A-Z]{2}:\s+""")
     private val quality = Regex("""\s*\((?:4KDV|4K|FHD|HD|SD)\)\s*$""", RegexOption.IGNORE_CASE)
     private val shortParen = Regex("""\s+\([A-Z0-9][A-Z0-9 .]{0,12}\)\s*$""")
@@ -89,9 +92,19 @@ object DummyEpg {
         return Parsed(title, start)
     }
 
+    fun stripChannelNumber(value: String): String {
+        var name = value.trim()
+        name = indexPrefix.replace(name, "")
+        name = leadingChannelNum.replace(name, "")
+        name = leadingHashNum.replace(name, "")
+        name = trailingChannelNum.replace(name, "")
+        return name.replace(spaces, " ").trim(' ', '-', ':', '|', '–', '—')
+    }
+
     private fun cleanTitle(value: String): String {
         var name = Titles.clean(value)
-        name = indexPrefix.replace(name, "")
+        name = com.olympus.iptv.data.NameStrip.stripGroupAndNumber(name, null)
+        name = stripChannelNumber(name)
         name = countryPrefix.replace(name, "")
         name = quality.replace(name, "")
         name = shortParen.replace(name, "")

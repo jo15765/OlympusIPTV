@@ -10,10 +10,10 @@ object GuideMetrics {
 
     /** Guide row height in dp. Compact is the tighter living-room density. */
     fun rowDp(compact: Boolean, tall: Boolean): Int = when {
-        compact && tall -> 36
-        compact -> 32
-        tall -> 44
-        else -> 40
+        compact && tall -> 42
+        compact -> 38
+        tall -> 50
+        else -> 46
     }
 
     fun rowPx(dp: Int, density: Float): Int = (dp * density).toInt().coerceAtLeast(1)

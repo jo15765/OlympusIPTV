@@ -22,7 +22,7 @@
             android:clickable="true"
             android:focusable="true"
             android:gravity="center"
-            android:nextFocusDown="@id/cardCountries"
+            android:nextFocusDown="@id/cardDecoder"
             android:paddingHorizontal="14dp"
             android:text="@string/back"
             android:textColor="@color/text_primary"
@@ -46,632 +46,603 @@
         android:textColor="@color/text_secondary"
         android:textSize="14sp" />
 
-    <LinearLayout
+    <ScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_marginTop="10dp"
         android:layout_weight="1"
-        android:orientation="horizontal">
+        android:fillViewport="true"
+        android:scrollbars="none">
 
         <LinearLayout
-            android:id="@+id/cardCountries"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_marginEnd="8dp"
-            android:layout_weight="1"
-            android:background="@drawable/bg_focusable"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:nextFocusRight="@id/cardLineup"
-            android:nextFocusDown="@id/cardStrip"
-            android:nextFocusUp="@id/btnBack"
-            android:orientation="vertical"
-            android:padding="10dp">
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
 
-            <ImageView
-                android:layout_width="28dp"
-                android:layout_height="28dp"
-                android:contentDescription="@null"
-                android:src="@drawable/ic_nav_web"
-                android:tint="@color/accent" />
-
+            <!-- Category 1: Playback & Video Engine -->
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
-                android:gravity="center"
-                android:text="@string/epg_card_countries"
-                android:textColor="@color/text_primary"
+                android:layout_marginBottom="6dp"
+                android:text="🎬 Playback &amp; Video Engine"
+                android:textColor="@color/accent"
                 android:textSize="15sp"
                 android:textStyle="bold" />
 
-            <TextView
+            <LinearLayout
+                android:id="@+id/cardDecoder"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center"
-                android:text="@string/epg_short_countries"
-                android:textColor="@color/text_secondary"
-                android:textSize="12sp" />
-        </LinearLayout>
+                android:layout_height="52dp"
+                android:layout_marginBottom="6dp"
+                android:background="@drawable/bg_focusable"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:nextFocusUp="@id/btnBack"
+                android:nextFocusDown="@id/cardDensity"
+                android:orientation="horizontal"
+                android:paddingHorizontal="16dp">
 
-        <LinearLayout
-            android:id="@+id/cardLineup"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_marginEnd="8dp"
-            android:layout_weight="1"
-            android:background="@drawable/bg_focusable"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:nextFocusLeft="@id/cardCountries"
-            android:nextFocusRight="@id/cardReset"
-            android:nextFocusDown="@id/cardGroups"
-            android:orientation="vertical"
-            android:padding="10dp">
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/epg_card_decoder"
+                    android:textColor="@color/text_primary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
 
-            <ImageView
-                android:layout_width="28dp"
-                android:layout_height="28dp"
-                android:contentDescription="@null"
-                android:src="@drawable/ic_nav_shows"
-                android:tint="@color/accent" />
+                <TextView
+                    android:id="@+id/decoderState"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/decoder_hardware"
+                    android:textColor="@color/accent"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
 
+            <LinearLayout
+                android:id="@+id/cardDensity"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:layout_marginBottom="6dp"
+                android:background="@drawable/bg_focusable"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:nextFocusUp="@id/cardDecoder"
+                android:nextFocusDown="@id/cardPip"
+                android:orientation="horizontal"
+                android:paddingHorizontal="16dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/epg_card_density"
+                    android:textColor="@color/text_primary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/densityState"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/epg_short_density_comfortable"
+                    android:textColor="@color/accent"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/cardPip"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:layout_marginBottom="6dp"
+                android:background="@drawable/bg_focusable"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:nextFocusUp="@id/cardDensity"
+                android:nextFocusDown="@id/cardHideEmpty"
+                android:orientation="horizontal"
+                android:paddingHorizontal="16dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/epg_card_pip"
+                    android:textColor="@color/text_primary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/pipState"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/epg_short_hide_empty_on"
+                    android:textColor="@color/accent"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/cardAutoClean"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_marginEnd="10dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_focusable"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingHorizontal="16dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/epg_card_auto_clean"
+                    android:textColor="@color/text_primary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/autoCleanState"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/epg_short_hide_empty_on"
+                    android:textColor="@color/accent"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/cardHideEmpty"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:layout_marginBottom="12dp"
+                android:background="@drawable/bg_focusable"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:nextFocusUp="@id/cardPip"
+                android:nextFocusDown="@id/cardCountries"
+                android:orientation="horizontal"
+                android:paddingHorizontal="16dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/epg_card_hide_empty"
+                    android:textColor="@color/text_primary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/hideEmptyState"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/epg_short_hide_empty_off"
+                    android:textColor="@color/accent"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <!-- Category 2: Channel & EPG Curation -->
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
-                android:gravity="center"
-                android:text="@string/epg_card_lineup"
-                android:textColor="@color/text_primary"
+                android:layout_marginBottom="6dp"
+                android:text="📺 Channel &amp; EPG Curation"
+                android:textColor="@color/accent"
                 android:textSize="15sp"
                 android:textStyle="bold" />
 
-            <TextView
+            <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center"
-                android:text="@string/epg_short_lineup"
-                android:textColor="@color/text_secondary"
-                android:textSize="12sp" />
-        </LinearLayout>
+                android:layout_height="72dp"
+                android:layout_marginBottom="6dp"
+                android:orientation="horizontal">
 
-        <LinearLayout
-            android:id="@+id/cardReset"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:background="@drawable/bg_focusable"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:nextFocusLeft="@id/cardLineup"
-            android:nextFocusDown="@id/cardSanitize"
-            android:orientation="vertical"
-            android:padding="10dp">
+                <LinearLayout
+                    android:id="@+id/cardCountries"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_focusable"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:nextFocusUp="@id/cardHideEmpty"
+                    android:nextFocusRight="@id/cardLineup"
+                    android:nextFocusDown="@id/cardStrip"
+                    android:orientation="vertical"
+                    android:padding="8dp">
 
-            <ImageView
-                android:layout_width="28dp"
-                android:layout_height="28dp"
-                android:contentDescription="@null"
-                android:src="@drawable/ic_nav_refresh"
-                android:tint="@color/accent" />
+                    <ImageView
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_nav_web"
+                        android:tint="@color/accent" />
 
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:gravity="center"
+                        android:text="@string/epg_card_countries"
+                        android:textColor="@color/text_primary"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/cardLineup"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_focusable"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:nextFocusUp="@id/cardHideEmpty"
+                    android:nextFocusLeft="@id/cardCountries"
+                    android:nextFocusRight="@id/cardReset"
+                    android:nextFocusDown="@id/cardGroups"
+                    android:orientation="vertical"
+                    android:padding="8dp">
+
+                    <ImageView
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_nav_shows"
+                        android:tint="@color/accent" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:gravity="center"
+                        android:text="@string/epg_card_lineup"
+                        android:textColor="@color/text_primary"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/cardReset"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_focusable"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:nextFocusUp="@id/cardHideEmpty"
+                    android:nextFocusLeft="@id/cardLineup"
+                    android:nextFocusDown="@id/cardSanitize"
+                    android:orientation="vertical"
+                    android:padding="8dp">
+
+                    <ImageView
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_nav_refresh"
+                        android:tint="@color/accent" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:gravity="center"
+                        android:text="@string/epg_card_reset"
+                        android:textColor="@color/text_primary"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="72dp"
+                android:layout_marginBottom="6dp"
+                android:orientation="horizontal">
+
+                <LinearLayout
+                    android:id="@+id/cardStrip"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_focusable"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:nextFocusUp="@id/cardCountries"
+                    android:nextFocusRight="@id/cardGroups"
+                    android:nextFocusDown="@id/cardParse"
+                    android:orientation="vertical"
+                    android:padding="8dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:text="@string/epg_card_strip"
+                        android:textColor="@color/text_primary"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/cardGroups"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_focusable"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:nextFocusUp="@id/cardLineup"
+                    android:nextFocusLeft="@id/cardStrip"
+                    android:nextFocusRight="@id/cardSanitize"
+                    android:nextFocusDown="@id/cardImages"
+                    android:orientation="vertical"
+                    android:padding="8dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:text="@string/epg_card_groups"
+                        android:textColor="@color/text_primary"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/cardSanitize"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_focusable"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:nextFocusUp="@id/cardReset"
+                    android:nextFocusLeft="@id/cardGroups"
+                    android:nextFocusDown="@id/cardParental"
+                    android:orientation="vertical"
+                    android:padding="8dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:text="@string/epg_card_sanitize"
+                        android:textColor="@color/text_primary"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:layout_marginBottom="12dp"
+                android:orientation="horizontal">
+
+                <LinearLayout
+                    android:id="@+id/cardParse"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_focusable"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:nextFocusUp="@id/cardStrip"
+                    android:nextFocusRight="@id/cardImages"
+                    android:nextFocusDown="@id/cardParental"
+                    android:orientation="vertical"
+                    android:padding="8dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:text="@string/epg_card_parse"
+                        android:textColor="@color/text_primary"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/cardImages"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_focusable"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:nextFocusUp="@id/cardGroups"
+                    android:nextFocusLeft="@id/cardParse"
+                    android:nextFocusDown="@id/cardParental"
+                    android:orientation="vertical"
+                    android:padding="8dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:text="@string/epg_card_images"
+                        android:textColor="@color/text_primary"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Category 3: Security & Parental Controls -->
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
-                android:gravity="center"
-                android:text="@string/epg_card_reset"
-                android:textColor="@color/text_primary"
+                android:layout_marginBottom="6dp"
+                android:text="🔐 Security &amp; Parental Controls"
+                android:textColor="@color/accent"
                 android:textSize="15sp"
                 android:textStyle="bold" />
 
-            <TextView
+            <LinearLayout
+                android:id="@+id/cardParental"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center"
-                android:text="@string/epg_short_reset"
-                android:textColor="@color/text_secondary"
-                android:textSize="12sp" />
-        </LinearLayout>
-    </LinearLayout>
+                android:layout_height="52dp"
+                android:layout_marginBottom="6dp"
+                android:background="@drawable/bg_focusable"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:nextFocusUp="@id/cardParse"
+                android:nextFocusDown="@id/cardPinTimeout"
+                android:orientation="horizontal"
+                android:paddingHorizontal="16dp">
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_marginTop="8dp"
-        android:layout_weight="1"
-        android:orientation="horizontal">
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/epg_card_parental"
+                    android:textColor="@color/text_primary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
 
-        <LinearLayout
-            android:id="@+id/cardStrip"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_marginEnd="8dp"
-            android:layout_weight="1"
-            android:background="@drawable/bg_focusable"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:nextFocusRight="@id/cardGroups"
-            android:nextFocusUp="@id/cardCountries"
-            android:nextFocusDown="@id/cardParse"
-            android:orientation="vertical"
-            android:padding="10dp">
+            <LinearLayout
+                android:id="@+id/cardPinTimeout"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:layout_marginBottom="12dp"
+                android:background="@drawable/bg_focusable"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:nextFocusUp="@id/cardParental"
+                android:nextFocusDown="@id/cardTmdb"
+                android:orientation="horizontal"
+                android:paddingHorizontal="16dp">
 
-            <ImageView
-                android:layout_width="28dp"
-                android:layout_height="28dp"
-                android:contentDescription="@null"
-                android:src="@drawable/ic_nav_edit"
-                android:tint="@color/accent" />
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/epg_card_pin_timeout"
+                    android:textColor="@color/text_primary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
 
+                <TextView
+                    android:id="@+id/pinTimeoutState"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/epg_short_pin_timeout_value"
+                    android:textColor="@color/accent"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <!-- Category 4: Integrations & Services -->
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
-                android:gravity="center"
-                android:text="@string/epg_card_strip"
-                android:textColor="@color/text_primary"
+                android:layout_marginBottom="6dp"
+                android:text="💾 Integrations &amp; Services"
+                android:textColor="@color/accent"
                 android:textSize="15sp"
                 android:textStyle="bold" />
 
-            <TextView
+            <LinearLayout
+                android:id="@+id/cardTmdb"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center"
-                android:text="@string/epg_short_strip"
-                android:textColor="@color/text_secondary"
-                android:textSize="12sp" />
+                android:layout_height="52dp"
+                android:layout_marginBottom="6dp"
+                android:background="@drawable/bg_focusable"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:nextFocusUp="@id/cardPinTimeout"
+                android:nextFocusDown="@id/cardScrobbler"
+                android:orientation="horizontal"
+                android:paddingHorizontal="16dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/epg_card_tmdb"
+                    android:textColor="@color/text_primary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tmdbState"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/epg_short_tmdb"
+                    android:textColor="@color/accent"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/cardScrobbler"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:layout_marginBottom="16dp"
+                android:background="@drawable/bg_focusable"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:nextFocusUp="@id/cardTmdb"
+                android:orientation="horizontal"
+                android:paddingHorizontal="16dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/epg_card_scrobbler"
+                    android:textColor="@color/text_primary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/scrobblerState"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/scrobbler_none"
+                    android:textColor="@color/accent"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
         </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/cardGroups"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_marginEnd="8dp"
-            android:layout_weight="1"
-            android:background="@drawable/bg_focusable"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:nextFocusLeft="@id/cardStrip"
-            android:nextFocusRight="@id/cardSanitize"
-            android:nextFocusUp="@id/cardLineup"
-            android:nextFocusDown="@id/cardImages"
-            android:orientation="vertical"
-            android:padding="10dp">
-
-            <ImageView
-                android:layout_width="28dp"
-                android:layout_height="28dp"
-                android:contentDescription="@null"
-                android:src="@drawable/ic_nav_edit"
-                android:tint="@color/accent" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:gravity="center"
-                android:text="@string/epg_card_groups"
-                android:textColor="@color/text_primary"
-                android:textSize="15sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center"
-                android:text="@string/epg_short_groups"
-                android:textColor="@color/text_secondary"
-                android:textSize="12sp" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/cardSanitize"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:background="@drawable/bg_focusable"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:nextFocusLeft="@id/cardGroups"
-            android:nextFocusUp="@id/cardReset"
-            android:orientation="vertical"
-            android:padding="10dp">
-
-            <ImageView
-                android:layout_width="28dp"
-                android:layout_height="28dp"
-                android:contentDescription="@null"
-                android:src="@drawable/ic_star"
-                android:tint="@color/accent" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:gravity="center"
-                android:text="@string/epg_card_sanitize"
-                android:textColor="@color/text_primary"
-                android:textSize="15sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center"
-                android:text="@string/epg_short_sanitize"
-                android:textColor="@color/text_secondary"
-                android:textSize="12sp" />
-        </LinearLayout>
-    </LinearLayout>
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_marginTop="8dp"
-        android:layout_weight="1"
-        android:orientation="horizontal">
-
-        <LinearLayout
-            android:id="@+id/cardParse"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_marginEnd="8dp"
-            android:layout_weight="1"
-            android:background="@drawable/bg_focusable"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:nextFocusRight="@id/cardImages"
-            android:nextFocusUp="@id/cardStrip"
-            android:orientation="vertical"
-            android:padding="10dp">
-
-            <ImageView
-                android:layout_width="28dp"
-                android:layout_height="28dp"
-                android:contentDescription="@null"
-                android:src="@drawable/ic_nav_search"
-                android:tint="@color/accent" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:gravity="center"
-                android:text="@string/epg_card_parse"
-                android:textColor="@color/text_primary"
-                android:textSize="15sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center"
-                android:text="@string/epg_short_parse"
-                android:textColor="@color/text_secondary"
-                android:textSize="12sp" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/cardImages"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:background="@drawable/bg_focusable"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:nextFocusLeft="@id/cardParse"
-            android:nextFocusRight="@id/cardParental"
-            android:nextFocusUp="@id/cardGroups"
-            android:orientation="vertical"
-            android:padding="10dp">
-
-            <ImageView
-                android:layout_width="28dp"
-                android:layout_height="28dp"
-                android:contentDescription="@null"
-                android:src="@drawable/ic_nav_movie"
-                android:tint="@color/accent" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:gravity="center"
-                android:text="@string/epg_card_images"
-                android:textColor="@color/text_primary"
-                android:textSize="15sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center"
-                android:text="@string/epg_short_images"
-                android:textColor="@color/text_secondary"
-                android:textSize="12sp" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/cardParental"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_marginStart="8dp"
-            android:layout_weight="1"
-            android:background="@drawable/bg_focusable"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:nextFocusLeft="@id/cardImages"
-            android:nextFocusUp="@id/cardSanitize"
-            android:nextFocusDown="@id/cardHideEmpty"
-            android:orientation="vertical"
-            android:padding="10dp">
-
-            <ImageView
-                android:layout_width="28dp"
-                android:layout_height="28dp"
-                android:contentDescription="@null"
-                android:src="@drawable/ic_lock"
-                android:tint="@color/accent" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:gravity="center"
-                android:text="@string/epg_card_parental"
-                android:textColor="@color/text_primary"
-                android:textSize="15sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center"
-                android:text="@string/epg_short_parental"
-                android:textColor="@color/text_secondary"
-                android:textSize="12sp" />
-        </LinearLayout>
-    </LinearLayout>
-
-    <LinearLayout
-        android:id="@+id/cardHideEmpty"
-        android:layout_width="match_parent"
-        android:layout_height="64dp"
-        android:layout_marginTop="8dp"
-        android:background="@drawable/bg_focusable"
-        android:clickable="true"
-        android:focusable="true"
-        android:gravity="center_vertical"
-        android:nextFocusUp="@id/cardParental"
-        android:nextFocusDown="@id/cardDensity"
-        android:orientation="horizontal"
-        android:paddingHorizontal="16dp">
-
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="@string/epg_card_hide_empty"
-            android:textColor="@color/text_primary"
-            android:textSize="15sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/hideEmptyState"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/epg_short_hide_empty_on"
-            android:textColor="@color/accent"
-            android:textSize="14sp"
-            android:textStyle="bold" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:id="@+id/cardDensity"
-        android:layout_width="match_parent"
-        android:layout_height="64dp"
-        android:layout_marginTop="8dp"
-        android:background="@drawable/bg_focusable"
-        android:clickable="true"
-        android:focusable="true"
-        android:gravity="center_vertical"
-        android:nextFocusUp="@id/cardHideEmpty"
-        android:nextFocusDown="@id/cardPinTimeout"
-        android:orientation="horizontal"
-        android:paddingHorizontal="16dp">
-
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="@string/epg_card_density"
-            android:textColor="@color/text_primary"
-            android:textSize="15sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/densityState"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/epg_short_density_comfortable"
-            android:textColor="@color/accent"
-            android:textSize="14sp"
-            android:textStyle="bold" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:id="@+id/cardPinTimeout"
-        android:layout_width="match_parent"
-        android:layout_height="64dp"
-        android:layout_marginTop="8dp"
-        android:background="@drawable/bg_focusable"
-        android:clickable="true"
-        android:focusable="true"
-        android:gravity="center_vertical"
-        android:nextFocusUp="@id/cardDensity"
-        android:nextFocusDown="@id/cardDecoder"
-        android:orientation="horizontal"
-        android:paddingHorizontal="16dp">
-
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="@string/epg_card_pin_timeout"
-            android:textColor="@color/text_primary"
-            android:textSize="15sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/pinTimeoutState"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/epg_short_pin_timeout"
-            android:textColor="@color/accent"
-            android:textSize="14sp"
-            android:textStyle="bold" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:id="@+id/cardDecoder"
-        android:layout_width="match_parent"
-        android:layout_height="64dp"
-        android:layout_marginTop="8dp"
-        android:background="@drawable/bg_focusable"
-        android:clickable="true"
-        android:focusable="true"
-        android:gravity="center_vertical"
-        android:nextFocusUp="@id/cardPinTimeout"
-        android:nextFocusDown="@id/cardTmdb"
-        android:orientation="horizontal"
-        android:paddingHorizontal="16dp">
-
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="@string/epg_card_decoder"
-            android:textColor="@color/text_primary"
-            android:textSize="15sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/decoderState"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/decoder_hardware"
-            android:textColor="@color/accent"
-            android:textSize="14sp"
-            android:textStyle="bold" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:id="@+id/cardTmdb"
-        android:layout_width="match_parent"
-        android:layout_height="64dp"
-        android:layout_marginTop="8dp"
-        android:background="@drawable/bg_focusable"
-        android:clickable="true"
-        android:focusable="true"
-        android:gravity="center_vertical"
-        android:nextFocusUp="@id/cardDecoder"
-        android:nextFocusDown="@id/cardScrobbler"
-        android:orientation="horizontal"
-        android:paddingHorizontal="16dp">
-
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="@string/epg_card_tmdb"
-            android:textColor="@color/text_primary"
-            android:textSize="15sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/tmdbState"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/epg_short_tmdb"
-            android:textColor="@color/accent"
-            android:textSize="14sp"
-            android:textStyle="bold" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:id="@+id/cardScrobbler"
-        android:layout_width="match_parent"
-        android:layout_height="64dp"
-        android:layout_marginTop="8dp"
-        android:background="@drawable/bg_focusable"
-        android:clickable="true"
-        android:focusable="true"
-        android:gravity="center_vertical"
-        android:nextFocusUp="@id/cardTmdb"
-        android:nextFocusDown="@id/cardPip"
-        android:orientation="horizontal"
-        android:paddingHorizontal="16dp">
-
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="@string/epg_card_scrobbler"
-            android:textColor="@color/text_primary"
-            android:textSize="15sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/scrobblerState"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/scrobbler_none"
-            android:textColor="@color/accent"
-            android:textSize="14sp"
-            android:textStyle="bold" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:id="@+id/cardPip"
-        android:layout_width="match_parent"
-        android:layout_height="64dp"
-        android:layout_marginTop="8dp"
-        android:background="@drawable/bg_focusable"
-        android:clickable="true"
-        android:focusable="true"
-        android:gravity="center_vertical"
-        android:nextFocusUp="@id/cardScrobbler"
-        android:orientation="horizontal"
-        android:paddingHorizontal="16dp">
-
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="@string/epg_card_pip"
-            android:textColor="@color/text_primary"
-            android:textSize="15sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/pipState"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/epg_short_hide_empty_on"
-            android:textColor="@color/accent"
-            android:textSize="14sp"
-            android:textStyle="bold" />
-    </LinearLayout>
+    </ScrollView>
 
     <TextView
         android:id="@+id/cardDetail"

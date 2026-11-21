@@ -21,6 +21,7 @@ import com.olympus.iptv.OlympusIptvApp
 import com.olympus.iptv.R
 import com.olympus.iptv.data.Channel
 import com.olympus.iptv.data.ContentKind
+import com.olympus.iptv.data.QueueItem
 import com.olympus.iptv.data.ShowNames
 import com.olympus.iptv.databinding.ActivityFreshBinding
 import com.olympus.iptv.databinding.ItemFreshBinding
@@ -37,7 +38,6 @@ import com.olympus.iptv.ui.player.PlayerActivity
 import com.olympus.iptv.ui.player.SeriesPlay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -59,6 +59,7 @@ class FreshFragment : Fragment() {
     private var seriesJob: Job? = null
     private var seasonSwitchToken = 0
     private var listFocusPos = 0
+    private var queuedInDetail = false
     private lateinit var cacheFile: File
     private var opening = false
     private var focusGuard: ViewTreeObserver.OnGlobalFocusChangeListener? = null
@@ -140,13 +141,11 @@ class FreshFragment : Fragment() {
         binding.btnBack.setOnClickListener { leaveFresh() }
         binding.detailBack.setOnClickListener { leaveFresh() }
         binding.btnBack.nextFocusDownId = binding.freshList.id
-        binding.detailBack.nextFocusDownId = binding.detailHero.id
+        binding.detailBack.nextFocusDownId = binding.detailPlay.id
         binding.freshList.nextFocusUpId = binding.btnBack.id
-        binding.detailSeasonList.nextFocusUpId = binding.detailHero.id
-        binding.detailHero.nextFocusUpId = binding.detailBack.id
-        binding.detailHero.nextFocusDownId = binding.detailSeasonList.id
         binding.detailPlay.nextFocusUpId = binding.detailBack.id
-        binding.detailPlay.nextFocusDownId = binding.detailSeasonList.id
+        binding.detailQueue.nextFocusUpId = binding.detailBack.id
+        binding.detailSeasonList.nextFocusUpId = binding.detailBack.id
         binding.freshHero.visibility = View.GONE
         requireActivity().onBackPressedDispatcher.addCallback(
             viewLifecycleOwner,
@@ -180,11 +179,10 @@ class FreshFragment : Fragment() {
         if (hostedInLibrary() && !detailOpen()) return false
         if (event.action == KeyEvent.ACTION_DOWN && detailOpen()) {
             when (event.keyCode) {
-                KeyEvent.KEYCODE_DPAD_DOWN -> {
-                    if (enterSeasons()) return true
-                    if (enterEpisodes()) return true
-                }
-                KeyEvent.KEYCODE_DPAD_UP -> if (revealHero()) return true
+                KeyEvent.KEYCODE_DPAD_LEFT,
+                KeyEvent.KEYCODE_DPAD_RIGHT,
+                KeyEvent.KEYCODE_DPAD_UP,
+                KeyEvent.KEYCODE_DPAD_DOWN -> return handleDetailDpad(event.keyCode)
             }
         }
         if (event.action == KeyEvent.ACTION_DOWN &&
@@ -260,6 +258,7 @@ class FreshFragment : Fragment() {
     private fun reclaimFreshFocus() {
         if (!viewActive()) return
         if (detailOpen()) {
+            if (binding.detailPlay.visibility == View.VISIBLE && binding.detailPlay.requestFocus()) return
             if (binding.detailSeriesPane.visibility == View.VISIBLE) {
                 val seasonHolder = binding.detailSeasonList.findViewHolderForAdapterPosition(
                     seasonNumbers.indexOf(season).coerceAtLeast(0)
@@ -269,7 +268,6 @@ class FreshFragment : Fragment() {
                     return
                 }
             }
-            if (binding.detailPlay.visibility == View.VISIBLE && binding.detailPlay.requestFocus()) return
             binding.detailBack.requestFocus()
             return
         }
@@ -406,45 +404,133 @@ class FreshFragment : Fragment() {
         binding.freshStatus.text = getString(message)
     }
 
-    private fun heroFocused(): Boolean {
-        val focused = currentFocus ?: return false
-        if (focused === binding.detailBack || focused === binding.detailHero || focused === binding.detailPlay) {
+    private fun handleDetailDpad(keyCode: Int): Boolean {
+        val focused = currentFocus ?: run {
+            binding.detailPlay.requestFocus()
             return true
         }
-        return focusIsIn(binding.detailHero, focused)
-    }
+        val isSeries = binding.detailSeriesPane.visibility == View.VISIBLE
 
-    private fun showDetailHero(show: Boolean) {
-        binding.detailHero.visibility = if (show) View.VISIBLE else View.GONE
-        val touch = com.olympus.iptv.ui.DeviceForm.isTouchPrimary(requireContext())
-        binding.detailBack.visibility = if (show && touch) View.VISIBLE else View.GONE
-    }
-
-    private fun enterSeasons(): Boolean {
-        if (!heroFocused()) return false
-        if (binding.detailSeriesPane.visibility != View.VISIBLE || seasonNumbers.isEmpty()) return false
-        showDetailHero(false)
-        focusSeasonChip(seasonNumbers.indexOf(season).coerceAtLeast(0))
-        return true
-    }
-
-    private fun enterEpisodes(): Boolean {
-        val focused = currentFocus ?: return false
-        if (!focusIsIn(binding.detailSeasonList, focused)) return false
-        if (episodeAdapter.itemCount == 0) return false
-        binding.detailEpisodeList.scrollToPosition(0)
-        binding.detailEpisodeList.post {
-            if (!viewActive()) return@post
-            binding.detailEpisodeList.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
+        // 1. Focused on primary Play button (Play SXXEXX / Play)
+        if (focused === binding.detailPlay) {
+            return when (keyCode) {
+                KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                    if (binding.detailQueue.visibility == View.VISIBLE) {
+                        binding.detailQueue.requestFocus()
+                    } else if (isSeries && seasonNumbers.isNotEmpty()) {
+                        focusSeasonChip(0)
+                    }
+                    true
+                }
+                // Up, Down, and Left do nothing on Play
+                else -> true
+            }
         }
+
+        // 2. Focused on + Queue button
+        if (focused === binding.detailQueue) {
+            return when (keyCode) {
+                KeyEvent.KEYCODE_DPAD_LEFT -> {
+                    binding.detailPlay.requestFocus()
+                    true
+                }
+                KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                    if (isSeries && seasonNumbers.isNotEmpty()) {
+                        focusSeasonChip(0)
+                    }
+                    true
+                }
+                // Up and Down do nothing on + Queue
+                else -> true
+            }
+        }
+
+        // 3. Focused on a Season chip
+        if (focusIsIn(binding.detailSeasonList, focused)) {
+            val holder = binding.detailSeasonList.findContainingViewHolder(focused)
+            val pos = holder?.bindingAdapterPosition ?: RecyclerView.NO_POSITION
+            val lastIdx = seasonNumbers.lastIndex
+            return when (keyCode) {
+                KeyEvent.KEYCODE_DPAD_LEFT -> {
+                    if (pos > 0) {
+                        focusSeasonChip(pos - 1)
+                    } else if (binding.detailQueue.visibility == View.VISIBLE) {
+                        binding.detailQueue.requestFocus()
+                    } else {
+                        binding.detailPlay.requestFocus()
+                    }
+                    true
+                }
+                KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                    if (pos in 0 until lastIdx) {
+                        focusSeasonChip(pos + 1)
+                    } else {
+                        // Last season wraps right back to Play SXXEXX
+                        binding.detailPlay.requestFocus()
+                    }
+                    true
+                }
+                KeyEvent.KEYCODE_DPAD_DOWN -> {
+                    if (episodeAdapter.itemCount > 0) {
+                        focusEpisodeRow(0)
+                    }
+                    true
+                }
+                // Up does nothing on Seasons
+                else -> true
+            }
+        }
+
+        // 4. Focused on an Episode row
+        if (focusIsIn(binding.detailEpisodeList, focused)) {
+            val holder = binding.detailEpisodeList.findContainingViewHolder(focused)
+            val pos = holder?.bindingAdapterPosition ?: RecyclerView.NO_POSITION
+            val lastEp = episodeAdapter.itemCount - 1
+            return when (keyCode) {
+                KeyEvent.KEYCODE_DPAD_UP -> {
+                    if (pos > 0) {
+                        focusEpisodeRow(pos - 1)
+                    } else {
+                        // First episode in season -> Up returns to the active Season chip
+                        focusSeasonChip(seasonNumbers.indexOf(season).coerceAtLeast(0))
+                    }
+                    true
+                }
+                KeyEvent.KEYCODE_DPAD_DOWN -> {
+                    if (pos in 0 until lastEp) {
+                        focusEpisodeRow(pos + 1)
+                    } else if (lastEp >= 0) {
+                        // Last episode in season -> Down wraps back to first episode
+                        focusEpisodeRow(0)
+                    }
+                    true
+                }
+                // Left and Right do nothing when on actual episodes
+                else -> true
+            }
+        }
+
+        // Fallback: keep focus anchored on Play
+        binding.detailPlay.requestFocus()
         return true
     }
 
-    private fun revealHero(): Boolean {
-        val focused = currentFocus ?: return false
-        if (!focusIsIn(binding.detailSeasonList, focused)) return false
-        showDetailHero(true)
-        return binding.detailHero.requestFocus()
+    private fun focusEpisodeRow(index: Int) {
+        if (index < 0 || index >= episodeAdapter.itemCount) return
+        binding.detailEpisodeList.scrollToPosition(index)
+        binding.detailEpisodeList.post {
+            if (!viewActive() || binding.freshDetail.visibility != View.VISIBLE) return@post
+            val holder = binding.detailEpisodeList.findViewHolderForAdapterPosition(index)
+            if (holder != null) {
+                holder.itemView.requestFocus()
+            } else {
+                binding.detailEpisodeList.post {
+                    if (viewActive()) {
+                        binding.detailEpisodeList.findViewHolderForAdapterPosition(index)?.itemView?.requestFocus()
+                    }
+                }
+            }
+        }
     }
 
     private fun showDetail(title: CatalogDb.FreshTitle) {
@@ -453,36 +539,38 @@ class FreshFragment : Fragment() {
         clearSeriesState()
         shown = title
         binding.freshDetail.visibility = View.VISIBLE
-        showDetailHero(true)
+        binding.detailHero.visibility = View.VISIBLE
+        val touch = com.olympus.iptv.ui.DeviceForm.isTouchPrimary(requireContext())
+        binding.detailBack.visibility = if (touch) View.VISIBLE else View.GONE
         binding.detailService.text = if (title.day.isBlank()) {
             title.service
         } else {
             getString(R.string.fresh_when, title.service, title.day)
         }
         binding.detailName.text = title.name
-        bindArt(binding.detailLogo, title.logoUrl, 160, 230)
+        bindArt(binding.detailLogo, title.logoUrl, 84, 120)
         val waiting = title.detail.startsWith("Premieres ") || title.detail.matches(SEASON_ONLY)
         binding.detailBody.text = if (waiting) getString(R.string.fresh_detail_loading) else title.detail
+        bindDetailQueue(title)
         val series = title.bucket == CatalogDb.SERIES
         if (series) {
-            binding.detailPlay.visibility = View.GONE
-            binding.detailPlay.nextFocusDownId = binding.detailSeasonList.id
-            binding.detailHero.isFocusable = true
-            binding.detailHero.isFocusableInTouchMode = true
+            binding.detailPlay.visibility = View.VISIBLE
+            binding.detailPlay.text = getString(R.string.fresh_play)
+            binding.detailPlay.setOnClickListener {
+                val first = episodesBySeason[season]?.firstOrNull() ?: seriesEpisodes.firstOrNull()
+                if (first != null) playEpisode(first)
+            }
             binding.detailSeriesPane.visibility = View.VISIBLE
             binding.detailEpisodeStatus.visibility = View.VISIBLE
             binding.detailEpisodeStatus.text = getString(R.string.episodes_loading)
             seasonAdapter.submit(emptyList())
             episodeAdapter.submit(emptyList())
             loadSeries(title)
-            binding.detailHero.post {
-                if (viewActive() && shown?.id == title.id) binding.detailHero.requestFocus()
+            binding.detailPlay.post {
+                if (viewActive() && shown?.id == title.id) binding.detailPlay.requestFocus()
             }
         } else {
             binding.detailSeriesPane.visibility = View.GONE
-            binding.detailPlay.nextFocusDownId = View.NO_ID
-            binding.detailHero.isFocusable = false
-            binding.detailHero.isFocusableInTouchMode = false
             binding.detailPlay.visibility = View.VISIBLE
             binding.detailPlay.text = getString(R.string.fresh_play)
             binding.detailPlay.setOnClickListener { openMovie(title) }
@@ -491,6 +579,48 @@ class FreshFragment : Fragment() {
             }
         }
         if (waiting) loadDescription(title)
+    }
+
+    private fun bindDetailQueue(title: CatalogDb.FreshTitle) {
+        val app = requireActivity().application as OlympusIptvApp
+        val item = QueueItem(
+            bucket = title.bucket,
+            id = title.id,
+            name = title.name,
+            logoUrl = title.logoUrl,
+            seriesId = if (title.bucket == CatalogDb.SERIES) title.id else null
+        )
+        queuedInDetail = false
+        binding.detailQueue.text = getString(R.string.fresh_queue_add)
+        viewLifecycleOwner.lifecycleScope.launch {
+            val saved = withContext(Dispatchers.IO) {
+                app.playlistStore.queue(playlistId).any { it.bucket == item.bucket && it.id == item.id }
+            }
+            if (!viewActive() || shown?.id != title.id) return@launch
+            queuedInDetail = saved
+            binding.detailQueue.text = getString(if (saved) R.string.fresh_queue_saved else R.string.fresh_queue_add)
+        }
+        binding.detailQueue.setOnClickListener {
+            if (playlistId.isBlank()) return@setOnClickListener
+            val next = !queuedInDetail
+            queuedInDetail = next
+            binding.detailQueue.text = getString(if (next) R.string.fresh_queue_saved else R.string.fresh_queue_add)
+            viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
+                if (next) app.playlistStore.addQueue(playlistId, item)
+                else app.playlistStore.removeQueue(playlistId, item.bucket, item.id)
+            }
+        }
+    }
+
+    private fun updatePrimaryPlayButton(episodes: List<Channel>) {
+        val first = episodes.firstOrNull()
+        if (first == null) {
+            binding.detailPlay.text = getString(R.string.fresh_play)
+            return
+        }
+        val epSeason = first.season ?: season
+        val epNum = first.number ?: 1
+        binding.detailPlay.text = getString(R.string.fresh_play_episode, epSeason, epNum)
     }
 
     private fun hideDetail() {
@@ -630,6 +760,7 @@ class FreshFragment : Fragment() {
         }
         val episodes = grouped[season].orEmpty()
         episodeAdapter.submit(episodes)
+        updatePrimaryPlayButton(episodes)
         if (focusSeasons) {
             focusSeasonChip(numbers.indexOf(season).coerceAtLeast(0))
         }
@@ -647,6 +778,7 @@ class FreshFragment : Fragment() {
         if (previousIndex >= 0) seasonAdapter.notifyItemChanged(previousIndex)
         if (nextIndex >= 0) seasonAdapter.notifyItemChanged(nextIndex)
         episodeAdapter.submit(episodes)
+        updatePrimaryPlayButton(episodes)
         binding.detailEpisodeStatus.visibility =
             if (episodes.isEmpty()) View.VISIBLE else View.GONE
         if (episodes.isEmpty()) {
@@ -811,7 +943,7 @@ class FreshFragment : Fragment() {
                     WatchQueue.offer(
                         requireActivity() as AppCompatActivity,
                         playlistId,
-                        com.olympus.iptv.data.QueueItem(
+                        QueueItem(
                             bucket = title.bucket,
                             id = title.id,
                             name = title.name,
@@ -908,19 +1040,19 @@ class FreshFragment : Fragment() {
                     number,
                     episode.name
                 )
-                val meta = listOfNotNull(
-                    episode.aired?.takeIf { it.isNotBlank() },
-                    episode.runtime?.takeIf { it.isNotBlank() }
-                ).joinToString(" · ")
-                row.episodeMeta.text = meta
-                row.episodeMeta.visibility = if (meta.isBlank()) View.GONE else View.VISIBLE
+                val runtime = episode.runtime?.takeIf { it.isNotBlank() }.orEmpty()
+                row.episodeRuntimeBadge.text = runtime
+                row.episodeRuntimeBadge.visibility = if (runtime.isBlank()) View.GONE else View.VISIBLE
+                val aired = episode.aired?.takeIf { it.isNotBlank() }.orEmpty()
+                row.episodeMeta.text = aired
+                row.episodeMeta.visibility = if (aired.isBlank()) View.GONE else View.VISIBLE
                 val plot = episode.blurb.orEmpty()
                 row.episodePlot.text = plot
                 row.episodePlot.visibility = if (plot.isBlank()) View.GONE else View.VISIBLE
                 val art = episode.logoUrl?.takeIf { it.isNotBlank() } ?: shown?.logoUrl
                 if (row.episodeArt.tag != art) {
                     row.episodeArt.tag = art
-                    bindArt(row.episodeArt, art, 128, 72)
+                    bindArt(row.episodeArt, art, 116, 66)
                 }
                 val play = View.OnClickListener { playEpisode(episode) }
                 row.root.setOnClickListener(play)

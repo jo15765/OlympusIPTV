@@ -123,7 +123,7 @@ val gzipDashboardHtml = tasks.register("gzipDashboardHtml") {
     doLast {
         val destDir = outDir.get().asFile
         destDir.mkdirs()
-        GZIPOutputStream(FileOutputStream(destDir.resolve("index.html.gz"))).use { gzip ->
+        GZIPOutputStream(FileOutputStream(destDir.resolve("portal-page.pack"))).use { gzip ->
             html.asFile.inputStream().use { it.copyTo(gzip) }
         }
     }

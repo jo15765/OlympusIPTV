@@ -69,7 +69,7 @@
     <string name="nav_about">About</string>
     <string name="nav_reminders">Reminders</string>
     <string name="favorites_setup_again">Favorites setup</string>
-    <string name="nav_admin">Admin</string>
+    <string name="nav_admin">Settings &amp; Help</string>
     <string name="nav_library">My Library</string>
     <string name="admin_about_detail">Credits, coffee, and the player-only notice</string>
     <string name="admin_favorites_detail">Auto-add or rebuild your favorites list</string>
@@ -84,7 +84,7 @@
     <string name="copy_tv_url">Copy TV URL</string>
     <string name="copy_tv_url_done">Copied</string>
     <string name="breadcrumb_live">Live TV</string>
-    <string name="breadcrumb_admin">Admin</string>
+    <string name="breadcrumb_admin">Settings &amp; Help</string>
     <string name="season_unwatched">%1$d new</string>
     <string name="admin_refresh_detail">Check the provider and save channels that are not already on this TV.</string>
     <string name="admin_web_detail">Open the lineup on a phone or computer on the same Wi-Fi.</string>
@@ -419,6 +419,8 @@
     <string name="vod_reviews">Reviews</string>
     <string name="play">Play</string>
     <string name="cast">Cast</string>
+    <string name="paste_playlist_url">Paste playlist URL</string>
+    <string name="paste_empty">Clipboard is empty</string>
     <string name="cast_title">Cast to Chromecast</string>
     <string name="cast_disclaimer">Many IPTV and HLS links do not play on Chromecast’s default receiver. Casting may fail even when local playback works.</string>
     <string name="cast_continue">Choose device</string>
@@ -720,6 +722,8 @@
     <string name="sleep_timer">Sleep</string>
     <string name="sleep_off">Sleep off</string>
     <string name="sleep_30">Sleep in 30 min</string>
+    <string name="channel_down">Channel down</string>
+    <string name="channel_up">Channel up</string>
     <string name="sleep_60">Sleep in 60 min</string>
     <string name="sleep_90">Sleep in 90 min</string>
     <string name="sleep_armed">Sleep timer set</string>
@@ -752,4 +756,11 @@
     <string name="av_sync_earlier">Audio earlier (−100 ms) · now %1$d ms</string>
     <string name="av_sync_later">Audio later (+100 ms) · now %1$d ms</string>
     <string name="av_sync_status">Audio offset %1$d ms</string>
+    <string name="fresh_play_episode">Play S%1$02dE%2$02d</string>
+    <string name="fresh_queue_add">+ Queue</string>
+    <string name="fresh_queue_saved">✓ Queued</string>
+    <string name="epg_card_auto_clean">Auto-Clean Channel Names</string>
+    <string name="epg_card_auto_clean_detail">Automatically remove group prefixes, channel numbers, and tags across TV and Web-UI.</string>
+    <string name="epg_auto_clean_on">Auto-clean channel names on</string>
+    <string name="epg_auto_clean_off">Auto-clean channel names off</string>
 </resources>

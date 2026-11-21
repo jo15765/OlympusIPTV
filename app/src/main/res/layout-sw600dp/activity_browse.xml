@@ -1,0 +1,1218 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/bg_screen">
+
+    <LinearLayout
+        android:id="@+id/guideShell"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+    <LinearLayout
+        android:id="@+id/mobileTopBar"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="12dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/mobileBack"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:background="@drawable/bg_nav"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:paddingHorizontal="14dp"
+            android:text="@string/mobile_back"
+            android:textColor="@color/text_primary"
+            android:textSize="15sp" />
+
+        <TextView
+            android:id="@+id/mobileTitle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="@string/rail_title"
+            android:textColor="@color/text_primary"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/mobileAdmin"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:background="@drawable/bg_nav"
+            android:clickable="true"
+            android:focusable="false"
+            android:gravity="center"
+            android:paddingHorizontal="12dp"
+            android:text="@string/nav_admin"
+            android:textColor="@color/text_primary"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/mobileAbout"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/bg_nav"
+            android:clickable="true"
+            android:focusable="false"
+            android:gravity="center"
+            android:paddingHorizontal="12dp"
+            android:text="@string/nav_about"
+            android:textColor="@color/text_primary"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/mobileSearch"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/bg_nav"
+            android:clickable="true"
+            android:focusable="false"
+            android:gravity="center"
+            android:paddingHorizontal="12dp"
+            android:text="@string/search"
+            android:textColor="@color/text_primary"
+            android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/mobileCast"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/bg_nav"
+            android:clickable="true"
+            android:focusable="false"
+            android:gravity="center"
+            android:paddingHorizontal="12dp"
+            android:text="@string/cast"
+            android:textColor="@color/text_primary"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <HorizontalScrollView
+        android:id="@+id/groupPills"
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:fillViewport="true"
+        android:focusable="false"
+        android:paddingHorizontal="12dp"
+        android:paddingTop="8dp"
+        android:scrollbars="none"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:id="@+id/groupPillRow"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:gravity="center_vertical"
+            android:orientation="horizontal" />
+    </HorizontalScrollView>
+
+    <TextView
+        android:id="@+id/groupClock"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:focusable="false"
+        android:gravity="center_vertical|end"
+        android:paddingHorizontal="20dp"
+        android:paddingTop="4dp"
+        android:textColor="@color/text_primary"
+        android:textSize="16sp"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:id="@+id/guideRow"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="horizontal">
+
+        <ScrollView
+            android:id="@+id/navRail"
+            android:layout_width="185dp"
+            android:layout_height="match_parent"
+            android:background="@color/nav_rail"
+            android:descendantFocusability="afterDescendants"
+            android:fillViewport="true"
+            android:focusable="false"
+            android:focusableInTouchMode="false"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:paddingHorizontal="12dp"
+                android:paddingTop="10dp"
+                android:paddingBottom="8dp">
+
+            <TextView
+                android:id="@+id/playlistTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:focusable="false"
+                android:ellipsize="end"
+                android:gravity="center_horizontal"
+                android:lineSpacingExtra="0dp"
+                android:maxLines="1"
+                android:paddingHorizontal="4dp"
+                android:text="@string/rail_title"
+                android:textColor="@color/accent"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/btnSearch"
+                style="@style/OlympusIptvNavItem"
+                android:layout_marginTop="4dp"
+                android:drawableStart="@drawable/ic_nav_search"
+                android:drawablePadding="8dp"
+                android:drawableTint="@color/nav_icon"
+                android:text="@string/search" />
+
+            <TextView
+                android:id="@+id/tabLive"
+                style="@style/OlympusIptvNavItem"
+                android:drawableStart="@drawable/ic_nav_tv"
+                android:drawablePadding="8dp"
+                android:drawableTint="@color/nav_icon"
+                android:text="@string/nav_tv" />
+
+            <TextView
+                android:id="@+id/tabVod"
+                style="@style/OlympusIptvNavItem"
+                android:drawableStart="@drawable/ic_nav_movie"
+                android:drawablePadding="8dp"
+                android:drawableTint="@color/nav_icon"
+                android:text="@string/vod" />
+
+            <TextView
+                android:id="@+id/tabShows"
+                style="@style/OlympusIptvNavItem"
+                android:drawableStart="@drawable/ic_nav_shows"
+                android:drawablePadding="8dp"
+                android:drawableTint="@color/nav_icon"
+                android:text="@string/nav_shows" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="6dp"
+                android:background="@color/stroke" />
+
+            <TextView
+                android:id="@+id/btnLibrary"
+                style="@style/OlympusIptvNavItem"
+                android:drawableStart="@drawable/ic_nav_shows"
+                android:drawablePadding="8dp"
+                android:drawableTint="@color/nav_icon"
+                android:text="@string/nav_library" />
+
+            <TextView
+                android:id="@+id/btnRecord"
+                style="@style/OlympusIptvNavItem"
+                android:drawableStart="@drawable/ic_nav_record"
+                android:drawablePadding="8dp"
+                android:drawableTint="@color/nav_icon"
+                android:text="@string/nav_recordings" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1" />
+
+            <TextView
+                android:id="@+id/btnAdmin"
+                style="@style/OlympusIptvNavItem"
+                android:drawableStart="@drawable/ic_settings"
+                android:drawablePadding="8dp"
+                android:drawableTint="@color/nav_icon"
+                android:text="@string/nav_admin" />
+
+            <TextView
+                android:id="@+id/refreshLine"
+                style="@style/OlympusIptvNavStatus"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/btnAbout"
+                style="@style/OlympusIptvNavItem"
+                android:drawableStart="@drawable/ic_nav_edit"
+                android:drawablePadding="8dp"
+                android:drawableTint="@color/nav_icon"
+                android:text="@string/nav_about"
+                android:visibility="gone" />
+
+            </LinearLayout>
+        </ScrollView>
+
+        <View
+            android:id="@+id/navDivider"
+            android:layout_width="1dp"
+            android:layout_height="match_parent"
+            android:background="@color/stroke" />
+
+        <LinearLayout
+            android:id="@+id/groupColumn"
+            android:layout_width="260dp"
+            android:layout_height="match_parent"
+            android:layout_weight="0"
+            android:orientation="vertical"
+            android:paddingTop="18dp"
+            android:paddingBottom="12dp">
+
+            <HorizontalScrollView
+                android:id="@+id/shortcutRow"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:layout_marginBottom="12dp"
+                android:clipToPadding="false"
+                android:descendantFocusability="afterDescendants"
+                android:fillViewport="false"
+                android:focusable="false"
+                android:paddingHorizontal="20dp"
+                android:scrollbars="none">
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/btnFavoritesSetup"
+                        style="@style/OlympusIptvChip"
+                        android:drawableStart="@drawable/ic_star"
+                        android:nextFocusDown="@id/categoryList"
+                        android:nextFocusLeft="@id/tabLive"
+                        android:nextFocusRight="@id/btnQueue"
+                        android:text="@string/favorites_setup_again" />
+
+                    <TextView
+                        android:id="@+id/btnQueue"
+                        style="@style/OlympusIptvChip"
+                        android:drawableStart="@drawable/ic_nav_queue"
+                        android:nextFocusDown="@id/categoryList"
+                        android:nextFocusLeft="@id/btnFavoritesSetup"
+                        android:nextFocusRight="@id/btnFresh"
+                        android:text="@string/nav_queue" />
+
+                    <TextView
+                        android:id="@+id/btnFresh"
+                        style="@style/OlympusIptvChip"
+                        android:drawableStart="@drawable/ic_nav_new"
+                        android:nextFocusDown="@id/categoryList"
+                        android:nextFocusLeft="@id/btnQueue"
+                        android:nextFocusRight="@id/freshCount"
+                        android:text="@string/nav_fresh" />
+
+                    <TextView
+                        android:id="@+id/freshCount"
+                        android:layout_width="wrap_content"
+                        android:layout_height="28dp"
+                        android:layout_marginStart="4dp"
+                        android:background="@drawable/bg_search_pill"
+                        android:gravity="center"
+                        android:minWidth="28dp"
+                        android:nextFocusLeft="@id/btnFresh"
+                        android:nextFocusRight="@id/btnRemind"
+                        android:paddingHorizontal="8dp"
+                        android:textColor="@color/accent"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        android:visibility="gone" />
+
+                    <TextView
+                        android:id="@+id/btnRemind"
+                        style="@style/OlympusIptvChip"
+                        android:drawableStart="@drawable/ic_nav_remind"
+                        android:nextFocusDown="@id/categoryList"
+                        android:nextFocusLeft="@id/freshCount"
+                        android:nextFocusRight="@id/btnParental"
+                        android:text="@string/nav_reminders" />
+
+                    <TextView
+                        android:id="@+id/btnParental"
+                        style="@style/OlympusIptvChip"
+                        android:drawableStart="@drawable/ic_lock"
+                        android:nextFocusDown="@id/categoryList"
+                        android:nextFocusLeft="@id/btnRemind"
+                        android:nextFocusRight="@id/btnLastGroup"
+                        android:text="@string/parental_chip" />
+
+                    <TextView
+                        android:id="@+id/btnLastGroup"
+                        style="@style/OlympusIptvChip"
+                        android:nextFocusDown="@id/categoryList"
+                        android:nextFocusLeft="@id/btnParental"
+                        android:nextFocusRight="@id/btnLastGroup"
+                        android:text="@string/last_group_chip"
+                        android:visibility="gone" />
+                </LinearLayout>
+            </HorizontalScrollView>
+
+            <LinearLayout
+                android:id="@+id/homeContinue"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="20dp"
+                android:layout_marginBottom="12dp"
+                android:background="@drawable/bg_continue"
+                android:clickable="true"
+                android:descendantFocusability="afterDescendants"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:gravity="center_vertical"
+                android:nextFocusDown="@id/categoryList"
+                android:orientation="horizontal"
+                android:paddingHorizontal="16dp"
+                android:paddingVertical="12dp"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:focusable="false"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:focusable="false"
+                        android:text="@string/continue_watching_home"
+                        android:textColor="@color/accent"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/homeContinueTitle"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:ellipsize="end"
+                        android:focusable="false"
+                        android:maxLines="1"
+                        android:textColor="@color/text_primary"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/homeContinueMeta"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:ellipsize="end"
+                        android:focusable="false"
+                        android:maxLines="1"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="13sp" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/homeContinuePlay"
+                    android:layout_width="wrap_content"
+                    android:layout_height="44dp"
+                    android:layout_marginStart="12dp"
+                    android:background="@drawable/bg_button"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:focusableInTouchMode="true"
+                    android:gravity="center"
+                    android:nextFocusLeft="@id/homeContinue"
+                    android:nextFocusDown="@id/categoryList"
+                    android:paddingHorizontal="18dp"
+                    android:text="@string/fresh_play"
+                    android:textColor="@color/bg"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/mobileSectionRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                android:gravity="center"
+                android:orientation="horizontal"
+                android:paddingHorizontal="16dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/mobileTabLive"
+                    style="@style/OlympusIptvChip"
+                    android:text="@string/nav_tv" />
+
+                <TextView
+                    android:id="@+id/mobileTabMovies"
+                    style="@style/OlympusIptvChip"
+                    android:text="@string/vod" />
+
+                <TextView
+                    android:id="@+id/mobileTabShows"
+                    style="@style/OlympusIptvChip"
+                    android:text="@string/nav_shows" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/groupsHeader"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingHorizontal="20dp"
+                android:paddingBottom="8dp">
+
+                <TextView
+                    android:id="@+id/groupsTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/groups"
+                    android:textColor="@color/text_primary"
+                    android:textSize="22sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/groupsSearch"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:background="@drawable/bg_nav"
+                    android:clickable="true"
+                    android:focusable="false"
+                    android:gravity="center"
+                    android:paddingHorizontal="14dp"
+                    android:text="@string/search"
+                    android:textColor="@color/text_primary"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <EditText
+                android:id="@+id/groupsFilter"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:layout_marginHorizontal="16dp"
+                android:layout_marginBottom="8dp"
+                android:background="@drawable/bg_input"
+                android:hint="@string/groups_filter_hint"
+                android:imeOptions="actionSearch"
+                android:inputType="text"
+                android:maxLines="1"
+                android:paddingHorizontal="14dp"
+                android:textColor="@color/text_primary"
+                android:textColorHint="@color/text_secondary"
+                android:textSize="15sp"
+                android:visibility="gone" />
+
+            <LinearLayout
+                android:id="@+id/nowPlayingBar"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="16dp"
+                android:layout_marginBottom="8dp"
+                android:background="@drawable/bg_continue"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingHorizontal="14dp"
+                android:paddingVertical="10dp"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/nowPlayingLabel"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/now_playing"
+                        android:textColor="@color/accent"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/nowPlayingTitle"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:textColor="@color/text_primary"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/nowPlayingResume"
+                    android:layout_width="wrap_content"
+                    android:layout_height="40dp"
+                    android:background="@drawable/bg_button"
+                    android:gravity="center"
+                    android:paddingHorizontal="14dp"
+                    android:text="@string/now_playing_resume"
+                    android:textColor="@color/bg"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+                android:id="@+id/groupsRefresh"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:enabled="false">
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/categoryList"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:clipToPadding="false"
+                    android:descendantFocusability="afterDescendants"
+                    android:focusable="false"
+                    android:paddingHorizontal="8dp"
+                    android:paddingBottom="12dp" />
+            </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+        </LinearLayout>
+
+        <View
+            android:id="@+id/contentDivider"
+            android:layout_width="1dp"
+            android:layout_height="match_parent"
+            android:background="@color/stroke"
+            android:visibility="gone" />
+
+        <LinearLayout
+            android:id="@+id/contentColumn"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:paddingTop="4dp"
+            android:paddingEnd="4dp"
+            android:paddingBottom="4dp"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:id="@+id/channelHeader"
+                android:layout_width="match_parent"
+                android:layout_height="28dp"
+                android:gravity="center_vertical"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/guideDate"
+                    android:layout_width="match_parent"
+                    android:layout_height="16dp"
+                    android:ellipsize="end"
+                    android:gravity="center_vertical"
+                    android:maxLines="1"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp"
+                    android:visibility="gone" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/contentTitle"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:ellipsize="end"
+                        android:gravity="center_vertical"
+                        android:maxLines="1"
+                        android:textColor="@color/text_primary"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/guideNow"
+                        android:layout_width="wrap_content"
+                        android:layout_height="28dp"
+                        android:layout_marginEnd="8dp"
+                        android:background="@drawable/bg_nav"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center"
+                        android:paddingHorizontal="12dp"
+                        android:text="@string/guide_now"
+                        android:textColor="@color/text_primary"
+                        android:textSize="13sp"
+                        android:visibility="gone" />
+
+                    <TextView
+                        android:id="@+id/vpnChip"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="8dp"
+                        android:background="@drawable/bg_panel"
+                        android:ellipsize="end"
+                        android:maxWidth="240dp"
+                        android:maxLines="1"
+                        android:paddingHorizontal="10dp"
+                        android:paddingVertical="4dp"
+                        android:textColor="@color/accent"
+                        android:textSize="12sp"
+                        android:visibility="gone" />
+
+                    <TextView
+                        android:id="@+id/contentHint"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/bg_panel"
+                        android:paddingHorizontal="10dp"
+                        android:paddingVertical="4dp"
+                        android:text="@string/content_sort_hint"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="12sp"
+                        android:visibility="gone" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <View
+                android:id="@+id/channelGuideSpacer"
+                android:layout_width="match_parent"
+                android:layout_height="0dp" />
+
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1">
+
+                <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+                    android:id="@+id/channelRefresh"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:enabled="false">
+
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/channelList"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:clipToPadding="false"
+                        android:descendantFocusability="afterDescendants"
+                        android:focusable="false"
+                        android:paddingBottom="0dp" />
+                </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+
+                <LinearLayout
+                    android:id="@+id/libraryStatus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+
+                    <ProgressBar
+                        android:layout_width="42dp"
+                        android:layout_height="42dp"
+                        android:indeterminate="true" />
+
+                    <TextView
+                        android:id="@+id/libraryStatusText"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:gravity="center"
+                        android:text="@string/loading_movies_wait"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="16sp" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/errorText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:gravity="center"
+                    android:padding="24dp"
+                    android:textColor="@color/text_secondary"
+                    android:visibility="gone" />
+
+                <LinearLayout
+                    android:id="@+id/channelSkeleton"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:orientation="vertical"
+                    android:paddingHorizontal="12dp"
+                    android:paddingTop="8dp"
+                    android:visibility="gone">
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:layout_marginBottom="8dp"
+                        android:background="@drawable/bg_skeleton_row" />
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:layout_marginBottom="8dp"
+                        android:background="@drawable/bg_skeleton_row"
+                        android:alpha="0.85" />
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:layout_marginBottom="8dp"
+                        android:background="@drawable/bg_skeleton_row"
+                        android:alpha="0.7" />
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:layout_marginBottom="8dp"
+                        android:background="@drawable/bg_skeleton_row"
+                        android:alpha="0.55" />
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:background="@drawable/bg_skeleton_row"
+                        android:alpha="0.4" />
+                </LinearLayout>
+            </FrameLayout>
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/programPane"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1.5"
+            android:orientation="vertical"
+            android:paddingStart="0dp"
+            android:paddingTop="4dp"
+            android:paddingEnd="8dp"
+            android:paddingBottom="4dp"
+            android:visibility="gone">
+
+            <HorizontalScrollView
+                android:id="@+id/programHeaderScroll"
+                android:layout_width="match_parent"
+                android:layout_height="28dp"
+                android:focusable="false"
+                android:scrollbars="none">
+
+                <LinearLayout
+                    android:id="@+id/programHeader"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:orientation="vertical" />
+            </HorizontalScrollView>
+
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1">
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/programList"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:clipToPadding="false"
+                    android:descendantFocusability="afterDescendants"
+                    android:focusable="false" />
+
+                <View
+                    android:id="@+id/programNowLine"
+                    android:layout_width="3dp"
+                    android:layout_height="match_parent"
+                    android:background="@drawable/bg_now_line"
+                    android:visibility="invisible" />
+            </FrameLayout>
+        </LinearLayout>
+
+        <FrameLayout
+            android:id="@+id/blankPane"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/lineupStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:text="@string/updating_lineup"
+                android:textColor="@color/text_secondary"
+                android:textSize="18sp"
+                android:visibility="gone" />
+        </FrameLayout>
+
+        <ViewStub
+            android:id="@+id/deviceStub"
+            android:inflatedId="@+id/devicePane"
+            android:layout="@layout/browse_pane_device"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1" />
+
+        <ViewStub
+            android:id="@+id/aboutStub"
+            android:inflatedId="@+id/aboutPane"
+            android:layout="@layout/browse_pane_about"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1" />
+
+        <ViewStub
+            android:id="@+id/adminStub"
+            android:inflatedId="@+id/adminPane"
+            android:layout="@layout/browse_pane_admin"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1" />
+
+        <ViewStub
+            android:id="@+id/vpnStub"
+            android:inflatedId="@+id/vpnPane"
+            android:layout="@layout/browse_pane_vpn"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1" />
+
+        <ViewStub
+            android:id="@+id/refreshStub"
+            android:inflatedId="@+id/refreshPane"
+            android:layout="@layout/browse_pane_refresh"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/mobileBottomTabs"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:background="@drawable/bg_bottom_tabs"
+        android:elevation="10dp"
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:paddingHorizontal="4dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/bottomTabLive"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@drawable/bg_nav"
+            android:clickable="true"
+            android:focusable="false"
+            android:gravity="center"
+            android:text="@string/nav_tv"
+            android:textColor="@color/text_primary"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/bottomTabMovies"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@drawable/bg_nav"
+            android:clickable="true"
+            android:focusable="false"
+            android:gravity="center"
+            android:text="@string/vod"
+            android:textColor="@color/text_primary"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/bottomTabShows"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@drawable/bg_nav"
+            android:clickable="true"
+            android:focusable="false"
+            android:gravity="center"
+            android:text="@string/nav_shows"
+            android:textColor="@color/text_primary"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/bottomTabLibrary"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@drawable/bg_nav"
+            android:clickable="true"
+            android:focusable="false"
+            android:gravity="center"
+            android:text="@string/nav_library"
+            android:textColor="@color/text_primary"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/bottomTabAdmin"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@drawable/bg_nav"
+            android:clickable="true"
+            android:focusable="false"
+            android:gravity="center"
+            android:text="@string/nav_admin"
+            android:textColor="@color/text_primary"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/previewCard"
+        android:layout_width="220dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_margin="16dp"
+        android:background="@drawable/bg_panel"
+        android:elevation="12dp"
+        android:focusable="false"
+        android:orientation="vertical"
+        android:padding="4dp"
+        android:visibility="gone">
+
+        <androidx.media3.ui.PlayerView
+            android:id="@+id/previewPlayer"
+            android:layout_width="match_parent"
+            android:layout_height="124dp"
+            android:focusable="false"
+            app:resize_mode="zoom"
+            app:surface_type="texture_view"
+            app:use_controller="false" />
+
+        <TextView
+            android:id="@+id/previewCaption"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:focusable="false"
+            android:maxLines="1"
+            android:paddingHorizontal="6dp"
+            android:paddingVertical="4dp"
+            android:textColor="@color/text_primary"
+            android:textSize="11sp" />
+    </LinearLayout>
+
+    <View
+        android:id="@+id/groupPinScrim"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#CC141210"
+        android:clickable="true"
+        android:focusable="false"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:id="@+id/groupPin"
+        android:layout_width="420dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:background="@drawable/bg_panel"
+        android:clickable="true"
+        android:descendantFocusability="afterDescendants"
+        android:elevation="18dp"
+        android:focusable="true"
+        android:orientation="vertical"
+        android:paddingHorizontal="24dp"
+        android:paddingVertical="20dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/groupPinTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:focusable="false"
+            android:gravity="center"
+            android:text="@string/group_pin_title"
+            android:textColor="@color/text_primary"
+            android:textSize="22sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/groupPinDigits"
+            android:layout_width="match_parent"
+            android:layout_height="64dp"
+            android:layout_marginTop="14dp"
+            android:background="@color/bg_elevated"
+            android:focusable="false"
+            android:gravity="center"
+            android:letterSpacing="0.35"
+            android:text="––––"
+            android:textColor="@color/text_primary"
+            android:textSize="34sp" />
+
+        <GridLayout
+            android:id="@+id/groupPinPad"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:alignmentMode="alignMargins"
+            android:columnCount="3"
+            android:descendantFocusability="afterDescendants"
+            android:rowCount="4"
+            android:useDefaultMargins="true">
+
+            <TextView android:id="@+id/guidePin1" style="@style/OlympusIptvPinKey" android:text="1" />
+            <TextView android:id="@+id/guidePin2" style="@style/OlympusIptvPinKey" android:text="2" />
+            <TextView android:id="@+id/guidePin3" style="@style/OlympusIptvPinKey" android:text="3" />
+            <TextView android:id="@+id/guidePin4" style="@style/OlympusIptvPinKey" android:text="4" />
+            <TextView android:id="@+id/guidePin5" style="@style/OlympusIptvPinKey" android:text="5" />
+            <TextView android:id="@+id/guidePin6" style="@style/OlympusIptvPinKey" android:text="6" />
+            <TextView android:id="@+id/guidePin7" style="@style/OlympusIptvPinKey" android:text="7" />
+            <TextView android:id="@+id/guidePin8" style="@style/OlympusIptvPinKey" android:text="8" />
+            <TextView android:id="@+id/guidePin9" style="@style/OlympusIptvPinKey" android:text="9" />
+            <TextView android:id="@+id/guidePinClearDigit" style="@style/OlympusIptvPinKey" android:text="⌫" />
+            <TextView android:id="@+id/guidePin0" style="@style/OlympusIptvPinKey" android:text="0" />
+            <TextView android:id="@+id/groupPinCancel" style="@style/OlympusIptvPinKey" android:text="@string/group_pin_cancel" />
+        </GridLayout>
+
+        <TextView
+            android:id="@+id/groupPinClear"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/bg_focusable"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:text="@string/group_pin_clear"
+            android:textColor="@color/text_primary"
+            android:textSize="16sp"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/groupPinWrong"
+        android:layout_width="360dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:background="@drawable/bg_panel"
+        android:elevation="24dp"
+        android:orientation="vertical"
+        android:paddingHorizontal="28dp"
+        android:paddingVertical="24dp"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:focusable="false"
+            android:gravity="center"
+            android:text="@string/group_pin_wrong"
+            android:textColor="@color/danger"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/groupPinWrongOk"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="18dp"
+            android:background="@drawable/bg_button"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:text="@string/group_pin_wrong_ok"
+            android:textColor="@color/bg"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/channelDial"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="end|top"
+        android:layout_margin="28dp"
+        android:background="@drawable/bg_login_card"
+        android:elevation="16dp"
+        android:focusable="false"
+        android:orientation="vertical"
+        android:paddingHorizontal="28dp"
+        android:paddingVertical="16dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/channelDialLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:focusable="false"
+            android:text="@string/channel_dial"
+            android:textColor="@color/text_secondary"
+            android:textSize="16sp" />
+
+        <TextView
+            android:id="@+id/channelDialNumber"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:focusable="false"
+            android:textColor="@color/accent"
+            android:textSize="64sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/channelDialHint"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:focusable="false"
+            android:textColor="@color/accent"
+            android:textSize="14sp"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <ProgressBar
+        android:id="@+id/loading"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_gravity="center"
+        android:indeterminate="true"
+        android:visibility="gone" />
+
+    <FrameLayout
+        android:id="@+id/toolOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/bg_screen"
+        android:elevation="12dp"
+        android:visibility="gone">
+
+        <FrameLayout
+            android:id="@+id/toolHost"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+    </FrameLayout>
+</FrameLayout>

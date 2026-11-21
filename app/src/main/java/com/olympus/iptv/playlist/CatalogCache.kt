@@ -16,7 +16,7 @@ class CatalogCache(context: Context) {
         val file = file(playlistId, includeVod)
         if (!file.isFile || file.length() == 0L) return null
         return runCatching {
-            GZIPInputStream(file.inputStream()).use { input ->
+            GZIPInputStream(file.inputStream(), 65536).use { input ->
                 InputStreamReader(input, Charsets.UTF_8).use { reader ->
                     gson.fromJson(reader, LoadedPlaylist::class.java)
                 }
@@ -27,7 +27,7 @@ class CatalogCache(context: Context) {
     fun write(playlistId: String, includeVod: Boolean, loaded: LoadedPlaylist) {
         val file = file(playlistId, includeVod)
         val tmp = File(dir, file.name + ".tmp")
-        GZIPOutputStream(tmp.outputStream()).use { output ->
+        GZIPOutputStream(tmp.outputStream(), 65536).use { output ->
             OutputStreamWriter(output, Charsets.UTF_8).use { writer ->
                 gson.toJson(loaded, writer)
             }

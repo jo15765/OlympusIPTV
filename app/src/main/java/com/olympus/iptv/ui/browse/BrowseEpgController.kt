@@ -53,7 +53,7 @@ class BrowseEpgController(
         }
         val density = activity.resources.displayMetrics.density
         val rule = android.widget.FrameLayout(activity).apply {
-            layoutParams = LinearLayout.LayoutParams(width, (10 * density).toInt())
+            layoutParams = LinearLayout.LayoutParams(width, (8 * density).toInt())
         }
         rule.addView(View(activity).apply {
             setBackgroundColor(activity.getColor(R.color.stroke))
@@ -62,7 +62,7 @@ class BrowseEpgController(
                 density.toInt().coerceAtLeast(1)
             ).apply { gravity = Gravity.CENTER_VERTICAL }
         })
-        val dot = (5 * density).toInt()
+        val dot = (4 * density).toInt()
         repeat(count) { index ->
             rule.addView(View(activity).apply {
                 background = android.graphics.drawable.GradientDrawable().apply {
@@ -95,25 +95,29 @@ class BrowseEpgController(
     }
 
     fun paintSynopsis(channel: Channel, program: EpgProgram?) {
+        val channelAdapter = binding.channelList.adapter as? ChannelAdapter
         if (binding.programPane.visibility != View.VISIBLE) {
             synopsisChannel = null
             synopsisProgram = null
+            channelAdapter?.setGuideFocused(null)
             return
         }
         val now = EpgUtils.now()
         synopsisChannel = channel
         synopsisProgram = program ?: epgCache()[channel.id]?.now
-            ?: programAdapter.programsFor(channel.id)?.firstOrNull { now >= it.startMillis && now < it.endMillis }
+                ?: programAdapter.programsFor(channel.id)?.firstOrNull { now >= it.startMillis && now < it.endMillis }
+        channelAdapter?.setGuideFocused(channel.id)
     }
 
     fun syncChannelOffset() {
-        if (binding.programPane.visibility != View.VISIBLE) {
-            setSpacer(0)
-            binding.programList.setPadding(0, 0, 0, binding.programList.paddingBottom)
-            return
+        // Hide the redundant top-right clock whenever the full guide is visible
+        if (binding.programPane.visibility == View.VISIBLE) {
+            binding.groupClock.visibility = View.GONE
         }
         setSpacer(0)
+        binding.channelList.setPadding(0, 0, 0, binding.channelList.paddingBottom)
         binding.programList.setPadding(0, 0, 0, binding.programList.paddingBottom)
+        if (binding.programPane.visibility != View.VISIBLE) return
         binding.guideRow.post {
             if (binding.programPane.visibility != View.VISIBLE) return@post
             val channelAt = IntArray(2)
@@ -121,8 +125,9 @@ class BrowseEpgController(
             binding.channelList.getLocationInWindow(channelAt)
             binding.programList.getLocationInWindow(programAt)
             val delta = GuideMetrics.verticalDelta(channelAt[1], programAt[1])
-            if (delta > 1) setSpacer(delta)
-            else if (delta < -1) {
+            if (delta > 1) {
+                binding.channelList.setPadding(0, delta, 0, binding.channelList.paddingBottom)
+            } else if (delta < -1) {
                 binding.programList.setPadding(0, -delta, 0, binding.programList.paddingBottom)
             }
             val browse = activity as? BrowseActivity ?: return@post

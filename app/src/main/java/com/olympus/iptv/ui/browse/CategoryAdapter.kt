@@ -202,16 +202,17 @@ class CategoryAdapter(
                 binding.detail.alpha = 1f
                 binding.icon.alpha = 1f
             } else {
+                binding.root.isSelected = binding.root.isFocused
                 binding.root.setOnFocusChangeListener { _, hasFocus ->
                     FocusMotion.animate(binding.root, hasFocus)
-                    paintFocusChrome(hasFocus || item.id == selectedId)
+                    binding.root.isSelected = hasFocus
+                    paintFocusChrome(hasFocus)
                     if (hasFocus) {
-                        binding.root.isSelected = true
                         onSelect(item, false)
                     }
                 }
                 FocusMotion.animate(binding.root, binding.root.isFocused)
-                paintFocusChrome(binding.root.isFocused || item.id == selectedId)
+                paintFocusChrome(binding.root.isFocused)
             }
         }
 

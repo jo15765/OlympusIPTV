@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="52dp"
+    android:layout_height="wrap_content"
+    android:minHeight="52dp"
     android:layout_marginBottom="0dp"
     android:descendantFocusability="afterDescendants"
     android:focusable="false"
@@ -124,6 +125,27 @@
                 android:maxLines="1"
                 android:textColor="@color/accent"
                 android:textSize="13sp" />
+
+            <ProgressBar
+                android:id="@+id/epgProgress"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="4dp"
+                android:layout_marginTop="4dp"
+                android:max="1000"
+                android:progressTint="@color/accent"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/epgNext"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp"
+                android:visibility="gone" />
         </LinearLayout>
     </LinearLayout>
 

@@ -19,6 +19,6 @@ class ChannelNumberJumpTest {
     @Test
     fun prefetchesTheNextSix() {
         val urls = ImagePrefetcher.ahead(listOf("a", null, "c", "d", "e", "f", "g", "h"), 1)
-        assertEquals(listOf("c", "d", "e", "f", "g"), urls)
+        assertEquals(listOf("c", "d", "e", "f", "g", "h"), urls)
     }
 }

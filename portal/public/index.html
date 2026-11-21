@@ -1278,9 +1278,11 @@
           <span id="channelNote"></span>
           <label><input class="group-check" id="channelsSelectAll" type="checkbox" /> Select All</label>
           <div class="group-bulk">
+            <button id="channelsBulkFav" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l2.7 5.5 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.8 1-6.1-4.4-4.3 6.1-.9L12 3z"/></svg>Bulk Favorite</button>
             <button id="channelsBulkHide" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12s4-6 9-6 9 6 9 6-4 6-9 6-9-6-9-6z"/><path d="M4 5l16 14"/></svg>Bulk Hide</button>
             <button id="channelsBulkMove" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 7h11M8 12h11M8 17h11"/><path d="M4 7h.01M4 12h.01M4 17h.01"/></svg>Bulk Move</button>
           </div>
+          <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer"><input class="group-check" id="hideBackupDupes" type="checkbox" /> Hide backup duplicates</label>
           <div class="channel-views">
             <button id="channelsGrid" type="button" aria-pressed="false" title="Grid"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></svg></button>
             <button id="channelsList" type="button" aria-pressed="true" title="List"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 7h12M8 12h12M8 17h12"/><path d="M4 7h.01M4 12h.01M4 17h.01"/></svg></button>
@@ -1468,6 +1470,12 @@
           <article class="clean-card" id="epgStripTool">
             <h3>Strip Names <button class="info-dot" type="button" title="Comma-separated. A space you type is kept. An entry with a space or a colon is removed exactly, wherever it appears. A plain word comes off the start or the end. Capitalization does not matter. Save sends it to the TV.">i</button></h3>
             <p class="hint">Remove specific words/characters from group/channel names (comma-separated).</p>
+            <label class="intl-switch" style="margin:8px 0 10px"><input id="autoCleanNamesToggle" type="checkbox" checked /><span class="switch" aria-hidden="true"></span> Smart Auto-Clean Names (strip group prefixes, channel #s &amp; colons)</label>
+            <div class="clean-chips" style="margin-bottom:10px">
+              <button class="clean-chip" type="button" data-strip-preset="prefix:USA, US:, UK:, CA:">+ Country Prefixes</button>
+              <button class="clean-chip" type="button" data-strip-preset="suffix:4K, UHD, FHD, HD, SD, 60fps">+ Quality Tags</button>
+              <button class="clean-chip" type="button" data-strip-preset="prefix:ESPN+, NFL Teams:, NBA, NHL:, MLB">+ Sports Labels</button>
+            </div>
             <div class="clean-fields">
               <div>
                 <label for="stripPrefixes">Prefix</label>
@@ -1478,6 +1486,7 @@
                 <input id="stripSuffixes" type="text" placeholder="FHD, UHD, 4K, HD" autocomplete="off" />
               </div>
             </div>
+            <div id="stripLivePreview" style="margin-top:12px;padding:10px 12px;border-radius:10px;background:var(--elev);border:1px solid var(--stroke);font-size:12px;color:var(--muted)"></div>
           </article>
           <article class="clean-card" id="epgRenameTool">
             <h3>Bulk Rename Groups <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20h4l10-10-4-4L4 16v4z"/><path d="M13 7l4 4"/></svg> <button class="info-dot" type="button" title="Replaces this text in every group name, ignoring capitalization, including names you set on the Groups tab. Apply saves it for the TV.">i</button></h3>
@@ -1913,11 +1922,43 @@
       }
       return current;
     }
+    function renderStripLivePreview() {
+      const box = document.querySelector("#stripLivePreview");
+      if (!box) return;
+      const prefixes = stripTokens(document.querySelector("#stripPrefixes").value);
+      const suffixes = stripTokens(document.querySelector("#stripSuffixes").value);
+      const autoClean = document.querySelector("#autoCleanNamesToggle")?.checked !== false;
+      const samples = [];
+      for (const rows of groupCache.values()) {
+        for (const ch of rows) {
+          if (samples.length >= 5) break;
+          samples.push(ch);
+        }
+        if (samples.length >= 5) break;
+      }
+      if (!samples.length) {
+        samples.push(
+          { name: "USA | Sports 14: ESPN HD", groupId: "" },
+          { name: "US: 04 - NBC 4K", groupId: "" },
+          { name: "HBO East FHD [1]", groupId: "" }
+        );
+      }
+      const lines = samples.map((ch) => {
+        const group = (state.catalog?.groups || []).find((g) => g.id === ch.groupId);
+        const base = autoClean ? smartCleanBase(ch.name, group ? group.name : "") : String(ch.name || "");
+        const after = stripName(base, prefixes, suffixes);
+        return `<div style="display:flex;justify-content:space-between;gap:12px;padding:2px 0"><span style="opacity:.75">${escapeHtml(ch.name)}</span><strong style="color:var(--accent)">→ ${escapeHtml(after)}</strong></div>`;
+      });
+      box.innerHTML = `<div style="font-weight:700;color:var(--text);margin-bottom:4px">Live Preview</div>` + lines.join("");
+    }
     function paintStrip() {
       const lineupNow = lineup();
       document.querySelector("#stripPrefixes").value = (lineupNow.namePrefixes || []).join(", ");
       document.querySelector("#stripSuffixes").value = (lineupNow.nameSuffixes || []).join(", ");
+      const autoBox = document.querySelector("#autoCleanNamesToggle");
+      if (autoBox) autoBox.checked = lineupNow.autoCleanNames !== false;
       paintGroupRule();
+      renderStripLivePreview();
     }
     function paintGroupRule() {
       const lineupNow = lineup();
@@ -2068,9 +2109,46 @@
       if (!String(find).trim()) return group.name || "";
       return replaceGroupText(group.name || "", find, lineup().groupReplace || "");
     }
+    function smartCleanBase(rawName, groupTitle) {
+      let current = String(rawName || "").trim();
+      if (!current) return current;
+      if (lineup().autoCleanNames === false) return current;
+      if (groupTitle) {
+        const rawGroup = String(groupTitle).trim();
+        const candidates = [rawGroup];
+        const afterPipe = rawGroup.split("|").pop().trim();
+        if (afterPipe.length >= 2 && !candidates.includes(afterPipe)) candidates.push(afterPipe);
+        const afterColon = rawGroup.split(":").pop().trim();
+        if (afterColon.length >= 2 && !candidates.includes(afterColon)) candidates.push(afterColon);
+        candidates.sort((a, b) => b.length - a.length);
+        for (const group of candidates) {
+          if (current.length > group.length && current.slice(0, group.length).toLowerCase() === group.toLowerCase()) {
+            const rest = current.slice(group.length);
+            if (rest && !/[A-Za-z]/.test(rest[0])) {
+              const stripped = rest.replace(/^[\s:|–—\-]+/, "").replace(/^(?:(?:ch(?:annel)?\.?\s*)|#)?\d{1,4}\s*[:|\-–—.]\s*/i, "").replace(/^[\s:|–—\-]+/, "").trim();
+              if (stripped) { current = stripped; break; }
+            }
+          }
+        }
+      }
+      current = current
+        .replace(/^[A-Za-z][A-Za-z0-9 &'+\-]{0,28}\s+\d{1,4}\s*[:|\-–—]\s*/, "")
+        .replace(/^(?:(?:ch(?:annel)?\.?\s*)|#)?\d{1,4}\s*[:|\-–—.]\s*/i, "")
+        .replace(/^(?:(?:ch(?:annel)?\.?\s*)|#)\d{1,4}\s+/i, "")
+        .replace(/\s*(?:\[(?:ch(?:annel)?\.?\s*)?#?\d{1,4}\]|\((?:ch(?:annel)?\.?\s*)?#?\d{1,4}\)|[|:\-–—]\s*(?:ch(?:annel)?\.?\s*)?#?\d{1,4}|\s+#\d{1,4})\s*$/i, "")
+        .replace(/\s{2,}/g, " ")
+        .replace(/^[\s:|\-–—]+|[\s:|\-–—]+$/g, "");
+      return current || String(rawName || "").trim();
+    }
+    function channelStem(name) {
+      return String(name || "").toLowerCase().replace(/\b(2160p|1080p|720p|480p|4k|uhd|fhd|hd|sd|60fps|hevc|h265)\b/gi, "").replace(/\[\d+\]|\(\d+\)/g, "").replace(/[^a-z0-9]+/g, " ").trim();
+    }
     function channelName(channel) {
       const custom = (lineup().channelNames || {})[channel.id];
-      return stripName(custom || channel.name, lineup().namePrefixes || [], lineup().nameSuffixes || []);
+      if (custom) return stripName(custom, lineup().namePrefixes || [], lineup().nameSuffixes || []);
+      const group = (state.catalog.groups || []).find((g) => g.id === channel.groupId);
+      const base = smartCleanBase(channel.name, group ? group.name : "");
+      return stripName(base, lineup().namePrefixes || [], lineup().nameSuffixes || []);
     }
     const groupCache = new Map();
     function sortGroup(channels, groupId) {
@@ -2717,9 +2795,16 @@
       note.textContent = "Loading channels…";
       const all = await channelsFor(group.id, queryKey);
       if (token !== channelRender) return;
+      const hideDupes = document.querySelector("#hideBackupDupes")?.checked === true;
+      const seenStems = hideDupes ? new Set() : null;
+      const deduped = hideDupes ? all.filter((ch) => {
+        const stem = channelStem(channelName(ch));
+        if (!stem || !seenStems.has(stem)) { if (stem) seenStems.add(stem); return true; }
+        return false;
+      }) : all;
       const matches = channelAlpha
-        ? all.slice().sort((a, b) => channelName(a).localeCompare(channelName(b)))
-        : all;
+        ? deduped.slice().sort((a, b) => channelName(a).localeCompare(channelName(b)))
+        : deduped;
       channelWindowItems = matches;
       if (!keepWindow) channelWindowStart = 0;
       const total = groupTotals.get(group.id + "\n" + queryKey) ?? matches.length;
@@ -3931,6 +4016,34 @@
     });
     syncVpnFields();
     document.querySelector("#epgBack").addEventListener("click", () => showTab("admin"));
+    document.querySelector("#stripPrefixes")?.addEventListener("input", renderStripLivePreview);
+    document.querySelector("#stripSuffixes")?.addEventListener("input", renderStripLivePreview);
+    document.querySelector("#autoCleanNamesToggle")?.addEventListener("change", (e) => {
+      lineup().autoCleanNames = e.target.checked;
+      renderStripLivePreview();
+    });
+    document.querySelectorAll("[data-strip-preset]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const spec = btn.getAttribute("data-strip-preset") || "";
+        const [side, rawTokens] = spec.split(":");
+        const input = document.querySelector(side === "suffix" ? "#stripSuffixes" : "#stripPrefixes");
+        if (!input) return;
+        const merged = mergeStrip(stripTokens(input.value), stripTokens(rawTokens));
+        input.value = merged.join(", ");
+        renderStripLivePreview();
+      });
+    });
+    document.querySelector("#hideBackupDupes")?.addEventListener("change", () => renderChannels());
+    document.querySelector("#channelsBulkFav")?.addEventListener("click", async () => {
+      const ids = Array.from(selectedChannels);
+      if (!ids.length) return;
+      const status = document.querySelector("#channelBulkStatus");
+      for (const id of ids) {
+        const key = "live:" + id;
+        if (!state.favorites.ids.includes(key)) state.favorites.ids.push(key);
+      }
+      if (status) status.textContent = "Added " + ids.length + " to favorites (click Save)";
+    });
     let SANITIZE_STREAMS = null;
     function sanitizeStreamTokens() {
       if (SANITIZE_STREAMS) return SANITIZE_STREAMS;

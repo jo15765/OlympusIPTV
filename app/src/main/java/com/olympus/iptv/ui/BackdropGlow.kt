@@ -27,8 +27,13 @@ object BackdropGlow {
         quietUntil = SystemClock.uptimeMillis() + 450L
     }
 
+    @Volatile private var lastSampleAt = 0L
+
     fun apply(bitmap: Bitmap, target: View) {
         if (bitmap.width < 2 || bitmap.height < 2) return
+        val now = SystemClock.uptimeMillis()
+        if (now < quietUntil || (now - lastSampleAt < 180L && target.background != null)) return
+        lastSampleAt = now
         val tiny = if (bitmap.width == THUMB_W && bitmap.height == THUMB_H) {
             bitmap
         } else {
@@ -49,7 +54,10 @@ object BackdropGlow {
             intArrayOf(accent, dark)
         )
         val previous = target.background
-        val animate = motion && SystemClock.uptimeMillis() >= quietUntil && previous != null
+        val animate = motion &&
+            !DeviceForm.powerSave(target.context) &&
+            SystemClock.uptimeMillis() >= quietUntil &&
+            previous != null
         if (!animate) {
             target.background = next
             return

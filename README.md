@@ -6,7 +6,7 @@
 
 ### For the latest and greatest, build your own APK from this code.
 
-The latest signed file is **0.2.82** (versionCode 83). **One APK** installs on Android TV / set-top boxes and on phones and tablets. It keeps the 0.2.79 device tiers and guide, restores the Admin cards, closes provider connections when you leave the app, and adds an Active Streams card on the phone dashboard. Optional keys in `local.properties`: `tmdb.apiKey`, `watchmode.apiKey`, `opensubtitles.apiKey`, `sendgrid.apiKey` + `sendgrid.fromEmail`.
+The latest signed file is **0.2.82** (versionCode 83). This source tree uses the same version numbers and has not been packed into a new APK. **One APK** installs on Android TV / set-top boxes and on phones and tablets. The signed file keeps the 0.2.79 device tiers and guide, restores the Admin cards, closes provider connections when you leave the app, and adds an Active Streams card on the phone dashboard. Build this source for the phone layout, guide-clock fix, and build changes listed under [0.2.82](#0282). Optional keys in `local.properties`: `tmdb.apiKey`, `watchmode.apiKey`, `opensubtitles.apiKey`, `sendgrid.apiKey` + `sendgrid.fromEmail`.
 
 **This is a player only. You must provide your own streams.**
 
@@ -69,11 +69,11 @@ Olympus-IPTV is one APK for Android TV / set-top boxes and for phones and tablet
 | Signed file | `C:\Users\chalu\Downloads\olympus-iptv-0.2.82.apk` |
 | What that file is | versionName **0.2.82**, versionCode **83** |
 | Source in this tree | versionName **0.2.82**, versionCode **83** |
-| What to run | Install the signed 0.2.82 APK, or build this source |
+| What to run | Install the signed 0.2.82 APK for the last packed release, or build this source for everything under “In this source” |
 | Install | Over the existing copy (TV or phone). Uninstalling wipes the saved account, playlist, and favorites. Downloader works with the same file. |
 | Launcher name | Two centered lines: Olympus over IPTV |
 
-**0.2.82** is the current signed release. The first-run tips put the remote on Got it, and the Continue watching strip is gone. In this source, Admin is the original image cards again, and account status, quiet hours, backup, and Magic Cleanup open from a Setup card. Leaving the app stops the player, the next-channel player, and the guide preview so the provider connection closes. Picture-in-picture keeps playing. The phone Admin page has an Active Streams card. Sticks with a small heap still use the 16 MB image cache, RGB_565 posters, and a 10 second buffer. Larger boxes pre-warm only the next channel.
+**0.2.82** is the current signed release. The first-run tips put the remote on Got it, and the Continue watching strip is gone. In this source, after that file, Admin is the original image cards again, and account status, quiet hours, backup, and Magic Cleanup open from a Setup card. The same source also has the phone chrome, gestures, cellular limits, and the guide-clock fix in the [0.2.82](#0282) notes. Those are not in the signed APK until you build them. Leaving the app stops the player, the next-channel player, and the guide preview so the provider connection closes. Picture-in-picture keeps playing. The phone Admin page has an Active Streams card. Sticks with a small heap still use the 16 MB image cache, RGB_565 posters, and a 10 second buffer. Larger boxes pre-warm only the next channel.
 
 ### What’s new since 0.2.56 (enhancements)
 
@@ -115,7 +115,7 @@ Olympus-IPTV is one APK for Android TV / set-top boxes and for phones and tablet
 | Up next | In the last 25 seconds of a movie or episode, an Up Next card counts down and can start the next title |
 | Last channel | Mini-guide **Last**, or a second Back within half a second on a live channel |
 | A–Z jump | Hold Up or Down for 1.2 seconds on a long channel list, or press Right past a movie or show column |
-| First run | Step 1 playlist, Step 2 pairing QR, Step 3 favorites |
+| First run | TV: playlist, pairing QR, favorites. A phone keeps the QR on the first screen and skips the second QR page |
 | Guide crash | Channel rows and program rows no longer share one recycled-view pool, so a row cannot be bound as the wrong kind |
 
 ---
@@ -126,29 +126,38 @@ Olympus-IPTV is one APK for Android TV / set-top boxes and for phones and tablet
 
 </div>
 
-There is **no separate mobile APK**. The same `olympus-iptv-0.2.82.apk` detects whether it is running on a television (Leanback / UI mode) or a touch-first phone or tablet.
+There is **no separate mobile APK**. The app detects a television (Leanback / television UI mode) versus a touch-first phone or tablet. A television with a touchscreen stays on the TV layout. The signed `olympus-iptv-0.2.82.apk` has the earlier phone chrome. The table below is this source.
 
 | On phones and tablets | What changed |
 | --- | --- |
-| Guide chrome | Top **Back** + title + **Admin** / **About** / **Search**; bottom Live / Movies / Shows tabs; sticky Groups header with Search; left TV rail hidden; groups are a single tall list |
-| Group filter | Typeahead field under Groups — jump to a group by name without leaving Live |
+| Guide chrome | Compact phones (smallest width under 600dp): top **Back**, title, **About**, **Search**, and **Cast**. **Admin** is not on that top bar. Bottom tabs are **Live**, **Movies**, **Shows**, **Library**, and **Admin**. The left TV rail stays hidden. Tablets keep the group list beside the channels. A wide TV still uses a flexible group column, not the tablet’s fixed 260dp column |
+| Columns | Category and poster grids follow the width: 2 columns under 600dp, 3 from 600dp, 4 from 900dp. TV stays at 5, or 6 at 1200dp and wider |
+| Group filter | Typeahead field under Groups — jump to a group by name without leaving Live. Portrait Live also shows group chips |
 | Now playing | After leaving the player, a resume strip shows the last title. Live shows **LIVE • Return to Fullscreen**; tap it to open the player again |
-| Live “now” | Channel rows show one line of what’s on (no TV EPG grid) |
+| Live “now” | A portrait phone shows the current title, a gold progress bar, and the next title on the row. A landscape phone and a TV keep the hour-by-hour guide |
 | Empty CTAs | Empty Favorites opens Favorites setup; empty Continue points you to Movies/Shows |
-| Pull to refresh | Swipe down on the groups list to refresh the catalog quietly |
-| Haptics | Light feedback on Play, group open, PIN set / unlock / wrong PIN |
-| Live play | Opening a Live group shows a full-width channel list (not the TV EPG split); tap a row to play |
+| Pull to refresh | Swipe down on the groups list or the channel list to refresh the catalog quietly |
+| Haptics | Light feedback on Play, group open, PIN set / unlock / wrong PIN, pull to refresh, and the player gesture pill |
+| Live play | A portrait phone opens the channel list. A landscape phone opens the hour guide. Tap a row to play |
+| Playlist links | **Paste playlist URL** on the phone login screen. Opening an `.m3u` or `.m3u8` link, or `olympusiptv://add?url=`, fills Add Playlist. The phone keyboard opens on search and URL fields. TV still keeps the keyboard off until it is asked for |
+| First run | The QR stays on the first login screen. Continue on a phone goes to favorites and does not open a second QR page. TV still gets the pairing step |
+| Local channels | ZIP matching uses the four nearest markets. Georgia ZIPs such as 30677 and 30605 can land on Atlanta, Athens, Augusta, Macon, Savannah, or Columbus GA |
+| Cellular | Automatic catalog refresh and host warm-up wait on a metered network. A manual refresh and the first connect still run. Guide prefetch is not blocked. Cellular video is about 2.5 Mbps, 6 Mbps when the link reports at least 15 Mbps, and unlimited at about 50 Mbps or on Wi-Fi. TV is not capped |
+| Background sync | On a phone, a job every 6 hours refreshes the catalog on unmetered Wi-Fi when the battery is not low, including after reboot. Televisions do not schedule it. This uses Android’s job scheduler. WorkManager is not in the offline build |
+| Battery saver | On a phone or tablet, saver mode skips the poster glow crossfade and decodes large posters at 320px. TV ignores the system saver |
 | Long-press | Bottom sheet for Favorite / Record / Remind / Queue / **Ratings & reviews** (Movies/Shows) / **Open in PiP** (TV still uses the dialog menu) |
-| PiP | Picture-in-picture while you browse: Open in PiP, swipe up on a title, or leave the player for Home when **PiP gestures** is on |
 | Skeletons | Placeholder rows while the first page of a group loads |
 | Scroll / memory | Remembers position per group; return from player lands on the same row; leaving a huge group drops the in-memory page over ~400 rows |
 | Look | Soft charcoal gradient background; raised Continue strip and bottom tabs; honey focus rings (TV also scales the focused card slightly) |
-| Lighter open | No AutoTransition when columns change; no side-by-side EPG pane; cold start skips dashboard/Watchmode warm (New / web still trigger it); no Live auto-preview on focus (saves a second decoder); smaller Coil caches; phone EPG prefetch waits ~220 ms after focus settles |
+| Lighter open | Compact phones skip the column animation. A portrait phone has no side-by-side EPG pane; a landscape phone does. Cold start skips dashboard/Watchmode warm (New / web still trigger it); no Live auto-preview on focus (saves a second decoder); smaller Coil caches; phone EPG prefetch waits ~220 ms after focus settles |
 | Visible Back | Guide (opened group / PIN / Admin / About), Fresh, Parental, Favorites setup, Search, and the player all show an on-screen Back |
 | Touch scroll | Favorites setup, Episodes, Queue, Search, and Admin/Refresh cards scroll without focus traps |
-| Player | Portrait dock; soft top overlay scrim; play/pause + scrubber auto-hide after 3 s (tap shows again); **Connecting…** only while truly waiting; error card with Retry / Next / close; sleep timer; Cast / Trailer / PiP on the menu; one ExoPlayer only |
+| Player | Portrait dock; soft top overlay scrim; play/pause + scrubber auto-hide after 3 s (tap shows again); **Connecting…** only while truly waiting; error card with Retry / Next / close; sleep timer; Cast / Trailer / PiP on the menu and a **Cast** control on the dock; one ExoPlayer only |
+| Gestures | On a phone, the left edge sets brightness and the right edge sets volume. A gold pill shows the level, with a tick about every 10%. Double-tap seeks ±15 seconds when the title has a duration. A single tap still shows or hides controls |
+| Lock screen | The playback notification has channel down, play/pause, channel up, and a 30-minute sleep toggle. Bluetooth previous and next change the channel. Cast stays on its own chooser, with the format disclaimer |
+| PiP | Picture-in-picture while you browse: Open in PiP, swipe up on a title, or leave the player for Home when **PiP gestures** is on and video or radio is playing. Not used on TV |
 | System navigation bar | Player and main screens pad for system bars so the 3-button or gesture bar does not cover play controls or key chrome |
-| Touch | Tap the video to show or hide controls; orientation is unlocked by default |
+| Touch | Tap the video to show or hide controls; orientation is unlocked by default. Turning the phone does not cancel an open guide |
 | Immersive watch | While controls are hidden, system bars hide; swipe shows them briefly; when the menu is open, bars stay visible and controls sit above them |
 
 TV remotes and landscape-first layouts are unchanged on set-top boxes. Phone PiP is not used on Leanback TV.
@@ -196,7 +205,7 @@ It walks through enabling unknown sources on an Onn box, installing Downloader b
 When an account is already saved, the app opens on two panes: the settings rail and the group cards. The login screen is not created. The rail is on screen while the group names load, and the cards fill in as soon as those names are ready from the local library. Heavy work (dashboard snapshot, image cleanup, Watchmode “New” cards) starts after that paint so a returning launch stays quick. The channel list and the hour-by-hour guide stay hidden until a card is opened. It does not start the last channel. The rail stays open, and its divider sits at the end of the longest label. The title on that rail is **Olympus IPTV** on one line. The launcher name under the icon stays on two lines. Above the group cards, Live TV shows the current date and time (`MM/DD/YYYY  hh:mm AM/PM`) instead of a row of favorite channel names.
 
 1. **TV, Movies, or Shows.** Group cards fill the space beside the rail, three smaller cards per row. Choosing one of those on the rail opens its cards and moves focus to the top-left card. A card shows the group name and, once counted, how many channels or titles it holds. Recently watched says Resume watching. Continue says Pick up where you left off. Moving across the cards does not load channels. The counts are read once and kept until the library changes.
-2. **OK on a card**, or Right from a card on the right edge, opens that group and loads it then. Focus leaves the group card. On TV, a Live group under 250 channels opens the side-by-side EPG and lands on the program that is on now for the first channel. A Live group with **250 or more** channels (common for a single provider “24/7 Shows” folder) still opens the guide, but fills it with **hour blocks of each channel name** (no provider EPG download). Channels page in **20** at a time as you scroll, so a thousand-row folder stays usable. Movies and Shows land on the first title. The other groups are not listed on that screen. Back from About or Admin returns focus to that same item on the left rail.
+2. **OK on a card**, or Right from a card on the right edge, opens that group and loads it then. Focus leaves the group card. On TV, and on a landscape phone, a Live group under 250 channels opens the side-by-side EPG and lands on the program that is on now for the first channel. A portrait phone opens the channel list instead, with now and next on each row. A Live group with **250 or more** channels (common for a single provider “24/7 Shows” folder) still opens the guide, but fills it with **hour blocks of each channel name** (no provider EPG download). Channels page in **20** at a time as you scroll, so a thousand-row folder stays usable. Movies and Shows land on the first title. The other groups are not listed on that screen. Back from About or Admin returns focus to that same item on the left rail.
 3. **Right** from a channel moves into the guide and later in time. **Left** from the first time slot returns to the channel list. Left from a later slot steps one slot back.
 4. **Back** from the channel list or the guide returns to the group cards. Back from the cards returns to the rail. Back on the rail does not quit the app.
 5. **Left** during full-screen playback returns to the channel list. **Back** during live playback returns to the channel and guide for that group. Back from there returns to the group cards. Back during movie or show playback still leaves the player and returns to the title you started.
@@ -336,7 +345,7 @@ Search looks through TV, Movies, and Shows and groups the hits under those headi
 
 The player is Media3 ExoPlayer on its own HTTP stack. Logos use Coil. Catalog and dashboard calls use OkHttp. The player does not send your streams through that client.
 
-On a phone or tablet, tap the picture to show or hide the transport chrome (caption, play/pause, scrubber). That chrome auto-hides after **3 seconds**. Portrait can show a dock with scrubber, Back, Play/Pause, and Menu while chrome is up. Phone **Menu** (or TV **Info**) opens the full action row. An on-screen **Back** closes chrome/menu; another Back (or the system gesture) leaves the player. While chrome is hidden, the system bars hide for immersive watching. A first-run tip explains tap-for-controls. Sleep → Lock rotation remembers portrait or landscape for the next open.
+On a phone or tablet, tap the picture to show or hide the transport chrome (caption, play/pause, scrubber). The left edge of the picture sets brightness and the right edge sets volume. Double-tap jumps 15 seconds when the title has a length. That chrome auto-hides after **3 seconds**. Portrait can show a dock with scrubber, Back, Play/Pause, and Menu while chrome is up. Phone **Menu** (or TV **Info**) opens the full action row. An on-screen **Back** closes chrome/menu; another Back (or the system gesture) leaves the player. While chrome is hidden, the system bars hide for immersive watching. A first-run tip explains tap-for-controls. Sleep → Lock rotation remembers portrait or landscape for the next open.
 
 The Audio list also has **Night mode** (off until you turn it on; Android 9 and newer), **Screen off, audio only** for a music or news channel, and **Audio earlier / Audio later** to keep a lip-sync offset for that channel. The top caption shows the lineup name, the current program, and the next program. On Movies/Shows it can also show a cached rating line when TMDB data is available. Channel Up/Down (or Up/Down while zapping live) shows a bottom **zap OSD** immediately — logo, channel, now/next, and a short progress bar — while the last video frame stays on screen (no black flash). Live buffers are tuned for IPTV (about 2.5–15 s). Live neighbors are prepared in the background so channel changes feel quicker. **OK / center** while watching shows the caption, play/pause, and progress for 3 seconds (press again while they are up to pause/resume). **Info** on TV (or **Menu** on phone) opens Audio, Subtitles, Record, Picture, **Last**, **Go live**, **Multi-view**, **Sleep**, **Cast**, **Trailer**, and **PiP** along the bottom. Audio picks a language carried in the stream. The player prefers **English (US)** when that track exists, remembers the language you last chose for a channel, and reuses that choice the next time the channel opens. Subtitles picks a track in the stream or an English file, and the language you last chose is remembered the same way. Record asks what to record. Picture picks Fit, Fill, or Stretch and keeps that choice for the next stream. **Sleep** offers Off / 30 / 60 / 90 minutes, then pauses and leaves the player. **Cast** opens a Chromecast picker after a disclaimer that IPTV/HLS formats often fail on the default Cast receiver. **Trailer** opens YouTube for the current VOD/series title when TMDB finds one. **PiP** (phones) shrinks playback into a system picture-in-picture window so you can keep watching while browsing. If reconnect fails repeatedly, an on-screen **Playback stopped** card offers **Retry**, **Next** (live zap), or close, with the same provider-vs-app wording. **Last** is for live TV. It returns to the live channel you were on before this one. The remote’s Last Channel key does the same. You need at least two live channels in that trail before Last has somewhere to go. Pause on live keeps you in the timeshift window; Left and Right step about ten seconds inside that window when the stream allows it. **Go live** jumps back to the live edge. **Multi-view** shows the previous live channel beside the current one, muted, and keeps that preference (TV only). Catch-up and other non-live titles use the same auto-hiding progress bar.
 
@@ -390,7 +399,7 @@ The recorder is a foreground service started after the guide has opened, so a sc
 
 </div>
 
-While the app process is running it serves the dashboard on the home network. It starts on port **8765**. If that port is already taken, it moves to the next free port and the address on the login screen updates. Admin, then Web-UI, shows the same address. Port 8443 stays with Cast on a Shield, an Onn box, and a Google TV Streamer. The address on screen is `http://` plus the TV’s own Wi-Fi address, for example `http://192.168.x.x:8765`. A phone on the same Wi-Fi opens that address. HTML/JSON responses are **gzip**-compressed when the browser sends `Accept-Encoding: gzip`. The Node `portal/data/store.json` file is never packaged into the APK. Login and the dashboard header both offer **Copy TV URL**. The server stops when the app process stops. Clients that are not on the home network are refused. Admin on the phone has the same VPN card as the TV, including a backup city. A VPN sends this app’s internet through that tunnel. Addresses on the home network, including this dashboard, stay on the LAN. If the first city does not answer, the backup city is tried. After a successful connection, a drop keeps the tunnel up and tries the other city. New streams wait until one of them answers, and they do not fall back onto the home connection. The Reminders tab lists the same reminders as the TV and can change the minutes or delete one. A running app keeps the page it already loaded until that process starts again.
+While the app process is running it serves the dashboard on the home network. It starts on port **8765**. If that port is already taken, it moves to the next free port and the address on the login screen updates. Admin, then Web-UI, shows the same address. Port 8443 stays with Cast on a Shield, an Onn box, and a Google TV Streamer. The address on screen is `http://` plus the TV’s own Wi-Fi address, for example `http://192.168.x.x:8765`. A phone on the same Wi-Fi opens that address. HTML/JSON responses are **gzip**-compressed when the browser sends `Accept-Encoding: gzip`. The dashboard page itself is stored pre-compressed as `dashboard/portal-page.pack`. The Node `portal/data/store.json` file is never packaged into the APK. Login and the dashboard header both offer **Copy TV URL**. The server stops when the app process stops. Clients that are not on the home network are refused. Admin on the phone has the same VPN card as the TV, including a backup city. A VPN sends this app’s internet through that tunnel. Addresses on the home network, including this dashboard, stay on the LAN. If the first city does not answer, the backup city is tried. After a successful connection, a drop keeps the tunnel up and tries the other city. New streams wait until one of them answers, and they do not fall back onto the home connection. The Reminders tab lists the same reminders as the TV and can change the minutes or delete one. A running app keeps the page it already loaded until that process starts again.
 
 Sign in with the email and the device id from Admin, then Web-UI. Opening a device loads groups, countries, a channel count, the lineup, favorites, and recordings from one saved copy. The group list, including each group’s country and the country numbers, is reused until the library changes. Checking a country updates that card. Checking or hiding one group or one channel updates that row. A group you have not reordered shows its first 400 channels. A group you have reordered keeps that order. Search, rename, and drag redraw the list they changed. Stream addresses are not sent to the page.
 
@@ -478,7 +487,10 @@ Admin, then Error log, shows the log in a window you can scroll and resize. Entr
 - TMDB / Watchmode title ratings share one disk + memory cache (`TitleRatings`); browse focus requests scores only, and the full reviews sheet reuses that cache.
 - Xtream VOD/series `titleLine` lookups are cached about six hours per playlist+id.
 - Watchmode, Scrobbler, and Xtream HTTP share the same OkHttp connection pool as other app clients.
-- Release builds use R8 minify and resource shrink (signed APK ~12.5 MB).
+- Release builds use R8 minify, resource shrink, and optimized resource shrinking. The release APK keeps 32-bit and 64-bit ARM only. Debug builds still include x86 for the emulator. Resources are limited to English. A baseline profile covers the guide and the player.
+- Once a day, guide rows older than 24 hours are deleted, then the database is vacuumed and the WAL is truncated. That maintenance is not inside a SQL transaction.
+- The dashboard page is gzipped at build time as `dashboard/portal-page.pack` and sent with gzip encoding. It is not named `index.html.gz`, which the asset packer treats as a second `index.html`.
+- On a phone, host warm-up and the quiet catalog refresh skip a metered network. A job every 6 hours refreshes the catalog on unmetered Wi-Fi when the battery is not low.
 - Phone Live groups do not auto-preview on focus (avoids a second decoder while scrolling).
 - Scrobbler start is delayed ~1.5 s so rapid channel changes do not spam Simkl/Trakt.
 - Decoder preference changes rebuild spare ExoPlayers lazily, not on every settings save.
@@ -532,10 +544,10 @@ Build from this folder when you want the latest source on a device.
 
 | | |
 | --- | --- |
-| Android Gradle Plugin | 9.5.1 |
+| Android Gradle Plugin | 9.5.2 |
 | Kotlin | 2.2.10 |
 | Gradle | 9.9.1 |
-| SDK | minSdk 24, compileSdk and targetSdk 35 |
+| SDK | minSdk 24, compileSdk 37, targetSdk 35 |
 | JDK | Android Studio’s JBR |
 
 ```powershell
@@ -569,7 +581,7 @@ The latest signed release is `C:\Users\chalu\Downloads\olympus-iptv-0.2.82.apk`.
 
 Android Studio: use a 1920×1080 Google TV emulator. Apply Changes does not pick up new screens. Stop the app, then Debug. Click the emulator window before the arrow keys. The emulator is a different device from a Shield or an Onn box, so it does not have that box’s account, playlist, or favorites.
 
-Libraries: Kotlin, AndroidX, ViewBinding, Media3 ExoPlayer (HLS and DASH), OkHttp, Gson, DataStore, Coil, Google Cast / MediaRouter, and SMBJ for the network share. The TV dashboard is a page in the APK, not a separate package.
+Libraries: Kotlin, AndroidX, ViewBinding, Media3 ExoPlayer (HLS and DASH), OkHttp, Gson, DataStore, Coil, profileinstaller, Google Cast / MediaRouter, and SMBJ for the network share. WorkManager is not a dependency. The TV dashboard is a page in the APK, not a separate package. Gradle is set to work offline.
 
 ---
 
@@ -638,7 +650,7 @@ clearcast-tuner/
 | About | Player-only notice, credits, coffee QR (opened from Admin) |
 | My Library | Queue, New, and Reminders stay on one screen; pills switch them in place |
 | Search | Find a channel, movie, or show and star it. Tiles show a rating and watch progress when those are known. A muted live dock appears after you leave the player |
-| Player | Play a channel, movie, episode, or recording; auto-hiding play/pause + progress; Cast, Trailer, PiP (phone), Audio/Subtitles, sleep |
+| Player | Play a channel, movie, episode, or recording; auto-hiding play/pause + progress; Cast, Trailer, PiP (phone), brightness and volume gestures, lock-screen channel controls, Audio/Subtitles, sleep |
 | New / Just Added | Playable premieres only; series seasons/episodes; D-pad focus trapped until Back |
 | EPG edits | Countries, groups, stripper, group renamer, Sanitize, Parental, images, name-to-guide, video decoder, TMDB items limit, PiP gestures, Scrobbler |
 | Favorites setup | Auto-add, skipped when the catalog is already loaded |
@@ -673,6 +685,16 @@ In this source, after that signed file:
 - On a low-memory stick, a memory warning clears the logo cache and the in-memory guide. The guide on disk stays.
 - Debug builds log disk reads and writes that happen on the main thread. Release builds do not.
 - The dashboard Backup button downloads one JSON file from the TV: favorites, group renames, parental PINs, strip rules, the rest of the lineup, and per-channel audio offsets. Import writes that file back. `portal/data/store.json` is not part of a source zip made with `archive-source.ps1`.
+- Opening the guide after New, For You, Recently Watched, or Favorites starts the clock on the current half hour. It no longer keeps an older window and scrolls into it, which had jumped the slot about 60 minutes ahead. Program titles stay on one line. Scrolling back inside a long program no longer pads the label, wraps it, and grows the row, which had left the text off-center.
+- A compact phone uses the top bar and the five bottom tabs described under [Phones and tablets](#phones-and-tablets). Tablets keep groups beside channels. Portrait phones use stacked now/next cards and group chips. Landscape phones keep the hour guide. Category and poster columns follow the screen width.
+- Phone login can paste a playlist URL. An `.m3u` or `.m3u8` link, or `olympusiptv://add?url=`, opens Add Playlist with that address. Search and URL fields use the phone keyboard. TV still forces the keyboard only where it already did.
+- First run on a phone does not open a second QR page after Continue. The QR remains on the first login screen. Turning the phone does not cancel the guide with “Job was cancelled”.
+- Local-channel ZIP matching checks the four nearest markets, including Athens, Augusta, Macon, Savannah, and Columbus GA next to Atlanta, so 30677 and 30605 can find a Georgia market.
+- On a phone, the left edge of the player sets brightness and the right edge sets volume, with a gold level pill. Double-tap seeks 15 seconds when the title has a length. Leaving the player for Home enters picture-in-picture when PiP gestures are on and video or radio is playing.
+- A phone playback notification and media session offer channel down, play/pause, channel up, and a 30-minute sleep toggle, including from the lock screen. Bluetooth previous and next change the channel.
+- **Cast** is on the phone browse bar and the phone player dock. It uses the focused channel, or the last channel that played. The format disclaimer is unchanged.
+- A metered network skips automatic catalog refresh and host warm-up. Cellular video is capped as in the phone table. A phone job every 6 hours refreshes the catalog on Wi-Fi when the battery is not low. Battery saver skips the poster glow and caps poster decode at 320px.
+- The release build is English-only, ARM-only, and minified with optimized resource shrinking. compileSdk is 37. The Android Gradle Plugin is 9.5.2. The pre-compressed dashboard asset is `portal-page.pack`.
 
 ### 0.2.81
 

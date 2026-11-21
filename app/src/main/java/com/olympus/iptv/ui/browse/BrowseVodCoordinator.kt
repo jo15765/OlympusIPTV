@@ -131,7 +131,7 @@ internal fun BrowseActivity.applyFavorites(ids: List<String>) {
 
 internal fun BrowseActivity.updateGroupClock(force: Boolean = false) {
         if (!viewReady()) return
-        if (section != GuideSection.TV || binding.groupColumn.visibility != View.VISIBLE) {
+        if (section != GuideSection.TV || binding.groupColumn.visibility != View.VISIBLE || binding.programPane.visibility == View.VISIBLE) {
             binding.groupClock.visibility = View.GONE
             groupClockMinute = Long.MIN_VALUE
             return
@@ -283,6 +283,7 @@ internal fun BrowseActivity.refreshPlaylist(quiet: Boolean = false) {
         if (app.catalogRefresh?.isActive == true) {
             if (touchPrimary && viewReady() && quiet) {
                 binding.groupsRefresh.isRefreshing = true
+                binding.channelRefresh.isRefreshing = true
             }
             return
         }
@@ -497,12 +498,14 @@ internal fun BrowseActivity.refreshPlaylist(quiet: Boolean = false) {
                         else getString(R.string.refresh_quiet_added, added)
                     )
                     binding.groupsRefresh.isRefreshing = false
+                    binding.channelRefresh.isRefreshing = false
                     return@withContext
                 }
                 moviesPending = false
                 showsPending = false
                 showLoading(false)
                 binding.groupsRefresh.isRefreshing = false
+                binding.channelRefresh.isRefreshing = false
                 binding.refreshLine.visibility = View.VISIBLE
                 binding.refreshLine.text = if (added == 0) {
                     getString(R.string.refresh_current)
@@ -524,6 +527,7 @@ internal fun BrowseActivity.refreshPlaylist(quiet: Boolean = false) {
                 withContext(Dispatchers.Main) {
                     if (isDestroyed) return@withContext
                     binding.groupsRefresh.isRefreshing = false
+                    binding.channelRefresh.isRefreshing = false
                     showRefreshStatus(getString(R.string.refresh_offline_hint))
                     Toast.makeText(
                         screen(),
@@ -564,6 +568,10 @@ internal fun BrowseActivity.ensureRefreshLoop() {
                 val running = app.catalogRefresh
                 if (running?.isActive == true) {
                     running.join()
+                    continue
+                }
+                if (com.olympus.iptv.playlist.MeteredNetwork.limited(this@ensureRefreshLoop)) {
+                    delay(60_000L)
                     continue
                 }
                 withContext(Dispatchers.Main) {
@@ -1177,7 +1185,7 @@ internal fun BrowseActivity.applyChannelLayout() {
         binding.contentHint.visibility = if (posters) View.VISIBLE else View.GONE
         val manager = binding.channelList.layoutManager
         // Phones: one poster column scrolls smoother than a 2-up grid on mid-range devices.
-        val posterSpan = if (touchPrimary) 1 else 4
+        val posterSpan = com.olympus.iptv.ui.DeviceForm.contentColumns(this)
         if (posters && manager !is androidx.recyclerview.widget.GridLayoutManager) {
             binding.channelList.layoutManager = androidx.recyclerview.widget.GridLayoutManager(this, posterSpan)
         } else if (posters && manager is androidx.recyclerview.widget.GridLayoutManager && manager.spanCount != posterSpan) {

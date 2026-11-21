@@ -41,6 +41,8 @@ data class LineupConfig(
     val namePrefixes: List<String>? = emptyList(),
     val nameSuffixes: List<String>? = emptyList(),
     val nameEpg: Boolean? = false,
+    /** Auto-strip group prefixes, channel numbers, and clutter by default across TV and Web-UI. */
+    val autoCleanNames: Boolean? = true,
     /** Bulk group find text. Shared by the TV and the web dashboard. */
     val groupFind: String? = null,
     /** Bulk group replacement. Empty means the found text is removed. */

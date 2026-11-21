@@ -227,6 +227,7 @@ class OlympusIptvApp : Application() {
             }
         }
         com.olympus.iptv.remind.ReminderClock.start(this)
+        com.olympus.iptv.playlist.CatalogSyncWorker.schedule(this)
         registerActivityLifecycleCallbacks(object : android.app.Application.ActivityLifecycleCallbacks {
             override fun onActivityResumed(activity: android.app.Activity) {
                 if (activity is com.olympus.iptv.remind.ReminderActivity) return

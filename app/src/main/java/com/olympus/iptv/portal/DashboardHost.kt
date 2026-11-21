@@ -6,6 +6,8 @@ import android.net.LinkProperties
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
+import android.util.LruCache
+import java.io.BufferedInputStream
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
@@ -73,6 +75,10 @@ object DashboardHost {
     @Volatile private var page: ByteArray? = null
     @Volatile private var pageGzip: ByteArray? = null
     @Volatile private var logo: ByteArray? = null
+    @Volatile private var cachedDeviceId: String? = null
+    private val logoMemCache = object : LruCache<String, Pair<String, ByteArray>>(4 * 1024 * 1024) {
+        override fun sizeOf(key: String, value: Pair<String, ByteArray>): Int = value.second.size
+    }
     private data class GuideHold(
         val playlistId: String,
         val stamp: Long,
@@ -312,7 +318,7 @@ object DashboardHost {
             return
         }
         socket.soTimeout = 20000
-        val input = socket.getInputStream()
+        val input = BufferedInputStream(socket.getInputStream(), 8192)
         val headerText = readHeader(input) ?: return
         val lines = headerText.split("\r\n")
         val request = lines.firstOrNull()?.split(" ") ?: return
@@ -846,18 +852,19 @@ object DashboardHost {
         val total: Int
         if (order.isEmpty()) {
             page = app.catalogDb.slimInGroup(gate.playlist.id, groupId, needle, limit, byName = true)
-            total = app.catalogDb.countInGroup(gate.playlist.id, groupId, needle)
+            total = if (page.size < limit) page.size else app.catalogDb.countInGroup(gate.playlist.id, groupId, needle)
         } else {
             val rank = HashMap<String, Int>(order.size)
             order.forEachIndexed { index, id -> rank[id] = index }
+            val fetchCap = (limit * 8).coerceIn(limit, 800)
             val matches = app.catalogDb.slimInGroup(
                 gate.playlist.id,
                 groupId,
                 needle,
-                limit = (limit * 8).coerceIn(limit, 800)
+                limit = fetchCap
             )
             page = matches.sortedWith(compareBy({ rank[it.id] ?: 999999 }, { it.name.lowercase(Locale.US) })).take(limit)
-            total = app.catalogDb.countInGroup(gate.playlist.id, groupId, needle)
+            total = if (matches.size < fetchCap) matches.size else app.catalogDb.countInGroup(gate.playlist.id, groupId, needle)
         }
         val pageRows = page.map { channel ->
             rememberLogo(channel.logo)
@@ -1184,6 +1191,10 @@ object DashboardHost {
             return
         }
         val hash = MessageDigest.getInstance("SHA-1").digest(target.toByteArray()).joinToString("") { "%02x".format(it) }
+        logoMemCache.get(hash)?.let { (cachedType, cachedBytes) ->
+            writeBytes(socket, 200, cachedType, cachedBytes, "public, max-age=86400, immutable", allowGzip = false)
+            return
+        }
         val file = File(app.cacheDir, "dashboard-logos/$hash")
         val typeFile = File(app.cacheDir, "dashboard-logos/$hash.type")
         if (!file.isFile || System.currentTimeMillis() - file.lastModified() > 7L * 24 * 60 * 60 * 1000) {
@@ -1211,6 +1222,7 @@ object DashboardHost {
                     file.parentFile?.mkdirs()
                     file.writeBytes(bytes)
                     typeFile.writeText(type)
+                    logoMemCache.put(hash, type to bytes)
                     true
                 }
             }.getOrDefault(false)
@@ -1220,7 +1232,13 @@ object DashboardHost {
             }
         }
         val type = if (typeFile.isFile) typeFile.readText() else "image/jpeg"
-        writeFile(socket, file, type, null)
+        val diskBytes = runCatching { file.readBytes() }.getOrNull()
+        if (diskBytes != null) {
+            logoMemCache.put(hash, type to diskBytes)
+            writeBytes(socket, 200, type, diskBytes, "public, max-age=86400, immutable", allowGzip = false)
+        } else {
+            writeFile(socket, file, type, null)
+        }
     }
 
     private fun rememberLogo(url: String?) {
@@ -1257,7 +1275,7 @@ object DashboardHost {
         val postedEmail = email?.trim()?.lowercase().orEmpty()
         val postedDevice = deviceId?.trim().orEmpty()
         if (saved.isBlank() || postedEmail != saved || postedDevice.isBlank()) return null
-        val id = runBlocking { app.playlistStore.deviceId() }
+        val id = cachedDeviceId ?: runBlocking { app.playlistStore.deviceId() }.also { cachedDeviceId = it }
         if (postedDevice != id) return null
         return Gate(session, id)
     }
@@ -1276,6 +1294,7 @@ object DashboardHost {
         namePrefixes = config.namePrefixes ?: emptyList(),
         nameSuffixes = config.nameSuffixes ?: emptyList(),
         nameEpg = config.nameEpg ?: false,
+        autoCleanNames = config.autoCleanNames ?: true,
         groupFind = config.groupFind,
         groupReplace = config.groupReplace,
         groupPins = config.groupPins,
@@ -1455,7 +1474,7 @@ object DashboardHost {
     private fun pageGzipBytes(context: Context): ByteArray? {
         pageGzip?.let { return it }
         val bytes = runCatching {
-            context.assets.open("dashboard/index.html.gz").use { it.readBytes() }
+            context.assets.open("dashboard/portal-page.pack").use { it.readBytes() }
         }.getOrNull() ?: return null
         pageGzip = bytes
         return bytes

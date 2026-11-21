@@ -207,6 +207,11 @@ internal fun BrowseActivity.wireLazyPanes() {
 
 
 internal fun BrowseActivity.hostOnCreate(savedInstanceState: Bundle?) {
+        if (com.olympus.iptv.ui.DeviceForm.isTouchPrimary(this) &&
+            requestedOrientation != android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        ) {
+            requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
         try {
         programAdapter = ProgramGuideAdapter(
             context = this,
@@ -218,9 +223,6 @@ internal fun BrowseActivity.hostOnCreate(savedInstanceState: Bundle?) {
             },
             onHold = { channel, _ -> showRowOptions(channel) }
         )
-        programAdapter.preferKeepPx = {
-            programAdapter.pxFor(com.olympus.iptv.playlist.EpgUtils.now())
-        }
         binding = ActivityBrowseBinding.inflate(layoutInflater)
         panes = BrowseLazyPanes(binding)
         wireLazyPanes()
@@ -244,7 +246,6 @@ internal fun BrowseActivity.hostOnCreate(savedInstanceState: Bundle?) {
         }
         touchPrimary = com.olympus.iptv.ui.DeviceForm.isTouchPrimary(this)
         if (touchPrimary) {
-            requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
             androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
             com.olympus.iptv.ui.InsetsPad.apply(
                 binding.guideShell,
@@ -277,11 +278,8 @@ internal fun BrowseActivity.hostOnCreate(savedInstanceState: Bundle?) {
             epgCache = { epgCache }
         )
 
-        binding.categoryList.layoutManager = if (touchPrimary) {
-            LinearLayoutManager(this)
-        } else {
-            androidx.recyclerview.widget.GridLayoutManager(this, CARD_SPAN)
-        }
+        val categorySpan = com.olympus.iptv.ui.DeviceForm.contentColumns(this)
+        binding.categoryList.layoutManager = androidx.recyclerview.widget.GridLayoutManager(this, categorySpan)
         binding.channelList.layoutManager = LinearLayoutManager(this)
         binding.categoryList.adapter = categoryAdapter
         binding.channelList.adapter = channelAdapter
@@ -296,12 +294,8 @@ internal fun BrowseActivity.hostOnCreate(savedInstanceState: Bundle?) {
         binding.channelList.setHasFixedSize(true)
         binding.categoryList.setItemViewCacheSize(if (touchPrimary) 8 else 12)
         binding.channelList.setItemViewCacheSize(if (touchPrimary) 12 else 24)
-        if (!touchPrimary) {
-            (binding.categoryList.layoutManager as androidx.recyclerview.widget.GridLayoutManager)
-                .initialPrefetchItemCount = CARD_SPAN * 2
-        } else {
-            (binding.categoryList.layoutManager as LinearLayoutManager).initialPrefetchItemCount = 6
-        }
+        (binding.categoryList.layoutManager as androidx.recyclerview.widget.GridLayoutManager)
+            .initialPrefetchItemCount = categorySpan * 2
         (binding.channelList.layoutManager as LinearLayoutManager).initialPrefetchItemCount =
             if (touchPrimary) 4 else 8
         binding.channelList.recycledViewPool.setMaxRecycledViews(0, if (touchPrimary) 16 else 32)
@@ -401,6 +395,8 @@ internal fun BrowseActivity.hostOnCreate(savedInstanceState: Bundle?) {
             val account = resolveAccount() ?: return@launch
             bootstrap(account)
         }
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
         } catch (error: Throwable) {
             com.olympus.iptv.AppLog.error("Guide", "The guide failed to open", error)
             val message = android.widget.TextView(this)
@@ -496,7 +492,6 @@ internal suspend fun BrowseActivity.bootstrap(savedIn: SavedPlaylist) {
                     openGuide = true
                 )
                 showLoading(false)
-                libraryJob.cancel()
                 val local = lineupJob.await()
                 applyFavorites(favoritesJob.await())
                 activeConfig = local
@@ -578,6 +573,8 @@ internal suspend fun BrowseActivity.bootstrap(savedIn: SavedPlaylist) {
         syncSharedLineup()
         runCatching { RecordingService.start(this) }
             .onFailure { com.olympus.iptv.AppLog.error("Guide", "Recording service did not start", it) }
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
         } catch (error: Throwable) {
             com.olympus.iptv.AppLog.error("Guide", "The guide failed to open", error)
             if (!isDestroyed) {
@@ -1184,9 +1181,6 @@ internal fun BrowseActivity.hostDispatchKey(event: KeyEvent): Boolean {
                 KeyEvent.KEYCODE_DPAD_LEFT -> {
                     if (slot != null && slot.column > 0) {
                         focusProgram(slot.row, slot.column - 1)
-                    } else {
-                        showMenu(GuideMenu.CHANNELS)
-                        focusReturnChannel(slot?.row ?: focusedChannelRow())
                     }
                     return true
                 }
@@ -1250,6 +1244,7 @@ internal fun BrowseActivity.hostDispatchKey(event: KeyEvent): Boolean {
             when (event.keyCode) {
                 KeyEvent.KEYCODE_DPAD_LEFT -> {
                     if (pos < 0 || pos % span == 0) {
+                        categoryAdapter.setSelected(null)
                         showMenu(GuideMenu.SETTINGS)
                         sectionButton().requestFocus()
                         binding.navRail.post { flushGroupRefresh() }
@@ -1268,10 +1263,12 @@ internal fun BrowseActivity.hostDispatchKey(event: KeyEvent): Boolean {
                     if (pos in 0 until span) {
                         when {
                             binding.homeContinue.visibility == View.VISIBLE -> {
+                                categoryAdapter.setSelected(null)
                                 binding.homeContinuePlay.requestFocus()
                                 return true
                             }
                             binding.shortcutRow.visibility == View.VISIBLE -> {
+                                categoryAdapter.setSelected(null)
                                 binding.btnFavoritesSetup.requestFocus()
                                 return true
                             }
@@ -1430,8 +1427,9 @@ internal fun BrowseActivity.enlargeTouchChips() {
             binding.btnRemind, binding.btnParental, binding.btnLastGroup,
             binding.mobileTabLive, binding.mobileTabMovies, binding.mobileTabShows,
             binding.mobileBack, binding.mobileAdmin, binding.mobileAbout, binding.mobileSearch,
-            binding.groupsSearch,
-            binding.bottomTabLive, binding.bottomTabMovies, binding.bottomTabShows
+            binding.mobileCast, binding.groupsSearch,
+            binding.bottomTabLive, binding.bottomTabMovies, binding.bottomTabShows,
+            binding.bottomTabLibrary, binding.bottomTabAdmin
         ).forEach { chip ->
             chip.minHeight = min
             chip.setPadding(padH, chip.paddingTop, padH, chip.paddingBottom)
@@ -1443,11 +1441,15 @@ internal fun BrowseActivity.applyGuideColumns() {
         val live = section == GuideSection.TV
         val full = guideMenu == GuideMenu.CHANNELS || guideMenu == GuideMenu.PROGRAMS
         val showSettings = !full
-        val showGroups = !full
+        val tablet = touchPrimary && !com.olympus.iptv.ui.DeviceForm.isCompact(this)
+        val showGroups = !full || tablet
         val showChannels = full
-        val phoneChrome = touchPrimary
-        // EPG pane only in PROGRAMS mode. CHANNELS (phones, or huge Live folders) is list-only.
-        val showPrograms = live && full && !phoneChrome && guideMenu == GuideMenu.PROGRAMS
+        val stacked = touchPrimary &&
+            com.olympus.iptv.ui.DeviceForm.isCompact(this) &&
+            com.olympus.iptv.ui.DeviceForm.isPortrait(this)
+        val phoneChrome = touchPrimary && com.olympus.iptv.ui.DeviceForm.isCompact(this)
+        // Portrait phones use stacked now/next cards. Landscape and TV use the hour grid.
+        val showPrograms = live && full && !stacked && guideMenu == GuideMenu.PROGRAMS
         setNavExpanded(true)
         val blockChannels = live && guideMenu == GuideMenu.PROGRAMS && !phoneChrome
         channelAdapter.guideRowsFocusable = !blockChannels
@@ -1474,7 +1476,8 @@ internal fun BrowseActivity.applyGuideColumns() {
         if (!showGroups && focusIsIn(binding.groupColumn)) binding.groupColumn.clearFocus()
         binding.groupColumn.visibility = if (showGroups) View.VISIBLE else View.GONE
         binding.shortcutRow.visibility = if (showGroups && live) View.VISIBLE else View.GONE
-        binding.groupPills.visibility = View.GONE
+        binding.groupPills.visibility = if (stacked && showChannels) View.VISIBLE else View.GONE
+        if (stacked && showChannels) syncGroupPills()
         binding.contentDivider.visibility = if (showGroups && showChannels) View.VISIBLE else View.GONE
         binding.contentColumn.visibility = if (showChannels) View.VISIBLE else View.GONE
         binding.programPane.visibility = if (showPrograms) View.VISIBLE else View.GONE
@@ -1510,12 +1513,33 @@ internal fun BrowseActivity.applyGuideColumns() {
         val content = binding.contentColumn.layoutParams as LinearLayout.LayoutParams
         val programs = binding.programPane.layoutParams as LinearLayout.LayoutParams
         val density = resources.displayMetrics.density
-        if (phoneChrome && showChannels) {
-            // Full-width channel list — do not leave weight on a hidden EPG pane.
+        binding.channelList.setHasFixedSize(!stacked)
+        if (tablet && showGroups) {
+            val groups = binding.groupColumn.layoutParams as LinearLayout.LayoutParams
+            val width = (260 * density).toInt()
+            if (groups.width != width || groups.weight != 0f) {
+                groups.width = width
+                groups.weight = 0f
+                binding.groupColumn.layoutParams = groups
+            }
+        } else if (!phoneChrome) {
+            val groups = binding.groupColumn.layoutParams as LinearLayout.LayoutParams
+            if (groups.weight != 1f) {
+                groups.width = 0
+                groups.weight = 1f
+                binding.groupColumn.layoutParams = groups
+            }
+        }
+        if (stacked && showChannels) {
             content.width = 0
             content.weight = 1f
             programs.width = 0
             programs.weight = 0f
+        } else if (tablet && showChannels && showPrograms) {
+            content.width = 0
+            content.weight = 1f
+            programs.width = 0
+            programs.weight = 1.4f
         } else if (showChannels && showPrograms && !full) {
             content.width = ((if (guideMenu == GuideMenu.SETTINGS) 180 else 220) * density).toInt()
             content.weight = 0f
@@ -1561,8 +1585,11 @@ internal fun BrowseActivity.openFullGuide() {
         binding.categoryList.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
         binding.groupColumn.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
         if (focusIsIn(binding.categoryList)) currentFocus?.clearFocus()
-        // TV Live always opens the guide pane. Mega-folders use name/hour filler (no EPG fetch).
-        if (section == GuideSection.TV && !touchPrimary) {
+        // Portrait phones use stacked now/next cards. Landscape, tablets, and TV use the hour grid.
+        val portraitPhone = touchPrimary &&
+            com.olympus.iptv.ui.DeviceForm.isCompact(this) &&
+            com.olympus.iptv.ui.DeviceForm.isPortrait(this)
+        if (section == GuideSection.TV && !portraitPhone) {
             if (guideMenu != GuideMenu.PROGRAMS) previousMenu = guideMenu
             guideMenu = GuideMenu.PROGRAMS
         } else {
@@ -1974,6 +2001,7 @@ internal fun BrowseActivity.setupPipSwipeOpen() {
 
 internal fun BrowseActivity.toggleGuideFavorite(channel: Channel) {
         val saved = playlist ?: return
+        Haptics.confirm(binding.root)
         val section = favoriteSection(section)
         val key = Favorites.keyFor(channel, section)
         val adding = !Favorites.matches(channel, favoriteIds)

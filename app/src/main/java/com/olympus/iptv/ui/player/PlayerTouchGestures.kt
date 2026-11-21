@@ -1,0 +1,110 @@
+package com.olympus.iptv.ui.player
+
+import android.media.AudioManager
+import android.view.GestureDetector
+import android.view.Gravity
+import android.view.MotionEvent
+import android.view.View
+import android.view.ViewGroup
+import android.widget.FrameLayout
+import com.olympus.iptv.ui.DeviceForm
+import com.olympus.iptv.ui.Haptics
+import kotlin.math.abs
+
+/** Phone overlay: edge swipes for brightness and volume, double-tap seek, center tap for controls. */
+internal object PlayerTouchGestures {
+    fun attach(activity: PlayerActivity, surface: View) {
+        if (!DeviceForm.isTouchPrimary(activity) || DeviceForm.isTelevision(activity)) return
+        val audio = activity.getSystemService(AudioManager::class.java)
+        val density = activity.resources.displayMetrics.density
+        val hud = GestureHud(activity)
+        (activity.binding.root as? ViewGroup)?.addView(
+            hud,
+            FrameLayout.LayoutParams((56 * density).toInt(), (220 * density).toInt(), Gravity.CENTER)
+        )
+        var originY = -1f
+        var side = 0
+        var startBrightness = 0.5f
+        var startVolume = 0
+        var lastStep = -1
+        val detector = GestureDetector(activity, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onDown(e: MotionEvent): Boolean = true
+
+            override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
+                activity.togglePlaybackChrome()
+                return true
+            }
+
+            override fun onDoubleTap(e: MotionEvent): Boolean {
+                val exo = activity.player ?: return true
+                val duration = exo.duration
+                if (duration <= 0L) return true
+                val width = surface.width.coerceAtLeast(1)
+                val delta = if (e.x < width / 2f) -15_000L else 15_000L
+                val next = (exo.currentPosition + delta).coerceIn(0L, duration)
+                exo.seekTo(next)
+                activity.showTransportChrome()
+                Haptics.confirm(surface)
+                hud.showSeek(if (delta < 0L) "−15s" else "+15s")
+                return true
+            }
+
+            override fun onScroll(
+                e1: MotionEvent?,
+                e2: MotionEvent,
+                distanceX: Float,
+                distanceY: Float
+            ): Boolean {
+                val start = e1 ?: return false
+                val width = surface.width
+                val height = surface.height
+                if (width <= 0 || height <= 0) return false
+                val edge = width * 0.22f
+                if (start.x > edge && start.x < width - edge) return false
+                if (abs(e2.y - start.y) < abs(e2.x - start.x)) return false
+                if (originY < 0f) {
+                    originY = start.y
+                    side = if (start.x <= edge) -1 else 1
+                    val current = activity.window.attributes.screenBrightness
+                    startBrightness = if (current < 0f) 0.5f else current
+                    startVolume = audio?.getStreamVolume(AudioManager.STREAM_MUSIC) ?: 0
+                    lastStep = -1
+                }
+                val drag = ((originY - e2.y) / height).coerceIn(-1f, 1f)
+                val percent = if (side < 0) {
+                    val level = (startBrightness + drag).coerceIn(0.01f, 1f)
+                    val params = activity.window.attributes
+                    params.screenBrightness = level
+                    activity.window.attributes = params
+                    (level * 100).toInt()
+                } else if (audio != null) {
+                    val max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
+                    val level = (startVolume + drag * max).toInt().coerceIn(0, max)
+                    runCatching { audio.setStreamVolume(AudioManager.STREAM_MUSIC, level, 0) }
+                    (level * 100) / max
+                } else {
+                    return true
+                }
+                val step = percent / 10
+                if (step != lastStep) {
+                    lastStep = step
+                    Haptics.clock(surface)
+                }
+                hud.showLevel(brightness = side < 0, percent = percent)
+                return true
+            }
+        })
+        surface.setOnTouchListener { _, event ->
+            val handled = detector.onTouchEvent(event)
+            if (event.actionMasked == MotionEvent.ACTION_UP ||
+                event.actionMasked == MotionEvent.ACTION_CANCEL
+            ) {
+                if (originY >= 0f || hud.visibility == View.VISIBLE) hud.fadeOut()
+                originY = -1f
+                side = 0
+                lastStep = -1
+            }
+            handled
+        }
+    }
+}

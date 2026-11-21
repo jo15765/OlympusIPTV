@@ -56,6 +56,11 @@ class FavoritesSetupActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (DeviceForm.isTouchPrimary(this) &&
+            requestedOrientation != ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        ) {
+            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
         binding = ActivityFavoritesSetupBinding.inflate(layoutInflater)
         setContentView(binding.root)
         val step = TextView(this).apply {
@@ -66,7 +71,6 @@ class FavoritesSetupActivity : AppCompatActivity() {
         }
         (binding.root as android.view.ViewGroup).addView(step, 0)
         if (touchPrimary) {
-            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
             WindowCompat.setDecorFitsSystemWindows(window, false)
             InsetsPad.apply(
                 binding.root,

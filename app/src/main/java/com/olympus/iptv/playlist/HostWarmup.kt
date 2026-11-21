@@ -11,6 +11,7 @@ object HostWarmup {
 
     fun launch(app: OlympusIptvApp, playlistId: String, favoriteKeys: List<String>) {
         if (playlistId.isBlank() || favoriteKeys.isEmpty() || warmedFor == playlistId) return
+        if (MeteredNetwork.limited(app)) return
         warmedFor = playlistId
         app.appScope.launch(Dispatchers.IO) {
             val hosts = ArrayList<String>(3)

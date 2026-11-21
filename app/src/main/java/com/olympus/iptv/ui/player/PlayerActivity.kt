@@ -166,6 +166,7 @@ class PlayerActivity : AppCompatActivity() {
     internal var sleepMinutes = 0
     internal var nightMode = false
     internal var radioOn = false
+    internal var phoneControls: PhoneMediaControls? = null
     internal var savedBrightness = -1f
     internal val radioClock: Runnable = object : Runnable {
         override fun run() {
@@ -531,6 +532,23 @@ class PlayerActivity : AppCompatActivity() {
         binding.playbackMenu.orientation = LinearLayout.HORIZONTAL
         binding.btnMenuBack.visibility = View.VISIBLE
         setPhoneSystemBarsHidden(true)
+        val row = binding.phoneDock.getChildAt(1) as? LinearLayout
+        if (row != null) {
+            val cast = android.widget.TextView(this)
+            val height = (52 * resources.displayMetrics.density).toInt()
+            cast.layoutParams = LinearLayout.LayoutParams(0, height, 1f).apply {
+                marginStart = (10 * resources.displayMetrics.density).toInt()
+            }
+            cast.gravity = Gravity.CENTER
+            cast.setBackgroundResource(R.drawable.bg_button_secondary)
+            cast.setText(R.string.cast)
+            cast.setTextColor(getColor(R.color.text_primary))
+            cast.textSize = 16f
+            cast.setOnClickListener { CastBridge.showChooser(this, current) }
+            row.addView(cast)
+        }
+        PlayerTouchGestures.attach(this, binding.playerView)
+        phoneControls = PhoneMediaControls(this).also { it.start() }
     }
 
     internal fun setPhoneSystemBarsHidden(hide: Boolean) {
@@ -545,7 +563,7 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
-    private fun togglePlaybackChrome() {
+    internal fun togglePlaybackChrome() {
         if (binding.subtitlePanel.visibility == View.VISIBLE) {
             closeSubtitlePanel()
             return
@@ -574,7 +592,7 @@ class PlayerActivity : AppCompatActivity() {
                 binding.playbackMenu.visibility == View.VISIBLE
             )
 
-    private fun showTransportChrome() {
+    internal fun showTransportChrome() {
         if (!::binding.isInitialized || isDestroyed) return
         val channel = current
         binding.overlay.visibility = View.VISIBLE
@@ -754,6 +772,7 @@ class PlayerActivity : AppCompatActivity() {
             providerName = loaded.name
             val channel = loaded
             current = channel
+            phoneControls?.publish()
             val app = application as OlympusIptvApp
             app.lastPlayed = channel
             app.lastPlayedPlaylistId = playlistId
@@ -819,6 +838,7 @@ class PlayerActivity : AppCompatActivity() {
             if (warmed != null) {
                 val previous = player
                 player = warmed
+                MobileBitrateCap.apply(this@PlayerActivity, warmed)
                 warmed.addListener(trackListener)
                 watchPlaybackEvents(warmed)
                 binding.playerView.player = warmed
@@ -914,6 +934,7 @@ class PlayerActivity : AppCompatActivity() {
             .setMediaSourceFactory(DefaultMediaSourceFactory(this).setDataSourceFactory(http))
             .build()
             .also { exo ->
+                MobileBitrateCap.apply(this, exo)
                 exo.addListener(trackListener)
                 watchPlaybackEvents(exo)
                 applyNightMode(exo)
@@ -1184,6 +1205,15 @@ class PlayerActivity : AppCompatActivity() {
         val hardFail = http == 401 || http == 403 || recoverAttempt >= MAX_LIVE_RECOVER
         if (error != null) noteStreamFailure(channel)
         if (hardFail) {
+            val sibling = com.olympus.iptv.playlist.ChannelFailover.alternate(
+                channel,
+                (application as OlympusIptvApp).playbackQueue
+            )
+            if (sibling != null) {
+                Toast.makeText(this, R.string.playback_backup, Toast.LENGTH_SHORT).show()
+                playById(sibling.id)
+                return
+            }
             runCatching { exo.stop() }
             showConnectingBadge(false)
             toastPlaybackIssue(error)
@@ -1692,7 +1722,7 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
-    private fun step(direction: Int) {
+    internal fun step(direction: Int) {
         if (stepping) return
         cancelNext()
         if (zapMode == ZAP_LIST) {
@@ -1895,7 +1925,11 @@ class PlayerActivity : AppCompatActivity() {
         if (touchPrimary && binding.overlay.visibility != View.VISIBLE) setPhoneSystemBarsHidden(true)
     }
 
-    private fun isLiveNow(channel: Channel? = current): Boolean = liveNow(channel)
+    private fun isLiveNow(channel: Channel? = current): Boolean {
+        val item = channel ?: return false
+        if (catchupUrl != null) return false
+        return item.kind == ContentKind.LIVE && item.seriesId.isNullOrBlank()
+    }
 
     private fun configureSeekPane(channel: Channel) {
         // Seek/play chrome is transient — show briefly, then auto-hide.
@@ -2006,6 +2040,7 @@ class PlayerActivity : AppCompatActivity() {
             hideHandler.removeCallbacks(seekTick)
             hideHandler.post(seekTick)
         }
+        phoneControls?.publish()
     }
 
     private val hideCatchup = Runnable {
@@ -2565,7 +2600,8 @@ class PlayerActivity : AppCompatActivity() {
 
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
-        if (pipSwipeHome && canEnterPip() && player?.isPlaying == true) {
+        val playing = player?.playWhenReady == true || radioOn
+        if (pipSwipeHome && canEnterPip() && playing && !DeviceForm.isTelevision(this)) {
             enterPip(manual = false)
         }
     }
@@ -2655,6 +2691,7 @@ class PlayerActivity : AppCompatActivity() {
         val exo = player ?: return
         if (!exo.playWhenReady || current == null || isDestroyed) return
         lastReconnectAt = now
+        MobileBitrateCap.apply(this, exo)
         playCurrent()
     }
 
@@ -2695,6 +2732,8 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        phoneControls?.release()
+        phoneControls = null
         leveler?.let { runCatching { it.release() } }
         leveler = null
         unhookReconnect()

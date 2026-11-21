@@ -581,6 +581,13 @@ internal fun BrowseActivity.setupMobileChrome() {
         binding.mobileAdmin.setOnClickListener { showAdminPane() }
         binding.mobileAbout.setOnClickListener { showAboutPane() }
         binding.mobileSearch.setOnClickListener { openSearch() }
+        binding.mobileCast.setOnClickListener {
+            val playing = focusedChannel ?: (application as OlympusIptvApp).lastPlayed
+            com.olympus.iptv.ui.cast.CastBridge.showChooser(this, playing)
+        }
+        if (com.olympus.iptv.ui.DeviceForm.isCompact(this)) {
+            binding.mobileAdmin.visibility = View.GONE
+        }
         binding.groupsSearch.visibility = View.VISIBLE
         binding.groupsSearch.setOnClickListener { openSearch() }
         binding.groupsFilter.visibility = View.VISIBLE
@@ -600,6 +607,15 @@ internal fun BrowseActivity.setupMobileChrome() {
             Haptics.tick(binding.groupsRefresh)
             refreshPlaylist(quiet = true)
         }
+        if (!com.olympus.iptv.ui.DeviceForm.isTelevision(this)) {
+            binding.channelRefresh.isEnabled = true
+            binding.channelRefresh.setColorSchemeResources(R.color.accent)
+            binding.channelRefresh.setProgressBackgroundColorSchemeResource(R.color.bg_elevated)
+            binding.channelRefresh.setOnRefreshListener {
+                Haptics.tick(binding.channelRefresh)
+                refreshPlaylist(quiet = true)
+            }
+        }
         paintNowPlayingBar()
         val openLive = View.OnClickListener { openSection(GuideSection.TV) }
         val openMovies = View.OnClickListener { openSection(GuideSection.MOVIES) }
@@ -610,6 +626,11 @@ internal fun BrowseActivity.setupMobileChrome() {
         binding.bottomTabLive.setOnClickListener(openLive)
         binding.bottomTabMovies.setOnClickListener(openMovies)
         binding.bottomTabShows.setOnClickListener(openShows)
+        binding.bottomTabLibrary.setOnClickListener {
+            val saved = playlist ?: return@setOnClickListener
+            startActivity(LibraryActivity.intent(this, saved.id))
+        }
+        binding.bottomTabAdmin.setOnClickListener { showAdminPane() }
         paintBottomTabs()
         paintMobileSettingsChips()
     }
@@ -636,6 +657,12 @@ internal fun BrowseActivity.paintBottomTabs() {
                 if (!settingsOpen && section == GuideSection.SHOWS) R.color.accent else R.color.text_primary
             )
         )
+        val adminOpen = panes.isAdminVisible()
+        binding.bottomTabAdmin.isSelected = adminOpen
+        binding.bottomTabAdmin.setTextColor(
+            getColor(if (adminOpen) R.color.accent else R.color.text_primary)
+        )
+        binding.bottomTabLibrary.setTextColor(getColor(R.color.text_primary))
     }
 
 internal fun BrowseActivity.paintMobileSettingsChips() {
@@ -740,8 +767,14 @@ internal fun BrowseActivity.syncGroupPills() {
                     isFocusable = false
                     isSelected = selected
                     setPadding(padH, padV, padH, padV)
-                    setTextColor(getColor(if (selected) R.color.bg else R.color.text_primary))
-                    setBackgroundResource(R.drawable.bg_group_pill)
+                    setTextColor(getColor(if (selected) R.color.accent else R.color.text_primary))
+                    setBackgroundResource(R.drawable.bg_chip)
+                    minHeight = (48 * density).toInt()
+                    gravity = android.view.Gravity.CENTER_VERTICAL
+                    setOnClickListener {
+                        val picked = categoryAdapter.categories().firstOrNull { it.id == tag }
+                        if (picked != null) selectCategory(picked, true)
+                    }
                     layoutParams = LinearLayout.LayoutParams(
                         ViewGroup.LayoutParams.WRAP_CONTENT,
                         ViewGroup.LayoutParams.WRAP_CONTENT
@@ -753,7 +786,7 @@ internal fun BrowseActivity.syncGroupPills() {
                 val pill = row.getChildAt(index) as TextView
                 val selected = categories[index].id == selectedCategoryId
                 pill.isSelected = selected
-                pill.setTextColor(getColor(if (selected) R.color.bg else R.color.text_primary))
+                pill.setTextColor(getColor(if (selected) R.color.accent else R.color.text_primary))
             }
         }
         val selectedIndex = categories.indexOfFirst { it.id == selectedCategoryId }
@@ -836,11 +869,15 @@ internal fun BrowseActivity.focusCurrentProgram(row: Int) {
             }
             val safe = row.coerceIn(0, count - 1)
             val channel = visibleChannels.getOrNull(safe) ?: return@post
+            val now = com.olympus.iptv.playlist.EpgUtils.now()
+            val start = GuideMetrics.start(now, halfHourMs)
+            programAdapter.scrollX = 0
+            if (programAdapter.setWindow(start, GuideMetrics.end(start))) {
+                buildProgramHeader()
+            }
+            scrollProgramGuide(0)
             syncProgramRowHeight()
-            val nowX = programAdapter.pxFor(com.olympus.iptv.playlist.EpgUtils.now())
-            val pad = (48 * resources.displayMetrics.density).toInt()
-            scrollProgramGuide((nowX - pad).coerceAtLeast(0))
-            focusProgram(safe, programAdapter.columnAt(channel, com.olympus.iptv.playlist.EpgUtils.now()))
+            focusProgram(safe, programAdapter.columnAt(channel, now))
         }
     }
 

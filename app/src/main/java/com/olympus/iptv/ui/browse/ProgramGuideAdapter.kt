@@ -48,12 +48,8 @@ class ProgramGuideAdapter(
         private set
     var scrollX = 0
     var rowHeight = dp(52)
-    var preferKeepPx: (() -> Int)? = null
     private val labelPad = dp(12)
     private val labelMinVisible = dp(56)
-    private val titlePaint = android.text.TextPaint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-        textSize = 14f * density
-    }
 
     fun setWindow(start: Long, end: Long): Boolean {
         if (windowStart == start && windowEnd == end) return false
@@ -329,15 +325,23 @@ class ProgramGuideAdapter(
 
         private fun obtainBlock(): TextView {
             val recycled = if (pool.isEmpty()) null else pool.removeAt(pool.lastIndex)
-            return recycled ?: TextView(itemView.context).apply {
+            val block = recycled ?: TextView(itemView.context).apply {
                 gravity = Gravity.CENTER_VERTICAL
                 maxLines = 1
+                isSingleLine = true
                 ellipsize = android.text.TextUtils.TruncateAt.END
-                setPadding(labelPad, 0, labelPad, 0)
+                marqueeRepeatLimit = -1
                 textSize = 13f
                 isFocusable = true
                 isClickable = true
             }
+            block.translationX = 0f
+            block.maxLines = 1
+            block.isSingleLine = true
+            block.ellipsize = android.text.TextUtils.TruncateAt.END
+            block.isSelected = false
+            block.setPaddingRelative(labelPad, 0, labelPad, 0)
+            return block
         }
 
         fun shiftLabels(): Boolean {
@@ -351,27 +355,27 @@ class ProgramGuideAdapter(
         }
 
         private fun shiftLabel(view: TextView, left: Int, width: Int): Boolean {
+            val focused = view.hasFocus()
+            view.maxLines = 1
+            view.isSingleLine = true
+            view.ellipsize = if (focused) {
+                android.text.TextUtils.TruncateAt.MARQUEE
+            } else {
+                android.text.TextUtils.TruncateAt.END
+            }
+            view.isSelected = focused
+            view.translationX = 0f
             if (width <= 0) {
-                view.maxLines = 1
-                view.ellipsize = android.text.TextUtils.TruncateAt.END
                 view.setPaddingRelative(labelPad, 0, labelPad, 0)
                 return false
             }
             val overflow = (scrollX - left).coerceAtLeast(0)
             val maxShift = (width - labelMinVisible - labelPad).coerceAtLeast(0)
             val start = labelPad + overflow.coerceAtMost(maxShift)
-            val visible = (width - start - labelPad).coerceAtLeast(0)
-            val title = view.text?.toString().orEmpty().substringBefore('\n')
-            val needsWrap = title.isNotBlank() && visible > 0 && titlePaint.measureText(title) > visible
-            val lines = if (needsWrap) 2 else 1
             if (view.paddingStart != start || view.paddingEnd != labelPad) {
                 view.setPaddingRelative(start, 0, labelPad, 0)
             }
-            if (view.maxLines != lines) {
-                view.maxLines = lines
-                view.ellipsize = android.text.TextUtils.TruncateAt.END
-            }
-            return needsWrap
+            return false
         }
 
         private fun bindBlock(
@@ -392,7 +396,7 @@ class ProgramGuideAdapter(
             val catchupPast = program != null &&
                 program.endMillis < System.currentTimeMillis() &&
                 channel.supportsCatchup()
-            view.text = label(sportsTitle(title, program), time, kind, false, catchupPast, plain = !time.isNullOrBlank())
+            view.text = label(sportsTitle(title, channel, program), time, kind, false, catchupPast, plain = !time.isNullOrBlank())
             val layout = view.layoutParams as? FrameLayout.LayoutParams
                 ?: FrameLayout.LayoutParams(width, ViewGroup.LayoutParams.MATCH_PARENT)
             layout.width = width
@@ -410,7 +414,13 @@ class ProgramGuideAdapter(
             view.setOnFocusChangeListener { _, hasFocus ->
                 view.background = backgroundFor(kind, hasFocus)
                 view.setTextColor(if (hasFocus) ink else primary)
-                view.text = label(sportsTitle(title, program), time, kind, hasFocus, catchupPast, plain = !time.isNullOrBlank())
+                view.text = label(sportsTitle(title, channel, program), time, kind, hasFocus, catchupPast, plain = !time.isNullOrBlank())
+                view.ellipsize = if (hasFocus) {
+                    android.text.TextUtils.TruncateAt.MARQUEE
+                } else {
+                    android.text.TextUtils.TruncateAt.END
+                }
+                view.isSelected = hasFocus
                 if (hasFocus) {
                     reveal(view)
                     onFocus(channel, program)
@@ -419,19 +429,23 @@ class ProgramGuideAdapter(
             if (hadFocus) {
                 view.background = backgroundFor(kind, true)
                 view.setTextColor(ink)
-                view.text = label(sportsTitle(title, program), time, kind, true, catchupPast, plain = !time.isNullOrBlank())
+                view.text = label(sportsTitle(title, channel, program), time, kind, true, catchupPast, plain = !time.isNullOrBlank())
+                view.ellipsize = android.text.TextUtils.TruncateAt.MARQUEE
+                view.isSelected = true
             }
         }
 
-        private fun sportsTitle(title: String, program: EpgProgram?): String {
-            if (program == null) return title
-            if (program.guideTitle.isNotEmpty()) return program.guideTitle
+        private fun sportsTitle(title: String, channel: Channel, program: EpgProgram?): String {
+            val clean = com.olympus.iptv.data.NameStrip.shown(title, channel.groupTitle).ifBlank { title }
+            if (program == null) return clean
+            if (program.guideTitle.isNotEmpty()) {
+                val stripped = program.guideTitle.replace(LIVE_EVENT_PREFIX, "")
+                return com.olympus.iptv.data.NameStrip.shown(stripped, channel.groupTitle).ifBlank { stripped }
+            }
             val now = System.currentTimeMillis()
-            val badge = SportsEvent.badge(title, now, program.startMillis, program.endMillis)
             val timing = EpgTiming.tag(now, program.startMillis, program.endMillis)
-            val marked = listOfNotNull(badge, timing).joinToString(" · ")
-            if (marked.isBlank()) return title
-            return "$marked  $title"
+            if (timing.isNullOrBlank()) return clean
+            return "$timing · $clean"
         }
 
         private fun label(
@@ -443,8 +457,24 @@ class ProgramGuideAdapter(
             plain: Boolean = false
         ): CharSequence {
             val pill = EpgProgramStyle.pill(kind)
-            val headline = (if (catchupPast) "↺ " else "") + if (pill == null) title else "[$pill] $title"
-            if (time.isNullOrBlank()) return headline
+            val headline = buildString {
+                if (catchupPast) append("↺ ")
+                append(title)
+                if (pill != null) append(" · ").append(pill.uppercase(Locale.US))
+            }
+            if (time.isNullOrBlank()) {
+                if (pill == null) return headline
+                val span = SpannableString(headline)
+                val tagStart = headline.length - pill.length
+                span.setSpan(AbsoluteSizeSpan(11, true), tagStart, headline.length, 0)
+                span.setSpan(
+                    ForegroundColorSpan(if (focused) ink else EpgProgramStyle.stroke(itemView.context, kind, false)),
+                    tagStart,
+                    headline.length,
+                    0
+                )
+                return span
+            }
             if (plain) return "$headline\n$time"
             val text = SpannableString("$headline\n$time")
             val start = headline.length + 1
@@ -456,16 +486,12 @@ class ProgramGuideAdapter(
                 0
             )
             if (pill != null) {
-                text.setSpan(
-                    AbsoluteSizeSpan(11, true),
-                    0,
-                    pill.length + 2,
-                    0
-                )
+                val tagStart = headline.length - pill.length
+                text.setSpan(AbsoluteSizeSpan(11, true), tagStart, headline.length, 0)
                 text.setSpan(
                     ForegroundColorSpan(if (focused) ink else EpgProgramStyle.stroke(itemView.context, kind, false)),
-                    0,
-                    pill.length + 2,
+                    tagStart,
+                    headline.length,
                     0
                 )
             }
@@ -488,17 +514,12 @@ class ProgramGuideAdapter(
             val shownLeft = scroll.scrollX
             val shownRight = shownLeft + width
             val pad = dp(16)
-            val prefer = preferKeepPx?.invoke()
-            val next = if (prefer != null && prefer in left until right) {
-                (prefer - pad).coerceAtLeast(0)
-            } else {
-                when {
-                    left >= shownLeft && right <= shownRight -> shownLeft
-                    left < shownLeft -> (left - pad).coerceAtLeast(0)
-                    right > shownRight && right - left >= width -> (left - pad).coerceAtLeast(0)
-                    right > shownRight -> (right - width + pad).coerceAtLeast(0)
-                    else -> shownLeft
-                }
+            val next = when {
+                left >= shownLeft && right <= shownRight -> shownLeft
+                left < shownLeft -> (left - pad).coerceAtLeast(0)
+                right > shownRight && right - left >= width -> (left - pad).coerceAtLeast(0)
+                right > shownRight -> (right - width + pad).coerceAtLeast(0)
+                else -> shownLeft
             }
             if (next != shownLeft) onScroll(next)
         }
@@ -508,6 +529,7 @@ class ProgramGuideAdapter(
 
     companion object {
         const val VIEW_PROGRAM = 20
+        private val LIVE_EVENT_PREFIX = Regex("""(?i)^LIVE EVENT(?:\s*·\s*\d+m\s+left)?\s*(?:·\s*)?""")
         private val wordBreaks = Regex("[^a-z0-9]+")
         private val fillerWords = setOf(
             "programming", "program", "programs", "programmes", "programme",

@@ -14,7 +14,7 @@ import java.io.File
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
-class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext, "olympus-iptv.db", null, 12) {
+class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext, "olympus-iptv.db", null, 13) {
     private val filesDir = context.applicationContext.filesDir
     private val writer = ReentrantLock()
     private val dashLock = Any()
@@ -1237,7 +1237,7 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         if (oldVersion < 9) ensureCatchupColumns(db)
         if (oldVersion < 10) ensureIndexes(db)
         if (oldVersion < 11) ensureMetaMissTable(db)
-        if (oldVersion < 12) {
+        if (oldVersion < 13) {
             ensureIndexes(db)
             ensureGuideTables(db)
         }
@@ -1311,6 +1311,9 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         )
         db.execSQL(
             "CREATE INDEX IF NOT EXISTS idx_channels_cat_country ON channels(playlist_id, bucket, category_id, country_id)"
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS idx_channels_bucket_cat_cover ON channels(playlist_id, bucket, category_id, name COLLATE NOCASE, id, logo_url, kind)"
         )
     }
 

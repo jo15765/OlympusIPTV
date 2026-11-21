@@ -1,5 +1,8 @@
 package com.olympus.iptv.ui.add
 
+import android.content.Intent
+import android.content.pm.ActivityInfo
+import android.net.Uri
 import android.os.Bundle
 import android.view.View
 import android.widget.Toast
@@ -25,6 +28,9 @@ class AddPlaylistActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (com.olympus.iptv.ui.DeviceForm.isTouchPrimary(this)) {
+            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
         binding = ActivityAddPlaylistBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
@@ -33,7 +39,52 @@ class AddPlaylistActivity : AppCompatActivity() {
         binding.btnCancel.setOnClickListener { finish() }
         binding.btnSave.setOnClickListener { save() }
         setMode(PlaylistType.M3U)
+        readIncoming(intent)
         binding.inputName.requestFocus()
+        if (com.olympus.iptv.ui.DeviceForm.isTouchPrimary(this)) {
+            val paste = android.widget.Button(this)
+            paste.text = getString(R.string.paste_playlist_url)
+            paste.isAllCaps = false
+            paste.setTextColor(ContextCompat.getColor(this, R.color.text_primary))
+            paste.setBackgroundResource(R.drawable.bg_button_secondary)
+            val gap = (8 * resources.displayMetrics.density).toInt()
+            paste.setPadding(gap * 2, gap, gap * 2, gap)
+            val params = android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            params.topMargin = gap
+            binding.m3uFields.addView(paste, params)
+            paste.setOnClickListener {
+                val clip = getSystemService(android.content.ClipboardManager::class.java)?.primaryClip
+                val text = if (clip != null && clip.itemCount > 0) {
+                    clip.getItemAt(0).coerceToText(this)?.toString()?.trim().orEmpty()
+                } else {
+                    ""
+                }
+                if (text.isBlank()) {
+                    Toast.makeText(this, R.string.paste_empty, Toast.LENGTH_SHORT).show()
+                } else {
+                    binding.inputM3uUrl.setText(text)
+                }
+            }
+        }
+    }
+
+    private fun readIncoming(incoming: Intent?) {
+        val data = incoming?.data ?: return
+        val url = if (data.scheme == "olympusiptv") {
+            data.getQueryParameter("url").orEmpty()
+        } else {
+            data.toString()
+        }.trim()
+        if (url.isBlank()) return
+        setMode(PlaylistType.M3U)
+        binding.inputM3uUrl.setText(url)
+        if (binding.inputName.text.isNullOrBlank()) {
+            val name = Uri.parse(url).lastPathSegment?.substringBefore('?').orEmpty()
+            if (name.isNotBlank()) binding.inputName.setText(name)
+        }
     }
 
     private fun setMode(type: PlaylistType) {

@@ -79,6 +79,7 @@ class EpgEditsFragment : Fragment() {
         binding.cardParse.setOnClickListener { confirmParse() }
         binding.cardImages.setOnClickListener { confirmStripImages() }
         binding.cardParental.setOnClickListener { openParental() }
+        binding.cardAutoClean.setOnClickListener { toggleAutoClean() }
         binding.cardHideEmpty.setOnClickListener { toggleHideEmpty() }
         binding.cardDensity.setOnClickListener { toggleDensity() }
         binding.cardPinTimeout.setOnClickListener { cyclePinTimeout() }
@@ -97,6 +98,7 @@ class EpgEditsFragment : Fragment() {
             binding.cardParse to R.string.epg_card_parse_detail,
             binding.cardImages to R.string.epg_card_images_detail,
             binding.cardParental to R.string.epg_card_parental_detail,
+            binding.cardAutoClean to R.string.epg_card_auto_clean_detail,
             binding.cardHideEmpty to R.string.epg_card_hide_empty_detail,
             binding.cardDensity to R.string.epg_card_density_detail,
             binding.cardPinTimeout to R.string.epg_card_pin_timeout_detail,
@@ -122,6 +124,7 @@ class EpgEditsFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             val store = (requireActivity().application as OlympusIptvApp).playlistStore
             config = store.lineup(playlistId)
+            showAutoClean(config.autoCleanNames != false)
             showHideEmpty(store.hideEmptyGroups())
             showDensity(store.guideDensity())
             showPinTimeout(store.parentalTimeoutMinutes())
@@ -130,6 +133,33 @@ class EpgEditsFragment : Fragment() {
             showScrobbler(store.scrobblerProvider())
             showPip(store.pipSwipeHome())
         }
+    }
+
+    private fun toggleAutoClean() {
+        val nextEnabled = config.autoCleanNames == false
+        val next = config.copy(autoCleanNames = nextEnabled, revision = System.currentTimeMillis())
+        config = next
+        showAutoClean(nextEnabled)
+        val app = requireActivity().application as OlympusIptvApp
+        app.stagedLineup = playlistId to next
+        app.appScope.launch {
+            runCatching { app.playlistStore.saveLineup(playlistId, next) }
+            val email = app.playlistStore.session.first()?.email
+            if (!email.isNullOrBlank()) {
+                runCatching { LineupClient(app).push(email, app.playlistStore.deviceId(), next) }
+            }
+        }
+        Toast.makeText(
+            requireContext(),
+            if (nextEnabled) R.string.epg_auto_clean_on else R.string.epg_auto_clean_off,
+            Toast.LENGTH_SHORT
+        ).show()
+    }
+
+    private fun showAutoClean(enabled: Boolean) {
+        binding.autoCleanState.setText(
+            if (enabled) R.string.epg_short_hide_empty_on else R.string.epg_short_hide_empty_off
+        )
     }
 
     private fun toggleHideEmpty() {

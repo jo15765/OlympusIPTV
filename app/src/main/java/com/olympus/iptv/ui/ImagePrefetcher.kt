@@ -4,7 +4,7 @@ import android.content.Context
 
 /** Warms the next off-screen posters while a list is idle. */
 object ImagePrefetcher {
-    const val AHEAD = 6
+    const val AHEAD = 12
 
     fun ahead(urls: List<String?>, firstOffScreen: Int, count: Int = AHEAD): List<String> {
         if (firstOffScreen < 0 || firstOffScreen >= urls.size || count <= 0) return emptyList()

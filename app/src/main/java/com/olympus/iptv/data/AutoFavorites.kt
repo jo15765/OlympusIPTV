@@ -24,6 +24,11 @@ object AutoFavorites {
         Market("Dallas", 32.7767, -96.7970),
         Market("Houston", 29.7604, -95.3698),
         Market("Atlanta", 33.7490, -84.3880),
+        Market("Athens", 33.9519, -83.3576),
+        Market("Augusta", 33.4735, -82.0105),
+        Market("Macon", 32.8407, -83.6324),
+        Market("Savannah", 32.0809, -81.0912),
+        Market("Columbus GA", 32.4610, -84.9877),
         Market("Washington", 38.9072, -77.0369),
         Market("Boston", 42.3601, -71.0589),
         Market("Phoenix", 33.4484, -112.0740),
@@ -288,13 +293,17 @@ object AutoFavorites {
     val sports: List<Sport> = leagues.map { Sport(it.id, it.label) }
 
     fun localPicks(channels: List<GuideChannel>, lat: Double, lon: Double): LocalResult {
-        val market = nearestMarket(lat, lon)
-        return LocalResult(market.name, pickLocal(channels, market.name) + pickNamed(channels, national))
+        val located = localStations(channels, lat, lon)
+        return LocalResult(located.market, located.picks + pickNamed(channels, national))
     }
 
     fun localStations(channels: List<GuideChannel>, lat: Double, lon: Double): LocalResult {
-        val market = nearestMarket(lat, lon)
-        return LocalResult(market.name, pickLocal(channels, market.name))
+        val ordered = markets.sortedBy { haversine(lat, lon, it.lat, it.lon) }
+        for (market in ordered.take(4)) {
+            val picks = pickLocal(channels, market.name)
+            if (picks.isNotEmpty()) return LocalResult(market.name, picks)
+        }
+        return LocalResult(ordered.first().name, emptyList())
     }
 
     fun wantsLocalStations(id: String): Boolean = packages[id]?.first?.isNotEmpty() == true
@@ -321,9 +330,17 @@ object AutoFavorites {
         val pack = packages[id] ?: return LocalResult("", emptyList())
         val picks = pickNamed(channels, pack.second).toMutableList()
         val market = if (pack.first.isNotEmpty() && lat != null && lon != null) {
-            val found = nearestMarket(lat, lon)
-            picks.addAll(0, pickLocal(channels, found.name, pack.first))
-            found.name
+            val ordered = markets.sortedBy { haversine(lat, lon, it.lat, it.lon) }
+            var named = ordered.first().name
+            for (candidate in ordered.take(4)) {
+                val local = pickLocal(channels, candidate.name, pack.first)
+                if (local.isNotEmpty()) {
+                    picks.addAll(0, local)
+                    named = candidate.name
+                    break
+                }
+            }
+            named
         } else {
             ""
         }
@@ -385,7 +402,7 @@ object AutoFavorites {
             val hits = channels.filter { channel ->
                 if (channel.group != group) return@filter false
                 val parsed = splitLocal(channel.name) ?: return@filter false
-                parsed.second.equals(network, ignoreCase = true) && parsed.first.equals(want, ignoreCase = true)
+                parsed.second.equals(network, ignoreCase = true) && sameCity(parsed.first, want)
             }.sortedWith(compareBy<GuideChannel> { if (it.name == it.name.uppercase()) 1 else 0 }.thenBy { it.name.length })
             val chosen = hits.firstOrNull() ?: continue
             picks.add(ChannelPick(chosen.id, chosen.name))
@@ -414,12 +431,23 @@ object AutoFavorites {
         return picks
     }
 
+    private fun cityKey(value: String): String =
+        value.substringBefore(",").trim().lowercase()
+
+    private fun sameCity(left: String, right: String): Boolean {
+        val a = cityKey(left)
+        val b = cityKey(right)
+        return a == b || a.startsWith("$b ") || b.startsWith("$a ")
+    }
+
     private fun splitLocal(name: String): Pair<String, String>? {
-        val parts = name.split("|").map { it.trim() }
-        if (parts.size < 3) return null
-        val network = parts[2].substringBefore(" ").uppercase()
+        val parts = name.split("|").map { it.trim() }.filter { it.isNotEmpty() }
+        val cityIndex = if (parts.size >= 3) 1 else 0
+        val networkIndex = if (parts.size >= 3) 2 else 1
+        if (parts.size <= networkIndex) return null
+        val network = parts[networkIndex].substringBefore(" ").uppercase()
         if (network.isEmpty()) return null
-        return parts[1] to network
+        return parts[cityIndex] to network
     }
 
     private fun bare(name: String): String = name.trim().replace(Regex("^US:\\s*", RegexOption.IGNORE_CASE), "").trim().lowercase()
