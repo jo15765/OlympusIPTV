@@ -5,9 +5,11 @@ import android.graphics.Bitmap
 import coil.imageLoader
 import coil.request.CachePolicy
 import coil.request.ImageRequest
+import coil.size.Precision
 
 fun ImageRequest.Builder.channelLogo(sizePx: Int): ImageRequest.Builder =
     size(sizePx)
+        .precision(Precision.INEXACT)
         .bitmapConfig(Bitmap.Config.RGB_565)
         .crossfade(false)
         .allowHardware(true)

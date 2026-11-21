@@ -250,7 +250,10 @@
     .side-foot .more[open] summary { background: transparent; color: var(--text); }
     #save { background: var(--save); color: #fff; border: 0; border-radius: 10px; padding: 10px 12px; font-weight: 700; }
     #signOut { background: transparent; color: #d5d8df; border: 0; text-align: left; padding: 8px 10px; font-weight: 600; }
-    .stage { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; padding: 18px 22px 16px; }
+    .stage { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; padding: 18px 22px 16px; background: radial-gradient(760px 360px at 85% 0%, rgba(226, 161, 90, 0.08), transparent 65%); }
+    .country-card.on { box-shadow: 0 4px 14px rgba(226, 161, 90, 0.12); }
+    .section-save { transition: transform 0.14s ease, box-shadow 0.14s ease, background-color 0.14s ease; }
+    .section-save:hover { transform: translateY(-1px); box-shadow: 0 0 0 4px rgba(226, 161, 90, 0.38), 0 6px 18px rgba(0, 0, 0, 0.35); }
     #editor .card.panel { background: transparent; border: 0; border-radius: 0; padding: 0; margin-top: 12px; }
     .panel-head h2 { font-size: 26px; font-weight: 700; }
     .panel-head input[type="search"] { flex: 0 1 260px; background: #242833; border-radius: 10px; }
@@ -432,7 +435,7 @@
     #channels.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); align-content: start; }
     .channel-row {
       display: grid;
-      grid-template-columns: 16px 16px 40px minmax(0, 1fr) 26px 26px 36px;
+      grid-template-columns: 16px 16px 40px minmax(0, 1fr) auto 26px 26px 36px 26px;
       gap: 10px;
       align-items: center;
       min-height: 54px;
@@ -469,7 +472,11 @@
     }
     .channel-title button { border: 0; background: transparent; color: #b7bdc8; padding: 0; display: grid; }
     .channel-title button svg { width: 14px; height: 14px; }
-    .channel-sub { color: var(--muted); font-size: 12px; margin-top: 1px; }
+    .channel-sub { color: var(--muted); font-size: 12px; margin-top: 2px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .meta-pill { display: inline-flex; align-items: center; padding: 1px 7px; border-radius: 999px; font-size: 10px; font-weight: 700; letter-spacing: 0.04em; background: rgba(226, 161, 90, 0.14); color: var(--accent); border: 1px solid rgba(226, 161, 90, 0.35); }
+    .side { backdrop-filter: blur(12px); }
+    .channel-row, .group-row, .country-card, .admin-card, .epg-card, .quick-card { transition: transform 0.14s ease, border-color 0.14s ease, background-color 0.14s ease, box-shadow 0.14s ease; }
+    .channel-row:hover, .group-row:hover, .country-card:hover { transform: translateY(-1px); border-color: rgba(226, 161, 90, 0.55); }
     #channels.grid .channel-grip, #channels.grid .group-step { display: none; }
     #channels.grid .channel-row { grid-template-columns: 16px 40px minmax(0, 1fr) 36px; min-height: 72px; }
     #panelClean { overflow: auto; }
@@ -1252,6 +1259,8 @@
             <button class="secondary" id="groupsVisible" type="button" aria-pressed="false">Visible</button>
             <button class="secondary" id="groupsHidden" type="button" aria-pressed="false">Hidden</button>
             <button class="secondary" id="groupsBoth" type="button" aria-pressed="true">Both</button>
+            <button class="secondary" id="groupsHideMatching" type="button" title="Hide all groups matching the current search or wildcard (e.g. PPV *, 24/7 *)">Hide Matching</button>
+            <button class="primary" id="smartLineupBtn" type="button" title="Enable Smart Auto-Clean Names and hide duplicate backup channels">✨ 1-Click Smart Lineup</button>
             <button class="section-save" type="button">Save</button>
           </div>
         </div>
@@ -2355,10 +2364,12 @@
       }
       const fromTv = published.some((country) => country.id && country.id !== "__other__");
       const base = fromTv ? published : countriesFromGroups();
+      const order = (session && session.lineup && session.lineup.countryOrder) || [];
+      const rank = new Map(order.map((id, idx) => [id, idx]));
       const list = base.map((country) => {
         const count = Math.max(Number(country.count) || 0, summed.get(country.id) || 0);
         return count === Number(country.count) ? country : Object.assign({}, country, { count });
-      });
+      }).sort((a, b) => (rank.get(a.id) ?? 9999) - (rank.get(b.id) ?? 9999));
       countryChoiceHold = { groups, published, list };
       return list;
     }
@@ -2461,7 +2472,37 @@
           count.className = "country-count";
           count.textContent = String(country.count);
           chip.append(label, count);
+          chip.draggable = true;
+          chip.title = "Click to toggle visibility • Drag to prioritize order";
+          chip.addEventListener("dragstart", (e) => {
+            e.dataTransfer.effectAllowed = "move";
+            e.dataTransfer.setData("text/country", country.id);
+          });
+          chip.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            chip.style.borderColor = "var(--accent)";
+          });
+          chip.addEventListener("dragleave", () => {
+            chip.style.borderColor = "";
+          });
+          chip.addEventListener("drop", (e) => {
+            e.preventDefault();
+            chip.style.borderColor = "";
+            const fromId = e.dataTransfer.getData("text/country");
+            if (!fromId || fromId === country.id) return;
+            pushUndoSnapshot();
+            const order = (lineup().countryOrder || countryChoices().map((c) => c.id)).slice();
+            const fromIdx = order.indexOf(fromId);
+            const toIdx = order.indexOf(country.id);
+            if (fromIdx >= 0 && toIdx >= 0) {
+              const [moved] = order.splice(fromIdx, 1);
+              order.splice(toIdx, 0, moved);
+              lineup().countryOrder = order;
+              renderCountries();
+            }
+          });
           chip.addEventListener("click", () => {
+            pushUndoSnapshot();
             const wasHidden = hidden.has(country.id);
             lineup().hiddenCountries = toggle(lineup().hiddenCountries, country.id, !wasHidden);
             syncInternationalFlag();
@@ -2487,6 +2528,37 @@
       const plain = groupName(group).replace(/\p{Extended_Pictographic}/gu, "").replace(/\s{2,}/g, " ").trim();
       return plain || groupName(group);
     }
+    function wildcardMatch(text, query) {
+      if (!query) return true;
+      if (!query.includes("*") && !query.includes("?")) return text.includes(query);
+      const escaped = query.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*").replace(/\?/g, ".");
+      try {
+        return new RegExp(escaped, "i").test(text);
+      } catch (_) {
+        return text.includes(query);
+      }
+    }
+    const undoStack = [];
+    function pushUndoSnapshot() {
+      if (!session || !session.lineup) return;
+      undoStack.push(JSON.stringify(session.lineup));
+      if (undoStack.length > 25) undoStack.shift();
+    }
+    function popUndoSnapshot() {
+      if (!undoStack.length || !session) return false;
+      const snap = JSON.parse(undoStack.pop());
+      lineupHold = true;
+      try {
+        session.lineup = Object.assign(blankLineup(), snap);
+        forgetTabPaint();
+        openTab(tab);
+        const status = document.querySelector("#saveStatus");
+        if (status) status.textContent = "Undid last change (click Save to sync).";
+      } finally {
+        lineupHold = false;
+      }
+      return true;
+    }
     function visibleGroups() {
       const groupQuery = document.querySelector("#groupSearch").value.trim().toLowerCase();
       const hidden = new Set(lineup().hiddenGroups || []);
@@ -2494,7 +2566,7 @@
         const isHidden = hidden.has(group.id);
         const matchesFilter = groupFilter === "both" || (groupFilter === "hidden" ? isHidden : !isHidden);
         const label = (groupName(group) + " " + (group.name || "")).toLowerCase();
-        return matchesFilter && (!groupQuery || label.includes(groupQuery));
+        return matchesFilter && wildcardMatch(label, groupQuery);
       });
     }
     function paintGroupSelectAll() {
@@ -2899,6 +2971,8 @@
         if (channel.logo) {
           const img = document.createElement("img");
           img.alt = "";
+          img.loading = "lazy";
+          img.decoding = "async";
           img.src = channel.logo;
           img.addEventListener("error", () => {
             img.remove();
@@ -2947,7 +3021,12 @@
         }
         const sub = document.createElement("div");
         sub.className = "channel-sub";
-        sub.textContent = channelDetail(channel);
+        channelDetail(channel).split(" • ").filter(Boolean).forEach((part) => {
+          const pill = document.createElement("span");
+          pill.className = "meta-pill";
+          pill.textContent = part;
+          sub.append(pill);
+        });
         copy.append(title, sub);
         const up = document.createElement("button");
         up.type = "button";
@@ -2974,13 +3053,41 @@
           shown.setAttribute("aria-pressed", String(wasHidden));
           shown.title = wasHidden ? "Hide channel" : "Show channel";
         });
+        const probe = document.createElement("button");
+        probe.type = "button";
+        probe.className = "secondary";
+        probe.style.padding = "3px 8px";
+        probe.style.fontSize = "11px";
+        probe.title = "Test stream health & latency from the TV";
+        probe.textContent = "Test";
+        probe.addEventListener("click", async () => {
+          probe.disabled = true;
+          probe.textContent = "…";
+          try {
+            const resp = await fetch("/api/stream/probe?channelId=" + encodeURIComponent(channel.id));
+            const res = await resp.json();
+            if (res.ok) {
+              probe.textContent = res.latencyMs + "ms";
+              probe.style.borderColor = "#73B56E";
+              probe.style.color = "#8fd18a";
+            } else {
+              probe.textContent = "Dead";
+              probe.style.borderColor = "#e07a72";
+              probe.style.color = "#e07a72";
+            }
+          } catch (_) {
+            probe.textContent = "Err";
+          } finally {
+            probe.disabled = false;
+          }
+        });
         const play = document.createElement("button");
         play.type = "button";
         play.className = "group-step";
         play.title = "Play on TV";
         play.textContent = "▶";
         play.addEventListener("click", () => sendRemote("play", channel.id));
-        row.append(grip, pick, logo, copy, up, down, shown, play);
+        row.append(grip, pick, logo, copy, probe, up, down, shown, play);
         box.append(row);
       });
       const remaining = matches.length - (channelWindowStart + sliced.rows.length);
@@ -3348,6 +3455,8 @@
       }
       const image = document.createElement("img");
       image.alt = "";
+      image.loading = "lazy";
+      image.decoding = "async";
       image.src = "/api/logo?u=" + encodeURIComponent(logoUrl);
       image.addEventListener("error", () => image.replaceWith(favoriteMark(title)));
       box.append(image);
@@ -3436,7 +3545,23 @@
         });
         const actions = document.createElement("div");
         actions.className = "fav-actions";
+        const tvBtn = document.createElement("button");
+        tvBtn.type = "button";
+        tvBtn.className = "fav-step";
+        tvBtn.title = "Play on TV";
+        tvBtn.setAttribute("aria-label", "Play on TV");
+        tvBtn.textContent = "▶";
+        tvBtn.addEventListener("click", (event) => {
+          event.stopPropagation();
+          const rawId = String(id).includes(":") ? String(id).split(":").slice(1).join(":") : String(id);
+          fetch("/api/remote", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "play", text: rawId })
+          }).catch(() => {});
+        });
         actions.append(
+          tvBtn,
           favStep(-1, () => moveFavorite(index, -1)),
           favStep(1, () => moveFavorite(index, 1)),
           favRemove(() => toggleWebFavorite(id, false))
@@ -4563,6 +4688,28 @@
     });
     document.querySelector("#groupsBulkHide").addEventListener("click", hideSelectedGroups);
     document.querySelector("#groupsDelete").addEventListener("click", hideSelectedGroups);
+    document.querySelector("#groupsHideMatching")?.addEventListener("click", () => {
+      const matches = visibleGroups();
+      if (!matches.length) return;
+      pushUndoSnapshot();
+      const hidden = new Set(lineup().hiddenGroups || []);
+      matches.forEach((g) => hidden.add(g.id));
+      lineup().hiddenGroups = [...hidden];
+      const status = document.querySelector("#groupBulkStatus");
+      if (status) status.textContent = "Hid " + matches.length + " matching groups (Ctrl+Z to undo, Save to sync).";
+      renderGroups();
+    });
+    document.querySelector("#smartLineupBtn")?.addEventListener("click", () => {
+      pushUndoSnapshot();
+      lineup().autoCleanNames = true;
+      const autoBox = document.querySelector("#autoCleanNamesToggle");
+      if (autoBox) autoBox.checked = true;
+      const dupeBox = document.querySelector("#hideBackupDupes");
+      if (dupeBox) dupeBox.checked = true;
+      const status = document.querySelector("#groupBulkStatus");
+      if (status) status.textContent = "✨ Smart Auto-Clean & duplicate hiding enabled — click Save to sync to TV.";
+      renderStripLivePreview();
+    });
     document.querySelector("#groupsBatchRename").addEventListener("click", () => {
       const status = document.querySelector("#groupBulkStatus");
       if (!selectedGroups.size) {
@@ -5206,6 +5353,34 @@
       if (webCopy) webCopy.textContent = line;
     }).catch(() => {
       document.querySelector("#address").textContent = "Stay on this Wi-Fi. This page is not published on the internet.";
+    });
+
+    document.addEventListener("keydown", (event) => {
+      const tag = (event.target && event.target.tagName) || "";
+      const typing = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z" && !typing) {
+        if (popUndoSnapshot()) event.preventDefault();
+        return;
+      }
+      if (event.altKey && !typing && event.key >= "1" && event.key <= "8") {
+        const tabs = ["countries", "groups", "channels", "favorites", "record", "reminders", "backup", "admin"];
+        const targetTab = tabs[Number(event.key) - 1];
+        if (targetTab) {
+          event.preventDefault();
+          showTab(targetTab);
+        }
+        return;
+      }
+      if (((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") || (!typing && event.key === "/")) {
+        event.preventDefault();
+        const searchId = tab === "groups" ? "#groupSearch"
+          : tab === "channels" ? "#channelSearch"
+          : tab === "favorites" ? "#favoriteSearch"
+          : tab === "record" ? "#recordSearch"
+          : "#countrySearch";
+        const box = document.querySelector(searchId);
+        if (box && !box.disabled) { box.focus(); box.select(); }
+      }
     });
   </script>
 </body>

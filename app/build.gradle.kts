@@ -92,6 +92,7 @@ android {
 }
 
 tasks.register("assertNoPortalDataInAssets") {
+    dependsOn("syncPortalToAssets")
     group = "verification"
     description = "Fails if portal/data or store.json appears under app assets."
     val assetsDir = layout.projectDirectory.dir("src/main/assets")
@@ -113,7 +114,22 @@ tasks.register("assertNoPortalDataInAssets") {
     }
 }
 
+val syncPortalToAssets = tasks.register("syncPortalToAssets") {
+    group = "build"
+    description = "Sync portal/public/index.html into app assets so standalone and embedded dashboards never diverge."
+    val srcHtml = rootProject.layout.projectDirectory.file("portal/public/index.html")
+    val dstHtml = layout.projectDirectory.file("src/main/assets/dashboard/index.html")
+    inputs.file(srcHtml)
+    outputs.file(dstHtml)
+    onlyIf { srcHtml.asFile.exists() }
+    doLast {
+        dstHtml.asFile.parentFile.mkdirs()
+        srcHtml.asFile.copyTo(dstHtml.asFile, overwrite = true)
+    }
+}
+
 val gzipDashboardHtml = tasks.register("gzipDashboardHtml") {
+    dependsOn(syncPortalToAssets)
     group = "build"
     description = "Pre-compress the web portal so the TV does not gzip it on each request."
     val html = layout.projectDirectory.file("src/main/assets/dashboard/index.html")
@@ -136,7 +152,11 @@ tasks.named("preBuild").configure {
 
 tasks.configureEach {
     if (name.startsWith("merge") && name.endsWith("Assets")) {
+        dependsOn(syncPortalToAssets)
         dependsOn(gzipDashboardHtml)
+    }
+    if (name.startsWith("lint") || name.startsWith("generate") && name.endsWith("Assets")) {
+        mustRunAfter(syncPortalToAssets)
     }
 }
 

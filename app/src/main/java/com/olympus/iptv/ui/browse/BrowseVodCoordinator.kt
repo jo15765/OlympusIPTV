@@ -1010,12 +1010,7 @@ internal fun BrowseActivity.resumeNowPlaying() {
 
 internal fun BrowseActivity.paintFreshCount() {
         if (!viewReady()) return
-        val saved = playlist?.id
-        val count = if (saved.isNullOrBlank()) 0 else {
-            (application as com.olympus.iptv.OlympusIptvApp).freshCards(saved)?.size ?: 0
-        }
-        binding.freshCount.text = count.toString()
-        binding.freshCount.visibility = if (count > 0) android.view.View.VISIBLE else android.view.View.GONE
+        binding.freshCount.visibility = android.view.View.GONE
     }
 
 internal fun BrowseActivity.maybeShowBackupTip() {
@@ -1729,10 +1724,24 @@ internal fun BrowseActivity.rememberGroupScroll() {
 
 internal fun BrowseActivity.showChannelSkeleton(show: Boolean) {
         if (!viewReady()) return
-        binding.channelSkeleton.visibility = if (show) View.VISIBLE else View.GONE
         if (show) {
+            if (binding.channelSkeleton.visibility != View.VISIBLE) {
+                binding.channelSkeleton.visibility = View.VISIBLE
+                binding.channelSkeleton.animate().cancel()
+                binding.channelSkeleton.alpha = 0.45f
+                val pulse = android.view.animation.AlphaAnimation(0.45f, 1.0f).apply {
+                    duration = 750L
+                    repeatMode = android.view.animation.Animation.REVERSE
+                    repeatCount = android.view.animation.Animation.INFINITE
+                }
+                binding.channelSkeleton.startAnimation(pulse)
+            }
             binding.libraryStatus.visibility = View.GONE
             binding.errorText.visibility = View.GONE
+        } else {
+            binding.channelSkeleton.clearAnimation()
+            binding.channelSkeleton.alpha = 1f
+            binding.channelSkeleton.visibility = View.GONE
         }
     }
 

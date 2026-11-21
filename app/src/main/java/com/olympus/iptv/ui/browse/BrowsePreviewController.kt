@@ -39,7 +39,7 @@ class BrowsePreviewController(
         if (channel.id == previewChannelId && previewPlayer != null) return
         previewJob?.cancel()
         previewJob = activity.lifecycleScope.launch {
-            delay(400)
+            delay(240)
             if (activity.isDestroyed) return@launch
             if (focusAllowsPreview() && focusedChannelId() != null && focusedChannelId() != channel.id) return@launch
             start(channel)
@@ -57,11 +57,7 @@ class BrowsePreviewController(
             )
             .setMediaSourceFactory(
                 DefaultMediaSourceFactory(activity).setDataSourceFactory(
-                    DefaultHttpDataSource.Factory()
-                        .setUserAgent("Olympus-IPTV")
-                        .setConnectTimeoutMs(15_000)
-                        .setReadTimeoutMs(20_000)
-                        .setAllowCrossProtocolRedirects(true)
+                    com.olympus.iptv.playlist.HttpClients.streamDataSourceFactory
                 )
             )
             .build()

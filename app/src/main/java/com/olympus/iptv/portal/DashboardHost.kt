@@ -23,6 +23,7 @@ import com.olympus.iptv.data.SmbSettings
 import com.olympus.iptv.playlist.CatalogDb
 import com.olympus.iptv.playlist.CatalogIngest
 import com.olympus.iptv.playlist.GroupLock
+import com.olympus.iptv.playlist.HttpClients
 import com.olympus.iptv.playlist.PlaylistLoader
 import com.olympus.iptv.playlist.XtreamClient
 import com.olympus.iptv.ui.player.StreamSessions
@@ -423,8 +424,43 @@ object DashboardHost {
             method == "GET" && path == "/api/remote/favorites" -> remoteFavorites(app, socket)
             method == "POST" && path == "/api/remote/favorites" -> saveRemoteFavorites(app, socket, json(body))
             method == "GET" && path == "/api/streams" -> activeStreams(app, socket)
+            method == "GET" && path == "/api/stream/probe" -> probeStream(app, socket, query["channelId"].orEmpty())
             else -> writeJson(socket, 404, mapOf("error" to "Not found"))
         }
+    }
+
+    private fun probeStream(app: OlympusIptvApp, socket: Socket, channelId: String) {
+        if (channelId.isBlank()) {
+            writeJson(socket, 400, mapOf("ok" to false, "error" to "Missing channelId"))
+            return
+        }
+        val playlist = runBlocking { app.playlistStore.playlists.first().firstOrNull() }
+        val channel = playlist?.let { saved ->
+            runCatching {
+                app.catalogDb.readChannel(saved.id, com.olympus.iptv.playlist.CatalogDb.LIVE, channelId)
+                    ?: app.catalogDb.readChannel(saved.id, com.olympus.iptv.playlist.CatalogDb.VOD, channelId)
+            }.getOrNull()
+        }
+        val url = channel?.streamUrl.orEmpty()
+        if (url.isBlank()) {
+            writeJson(socket, 404, mapOf("ok" to false, "error" to "Stream not found"))
+            return
+        }
+        val started = android.os.SystemClock.elapsedRealtime()
+        val client = HttpClients.shared.newBuilder()
+            .connectTimeout(2500, java.util.concurrent.TimeUnit.MILLISECONDS)
+            .readTimeout(2500, java.util.concurrent.TimeUnit.MILLISECONDS)
+            .build()
+        val outcome = runCatching {
+            val req = okhttp3.Request.Builder().url(url).header("Range", "bytes=0-1023").get().build()
+            client.newCall(req).execute().use { resp ->
+                resp.code
+            }
+        }
+        val latencyMs = android.os.SystemClock.elapsedRealtime() - started
+        val code = outcome.getOrNull() ?: 0
+        val ok = code in 200..399
+        writeJson(socket, 200, mapOf("ok" to ok, "status" to code, "latencyMs" to latencyMs))
     }
 
     private fun activeStreams(app: OlympusIptvApp, socket: Socket) {
@@ -625,10 +661,16 @@ object DashboardHost {
             return
         }
         val ids = runBlocking { app.playlistStore.favorites(playlist.id) }
+        val bareIds = ids.map { it.substringAfter(':') }.distinct()
+        val liveById = app.catalogDb.readChannelsByIds(playlist.id, CatalogDb.LIVE, bareIds).associateBy { it.id }
+        val vodById = if (liveById.size < bareIds.size) {
+            app.catalogDb.readChannelsByIds(playlist.id, CatalogDb.VOD, bareIds.filter { it !in liveById }).associateBy { it.id }
+        } else {
+            emptyMap()
+        }
         val rows = ids.map { id ->
             val bare = id.substringAfter(':')
-            val channel = app.catalogDb.readChannel(playlist.id, com.olympus.iptv.playlist.CatalogDb.LIVE, bare)
-                ?: app.catalogDb.readChannel(playlist.id, com.olympus.iptv.playlist.CatalogDb.VOD, bare)
+            val channel = liveById[bare] ?: vodById[bare]
             mapOf("id" to id, "name" to (channel?.name ?: bare))
         }
         writeJson(socket, 200, mapOf("favorites" to rows))

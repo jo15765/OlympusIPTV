@@ -9,6 +9,7 @@ import android.widget.TextView
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import coil.load
+import com.olympus.iptv.ui.channelLogo
 import com.olympus.iptv.R
 import com.olympus.iptv.data.Channel
 import com.olympus.iptv.data.StreamQuality
@@ -98,7 +99,7 @@ class PlayerMiniGuide(
             private val badge: TextView = view.findViewById(R.id.miniGuideBadge)
             private val bars: android.widget.LinearLayout = view.findViewById(R.id.miniLiveBars)
             fun bind(channel: Channel, active: Boolean) {
-                label.text = channel.name
+                label.text = com.olympus.iptv.data.NameStrip.shown(channel.name, channel.groupTitle)
                 val title = nowTitle(channel)
                 val same = sameShow(channel) && channel.id != playingId
                 show.text = if (same && !title.isNullOrBlank()) {
@@ -114,7 +115,10 @@ class PlayerMiniGuide(
                 badge.text = mark.orEmpty()
                 badge.visibility = if (mark.isNullOrBlank()) View.GONE else View.VISIBLE
                 com.olympus.iptv.ui.LiveBars.show(bars, channel.id == playingId)
+                val px = (48 * logo.resources.displayMetrics.density).toInt().coerceAtLeast(1)
                 logo.load(channel.logoUrl) {
+                    channelLogo(px)
+                    scale(coil.size.Scale.FIT)
                     placeholder(R.drawable.ic_channel_placeholder)
                     error(R.drawable.ic_channel_placeholder)
                 }

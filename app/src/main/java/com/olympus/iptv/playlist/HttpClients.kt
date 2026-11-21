@@ -63,6 +63,15 @@ object HttpClients {
             .build()
     }
 
+    val streamDataSourceFactory: androidx.media3.datasource.DefaultHttpDataSource.Factory by lazy {
+        androidx.media3.datasource.DefaultHttpDataSource.Factory()
+            .setUserAgent("Olympus-IPTV")
+            .setConnectTimeoutMs(8_000)
+            .setReadTimeoutMs(15_000)
+            .setAllowCrossProtocolRedirects(true)
+            .setKeepPostFor302Redirects(true)
+    }
+
     private fun buildShared(): OkHttpClient {
         val dir = cacheDir ?: File(System.getProperty("java.io.tmpdir"), "olympus-http")
         return OkHttpClient.Builder()

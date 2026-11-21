@@ -2,12 +2,12 @@ package com.olympus.iptv.ui.player
 
 import androidx.media3.exoplayer.DefaultLoadControl
 
-/** Live playback buffers. Tight enough to start, large enough to ride a brief stall. */
+/** Live playback buffers. Tight enough for instant channel zapping, large enough to ride a brief stall. */
 object PlayerBuffers {
-    const val MIN_MS = 2_500
+    const val MIN_MS = 2_000
     const val MAX_MS = 15_000
-    const val PLAYBACK_MS = 1_000
-    const val REBUFFER_MS = 2_000
+    const val PLAYBACK_MS = 650
+    const val REBUFFER_MS = 1_750
 
     fun live(lowRam: Boolean = false): DefaultLoadControl {
         val max = if (lowRam) 10_000 else MAX_MS

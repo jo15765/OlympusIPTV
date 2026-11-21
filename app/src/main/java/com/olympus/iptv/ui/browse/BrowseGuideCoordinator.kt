@@ -300,6 +300,16 @@ internal fun BrowseActivity.hostOnCreate(savedInstanceState: Bundle?) {
             if (touchPrimary) 4 else 8
         binding.channelList.recycledViewPool.setMaxRecycledViews(0, if (touchPrimary) 16 else 32)
         binding.channelList.recycledViewPool.setMaxRecycledViews(1, if (touchPrimary) 8 else 16)
+        Looper.myQueue().addIdleHandler {
+            if (!isDestroyed && !lowRamDevice) {
+                runCatching {
+                    panes.ensureAdmin()
+                    panes.ensureRefresh()
+                    panes.ensureVpn()
+                }
+            }
+            false
+        }
         setupPipSwipeOpen()
         lifecycleScope.launch {
             pipGestures = withContext(Dispatchers.IO) {
@@ -930,16 +940,23 @@ internal fun BrowseActivity.goBackOneScreen() {
         if (binding.programPane.visibility == View.VISIBLE && focusIsIn(binding.programPane)) {
             landOnOpened = false
             showMenu(GuideMenu.GROUPS)
+            armGroupFocus()
             focusGroups()
             return
         }
-        if (focusIsIn(binding.channelList)) {
+        if (focusIsIn(binding.channelList) ||
+            guideMenu == GuideMenu.CHANNELS ||
+            guideMenu == GuideMenu.PROGRAMS ||
+            (binding.contentColumn.visibility == View.VISIBLE && binding.groupColumn.visibility != View.VISIBLE)
+        ) {
             landOnOpened = false
+            rememberGroupScroll()
             showMenu(GuideMenu.GROUPS)
+            armGroupFocus()
             focusGroups()
             return
         }
-        if (focusIsIn(binding.groupColumn)) {
+        if (focusIsIn(binding.groupColumn) || binding.groupColumn.visibility == View.VISIBLE) {
             showMenu(GuideMenu.SETTINGS)
             sectionButton().requestFocus()
             binding.navRail.post { flushGroupRefresh() }

@@ -315,6 +315,14 @@ class ChannelAdapter(
                 binding.name.text = com.olympus.iptv.data.NameStrip.shown(item.name, item.groupTitle)
                 binding.name.maxLines = if (guideRowHeight > 0) 2 else 1
                 binding.name.textSize = if (guideRowHeight > 0) 13f else 15f
+                val badge = qualityBadgeFor(item.name)
+                if (badge == null) {
+                    binding.qualityBadge.visibility = View.GONE
+                } else {
+                    binding.qualityBadge.text = badge
+                    binding.qualityBadge.visibility = View.VISIBLE
+                }
+                binding.catchupBadge.visibility = if (item.supportsCatchup()) View.VISIBLE else View.GONE
                 binding.root.alpha = if (unhealthy(item)) 0.45f else 1f
                 binding.group.visibility = View.GONE
                 binding.country.visibility = View.GONE
@@ -484,6 +492,16 @@ class ChannelAdapter(
             val fromDp = (dp * view.resources.displayMetrics.density).toInt().coerceAtLeast(1)
             val measured = maxOf(view.width, view.height)
             return if (measured > 0) minOf(fromDp, measured) else fromDp
+        }
+    }
+
+    private fun qualityBadgeFor(rawName: String): String? {
+        val upper = rawName.uppercase()
+        return when {
+            "4K" in upper || "2160P" in upper || "UHD" in upper -> "4K"
+            "1080P" in upper || "FHD" in upper -> "FHD"
+            "60FPS" in upper -> "60FPS"
+            else -> null
         }
     }
 

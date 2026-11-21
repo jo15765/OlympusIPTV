@@ -166,6 +166,7 @@ class CategoryAdapter(
         fun bind(item: Category) {
             binding.label.text = com.olympus.iptv.data.NameImages.strip(item.name)
             binding.icon.setImageResource(icon(item))
+            binding.icon.imageTintList = android.content.res.ColorStateList.valueOf(genreTint(binding.root.context, item))
             bindPreviews(item)
             binding.liveBadge.visibility = if (liveGroup(item)) View.VISIBLE else View.GONE
             binding.root.isSelected = item.id == selectedId
@@ -260,6 +261,17 @@ class CategoryAdapter(
                 error(R.drawable.ic_channel_placeholder)
             }
         }
+    }
+
+    private fun genreTint(context: android.content.Context, item: Category): Int {
+        val lower = item.name.lowercase()
+        val res = when {
+            "sport" in lower || "espn" in lower || "nfl" in lower || "nba" in lower || "mlb" in lower || "nhl" in lower -> R.color.epg_sports_stroke
+            "movie" in lower || "cinema" in lower || "hbo" in lower || "showtime" in lower -> R.color.epg_movie_stroke
+            "news" in lower || "cnn" in lower || "fox news" in lower || "msnbc" in lower -> R.color.epg_live_stroke
+            else -> R.color.accent
+        }
+        return context.getColor(res)
     }
 
     private companion object {

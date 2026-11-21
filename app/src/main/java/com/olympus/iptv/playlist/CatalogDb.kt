@@ -1319,6 +1319,8 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
 
     fun maintainAfterRefresh() {
         val db = writableDatabase
+        val cutoff = System.currentTimeMillis() - 6L * 3_600_000L
+        runCatching { db.delete("epg_cache", "fetched_at < ?", arrayOf(cutoff.toString())) }
         runCatching { db.rawQuery("PRAGMA optimize", null).use { } }
         runCatching { db.execSQL("PRAGMA incremental_vacuum(200)") }
     }

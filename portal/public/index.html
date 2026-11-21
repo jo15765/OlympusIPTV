@@ -250,7 +250,10 @@
     .side-foot .more[open] summary { background: transparent; color: var(--text); }
     #save { background: var(--save); color: #fff; border: 0; border-radius: 10px; padding: 10px 12px; font-weight: 700; }
     #signOut { background: transparent; color: #d5d8df; border: 0; text-align: left; padding: 8px 10px; font-weight: 600; }
-    .stage { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; padding: 18px 22px 16px; }
+    .stage { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; padding: 18px 22px 16px; background: radial-gradient(760px 360px at 85% 0%, rgba(226, 161, 90, 0.08), transparent 65%); }
+    .country-card.on { box-shadow: 0 4px 14px rgba(226, 161, 90, 0.12); }
+    .section-save { transition: transform 0.14s ease, box-shadow 0.14s ease, background-color 0.14s ease; }
+    .section-save:hover { transform: translateY(-1px); box-shadow: 0 0 0 4px rgba(226, 161, 90, 0.38), 0 6px 18px rgba(0, 0, 0, 0.35); }
     #editor .card.panel { background: transparent; border: 0; border-radius: 0; padding: 0; margin-top: 12px; }
     .panel-head h2 { font-size: 26px; font-weight: 700; }
     .panel-head input[type="search"] { flex: 0 1 260px; background: #242833; border-radius: 10px; }
@@ -432,7 +435,7 @@
     #channels.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); align-content: start; }
     .channel-row {
       display: grid;
-      grid-template-columns: 16px 16px 40px minmax(0, 1fr) 26px 26px 36px;
+      grid-template-columns: 16px 16px 40px minmax(0, 1fr) auto 26px 26px 36px 26px;
       gap: 10px;
       align-items: center;
       min-height: 54px;
@@ -469,7 +472,11 @@
     }
     .channel-title button { border: 0; background: transparent; color: #b7bdc8; padding: 0; display: grid; }
     .channel-title button svg { width: 14px; height: 14px; }
-    .channel-sub { color: var(--muted); font-size: 12px; margin-top: 1px; }
+    .channel-sub { color: var(--muted); font-size: 12px; margin-top: 2px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .meta-pill { display: inline-flex; align-items: center; padding: 1px 7px; border-radius: 999px; font-size: 10px; font-weight: 700; letter-spacing: 0.04em; background: rgba(226, 161, 90, 0.14); color: var(--accent); border: 1px solid rgba(226, 161, 90, 0.35); }
+    .side { backdrop-filter: blur(12px); }
+    .channel-row, .group-row, .country-card, .admin-card, .epg-card, .quick-card { transition: transform 0.14s ease, border-color 0.14s ease, background-color 0.14s ease, box-shadow 0.14s ease; }
+    .channel-row:hover, .group-row:hover, .country-card:hover { transform: translateY(-1px); border-color: rgba(226, 161, 90, 0.55); }
     #channels.grid .channel-grip, #channels.grid .group-step { display: none; }
     #channels.grid .channel-row { grid-template-columns: 16px 40px minmax(0, 1fr) 36px; min-height: 72px; }
     #panelClean { overflow: auto; }
@@ -1252,6 +1259,8 @@
             <button class="secondary" id="groupsVisible" type="button" aria-pressed="false">Visible</button>
             <button class="secondary" id="groupsHidden" type="button" aria-pressed="false">Hidden</button>
             <button class="secondary" id="groupsBoth" type="button" aria-pressed="true">Both</button>
+            <button class="secondary" id="groupsHideMatching" type="button" title="Hide all groups matching the current search or wildcard (e.g. PPV *, 24/7 *)">Hide Matching</button>
+            <button class="primary" id="smartLineupBtn" type="button" title="Enable Smart Auto-Clean Names and hide duplicate backup channels">✨ 1-Click Smart Lineup</button>
             <button class="section-save" type="button">Save</button>
           </div>
         </div>
@@ -1332,6 +1341,11 @@
               <em id="adminVpnCard">Not Connected • Secure your traffic</em>
               <span>The dashboard stays on your Wi-Fi.</span>
             </button>
+            <button class="admin-card" id="adminStreams" type="button">
+              <span class="admin-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 7h16M4 12h16M4 17h10"/><circle cx="18" cy="17" r="2"/></svg></span>
+              <strong>Active Streams</strong>
+              <span>See which address is using each open stream.</span>
+            </button>
           </div>
         </div>
         <div id="adminRefreshPage" hidden>
@@ -1361,6 +1375,14 @@
           </div>
           <pre id="logView">Open a log to read it here.</pre>
           <div id="logList"></div>
+        </div>
+        <div id="adminStreamsPage" hidden>
+          <div class="panel-head">
+            <button class="secondary" id="adminStreamsBack" type="button">Back</button>
+            <h2>Active Streams</h2>
+          </div>
+          <p class="hint" id="adminStreamsLead">Checking the provider…</p>
+          <div id="adminStreamsList"></div>
         </div>
         <div id="adminVpnPage" hidden>
           <div class="panel-head">
@@ -1724,12 +1746,29 @@
           <article class="clean-card">
             <h3>Export</h3>
             <p class="hint">Download this device's settings as a file you can keep.</p>
-            <button class="clean-apply" id="exportSettings" type="button">Export</button>
+            <div class="clean-apply" id="remotePad" style="margin:16px 0;padding:12px;border:1px solid #3a3428;border-radius:12px">
+              <div style="font-weight:700;margin-bottom:8px">TV remote</div>
+              <div style="display:grid;grid-template-columns:repeat(3,72px);gap:8px;justify-content:start">
+                <span></span>
+                <button type="button" data-remote="up">Up</button>
+                <span></span>
+                <button type="button" data-remote="left">Left</button>
+                <button type="button" data-remote="ok">OK</button>
+                <button type="button" data-remote="right">Right</button>
+                <span></span>
+                <button type="button" data-remote="down">Down</button>
+                <button type="button" data-remote="back">Back</button>
+              </div>
+              <input id="remoteText" type="text" placeholder="Paste a stream, movie, or M3U URL — or type a channel" style="margin-top:10px;width:min(420px,100%)" />
+              <button type="button" id="remoteSend">Play on TV</button>
+              <div id="remoteFavorites" style="margin-top:12px"></div>
+            </div>
+            <button class="clean-apply" id="exportSettings" type="button">Export backup (.json)</button>
           </article>
           <article class="clean-card">
             <h3>Import</h3>
             <p class="hint">Replace this device's lineup with a settings file.</p>
-            <button class="clean-apply" id="importSettings" type="button">Import</button>
+            <button class="clean-apply" id="importSettings" type="button">Import backup (.json)</button>
             <input id="importFile" type="file" accept="application/json,.json" hidden />
           </article>
         </div>
@@ -2325,10 +2364,12 @@
       }
       const fromTv = published.some((country) => country.id && country.id !== "__other__");
       const base = fromTv ? published : countriesFromGroups();
+      const order = (session && session.lineup && session.lineup.countryOrder) || [];
+      const rank = new Map(order.map((id, idx) => [id, idx]));
       const list = base.map((country) => {
         const count = Math.max(Number(country.count) || 0, summed.get(country.id) || 0);
         return count === Number(country.count) ? country : Object.assign({}, country, { count });
-      });
+      }).sort((a, b) => (rank.get(a.id) ?? 9999) - (rank.get(b.id) ?? 9999));
       countryChoiceHold = { groups, published, list };
       return list;
     }
@@ -2431,7 +2472,37 @@
           count.className = "country-count";
           count.textContent = String(country.count);
           chip.append(label, count);
+          chip.draggable = true;
+          chip.title = "Click to toggle visibility • Drag to prioritize order";
+          chip.addEventListener("dragstart", (e) => {
+            e.dataTransfer.effectAllowed = "move";
+            e.dataTransfer.setData("text/country", country.id);
+          });
+          chip.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            chip.style.borderColor = "var(--accent)";
+          });
+          chip.addEventListener("dragleave", () => {
+            chip.style.borderColor = "";
+          });
+          chip.addEventListener("drop", (e) => {
+            e.preventDefault();
+            chip.style.borderColor = "";
+            const fromId = e.dataTransfer.getData("text/country");
+            if (!fromId || fromId === country.id) return;
+            pushUndoSnapshot();
+            const order = (lineup().countryOrder || countryChoices().map((c) => c.id)).slice();
+            const fromIdx = order.indexOf(fromId);
+            const toIdx = order.indexOf(country.id);
+            if (fromIdx >= 0 && toIdx >= 0) {
+              const [moved] = order.splice(fromIdx, 1);
+              order.splice(toIdx, 0, moved);
+              lineup().countryOrder = order;
+              renderCountries();
+            }
+          });
           chip.addEventListener("click", () => {
+            pushUndoSnapshot();
             const wasHidden = hidden.has(country.id);
             lineup().hiddenCountries = toggle(lineup().hiddenCountries, country.id, !wasHidden);
             syncInternationalFlag();
@@ -2457,6 +2528,37 @@
       const plain = groupName(group).replace(/\p{Extended_Pictographic}/gu, "").replace(/\s{2,}/g, " ").trim();
       return plain || groupName(group);
     }
+    function wildcardMatch(text, query) {
+      if (!query) return true;
+      if (!query.includes("*") && !query.includes("?")) return text.includes(query);
+      const escaped = query.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*").replace(/\?/g, ".");
+      try {
+        return new RegExp(escaped, "i").test(text);
+      } catch (_) {
+        return text.includes(query);
+      }
+    }
+    const undoStack = [];
+    function pushUndoSnapshot() {
+      if (!session || !session.lineup) return;
+      undoStack.push(JSON.stringify(session.lineup));
+      if (undoStack.length > 25) undoStack.shift();
+    }
+    function popUndoSnapshot() {
+      if (!undoStack.length || !session) return false;
+      const snap = JSON.parse(undoStack.pop());
+      lineupHold = true;
+      try {
+        session.lineup = Object.assign(blankLineup(), snap);
+        forgetTabPaint();
+        openTab(tab);
+        const status = document.querySelector("#saveStatus");
+        if (status) status.textContent = "Undid last change (click Save to sync).";
+      } finally {
+        lineupHold = false;
+      }
+      return true;
+    }
     function visibleGroups() {
       const groupQuery = document.querySelector("#groupSearch").value.trim().toLowerCase();
       const hidden = new Set(lineup().hiddenGroups || []);
@@ -2464,7 +2566,7 @@
         const isHidden = hidden.has(group.id);
         const matchesFilter = groupFilter === "both" || (groupFilter === "hidden" ? isHidden : !isHidden);
         const label = (groupName(group) + " " + (group.name || "")).toLowerCase();
-        return matchesFilter && (!groupQuery || label.includes(groupQuery));
+        return matchesFilter && wildcardMatch(label, groupQuery);
       });
     }
     function paintGroupSelectAll() {
@@ -2869,6 +2971,8 @@
         if (channel.logo) {
           const img = document.createElement("img");
           img.alt = "";
+          img.loading = "lazy";
+          img.decoding = "async";
           img.src = channel.logo;
           img.addEventListener("error", () => {
             img.remove();
@@ -2917,7 +3021,12 @@
         }
         const sub = document.createElement("div");
         sub.className = "channel-sub";
-        sub.textContent = channelDetail(channel);
+        channelDetail(channel).split(" • ").filter(Boolean).forEach((part) => {
+          const pill = document.createElement("span");
+          pill.className = "meta-pill";
+          pill.textContent = part;
+          sub.append(pill);
+        });
         copy.append(title, sub);
         const up = document.createElement("button");
         up.type = "button";
@@ -2944,7 +3053,41 @@
           shown.setAttribute("aria-pressed", String(wasHidden));
           shown.title = wasHidden ? "Hide channel" : "Show channel";
         });
-        row.append(grip, pick, logo, copy, up, down, shown);
+        const probe = document.createElement("button");
+        probe.type = "button";
+        probe.className = "secondary";
+        probe.style.padding = "3px 8px";
+        probe.style.fontSize = "11px";
+        probe.title = "Test stream health & latency from the TV";
+        probe.textContent = "Test";
+        probe.addEventListener("click", async () => {
+          probe.disabled = true;
+          probe.textContent = "…";
+          try {
+            const resp = await fetch("/api/stream/probe?channelId=" + encodeURIComponent(channel.id));
+            const res = await resp.json();
+            if (res.ok) {
+              probe.textContent = res.latencyMs + "ms";
+              probe.style.borderColor = "#73B56E";
+              probe.style.color = "#8fd18a";
+            } else {
+              probe.textContent = "Dead";
+              probe.style.borderColor = "#e07a72";
+              probe.style.color = "#e07a72";
+            }
+          } catch (_) {
+            probe.textContent = "Err";
+          } finally {
+            probe.disabled = false;
+          }
+        });
+        const play = document.createElement("button");
+        play.type = "button";
+        play.className = "group-step";
+        play.title = "Play on TV";
+        play.textContent = "▶";
+        play.addEventListener("click", () => sendRemote("play", channel.id));
+        row.append(grip, pick, logo, copy, probe, up, down, shown, play);
         box.append(row);
       });
       const remaining = matches.length - (channelWindowStart + sliced.rows.length);
@@ -3312,6 +3455,8 @@
       }
       const image = document.createElement("img");
       image.alt = "";
+      image.loading = "lazy";
+      image.decoding = "async";
       image.src = "/api/logo?u=" + encodeURIComponent(logoUrl);
       image.addEventListener("error", () => image.replaceWith(favoriteMark(title)));
       box.append(image);
@@ -3400,7 +3545,23 @@
         });
         const actions = document.createElement("div");
         actions.className = "fav-actions";
+        const tvBtn = document.createElement("button");
+        tvBtn.type = "button";
+        tvBtn.className = "fav-step";
+        tvBtn.title = "Play on TV";
+        tvBtn.setAttribute("aria-label", "Play on TV");
+        tvBtn.textContent = "▶";
+        tvBtn.addEventListener("click", (event) => {
+          event.stopPropagation();
+          const rawId = String(id).includes(":") ? String(id).split(":").slice(1).join(":") : String(id);
+          fetch("/api/remote", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "play", text: rawId })
+          }).catch(() => {});
+        });
         actions.append(
+          tvBtn,
           favStep(-1, () => moveFavorite(index, -1)),
           favStep(1, () => moveFavorite(index, 1)),
           favRemove(() => toggleWebFavorite(id, false))
@@ -3745,8 +3906,52 @@
       document.querySelector("#adminWebPage").hidden = which !== "web";
       document.querySelector("#adminLogPage").hidden = which !== "logs";
       document.querySelector("#adminVpnPage").hidden = which !== "vpn";
+      document.querySelector("#adminStreamsPage").hidden = which !== "streams";
       if (which === "vpn") refreshVpn();
       else stopVpnPoll();
+      if (which === "streams") refreshStreams();
+      else stopStreamsPoll();
+    }
+    document.querySelector("#adminStreams").addEventListener("click", () => showAdminPage("streams"));
+    document.querySelector("#adminStreamsBack").addEventListener("click", () => showAdminPage("home"));
+    let streamsPoll = 0;
+    function stopStreamsPoll() {
+      if (streamsPoll) clearInterval(streamsPoll);
+      streamsPoll = 0;
+    }
+    function streamLine(row) {
+      const ip = row.ip || "No IP reported";
+      const name = row.name || "Unnamed stream";
+      const role = row.role ? " · " + row.role : "";
+      const source = row.source ? " · " + row.source : "";
+      return "<p><strong>" + ip + "</strong> · " + name + role + source + "</p>";
+    }
+    async function refreshStreams() {
+      const lead = document.querySelector("#adminStreamsLead");
+      const list = document.querySelector("#adminStreamsList");
+      if (!lead || !list) return;
+      try {
+        const data = await fetch("/api/streams").then((res) => res.json());
+        const active = data.providerActive || "—";
+        const max = data.providerMax || "—";
+        const remote = !!data.providerListedIps;
+        lead.textContent = "Provider reports " + active + " of " + max + " connections in use.";
+        const rows = Array.isArray(data.streams) ? data.streams : [];
+        const local = Array.isArray(data.local) ? data.local : [];
+        const parts = [];
+        if (remote) {
+          parts.push("<p class=\"hint\">Addresses returned by the provider.</p>");
+          rows.forEach((row) => parts.push(streamLine(row)));
+        } else {
+          parts.push("<p class=\"hint\">This provider login does not include the IP of each connection. The addresses below are streams this TV still has open.</p>");
+          if (!local.length) parts.push("<p>None. Leaving the app closes the streams on this TV.</p>");
+          local.forEach((row) => parts.push(streamLine(row)));
+        }
+        list.innerHTML = parts.join("");
+      } catch (err) {
+        lead.textContent = "Could not read active streams.";
+      }
+      if (!streamsPoll) streamsPoll = setInterval(refreshStreams, 4000);
     }
     document.querySelector("#adminRefresh").addEventListener("click", () => showAdminPage("refresh"));
     document.querySelector("#adminWeb").addEventListener("click", () => showAdminPage("web"));
@@ -4483,6 +4688,28 @@
     });
     document.querySelector("#groupsBulkHide").addEventListener("click", hideSelectedGroups);
     document.querySelector("#groupsDelete").addEventListener("click", hideSelectedGroups);
+    document.querySelector("#groupsHideMatching")?.addEventListener("click", () => {
+      const matches = visibleGroups();
+      if (!matches.length) return;
+      pushUndoSnapshot();
+      const hidden = new Set(lineup().hiddenGroups || []);
+      matches.forEach((g) => hidden.add(g.id));
+      lineup().hiddenGroups = [...hidden];
+      const status = document.querySelector("#groupBulkStatus");
+      if (status) status.textContent = "Hid " + matches.length + " matching groups (Ctrl+Z to undo, Save to sync).";
+      renderGroups();
+    });
+    document.querySelector("#smartLineupBtn")?.addEventListener("click", () => {
+      pushUndoSnapshot();
+      lineup().autoCleanNames = true;
+      const autoBox = document.querySelector("#autoCleanNamesToggle");
+      if (autoBox) autoBox.checked = true;
+      const dupeBox = document.querySelector("#hideBackupDupes");
+      if (dupeBox) dupeBox.checked = true;
+      const status = document.querySelector("#groupBulkStatus");
+      if (status) status.textContent = "✨ Smart Auto-Clean & duplicate hiding enabled — click Save to sync to TV.";
+      renderStripLivePreview();
+    });
     document.querySelector("#groupsBatchRename").addEventListener("click", () => {
       const status = document.querySelector("#groupBulkStatus");
       if (!selectedGroups.size) {
@@ -4716,19 +4943,80 @@
     document.querySelector("#includeInternational").addEventListener("change", () => {
       applyInternational(document.querySelector("#includeInternational").checked, true);
     });
-    document.querySelector("#exportSettings").addEventListener("click", () => {
-      const file = {
-        "olympus-iptv": "lineup",
-        deviceId: session.deviceId,
-        exportedAt: new Date().toISOString(),
-        lineup: session.lineup
-      };
-      const blob = new Blob([JSON.stringify(file, null, 2)], { type: "application/json" });
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
-      link.download = "olympus-iptv-" + session.deviceId + "-settings.json";
-      link.click();
-      URL.revokeObjectURL(link.href);
+    async function sendRemote(action, text) {
+      try {
+        await fetch("/api/remote", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action, text: text || "" })
+        });
+      } catch (err) {}
+    }
+    document.querySelectorAll("[data-remote]").forEach((button) => {
+      button.addEventListener("click", () => sendRemote(button.getAttribute("data-remote")));
+    });
+    const remoteSend = document.querySelector("#remoteSend");
+    if (remoteSend) {
+      remoteSend.addEventListener("click", () => {
+        const field = document.querySelector("#remoteText");
+        sendRemote("text", field ? field.value : "");
+      });
+    }
+    async function loadRemoteFavorites() {
+      const box = document.querySelector("#remoteFavorites");
+      if (!box) return;
+      const response = await fetch("/api/remote/favorites");
+      if (!response.ok) return;
+      const payload = await response.json();
+      const rows = payload.favorites || [];
+      box.innerHTML = "";
+      rows.forEach((row, index) => {
+        const line = document.createElement("div");
+        line.style.margin = "4px 0";
+        const up = document.createElement("button");
+        up.type = "button";
+        up.textContent = "Up";
+        const down = document.createElement("button");
+        down.type = "button";
+        down.textContent = "Down";
+        const name = document.createElement("span");
+        name.textContent = " " + (row.name || row.id);
+        up.addEventListener("click", () => moveFavorite(rows, index, -1));
+        down.addEventListener("click", () => moveFavorite(rows, index, 1));
+        line.append(up, down, name);
+        box.appendChild(line);
+      });
+    }
+    async function moveFavorite(rows, index, delta) {
+      const next = index + delta;
+      if (next < 0 || next >= rows.length) return;
+      const copy = rows.slice();
+      const moved = copy.splice(index, 1)[0];
+      copy.splice(next, 0, moved);
+      await fetch("/api/remote/favorites", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: copy.map((row) => row.id) })
+      });
+      loadRemoteFavorites();
+    }
+    loadRemoteFavorites();
+    document.querySelector("#exportSettings").addEventListener("click", async () => {
+      const status = document.querySelector("#saveStatus");
+      try {
+        const response = await fetch("/api/profile?email=" + encodeURIComponent(accountEmail) + "&deviceId=" + encodeURIComponent(session.deviceId));
+        const file = await response.json();
+        if (!response.ok) throw new Error(file.error || "Could not export settings.");
+        const blob = new Blob([JSON.stringify(file, null, 2)], { type: "application/json" });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = "olympus-iptv-" + session.deviceId + "-settings.json";
+        link.click();
+        URL.revokeObjectURL(link.href);
+        if (status) status.textContent = "Downloaded this TV's favorites, lineup, and audio offsets.";
+      } catch (failure) {
+        if (status) status.textContent = failure.message || "Could not export settings.";
+      }
     });
     document.querySelector("#importSettings").addEventListener("click", () => document.querySelector("#importFile").click());
     document.querySelector("#importFile").addEventListener("change", async (event) => {
@@ -4740,24 +5028,37 @@
         const parsed = JSON.parse(await file.text());
         const incoming = parsed && parsed.lineup ? parsed.lineup : parsed;
         if (!incoming || typeof incoming !== "object" || Array.isArray(incoming)) throw new Error("That file is not a Olympus-IPTV settings file.");
-        const preview = backupPreview(incoming, parsed && parsed.exportedAt);
+        const preview = backupPreview(incoming, parsed && parsed.exportedAt, parsed && parsed.avSync);
         if (!window.confirm("Restore this backup onto " + session.deviceId + "?\n\n" + preview)) {
           status.textContent = "Import cancelled.";
           return;
         }
+        const payload = {
+          email: accountEmail,
+          deviceId: session.deviceId,
+          lineup: incoming
+        };
+        if (Array.isArray(parsed.favorites)) payload.favorites = parsed.favorites;
+        if (parsed.avSync && typeof parsed.avSync === "object" && !Array.isArray(parsed.avSync)) payload.avSync = parsed.avSync;
+        const restored = await fetch("/api/profile", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const restoredBody = await restored.json();
+        if (!restored.ok || !restoredBody.ok) throw new Error(restoredBody.error || "Could not restore that file.");
         session.lineup = Object.assign(blankLineup(), incoming);
+        if (Array.isArray(parsed.favorites) && session.favorites) session.favorites.ids = parsed.favorites;
         forgetTabPaint();
         paintStrip();
         openTab(tab || "countries");
-        await saveLineup();
-        if (!status.textContent.startsWith("Updated")) return;
         status.textContent = "Imported onto " + session.deviceId + ". The TV guide updates now.";
       } catch (failure) {
         status.textContent = failure.message || "Could not import that file.";
       }
     });
 
-    function backupPreview(lineup, exportedAt) {
+    function backupPreview(lineup, exportedAt, parsedAv) {
       const count = (value) => Array.isArray(value) ? value.length : Object.keys(value || {}).length;
       const hiddenCountries = count(lineup.hiddenCountries);
       const hiddenGroups = count(lineup.hiddenGroups);
@@ -4771,7 +5072,9 @@
         "Hidden channels: " + hiddenChannels + "\n" +
         "Renames: " + renamed + "\n" +
         "Parental PINs: " + pins + "\n" +
-        "International: " + (lineup.includeInternational ? "on" : "off");
+        "International: " + (lineup.includeInternational ? "on" : "off") + "\n" +
+        "Strip rules: " + (count(lineup.namePrefixes) + count(lineup.nameSuffixes)) + "\n" +
+        "Audio offsets: " + count(parsedAv || {});
     }
 
     const setupForm = document.querySelector("#setup");
@@ -5050,6 +5353,34 @@
       if (webCopy) webCopy.textContent = line;
     }).catch(() => {
       document.querySelector("#address").textContent = "Stay on this Wi-Fi. This page is not published on the internet.";
+    });
+
+    document.addEventListener("keydown", (event) => {
+      const tag = (event.target && event.target.tagName) || "";
+      const typing = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z" && !typing) {
+        if (popUndoSnapshot()) event.preventDefault();
+        return;
+      }
+      if (event.altKey && !typing && event.key >= "1" && event.key <= "8") {
+        const tabs = ["countries", "groups", "channels", "favorites", "record", "reminders", "backup", "admin"];
+        const targetTab = tabs[Number(event.key) - 1];
+        if (targetTab) {
+          event.preventDefault();
+          showTab(targetTab);
+        }
+        return;
+      }
+      if (((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") || (!typing && event.key === "/")) {
+        event.preventDefault();
+        const searchId = tab === "groups" ? "#groupSearch"
+          : tab === "channels" ? "#channelSearch"
+          : tab === "favorites" ? "#favoriteSearch"
+          : tab === "record" ? "#recordSearch"
+          : "#countrySearch";
+        const box = document.querySelector(searchId);
+        if (box && !box.disabled) { box.focus(); box.select(); }
+      }
     });
   </script>
 </body>

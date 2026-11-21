@@ -41,6 +41,7 @@ class ParentalFragment : Fragment() {
     private var pinTargets = emptyList<String>()
     private var pinKeyIndex = 4
     private var pinFocusGuard: ViewTreeObserver.OnGlobalFocusChangeListener? = null
+    private var screenFocusGuard: ViewTreeObserver.OnGlobalFocusChangeListener? = null
     @Volatile private var saving = false
 
     private val pinKeys: List<View> by lazy {
@@ -87,8 +88,20 @@ class ParentalFragment : Fragment() {
         binding.btnClearPin.setOnClickListener { clearSelected() }
         binding.pinCancel.setOnClickListener { hidePin() }
         binding.pinClearDigit.setOnClickListener { clearLastDigit() }
-        binding.pinScrim.setOnClickListener { /* absorb taps behind the pad */ }
+        binding.pinOk.setOnClickListener { submitPinModal() }
+        binding.pinScrim.setOnClickListener { reclaimPinFocus() }
+        binding.groupPin.setOnClickListener { reclaimPinFocus() }
+        val paintActionFocus = { view: android.widget.TextView, hasFocus: Boolean ->
+            view.setBackgroundResource(if (hasFocus) R.drawable.bg_button else R.drawable.bg_button_secondary)
+            view.setTextColor(requireContext().getColor(if (hasFocus) R.color.bg else R.color.text_primary))
+        }
+        binding.btnSetPin.setOnFocusChangeListener { _, hasFocus -> paintActionFocus(binding.btnSetPin, hasFocus) }
+        binding.btnClearPin.setOnFocusChangeListener { _, hasFocus -> paintActionFocus(binding.btnClearPin, hasFocus) }
         wirePad()
+        attachScreenFocusGuard()
+        binding.btnSetPin.post {
+            if (viewActive() && !pinOpen()) binding.btnSetPin.requestFocus()
+        }
         viewLifecycleOwner.lifecycleScope.launch {
             val app = requireActivity().application as OlympusIptvApp
             val loaded = withContext(Dispatchers.IO) {
@@ -111,16 +124,15 @@ class ParentalFragment : Fragment() {
             groups.addAll(LineupApplier.groups(loaded.second, config, loaded.third))
             adapter.notifyDataSetChanged()
             updateHint()
-            binding.groupList.post {
-                if (!viewActive() || pinOpen()) return@post
-                binding.groupList.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
-                    ?: binding.btnBack.requestFocus()
+            if (!pinOpen()) {
+                binding.btnSetPin.requestFocus()
             }
         }
     }
 
     override fun onDestroyView() {
         detachPinFocusGuard()
+        detachScreenFocusGuard()
         _binding = null
         super.onDestroyView()
     }
@@ -150,11 +162,15 @@ class ParentalFragment : Fragment() {
             key.nextFocusLeftId = pinKeys[row * 3 + (col - 1).coerceAtLeast(0)].id
             key.nextFocusRightId = pinKeys[row * 3 + (col + 1).coerceAtMost(2)].id
             key.nextFocusUpId = pinKeys[(row - 1).coerceAtLeast(0) * 3 + col].id
-            key.nextFocusDownId = pinKeys[(row + 1).coerceAtMost(3) * 3 + col].id
+            key.nextFocusDownId = if (row == 3) binding.pinOk.id else pinKeys[(row + 1) * 3 + col].id
             key.setOnFocusChangeListener { _, hasFocus ->
                 if (hasFocus) pinKeyIndex = index
             }
         }
+        binding.pinOk.nextFocusUpId = binding.pin0.id
+        binding.pinOk.nextFocusDownId = binding.pinOk.id
+        binding.pinOk.nextFocusLeftId = binding.pinClearDigit.id
+        binding.pinOk.nextFocusRightId = binding.pinCancel.id
     }
 
     private fun pinOpen(): Boolean = binding.groupPin.visibility == View.VISIBLE
@@ -165,6 +181,7 @@ class ParentalFragment : Fragment() {
             return
         }
         if (saving) return
+        clearingLocks = false
         pinTargets = selected.toList()
         pinDigits = ""
         pinKeyIndex = 4
@@ -215,10 +232,9 @@ class ParentalFragment : Fragment() {
         setBackgroundFocusEnabled(true)
         adapter.notifyDataSetChanged()
         updateHint()
-        binding.groupList.post {
+        binding.btnSetPin.post {
             if (!viewActive() || pinOpen()) return@post
-            binding.groupList.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
-                ?: binding.btnSetPin.requestFocus()
+            binding.btnSetPin.requestFocus()
         }
     }
 
@@ -235,16 +251,19 @@ class ParentalFragment : Fragment() {
         }
     }
 
-    private fun focusInPin(): Boolean {
+    private fun focusInView(container: View): Boolean {
         var view = currentFocus ?: return false
         while (true) {
-            if (view === binding.groupPin) return true
+            if (view === container) return true
             view = view.parent as? View ?: return false
         }
     }
 
+    private fun focusInPin(): Boolean = focusInView(binding.groupPin)
+
     private fun reclaimPinFocus() {
         if (!viewActive() || !pinOpen()) return
+        if (currentFocus === binding.pinOk) return
         val index = pinKeyIndex.coerceIn(0, pinKeys.lastIndex)
         val target = pinKeys[index]
         if (!target.requestFocus()) {
@@ -258,11 +277,23 @@ class ParentalFragment : Fragment() {
             reclaimPinFocus()
             return true
         }
+        if (currentFocus === binding.pinOk) {
+            when {
+                dy < 0 -> pinKeys[pinKeyIndex.coerceIn(9, 11)].requestFocus()
+                dx < 0 -> binding.pinClearDigit.requestFocus()
+                dx > 0 -> binding.pinCancel.requestFocus()
+            }
+            return true
+        }
         val index = pinKeys.indexOfFirst { it === currentFocus }.let {
             if (it >= 0) it else pinKeyIndex
         }.coerceIn(0, pinKeys.lastIndex)
         val col = index % 3
         val row = index / 3
+        if (row == 3 && dy > 0) {
+            binding.pinOk.requestFocus()
+            return true
+        }
         val nextCol = (col + dx).coerceIn(0, 2)
         val nextRow = (row + dy).coerceIn(0, 3)
         val next = nextRow * 3 + nextCol
@@ -300,6 +331,38 @@ class ParentalFragment : Fragment() {
         if (observer.isAlive) observer.removeOnGlobalFocusChangeListener(guard)
     }
 
+    private fun attachScreenFocusGuard() {
+        if (screenFocusGuard != null) return
+        val guard = ViewTreeObserver.OnGlobalFocusChangeListener { _, newFocus ->
+            if (!viewActive()) return@OnGlobalFocusChangeListener
+            if (pinOpen()) return@OnGlobalFocusChangeListener
+            val inside = newFocus != null && run {
+                var view: View? = newFocus
+                while (view != null) {
+                    if (view === binding.root) return@run true
+                    view = view.parent as? View
+                }
+                false
+            }
+            if (!inside) {
+                binding.btnSetPin.post {
+                    if (viewActive() && !pinOpen() && !focusInView(binding.root)) {
+                        binding.btnSetPin.requestFocus()
+                    }
+                }
+            }
+        }
+        screenFocusGuard = guard
+        binding.root.viewTreeObserver.addOnGlobalFocusChangeListener(guard)
+    }
+
+    private fun detachScreenFocusGuard() {
+        val guard = screenFocusGuard ?: return
+        screenFocusGuard = null
+        val observer = binding.root.viewTreeObserver
+        if (observer.isAlive) observer.removeOnGlobalFocusChangeListener(guard)
+    }
+
     private fun paintDigits() {
         binding.groupPinDigits.text = "•".repeat(pinDigits.length).padEnd(4, '–')
     }
@@ -309,33 +372,46 @@ class ParentalFragment : Fragment() {
         pinDigits += digit
         paintDigits()
         if (pinDigits.length == 4) {
-            val targets = pinTargets
-            val code = pinDigits
-            if (clearingLocks) {
-                val match = targets.all { GroupLock.accepts(config, it, code) }
-                if (!match) {
-                    Haptics.reject(binding.groupPin)
-                    pinDigits = ""
-                    paintDigits()
-                    Toast.makeText(requireContext(), R.string.parental_clear_bad_pin, Toast.LENGTH_SHORT).show()
-                    return
-                }
-                selected.clear()
-                clearingLocks = false
-                Haptics.tick(binding.groupPin)
-                applyPins(targets, null)
-                hidePin()
-                adapter.notifyDataSetChanged()
-                updateHint()
-                Toast.makeText(requireContext(), R.string.pin_cleared_ok, Toast.LENGTH_SHORT).show()
+            binding.pinOk.requestFocus()
+            submitPinModal()
+        }
+    }
+
+    private fun submitPinModal() {
+        if (saving) return
+        if (pinDigits.length < 4) {
+            Haptics.reject(binding.groupPin)
+            Toast.makeText(requireContext(), R.string.parental_clear_bad_pin, Toast.LENGTH_SHORT).show()
+            reclaimPinFocus()
+            return
+        }
+        val targets = pinTargets
+        val code = pinDigits
+        if (clearingLocks) {
+            val match = targets.all { GroupLock.accepts(config, it, code) }
+            if (!match) {
+                Haptics.reject(binding.groupPin)
+                pinDigits = ""
+                paintDigits()
+                reclaimPinFocus()
+                Toast.makeText(requireContext(), R.string.parental_clear_bad_pin, Toast.LENGTH_SHORT).show()
                 return
             }
             selected.clear()
+            clearingLocks = false
             Haptics.tick(binding.groupPin)
-            applyPins(targets, code)
+            applyPins(targets, null)
             hidePin()
-            Toast.makeText(requireContext(), R.string.pin_set_ok, Toast.LENGTH_SHORT).show()
+            adapter.notifyDataSetChanged()
+            updateHint()
+            Toast.makeText(requireContext(), R.string.pin_cleared_ok, Toast.LENGTH_SHORT).show()
+            return
         }
+        selected.clear()
+        Haptics.tick(binding.groupPin)
+        applyPins(targets, code)
+        hidePin()
+        Toast.makeText(requireContext(), R.string.pin_set_ok, Toast.LENGTH_SHORT).show()
     }
 
     private fun clearLastDigit() {
@@ -393,13 +469,74 @@ class ParentalFragment : Fragment() {
 
     fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (!pinOpen()) {
-            if (event.action == KeyEvent.ACTION_DOWN &&
-                (event.keyCode == KeyEvent.KEYCODE_BACK ||
-                    event.keyCode == KeyEvent.KEYCODE_ESCAPE ||
-                    event.keyCode == KeyEvent.KEYCODE_BUTTON_B)
-            ) {
-                exitToolHost()
-                return true
+            if (event.action == KeyEvent.ACTION_DOWN) {
+                val focused = currentFocus
+                when (event.keyCode) {
+                    KeyEvent.KEYCODE_DPAD_UP -> {
+                        if (focused === binding.btnSetPin || focused === binding.btnClearPin || focused === binding.btnBack) {
+                            return true
+                        }
+                        if (focused != null && focusInView(binding.groupList)) {
+                            val holder = binding.groupList.findContainingViewHolder(focused)
+                            val pos = holder?.bindingAdapterPosition ?: -1
+                            if (pos in 0..2) {
+                                binding.btnSetPin.requestFocus()
+                                return true
+                            }
+                        }
+                    }
+                    KeyEvent.KEYCODE_DPAD_LEFT -> {
+                        if (focused === binding.btnSetPin) return true
+                        if (focused === binding.btnClearPin) {
+                            binding.btnSetPin.requestFocus()
+                            return true
+                        }
+                        if (focused === binding.btnBack) {
+                            binding.btnClearPin.requestFocus()
+                            return true
+                        }
+                        if (focused != null && focusInView(binding.groupList)) {
+                            val holder = binding.groupList.findContainingViewHolder(focused)
+                            val pos = holder?.bindingAdapterPosition ?: -1
+                            if (pos >= 0 && pos % 3 == 0) return true
+                        }
+                    }
+                    KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                        if (focused === binding.btnSetPin) {
+                            binding.btnClearPin.requestFocus()
+                            return true
+                        }
+                        if (focused === binding.btnClearPin) {
+                            binding.btnBack.requestFocus()
+                            return true
+                        }
+                        if (focused === binding.btnBack) return true
+                        if (focused != null && focusInView(binding.groupList)) {
+                            val holder = binding.groupList.findContainingViewHolder(focused)
+                            val pos = holder?.bindingAdapterPosition ?: -1
+                            if (pos >= 0 && (pos % 3 == 2 || pos == groups.lastIndex)) return true
+                        }
+                    }
+                    KeyEvent.KEYCODE_DPAD_DOWN -> {
+                        if (focused === binding.btnSetPin || focused === binding.btnClearPin) {
+                            if (groups.isNotEmpty()) {
+                                binding.groupList.scrollToPosition(0)
+                                binding.groupList.post {
+                                    binding.groupList.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
+                                }
+                            }
+                            return true
+                        }
+                        if (focused === binding.btnBack) {
+                            binding.btnSetPin.requestFocus()
+                            return true
+                        }
+                    }
+                    KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_ESCAPE, KeyEvent.KEYCODE_BUTTON_B -> {
+                        exitToolHost()
+                        return true
+                    }
+                }
             }
             return false
         }
@@ -430,7 +567,9 @@ class ParentalFragment : Fragment() {
                 KeyEvent.KEYCODE_DPAD_RIGHT -> return movePinFocus(1, 0)
                 KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER,
                 KeyEvent.KEYCODE_BUTTON_A -> {
-                    (currentFocus ?: pinKeys[pinKeyIndex.coerceIn(0, pinKeys.lastIndex)]).performClick()
+                    val target = if (currentFocus === binding.pinOk) binding.pinOk
+                    else (currentFocus?.takeIf { focusInPin() } ?: pinKeys[pinKeyIndex.coerceIn(0, pinKeys.lastIndex)])
+                    target.performClick()
                     return true
                 }
             }

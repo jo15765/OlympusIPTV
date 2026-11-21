@@ -1,24 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="bg">#141210</color>
-    <color name="nav_rail">#1B1814</color>
-    <color name="bg_elevated">#221F1A</color>
-    <color name="bg_panel">#2C271F</color>
-    <color name="stroke">#433B31</color>
-    <color name="text_primary">#F6F1E7</color>
-    <color name="text_secondary">#C9BBA8</color>
-    <color name="accent">#E2A15A</color>
-    <color name="accent_dim">#B07A38</color>
-    <color name="focus">#F0C48A</color>
-    <color name="danger">#E07A72</color>
-    <color name="chip">#3A3126</color>
+    <color name="bg">#11100E</color>
+    <color name="nav_rail">#181613</color>
+    <color name="bg_elevated">#24201A</color>
+    <color name="bg_panel">#2E281F</color>
+    <color name="stroke">#4A4033</color>
+    <color name="text_primary">#F8F4EC</color>
+    <color name="text_secondary">#CEC0AC</color>
+    <color name="accent">#E6A65C</color>
+    <color name="accent_dim">#B57C38</color>
+    <color name="focus">#F5CA8E</color>
+    <color name="danger">#E37C74</color>
+    <color name="chip">#3D3428</color>
+    <color name="badge_surface">#26211A</color>
     <color name="black">#000000</color>
-    <color name="epg_live">#2A3328</color>
-    <color name="epg_live_stroke">#6FAE6A</color>
-    <color name="epg_new">#332A22</color>
-    <color name="epg_new_stroke">#E2A15A</color>
-    <color name="epg_sports">#1F2A33</color>
-    <color name="epg_sports_stroke">#5B9BD5</color>
-    <color name="epg_movie">#322433</color>
-    <color name="epg_movie_stroke">#B07AC8</color>
+    <color name="epg_live">#283426</color>
+    <color name="epg_live_stroke">#73B56E</color>
+    <color name="epg_new">#362B21</color>
+    <color name="epg_new_stroke">#E6A65C</color>
+    <color name="epg_sports">#1D2A36</color>
+    <color name="epg_sports_stroke">#5FA0DB</color>
+    <color name="epg_movie">#342336</color>
+    <color name="epg_movie_stroke">#B67ECF</color>
 </resources>

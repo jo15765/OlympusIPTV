@@ -370,7 +370,16 @@ internal fun BrowseActivity.onDialKey(event: KeyEvent): Boolean {
             dialDigits = ChannelNumberJump.append(dialDigits, digit)
             binding.channelDialNumber.text = dialDigits
             binding.channelDialNumber.setShadowLayer(24f, 0f, 0f, getColor(R.color.accent))
-            binding.channelDialHint.visibility = View.GONE
+            val previewIdx = ChannelNumberJump.indexFor(visibleChannels.map { it.number }, dialDigits.toIntOrNull() ?: 0)
+            val previewCh = visibleChannels.getOrNull(previewIdx)
+            if (previewCh != null) {
+                val cleanName = com.olympus.iptv.data.ChannelNames.present(previewCh, activeConfig)
+                val nowShow = epgCache[previewCh.id]?.now?.title?.takeIf { it.isNotBlank() }
+                binding.channelDialHint.text = if (nowShow != null) "$cleanName · $nowShow" else cleanName
+                binding.channelDialHint.visibility = View.VISIBLE
+            } else {
+                binding.channelDialHint.visibility = View.GONE
+            }
             binding.channelDial.visibility = View.VISIBLE
             focusHandler.removeCallbacks(dialJump)
             focusHandler.postDelayed(dialJump, ChannelNumberJump.DELAY_MS)

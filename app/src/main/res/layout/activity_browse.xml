@@ -320,23 +320,14 @@
                         android:drawableStart="@drawable/ic_nav_new"
                         android:nextFocusDown="@id/categoryList"
                         android:nextFocusLeft="@id/btnQueue"
-                        android:nextFocusRight="@id/freshCount"
+                        android:nextFocusRight="@id/btnRemind"
                         android:text="@string/nav_fresh" />
 
                     <TextView
                         android:id="@+id/freshCount"
-                        android:layout_width="wrap_content"
-                        android:layout_height="28dp"
-                        android:layout_marginStart="4dp"
-                        android:background="@drawable/bg_search_pill"
-                        android:gravity="center"
-                        android:minWidth="28dp"
-                        android:nextFocusLeft="@id/btnFresh"
-                        android:nextFocusRight="@id/btnRemind"
-                        android:paddingHorizontal="8dp"
-                        android:textColor="@color/accent"
-                        android:textSize="13sp"
-                        android:textStyle="bold"
+                        android:layout_width="0dp"
+                        android:layout_height="0dp"
+                        android:focusable="false"
                         android:visibility="gone" />
 
                     <TextView
@@ -344,7 +335,7 @@
                         style="@style/OlympusIptvChip"
                         android:drawableStart="@drawable/ic_nav_remind"
                         android:nextFocusDown="@id/categoryList"
-                        android:nextFocusLeft="@id/freshCount"
+                        android:nextFocusLeft="@id/btnFresh"
                         android:nextFocusRight="@id/btnParental"
                         android:text="@string/nav_reminders" />
 
