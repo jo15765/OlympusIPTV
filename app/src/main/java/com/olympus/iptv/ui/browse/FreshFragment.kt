@@ -907,26 +907,21 @@ class FreshFragment : Fragment() {
 
         inner class Holder(private val rowBinding: ItemFreshBinding) : RecyclerView.ViewHolder(rowBinding.root) {
             fun bind(title: CatalogDb.FreshTitle) {
-                rowBinding.freshName.text = title.name
-                rowBinding.freshGroup.text = if (title.day.isBlank()) {
+                rowBinding.freshTitle.text = title.name
+                rowBinding.freshService.text = if (title.day.isBlank()) {
                     title.service
                 } else {
                     getString(R.string.fresh_when, title.service, title.day)
                 }
-                rowBinding.freshScrimMeta.text = title.day.ifBlank { title.service }
-                rowBinding.freshScrimMeta.visibility =
-                    if (rowBinding.freshScrimMeta.text.isNullOrBlank()) View.GONE else View.VISIBLE
                 val preferTv = title.bucket == CatalogDb.SERIES
                 val rating = com.olympus.iptv.playlist.TitleRatings.peek(title.name, preferTv)
                     ?.ratings?.firstOrNull()?.scoreLabel
-                if (rating.isNullOrBlank()) {
-                    rowBinding.freshRating.visibility = View.GONE
-                } else {
+                if (!rating.isNullOrBlank()) {
                     val number = rating.substringBefore('/').substringBefore('%').trim()
-                    rowBinding.freshRating.text = "★ $number"
-                    rowBinding.freshRating.visibility = View.VISIBLE
+                    val service = rowBinding.freshService.text
+                    rowBinding.freshService.text = "★ $number  $service"
                 }
-                bindArt(rowBinding.freshLogo, title.logoUrl, 160, 220)
+                bindArt(rowBinding.freshPoster, title.logoUrl, 160, 220)
                 rowBinding.root.setOnFocusChangeListener { _, hasFocus ->
                     if (hasFocus) {
                         val pos = bindingAdapterPosition

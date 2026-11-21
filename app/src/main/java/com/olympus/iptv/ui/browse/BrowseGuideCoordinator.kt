@@ -259,6 +259,7 @@ internal fun BrowseActivity.hostOnCreate(savedInstanceState: Bundle?) {
             categoryAdapter.phoneListMode = true
         }
         wireHomeContinue()
+        setupGroupGenreChips()
         paintQueueChip()
         previewCtl = BrowsePreviewController(
             activity = this,
@@ -278,7 +279,7 @@ internal fun BrowseActivity.hostOnCreate(savedInstanceState: Bundle?) {
             epgCache = { epgCache }
         )
 
-        val categorySpan = com.olympus.iptv.ui.DeviceForm.contentColumns(this)
+        val categorySpan = com.olympus.iptv.ui.DeviceForm.categoryColumns(this)
         binding.categoryList.layoutManager = androidx.recyclerview.widget.GridLayoutManager(this, categorySpan)
         binding.channelList.layoutManager = LinearLayoutManager(this)
         binding.categoryList.adapter = categoryAdapter
@@ -464,8 +465,7 @@ internal suspend fun BrowseActivity.resolveAccount(): SavedPlaylist? {
         val (saved, favoritesReady) = withContext(Dispatchers.IO) { app.playlistStore.opening() }
         if (saved == null || saved.email.isNullOrBlank()) {
             startActivity(Intent(this, com.olympus.iptv.ui.login.LoginActivity::class.java))
-            finish()
-            overridePendingTransition(0, 0)
+            finishNoAnim()
             return null
         }
         val ready = favoritesReady ?: withContext(Dispatchers.IO) {
@@ -478,8 +478,7 @@ internal suspend fun BrowseActivity.resolveAccount(): SavedPlaylist? {
                 Intent(this, com.olympus.iptv.ui.login.FavoritesSetupActivity::class.java)
                     .putExtra(com.olympus.iptv.ui.login.FavoritesSetupActivity.EXTRA_PLAYLIST_ID, saved.id)
             )
-            finish()
-            overridePendingTransition(0, 0)
+            finishNoAnim()
             return null
         }
         return saved
@@ -725,11 +724,28 @@ internal suspend fun BrowseActivity.publishSharedCatalog(
             app.playlistStore.saveCatalogStamp(playlistId, stamp)
         }
         app.catalogDb.releaseSearchExport()
-        val countries = withContext(Dispatchers.IO) { app.catalogDb.dashboardSnapshot(playlistId).countries }
+        val snapshot = withContext(Dispatchers.IO) { app.catalogDb.dashboardSnapshot(playlistId) }
+        val countries = snapshot.countries
         val countryStamp = countries.joinToString("|") { "${it.id}:${it.count}" }
-        if (countryStamp != savedCountries) {
-            runCatching { client.publishCountries(email, deviceId, countries) }
+        if (countryStamp != savedCountries || stamp != savedStamp) {
+            runCatching { client.publishSnapshot(email, deviceId, snapshot, stamp.toLongOrNull() ?: 0L) }
             app.playlistStore.saveCountryStamp(playlistId, countryStamp)
+        }
+        val remoteWatch = runCatching { client.fetchWatchHistory(email, deviceId) }.getOrDefault(emptyList())
+        for (entry in remoteWatch) {
+            val cid = entry.channelId?.takeIf { it.isNotBlank() } ?: continue
+            val localMatch = recentEntries.firstOrNull { it.channelId == cid }
+            if (localMatch == null || (entry.updatedAt ?: 0L) > (localMatch.updatedAt ?: 0L)) {
+                runCatching { app.playlistStore.rememberWatch(playlistId, entry) }
+            }
+        }
+        runCatching {
+            val localBook = app.playlistStore.recordingBook(playlistId)
+            val remoteBook = client.syncRecordings(email, deviceId, localBook)
+            if ((remoteBook.revision ?: 0L) > (localBook.revision ?: 0L)) {
+                app.playlistStore.saveRecordingBook(playlistId, remoteBook)
+                RecordingService.start(app)
+            }
         }
     }
 
@@ -1241,16 +1257,47 @@ internal fun BrowseActivity.hostDispatchKey(event: KeyEvent): Boolean {
                     if (slot != null && slot.column > 0) {
                         focusProgram(slot.row, slot.column - 1)
                     } else if (slot != null && slot.column == 0) {
-                        landOnOpened = false
-                        rememberGroupScroll()
-                        showMenu(GuideMenu.GROUPS)
-                        armGroupFocus()
-                        focusGroups()
+                        val nowStart = GuideMetrics.start(com.olympus.iptv.playlist.EpgUtils.now(), halfHourMs)
+                        if (programAdapter.windowStart > nowStart) {
+                            val prevStart = (programAdapter.windowStart - GuideMetrics.SPAN_MS).coerceAtLeast(nowStart)
+                            programAdapter.setWindow(prevStart, GuideMetrics.end(prevStart))
+                            programAdapter.scrollX = 0
+                            buildProgramHeader()
+                            scrollProgramGuide(0)
+                            val ch = visibleChannels.getOrNull(slot.row)
+                            val lastCol = if (ch != null) programAdapter.columnAt(ch, GuideMetrics.end(prevStart) - 60_000L) else 0
+                            focusProgram(slot.row, lastCol)
+                        } else {
+                            landOnOpened = false
+                            rememberGroupScroll()
+                            showMenu(GuideMenu.GROUPS)
+                            armGroupFocus()
+                            focusGroups()
+                        }
                     }
                     return true
                 }
                 KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                    if (slot != null) focusProgram(slot.row, slot.column + 1)
+                    if (slot != null) {
+                        val track = binding.programList.findViewHolderForAdapterPosition(slot.row)
+                            ?.itemView
+                            ?.findViewById<android.widget.FrameLayout>(R.id.programTrack)
+                        val count = track?.childCount ?: 0
+                        if (slot.column + 1 < count) {
+                            focusProgram(slot.row, slot.column + 1)
+                        } else {
+                            val nowStart = GuideMetrics.start(com.olympus.iptv.playlist.EpgUtils.now(), halfHourMs)
+                            val maxStart = nowStart + 12L * 60L * 60L * 1000L
+                            if (programAdapter.windowStart < maxStart) {
+                                val nextStart = programAdapter.windowEnd
+                                programAdapter.setWindow(nextStart, GuideMetrics.end(nextStart))
+                                programAdapter.scrollX = 0
+                                buildProgramHeader()
+                                scrollProgramGuide(0)
+                                focusProgram(slot.row, 0)
+                            }
+                        }
+                    }
                     return true
                 }
                 KeyEvent.KEYCODE_DPAD_UP -> {
@@ -1344,6 +1391,11 @@ internal fun BrowseActivity.hostDispatchKey(event: KeyEvent): Boolean {
                 KeyEvent.KEYCODE_DPAD_UP -> {
                     if (pos in 0 until span) {
                         when {
+                            binding.groupGenreRow.visibility == View.VISIBLE && binding.groupGenreChips.childCount > 0 -> {
+                                categoryAdapter.setSelected(null)
+                                binding.groupGenreChips.getChildAt(0)?.requestFocus()
+                                return true
+                            }
                             binding.homeContinue.visibility == View.VISIBLE -> {
                                 categoryAdapter.setSelected(null)
                                 binding.homeContinuePlay.requestFocus()
@@ -1566,6 +1618,7 @@ internal fun BrowseActivity.applyGuideColumns() {
         if (!showGroups && focusIsIn(binding.groupColumn)) binding.groupColumn.clearFocus()
         binding.groupColumn.visibility = if (showGroups) View.VISIBLE else View.GONE
         binding.shortcutRow.visibility = if (showGroups && live) View.VISIBLE else View.GONE
+        binding.groupGenreRow.visibility = if (showGroups && live) View.VISIBLE else View.GONE
         binding.groupPills.visibility = if (stacked && showChannels) View.VISIBLE else View.GONE
         if (stacked && showChannels) syncGroupPills()
         binding.contentDivider.visibility = if (showGroups && showChannels) View.VISIBLE else View.GONE
@@ -1599,6 +1652,13 @@ internal fun BrowseActivity.applyGuideColumns() {
         paintNowPlayingBar()
         if (touchPrimary) {
             binding.groupsFilter.visibility = if (showGroups) View.VISIBLE else View.GONE
+        }
+        (binding.categoryList.layoutManager as? androidx.recyclerview.widget.GridLayoutManager)?.let { glm ->
+            val desired = com.olympus.iptv.ui.DeviceForm.categoryColumns(this)
+            if (glm.spanCount != desired) {
+                glm.spanCount = desired
+                binding.categoryList.recycledViewPool.clear()
+            }
         }
         val content = binding.contentColumn.layoutParams as LinearLayout.LayoutParams
         val programs = binding.programPane.layoutParams as LinearLayout.LayoutParams
@@ -1773,7 +1833,11 @@ internal fun BrowseActivity.ensureProgramGuide() {
             programAdapter.setWindow(start, GuideMetrics.end(start))
             programAdapter.scrollX = 0
         }
-        if (binding.programHeader.childCount == 0) buildProgramHeader()
+        val listW = binding.programList.width.takeIf { it > 0 }
+            ?: (resources.displayMetrics.widthPixels - (binding.contentColumn.layoutParams.width.takeIf { it > 0 } ?: (280 * resources.displayMetrics.density).toInt()))
+        if (programAdapter.setViewportWidth(listW) || binding.programHeader.childCount == 0) {
+            buildProgramHeader()
+        }
         syncProgramRowHeight()
         programAdapter.submit(visibleChannels)
         loadVisibleGuidePrograms()
@@ -2239,3 +2303,13 @@ internal fun BrowseActivity.playFromGuide(channel: Channel, program: EpgProgram?
         }
         play(channel)
     }
+
+internal fun AppCompatActivity.finishNoAnim() {
+    finish()
+    if (android.os.Build.VERSION.SDK_INT >= 34) {
+        overrideActivityTransition(android.app.Activity.OVERRIDE_TRANSITION_CLOSE, 0, 0)
+    } else {
+        @Suppress("DEPRECATION")
+        overridePendingTransition(0, 0)
+    }
+}

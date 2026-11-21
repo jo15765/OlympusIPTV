@@ -18,9 +18,11 @@ fun localProperty(name: String): String = Properties().apply {
 
 val watchmodeKey = localProperty("watchmode.apiKey")
 val opensubtitlesKey = localProperty("opensubtitles.apiKey")
-val sendgridKey = localProperty("sendgrid.apiKey")
-val sendgridFrom = localProperty("sendgrid.fromEmail")
+val mailgunKey = localProperty("mailgun.apiKey")
+val mailgunDomain = localProperty("mailgun.domain")
+val mailgunFrom = localProperty("mailgun.fromEmail")
 val tmdbKey = localProperty("tmdb.apiKey")
+val portalCloudUrl = localProperty("portal.cloudUrl")
 
 fun signingValue(key: String): String {
     val file = File(System.getProperty("user.home"), "olympus-iptv-signing.txt")
@@ -40,14 +42,16 @@ android {
         applicationId = "com.olympus.iptv"
         minSdk = 24
         targetSdk = 35
-        versionCode = 87
-        versionName = "0.2.86"
+        versionCode = 93
+        versionName = "0.2.92"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "WATCHMODE_API_KEY", "\"$watchmodeKey\"")
         buildConfigField("String", "OPENSUBTITLES_API_KEY", "\"$opensubtitlesKey\"")
-        buildConfigField("String", "SENDGRID_API_KEY", "\"$sendgridKey\"")
-        buildConfigField("String", "SENDGRID_FROM_EMAIL", "\"$sendgridFrom\"")
+        buildConfigField("String", "MAILGUN_API_KEY", "\"$mailgunKey\"")
+        buildConfigField("String", "MAILGUN_DOMAIN", "\"$mailgunDomain\"")
+        buildConfigField("String", "MAILGUN_FROM_EMAIL", "\"$mailgunFrom\"")
         buildConfigField("String", "TMDB_API_KEY", "\"$tmdbKey\"")
+        buildConfigField("String", "PORTAL_CLOUD_URL", "\"$portalCloudUrl\"")
     }
 
     // Release stays a single APK. TV sticks only need ARM. Debug keeps every ABI so the emulator still runs.
@@ -84,8 +88,10 @@ android {
         targetCompatibility = JavaVersion.VERSION_11
     }
 
-    kotlinOptions {
-        jvmTarget = "11"
+    kotlin {
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)
+        }
     }
 
     buildFeatures {
@@ -172,25 +178,17 @@ val gzipDashboardHtml = tasks.register("gzipDashboardHtml") {
     }
 }
 
-val publishReleaseApk = tasks.register("publishReleaseApk") {
-    group = "build"
-    description = "Copy the signed release APK into the user Downloads folder."
-    val releaseName = android.defaultConfig.versionName.orEmpty()
-    val apk = layout.buildDirectory.file("outputs/apk/release/app-release.apk")
-    inputs.file(apk)
-    outputs.upToDateWhen { false }
-    doLast {
-        if (releaseName.isBlank() || !apk.get().asFile.exists()) return@doLast
-        val downloads = File(System.getProperty("user.home"), "Downloads")
-        downloads.mkdirs()
-        val dest = File(downloads, "olympus-iptv-$releaseName.apk")
-        apk.get().asFile.copyTo(dest, overwrite = true)
-        logger.lifecycle("Release APK: ${dest.absolutePath}")
-    }
-}
-
 tasks.matching { it.name == "assembleRelease" }.configureEach {
-    finalizedBy(publishReleaseApk)
+    val releaseName = android.defaultConfig.versionName
+    val apkProvider = layout.buildDirectory.file("outputs/apk/release/app-release.apk")
+    val downloadsDir = File(System.getProperty("user.home"), "Downloads")
+    doLast {
+        val apk = apkProvider.get().asFile
+        if (!apk.exists() || releaseName.isNullOrBlank()) return@doLast
+        val dest = File(downloadsDir, "olympus-iptv-$releaseName.apk")
+        apk.copyTo(dest, overwrite = true)
+        println("Release APK: ${dest.absolutePath}")
+    }
 }
 
 tasks.named("preBuild").configure {

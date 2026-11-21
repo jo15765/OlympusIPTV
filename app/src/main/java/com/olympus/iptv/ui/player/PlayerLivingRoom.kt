@@ -35,9 +35,13 @@ internal fun PlayerActivity.enterPip(manual: Boolean) {
     hidePlaybackMenu()
     binding.overlay.visibility = View.GONE
     pipPending = true
-    val params = PictureInPictureParams.Builder()
+    val builder = PictureInPictureParams.Builder()
         .setAspectRatio(Rational(16, 9))
-        .build()
+    if (Build.VERSION.SDK_INT >= 31) {
+        builder.setAutoEnterEnabled(true)
+        builder.setSeamlessResizeEnabled(true)
+    }
+    val params = builder.build()
     runCatching { enterPictureInPictureMode(params) }
         .onFailure {
             pipPending = false

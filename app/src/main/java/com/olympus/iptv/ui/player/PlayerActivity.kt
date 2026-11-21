@@ -442,6 +442,11 @@ class PlayerActivity : AppCompatActivity() {
             showTransportChrome()
         }
         binding.btnPhoneMenu.setOnClickListener { showPlaybackMenu() }
+        binding.channelName.setOnClickListener {
+            if (current?.kind == ContentKind.LIVE && current?.seriesId.isNullOrBlank()) {
+                openMiniGuide()
+            }
+        }
         binding.btnSeekPlay.setOnClickListener {
             togglePause()
             showTransportChrome()
@@ -1650,7 +1655,15 @@ class PlayerActivity : AppCompatActivity() {
         lastSavedWatchId = channel.id
         lastSavedWatchAt = position
         app.appScope.launch {
-            runCatching { app.playlistStore.rememberWatch(savedId, watchEntry(channel, position, duration)) }
+            val entry = watchEntry(channel, position, duration)
+            runCatching { app.playlistStore.rememberWatch(savedId, entry) }
+            val email = runCatching { app.playlistStore.session.first()?.email?.trim().orEmpty() }.getOrDefault("")
+            if (email.isNotBlank()) {
+                runCatching {
+                    val deviceId = app.playlistStore.deviceId()
+                    com.olympus.iptv.playlist.LineupClient(app).pushWatchProgress(email, deviceId, entry)
+                }
+            }
             if (channel.kind != ContentKind.LIVE || !channel.seriesId.isNullOrBlank()) {
                 TvLauncherBridge.publishContinue(app, channel, savedId, position, duration)
             }

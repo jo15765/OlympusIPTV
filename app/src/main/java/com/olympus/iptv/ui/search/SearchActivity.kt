@@ -114,9 +114,9 @@ class SearchActivity : AppCompatActivity() {
         val span = if (touchPrimary) {
             2
         } else {
-            (resources.displayMetrics.widthPixels / resources.displayMetrics.density / 220f)
+            (resources.displayMetrics.widthPixels / resources.displayMetrics.density / 190f)
                 .toInt()
-                .coerceIn(3, 6)
+                .coerceIn(5, 6)
         }
         val layout = GridLayoutManager(this, span)
         adapter = SearchTileAdapter(
@@ -189,8 +189,24 @@ class SearchActivity : AppCompatActivity() {
         binding.inputSearch.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
-            override fun afterTextChanged(s: Editable?) = scheduleSearch(s?.toString().orEmpty())
+            override fun afterTextChanged(s: Editable?) {
+                val q = s?.toString().orEmpty()
+                scheduleSearch(q)
+                binding.inputSearch.setCompoundDrawablesRelativeWithIntrinsicBounds(
+                    0, 0, if (q.isNotEmpty()) android.R.drawable.ic_menu_close_clear_cancel else 0, 0
+                )
+            }
         })
+        binding.inputSearch.setOnTouchListener { _, event ->
+            if (event.action == android.view.MotionEvent.ACTION_UP && !binding.inputSearch.text.isNullOrEmpty()) {
+                val endDrawable = binding.inputSearch.compoundDrawablesRelative[2]
+                if (endDrawable != null && event.rawX >= (binding.inputSearch.right - endDrawable.bounds.width() - binding.inputSearch.paddingEnd)) {
+                    binding.inputSearch.setText("")
+                    return@setOnTouchListener true
+                }
+            }
+            false
+        }
         playlistId = app.guidePlaylistId
         val staged = app.stagedLineup?.takeIf { it.first == playlistId }?.second
         if (staged != null) applyConfig(staged)

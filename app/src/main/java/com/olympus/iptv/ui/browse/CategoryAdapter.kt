@@ -25,10 +25,20 @@ class CategoryAdapter(
     private val liveGroup: (Category) -> Boolean = { false }
 ) : RecyclerView.Adapter<CategoryAdapter.Holder>() {
 
+    enum class GenreFilter(val label: String) {
+        ALL("All"),
+        SPORTS("Sports"),
+        NEWS("News"),
+        LOCALS("Locals"),
+        ENTERTAINMENT("Entertainment"),
+        KIDS("Kids")
+    }
+
     private val allItems = mutableListOf<Category>()
     private val items = mutableListOf<Category>()
     private var selectedId: String? = null
     private var filterQuery = ""
+    private var genreFilter = GenreFilter.ALL
     /** Phone list rows: taller taps, no TV focus-select while scrolling. */
     var phoneListMode = false
 
@@ -67,20 +77,59 @@ class CategoryAdapter(
     }
 
     fun setFilter(query: String) {
-        applyFilter(query.trim(), force = false)
+        applyFilter(query.trim(), genreFilter, force = false)
     }
 
-    private fun applyFilter(query: String, force: Boolean) {
+    fun setGenreFilter(genre: GenreFilter) {
+        applyFilter(filterQuery, genre, force = false)
+    }
+
+    fun currentGenreFilter(): GenreFilter = genreFilter
+
+    private fun matchesGenre(category: Category, genre: GenreFilter): Boolean {
+        if (genre == GenreFilter.ALL) return true
+        // Always keep pinned smart cards visible at the top
+        if (category.id.startsWith("__")) return true
+        val lower = category.name.lowercase()
+        return when (genre) {
+            GenreFilter.ALL -> true
+            GenreFilter.SPORTS ->
+                "sport" in lower || "espn" in lower || "nfl" in lower || "nba" in lower ||
+                    "mlb" in lower || "nhl" in lower || "mls" in lower || "ufc" in lower ||
+                    "ppv" in lower || "dazn" in lower || "ncaa" in lower || "soccer" in lower ||
+                    "football" in lower || "baseball" in lower || "hockey" in lower || "golf" in lower ||
+                    "racing" in lower || "f1" in lower || "nascar" in lower || "fox sports" in lower
+            GenreFilter.NEWS ->
+                "news" in lower || "cnn" in lower || "msnbc" in lower || "fox news" in lower ||
+                    "cnbc" in lower || "bloomberg" in lower || "weather" in lower || "bbc" in lower ||
+                    "c-span" in lower || "cspan" in lower
+            GenreFilter.LOCALS ->
+                "local" in lower || "abc" in lower || "cbs" in lower || "nbc" in lower ||
+                    "fox" in lower || "pbs" in lower || "cw" in lower || "network" in lower ||
+                    "affiliate" in lower || "east" in lower || "west" in lower
+            GenreFilter.KIDS ->
+                "kid" in lower || "disney" in lower || "nick" in lower || "cartoon" in lower ||
+                    "family" in lower || "junior" in lower || "boomerang" in lower || "pbs kids" in lower
+            GenreFilter.ENTERTAINMENT ->
+                "entertain" in lower || "movie" in lower || "cinema" in lower || "hbo" in lower ||
+                    "showtime" in lower || "starz" in lower || "comedy" in lower || "drama" in lower ||
+                    "music" in lower || "mtv" in lower || "hgtv" in lower || "food" in lower ||
+                    "discovery" in lower || "history" in lower || "a&e" in lower || "bravo" in lower ||
+                    "amc" in lower || "tnt" in lower || "tbs" in lower || "usa" in lower || "syfy" in lower ||
+                    "hallmark" in lower || "lifetime" in lower || "24/7" in lower
+        }
+    }
+
+    private fun applyFilter(query: String, genre: GenreFilter = genreFilter, force: Boolean = false) {
         val normalized = query.trim()
-        if (!force && normalized.equals(filterQuery, ignoreCase = true) && items.isNotEmpty()) return
+        if (!force && normalized.equals(filterQuery, ignoreCase = true) && genre == genreFilter && items.isNotEmpty()) return
         filterQuery = normalized
-        val next = if (normalized.isBlank()) {
-            allItems.toList()
-        } else {
-            allItems.filter {
-                it.name.contains(normalized, ignoreCase = true) ||
-                    it.id.contains(normalized, ignoreCase = true)
-            }
+        genreFilter = genre
+        val next = allItems.filter { category ->
+            val matchesText = normalized.isBlank() ||
+                category.name.contains(normalized, ignoreCase = true) ||
+                category.id.contains(normalized, ignoreCase = true)
+            matchesText && matchesGenre(category, genre)
         }
         val old = items.toList()
         items.clear()
@@ -175,13 +224,13 @@ class CategoryAdapter(
                 binding.root.isFocusableInTouchMode = false
                 binding.root.minimumHeight =
                     (56 * binding.root.resources.displayMetrics.density).toInt()
-                binding.label.textSize = 16f
-                binding.detail.textSize = 13f
-                val pad = (14 * binding.root.resources.displayMetrics.density).toInt()
+                binding.label.textSize = 15f
+                binding.detail.textSize = 12f
+                val pad = (12 * binding.root.resources.displayMetrics.density).toInt()
                 binding.root.setPadding(pad, pad, pad, pad)
                 (binding.root.layoutParams as? ViewGroup.MarginLayoutParams)?.let { params ->
                     val gap = (4 * binding.root.resources.displayMetrics.density).toInt()
-                    params.setMargins(gap * 2, gap, gap * 2, gap)
+                    params.setMargins(gap, gap, gap, gap)
                     binding.root.layoutParams = params
                 }
             }
@@ -232,10 +281,26 @@ class CategoryAdapter(
         }
 
         private fun bindPreviews(item: Category) {
-            binding.icon.visibility = View.VISIBLE
-            binding.preview0.visibility = View.GONE
-            binding.preview1.visibility = View.GONE
-            binding.preview2.visibility = View.GONE
+            val urls = previewLogos(item)
+            if (urls.isEmpty()) {
+                binding.icon.visibility = View.VISIBLE
+                binding.preview0.visibility = View.GONE
+                binding.preview1.visibility = View.GONE
+                binding.preview2.visibility = View.GONE
+                return
+            }
+            binding.icon.visibility = View.GONE
+            val px = (28 * binding.root.resources.displayMetrics.density).toInt().coerceAtLeast(1)
+            val views = listOf(binding.preview0, binding.preview1, binding.preview2)
+            views.forEachIndexed { idx, view ->
+                val u = urls.getOrNull(idx)
+                if (u.isNullOrBlank()) {
+                    view.visibility = View.GONE
+                } else {
+                    view.visibility = View.VISIBLE
+                    loadPreview(view, u, px)
+                }
+            }
         }
 
         private fun loadPreview(view: ImageView, url: String, px: Int) {

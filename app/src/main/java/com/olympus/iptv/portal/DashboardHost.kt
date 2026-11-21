@@ -49,6 +49,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -425,8 +426,52 @@ object DashboardHost {
             method == "POST" && path == "/api/remote/favorites" -> saveRemoteFavorites(app, socket, json(body))
             method == "GET" && path == "/api/streams" -> activeStreams(app, socket)
             method == "GET" && path == "/api/stream/probe" -> probeStream(app, socket, query["channelId"].orEmpty())
+            method == "POST" && path == "/api/refresh" -> triggerCatalogRefresh(app, socket, json(body))
+            method == "POST" && path == "/api/stream/health/clear" -> clearDeadStreams(app, socket, json(body))
             else -> writeJson(socket, 404, mapOf("error" to "Not found"))
         }
+    }
+
+    private fun triggerCatalogRefresh(app: OlympusIptvApp, socket: Socket, body: JsonObject) {
+        if (gate(app, text(body, "email"), text(body, "deviceId")) == null) {
+            writeJson(socket, 400, mapOf("error" to "Email and device ID are required"))
+            return
+        }
+        val playlist = runBlocking { app.playlistStore.playlists.first().firstOrNull() }
+        if (playlist == null) {
+            writeJson(socket, 404, mapOf("error" to "No playlist configured on this device"))
+            return
+        }
+        if (app.catalogRefresh?.isActive == true) {
+            writeJson(socket, 200, mapOf("ok" to true, "running" to true, "message" to "Catalog sync is already running on the TV."))
+            return
+        }
+        app.appScope.launch {
+            runCatching {
+                val loader = com.olympus.iptv.playlist.PlaylistLoader()
+                val loaded = loader.load(playlist)
+                val db = app.catalogDb
+                db.insertMissing(playlist.id, com.olympus.iptv.playlist.CatalogDb.LIVE, loaded.liveCategories, loaded.liveChannels)
+                db.insertMissing(playlist.id, com.olympus.iptv.playlist.CatalogDb.VOD, loaded.vodCategories, loaded.vodChannels)
+                db.insertMissing(playlist.id, com.olympus.iptv.playlist.CatalogDb.SERIES, loaded.seriesCategories.orEmpty(), loaded.seriesChannels.orEmpty())
+                app.playlistStore.saveLastRefreshAt(playlist.id, System.currentTimeMillis())
+            }
+        }
+        writeJson(socket, 200, mapOf("ok" to true, "running" to true, "message" to "Started full catalog sync on the TV."))
+    }
+
+    private fun clearDeadStreams(app: OlympusIptvApp, socket: Socket, body: JsonObject) {
+        if (gate(app, text(body, "email"), text(body, "deviceId")) == null) {
+            writeJson(socket, 400, mapOf("error" to "Email and device ID are required"))
+            return
+        }
+        val playlist = runBlocking { app.playlistStore.playlists.first().firstOrNull() }
+        if (playlist != null) {
+            runCatching {
+                app.catalogDb.writableDatabase.delete("stream_health", "playlist_id=?", arrayOf(playlist.id))
+            }
+        }
+        writeJson(socket, 200, mapOf("ok" to true))
     }
 
     private fun probeStream(app: OlympusIptvApp, socket: Socket, channelId: String) {
@@ -636,6 +681,7 @@ object DashboardHost {
             return
         }
         val playlistId = gate.playlist.id
+        clearGuideCache()
         val page = runBlocking { app.playlistStore.savedPage(playlistId) }
         writeJson(
             socket,
@@ -878,6 +924,7 @@ object DashboardHost {
             return
         }
         val groupId = query["groupId"].orEmpty()
+        val groupName = query["groupName"].orEmpty()
         val needle = query["q"].orEmpty().trim().lowercase(Locale.US)
         val limit = (query["limit"]?.toIntOrNull() ?: 400).coerceIn(1, 400)
         val lineup = runBlocking { app.playlistStore.lineup(gate.playlist.id) }
@@ -893,8 +940,8 @@ object DashboardHost {
         val page: List<CatalogDb.SlimChannel>
         val total: Int
         if (order.isEmpty()) {
-            page = app.catalogDb.slimInGroup(gate.playlist.id, groupId, needle, limit, byName = true)
-            total = if (page.size < limit) page.size else app.catalogDb.countInGroup(gate.playlist.id, groupId, needle)
+            page = app.catalogDb.slimInGroup(gate.playlist.id, groupId, needle, limit, byName = true, groupName = groupName)
+            total = if (page.size < limit) page.size else app.catalogDb.countInGroup(gate.playlist.id, groupId, needle, groupName = groupName)
         } else {
             val rank = HashMap<String, Int>(order.size)
             order.forEachIndexed { index, id -> rank[id] = index }
@@ -903,10 +950,11 @@ object DashboardHost {
                 gate.playlist.id,
                 groupId,
                 needle,
-                limit = fetchCap
+                limit = fetchCap,
+                groupName = groupName
             )
             page = matches.sortedWith(compareBy({ rank[it.id] ?: 999999 }, { it.name.lowercase(Locale.US) })).take(limit)
-            total = if (matches.size < fetchCap) matches.size else app.catalogDb.countInGroup(gate.playlist.id, groupId, needle)
+            total = if (matches.size < fetchCap) matches.size else app.catalogDb.countInGroup(gate.playlist.id, groupId, needle, groupName = groupName)
         }
         val pageRows = page.map { channel ->
             rememberLogo(channel.logo)

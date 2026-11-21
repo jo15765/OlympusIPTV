@@ -79,16 +79,8 @@ class EpgRepository(
     suspend fun upcoming(playlist: SavedPlaylist?, channel: Channel): List<EpgProgram> =
         withContext(Dispatchers.IO) {
             val now = System.currentTimeMillis()
-            val id = channel.epgChannelId ?: channel.id
-            val cachedWindow = windows.get(EpgWindow.key(id, now))
-            val programs = if (cachedWindow != null) {
-                cachedWindow
-            } else {
-                val loaded = loadPrograms(playlist, channel)
-                rememberWindows(id, loaded, now)
-                windows.get(EpgWindow.key(id, now)) ?: EpgWindow.slice(loaded, now)
-            }
-            programs.filter { it.endMillis > now }.sortedBy { it.startMillis }.take(48)
+            val loaded = loadPrograms(playlist, channel)
+            loaded.filter { it.endMillis > now }.sortedBy { it.startMillis }.take(96)
         }
 
     private fun rememberWindows(channelId: String, programs: List<EpgProgram>, now: Long) {

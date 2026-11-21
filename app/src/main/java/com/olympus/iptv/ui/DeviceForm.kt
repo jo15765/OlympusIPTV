@@ -38,21 +38,33 @@ object DeviceForm {
         return power.isPowerSaveMode
     }
 
-    /** Poster and category columns: 2 on a portrait phone, 3–4 on a wide phone or tablet, 5–6 on TV. */
+    /** Poster columns: 2 on a portrait phone, 4 on a tablet, 5 on TV / wide screens. */
     fun contentColumns(context: Context): Int {
         val width = context.resources.configuration.screenWidthDp
         return when {
-            isTelevision(context) -> 3
-            width >= 900 -> 3
-            width >= 600 -> 2
-            else -> 1
+            isTelevision(context) || width >= 1000 -> 6
+            width >= 600 -> 4
+            else -> 2
+        }
+    }
+
+    /** Category card columns: locked to 3 on TV set-top boxes, 2 on compact phones, 3–4 on tablets/wide screens. */
+    fun categoryColumns(context: Context): Int {
+        if (isTelevision(context)) return 3
+        val width = context.resources.configuration.screenWidthDp
+        return when {
+            width >= 1100 -> 4
+            width >= 600 -> 3
+            else -> 2
         }
     }
 
     /** Fire Stick / Onn-class sticks versus Shield / Streamer-class boxes. */
     fun isLowRam(context: Context): Boolean {
         val manager = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
-        return isLowRam(manager?.isLowRamDevice == true, Runtime.getRuntime().maxMemory())
+        @Suppress("DEPRECATION")
+        val low = manager?.isLowRamDevice == true
+        return isLowRam(low, Runtime.getRuntime().maxMemory())
     }
 
     fun isLowRam(lowRamDevice: Boolean, maxMemoryBytes: Long): Boolean =

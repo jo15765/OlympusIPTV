@@ -7,11 +7,20 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import com.olympus.iptv.data.ContentKind
 import com.olympus.iptv.ui.DeviceForm
 import com.olympus.iptv.ui.Haptics
 import kotlin.math.abs
 
-/** Phone overlay: edge swipes for brightness and volume, double-tap seek, center tap for controls. */
+/**
+ * Full mobile touch gesture controller:
+ * - Left edge vertical swipe: screen brightness
+ * - Right edge vertical swipe: media volume
+ * - Center vertical fling: Live TV channel zap up/down
+ * - Center horizontal fling: VOD/Series quick scrub (-30s / +30s)
+ * - Double-tap left/right: -15s / +15s seek
+ * - Single tap: toggle transport chrome
+ */
 internal object PlayerTouchGestures {
     fun attach(activity: PlayerActivity, surface: View) {
         if (!DeviceForm.isTouchPrimary(activity) || DeviceForm.isTelevision(activity)) return
@@ -47,6 +56,45 @@ internal object PlayerTouchGestures {
                 Haptics.confirm(surface)
                 hud.showSeek(if (delta < 0L) "−15s" else "+15s")
                 return true
+            }
+
+            override fun onFling(
+                e1: MotionEvent?,
+                e2: MotionEvent,
+                velocityX: Float,
+                velocityY: Float
+            ): Boolean {
+                val start = e1 ?: return false
+                val width = surface.width
+                val height = surface.height
+                if (width <= 0 || height <= 0) return false
+                val edge = width * 0.22f
+                if (start.x > edge && start.x < width - edge) {
+                    val dx = e2.x - start.x
+                    val dy = e2.y - start.y
+                    val ch = activity.current
+                    val isLive = ch != null && ch.kind == ContentKind.LIVE && ch.seriesId.isNullOrBlank()
+                    // Vertical fling in center zaps Live TV channels
+                    if (isLive && abs(dy) > height * 0.14f && abs(dy) > abs(dx) * 1.4f && abs(velocityY) > 600f) {
+                        Haptics.confirm(surface)
+                        if (dy < 0f) activity.step(1) else activity.step(-1)
+                        return true
+                    }
+                    // Horizontal fling in center scrubs VOD / Series by +/- 30s
+                    if (!isLive && abs(dx) > width * 0.16f && abs(dx) > abs(dy) * 1.4f && abs(velocityX) > 600f) {
+                        val exo = activity.player ?: return false
+                        val duration = exo.duration
+                        if (duration > 0L) {
+                            val delta = if (dx < 0f) -30_000L else 30_000L
+                            exo.seekTo((exo.currentPosition + delta).coerceIn(0L, duration))
+                            activity.showTransportChrome()
+                            Haptics.confirm(surface)
+                            hud.showSeek(if (delta < 0L) "−30s" else "+30s")
+                            return true
+                        }
+                    }
+                }
+                return false
             }
 
             override fun onScroll(

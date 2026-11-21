@@ -31,7 +31,8 @@ class ChannelAdapter(
     private val isFavorite: (Channel) -> Boolean,
     private val onFavorite: (Channel) -> Unit,
     private val onRecord: (Channel) -> Unit,
-    private val epgProvider: (Channel) -> EpgNowNext?
+    private val epgProvider: (Channel) -> EpgNowNext?,
+    private val onWatched: (Channel) -> Unit = {}
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     private val items = mutableListOf<Channel>()
@@ -230,11 +231,21 @@ class ChannelAdapter(
     inner class PosterHolder(private val binding: ItemPosterBinding) : Holder(binding.root) {
         override fun bind(item: Channel, position: Int, full: Boolean) {
             binding.name.text = displayName(item)
-            binding.group.text = com.olympus.iptv.data.NameImages.strip(
-                detailOf(item.id) ?: groupLabel ?: item.groupTitle.orEmpty()
-            )
+            val resume = continueLabel(item)
+            val detail = detailOf(item.id)
+            val group = com.olympus.iptv.data.NameImages.strip(groupLabel ?: item.groupTitle.orEmpty())
+            val sub = listOfNotNull(resume, detail).joinToString(" · ").ifBlank { group }
+            binding.group.text = sub
+            binding.group.visibility = if (sub.isBlank()) View.GONE else View.VISIBLE
+
             bindLogo(item)
             bindPosterChrome(item)
+            bindFavorite(item)
+
+            binding.btnPosterWatched.setOnClickListener { onWatched(item) }
+            binding.btnPosterFavorite.setOnClickListener { onFavorite(item) }
+            binding.btnPosterMore.setOnClickListener { onLongClick(item) }
+
             binding.playTarget.isFocusable = true
             binding.playTarget.isFocusableInTouchMode = true
             val touch = DeviceForm.isTouchPrimary(binding.root.context)
@@ -244,6 +255,7 @@ class ChannelAdapter(
             }
             binding.playTarget.setOnLongClickListener { onLongClick(item) }
             binding.playTarget.setOnFocusChangeListener { _, hasFocus ->
+                binding.posterHoverOverlay.visibility = if (hasFocus) View.VISIBLE else View.GONE
                 if (!touch) FocusMotion.animate(binding.playTarget, hasFocus)
                 if (hasFocus) onFocused(item)
             }
@@ -251,11 +263,16 @@ class ChannelAdapter(
 
         private fun bindPosterChrome(item: Channel) {
             val rating = posterRating(item)
-            if (rating.isNullOrBlank()) {
-                binding.ratingBadge.visibility = View.GONE
-            } else {
-                binding.ratingBadge.text = rating
-                binding.ratingBadge.visibility = View.VISIBLE
+            when {
+                !rating.isNullOrBlank() -> {
+                    binding.ratingBadge.text = rating.replace("★", "").trim()
+                    binding.ratingBadge.visibility = View.VISIBLE
+                }
+                !item.seriesId.isNullOrBlank() -> {
+                    binding.ratingBadge.text = "TV"
+                    binding.ratingBadge.visibility = View.VISIBLE
+                }
+                else -> binding.ratingBadge.visibility = View.GONE
             }
             val meta = posterMeta(item)
             if (meta.isNullOrBlank()) {
@@ -274,19 +291,30 @@ class ChannelAdapter(
         }
 
         override fun bindLogo(item: Channel) {
-            val radius = 8f * binding.root.resources.displayMetrics.density
+            val density = binding.root.resources.displayMetrics.density
+            val targetH = ((if (DeviceForm.isCompact(binding.root.context)) 196 else 236) * density).toInt()
+            if (binding.logo.layoutParams != null && binding.logo.layoutParams.height != targetH) {
+                (binding.logo.parent as? View)?.layoutParams?.height = targetH
+            }
             binding.logo.clipToOutline = true
             binding.logo.outlineProvider = ViewOutlineProvider.BACKGROUND
-            loadLogo(binding.logo, item.logoUrl, 160, poster = true, cornerPx = radius)
+            loadLogo(binding.logo, item.logoUrl, 240, poster = true, cornerPx = 0f)
+            binding.logo.scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
         }
 
-        override fun bindFavorite(item: Channel) = Unit
+        override fun bindFavorite(item: Channel) {
+            binding.btnPosterFavorite.setImageResource(
+                if (isFavorite(item)) R.drawable.ic_heart_filled else R.drawable.ic_heart_outline
+            )
+        }
 
         override fun bindEpg(item: Channel) {
             val resume = continueLabel(item)
             val detail = detailOf(item.id)
             val group = com.olympus.iptv.data.NameImages.strip(groupLabel ?: item.groupTitle.orEmpty())
-            binding.group.text = listOfNotNull(resume, detail).joinToString(" · ").ifBlank { group }
+            val sub = listOfNotNull(resume, detail).joinToString(" · ").ifBlank { group }
+            binding.group.text = sub
+            binding.group.visibility = if (sub.isBlank()) View.GONE else View.VISIBLE
             bindPosterChrome(item)
         }
     }
@@ -330,19 +358,39 @@ class ChannelAdapter(
                 val density = binding.root.resources.displayMetrics.density
                 val padH = (6 * density).toInt()
                 binding.playTarget.setPadding(padH, 0, padH, 0)
-                val logo = ((if (guideRowHeight > 0) 18 else 24) * density).toInt()
+                val touch = DeviceForm.isTouchPrimary(binding.root.context)
+                if (portraitCard) {
+                    val padV = (12 * density).toInt()
+                    val padH = (12 * density).toInt()
+                    binding.playTarget.setPadding(padH, padV, padH, padV)
+                    binding.root.setPadding(padH, (4 * density).toInt(), padH, (4 * density).toInt())
+                }
+                val logo = ((if (portraitCard) 36 else if (guideRowHeight > 0) 18 else 24) * density).toInt()
                 binding.logo.layoutParams.width = logo
                 binding.logo.layoutParams.height = logo
                 bindLogo(item)
                 bindEpg(item)
                 bindGuideHighlight(item)
+                if (touch && guideRowHeight <= 0) {
+                    binding.favorite.visibility = View.VISIBLE
+                    binding.favorite.isFocusable = false
+                    binding.favorite.isFocusableInTouchMode = false
+                    bindFavorite(item)
+                    binding.favorite.setOnClickListener {
+                        Haptics.tick(binding.favorite)
+                        onFavorite(item)
+                    }
+                }
                 com.olympus.iptv.ui.LiveBars.show(binding.liveBars, item.id == playingId)
                 binding.playTarget.isFocusable = guideRowsFocusable
                 binding.playTarget.isFocusableInTouchMode = guideRowsFocusable
-                val touch = DeviceForm.isTouchPrimary(binding.root.context)
                 binding.playTarget.setOnClickListener {
                     if (touch) Haptics.tick(binding.playTarget)
                     onClick(item)
+                }
+                binding.playTarget.setOnLongClickListener {
+                    if (touch) Haptics.tick(binding.playTarget)
+                    onLongClick(item)
                 }
                 binding.playTarget.setOnFocusChangeListener { _, hasFocus ->
                     if (!touch && guideRowsFocusable) FocusMotion.animate(binding.playTarget, hasFocus)
@@ -360,9 +408,14 @@ class ChannelAdapter(
             binding.name.setTextColor(
                 ctx.getColor(if (active) R.color.accent else R.color.text_primary)
             )
-            // Never draw a focus rectangle around the channel name row in the live EPG grid.
-            binding.root.background = null
-            binding.playTarget.background = null
+            val portraitCard = DeviceForm.isCompact(ctx) && DeviceForm.isPortrait(ctx)
+            if (portraitCard) {
+                binding.playTarget.setBackgroundResource(R.drawable.bg_focusable)
+            } else {
+                // Never draw a focus rectangle around the channel name row in the live EPG grid.
+                binding.root.background = null
+                binding.playTarget.background = null
+            }
         }
 
         private fun hideActions() {
@@ -461,7 +514,7 @@ class ChannelAdapter(
             return
         }
         view.setTag(R.id.logo, key)
-        view.scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+        view.scaleType = if (poster) android.widget.ImageView.ScaleType.CENTER_CROP else android.widget.ImageView.ScaleType.FIT_CENTER
         val px = logoPx(view, sizeDp).let { size ->
             if (poster && DeviceForm.powerSave(view.context)) size.coerceAtMost(320) else size
         }

@@ -29,6 +29,10 @@ object DummyEpg {
         """\(\s*([A-Za-z]{3,9})\s+(\d{1,2})(?:\s+(\d{4}))?\s+(\d{1,2}):(\d{2})\s*(AM|PM)?\s*([A-Za-z]{2,4})?\s*\)""",
         RegexOption.IGNORE_CASE
     )
+    private val bareMonth = Regex(
+        """\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(\d{1,2})(?:,?\s+(\d{4}))?\s+(\d{1,2}):(\d{2})\s*(AM|PM)?\s*([A-Za-z]{2,4})?\s*$""",
+        RegexOption.IGNORE_CASE
+    )
     private val indexPrefix = Regex("""^[A-Za-z][A-Za-z0-9 &'+\-]{0,24}\s+\d{1,4}\s*[:|\-–—]\s*""")
     private val leadingChannelNum = Regex("""^(?:(?:ch(?:annel)?\.?\s*)|#)?\d{1,4}\s*[:|\-–—.]\s*""", RegexOption.IGNORE_CASE)
     private val leadingHashNum = Regex("""^(?:(?:ch(?:annel)?\.?\s*)|#)\d{1,4}\s+""", RegexOption.IGNORE_CASE)
@@ -94,14 +98,14 @@ object DummyEpg {
         if (raw.isEmpty()) return null
         val lastAt = raw.lastIndexOf('@')
         val slice = if (lastAt >= 0) raw.substring(lastAt) else raw
-        val timed = atTime.find(slice) ?: atTime.find(raw) ?: parenMonth.find(raw) ?: parenDot.find(raw) ?: return null
+        val timed = atTime.find(slice) ?: atTime.find(raw) ?: parenMonth.find(raw) ?: parenDot.find(raw) ?: bareMonth.find(raw) ?: return null
         return matchStart(timed, now)
     }
 
     private fun parse(channelName: String, now: Long): Parsed {
         val raw = channelName.trim()
         if (raw.isEmpty()) return Parsed("No event", null)
-        val timed = atTime.find(raw) ?: parenMonth.find(raw) ?: parenDot.find(raw)
+        val timed = atTime.find(raw) ?: parenMonth.find(raw) ?: parenDot.find(raw) ?: bareMonth.find(raw)
         val withoutTime = if (timed == null) raw else raw.removeRange(timed.range).trim()
         val title = cleanTitle(withoutTime).ifBlank { cleanTitle(raw) }.ifBlank { "No event" }
         val start = timed?.let { matchStart(it, now) }
@@ -138,7 +142,7 @@ object DummyEpg {
             } else {
                 stamp(day = groups[2], monthName = groups[1], year = groups[3], hour = groups[4], minute = groups[5], ampm = groups[6], zone = groups[7], now = now)
             }
-            else -> null
+            else -> stamp(day = groups[2], monthName = groups[1], year = groups[3], hour = groups[4], minute = groups[5], ampm = groups[6], zone = groups[7], now = now)
         }
     }
 

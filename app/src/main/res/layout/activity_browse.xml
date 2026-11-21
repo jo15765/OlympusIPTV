@@ -566,6 +566,27 @@
                     android:textStyle="bold" />
             </LinearLayout>
 
+            <HorizontalScrollView
+                android:id="@+id/groupGenreRow"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:layout_marginBottom="8dp"
+                android:clipToPadding="false"
+                android:descendantFocusability="afterDescendants"
+                android:fillViewport="false"
+                android:focusable="false"
+                android:paddingHorizontal="16dp"
+                android:scrollbars="none"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:id="@+id/groupGenreChips"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal" />
+            </HorizontalScrollView>
+
             <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
                 android:id="@+id/groupsRefresh"
                 android:layout_width="match_parent"
@@ -640,20 +661,7 @@
                         android:textSize="16sp"
                         android:textStyle="bold" />
 
-                    <TextView
-                        android:id="@+id/guideNow"
-                        android:layout_width="wrap_content"
-                        android:layout_height="28dp"
-                        android:layout_marginEnd="8dp"
-                        android:background="@drawable/bg_nav"
-                        android:clickable="true"
-                        android:focusable="true"
-                        android:gravity="center"
-                        android:paddingHorizontal="12dp"
-                        android:text="@string/guide_now"
-                        android:textColor="@color/text_primary"
-                        android:textSize="13sp"
-                        android:visibility="gone" />
+
 
                     <TextView
                         android:id="@+id/vpnChip"
@@ -802,19 +810,42 @@
             android:paddingBottom="4dp"
             android:visibility="gone">
 
-            <HorizontalScrollView
-                android:id="@+id/programHeaderScroll"
+            <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="28dp"
-                android:focusable="false"
-                android:scrollbars="none">
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
 
-                <LinearLayout
-                    android:id="@+id/programHeader"
+                <TextView
+                    android:id="@+id/guideNow"
                     android:layout_width="wrap_content"
-                    android:layout_height="match_parent"
-                    android:orientation="vertical" />
-            </HorizontalScrollView>
+                    android:layout_height="28dp"
+                    android:layout_marginEnd="8dp"
+                    android:background="@drawable/bg_nav"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:paddingHorizontal="12dp"
+                    android:text="@string/guide_now"
+                    android:textColor="@color/text_primary"
+                    android:textSize="13sp"
+                    android:visibility="gone" />
+
+                <HorizontalScrollView
+                    android:id="@+id/programHeaderScroll"
+                    android:layout_width="0dp"
+                    android:layout_height="28dp"
+                    android:layout_weight="1"
+                    android:focusable="false"
+                    android:scrollbars="none">
+
+                    <LinearLayout
+                        android:id="@+id/programHeader"
+                        android:layout_width="wrap_content"
+                        android:layout_height="match_parent"
+                        android:orientation="vertical" />
+                </HorizontalScrollView>
+            </LinearLayout>
 
             <FrameLayout
                 android:layout_width="match_parent"

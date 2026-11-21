@@ -5,9 +5,10 @@ import java.util.Locale
 /** Live sports matchups in an EPG title, plus how long is left. */
 object SportsEvent {
     fun isMatchup(title: String): Boolean {
-        val hay = title.lowercase(Locale.US)
-        if (MARKERS.any { it in hay }) return true
-        return VERSUS.containsMatchIn(title)
+        val trimmed = title.trim()
+        if (trimmed.isEmpty()) return false
+        if (LEAGUE_WORDS.containsMatchIn(trimmed)) return true
+        return VERSUS.containsMatchIn(trimmed)
     }
 
     fun minutesLeft(now: Long, start: Long, end: Long): Int? {
@@ -23,8 +24,7 @@ object SportsEvent {
     }
 
     private val VERSUS = Regex("""(?i)\bvs\.?\b|@""")
-    private val MARKERS = listOf(
-        "nfl", "nba", "mlb", "nhl", "ufc", "mma", "premier league",
-        "espn+", "espn plus", "dazn", "ufc "
+    private val LEAGUE_WORDS = Regex(
+        """(?i)\b(?:nfl|nba|mlb|nhl|ufc|mma|dazn|premier\s+league|champions\s+league|europa\s+league|bundesliga|la\s+liga|serie\s+a|ligue\s+1|mls|ncaa[bfw]?|f1|formula\s+1|nascar|pga|atp|wta|espn\+|espn\s+plus)\b"""
     )
 }

@@ -15,8 +15,12 @@ object MobileBitrateCap {
     fun apply(context: Context, player: Player) {
         if (DeviceForm.isTelevision(context)) return
         val cap = if (MeteredNetwork.limited(context)) {
+            val manager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+            val dataSaver = android.os.Build.VERSION.SDK_INT >= 24 &&
+                manager?.restrictBackgroundStatus == ConnectivityManager.RESTRICT_BACKGROUND_STATUS_ENABLED
             val downKbps = downstreamKbps(context)
             when {
+                dataSaver -> CELLULAR_SLOW_BPS
                 downKbps >= 50_000 -> Int.MAX_VALUE
                 downKbps >= 15_000 -> CELLULAR_FAST_BPS
                 else -> CELLULAR_SLOW_BPS

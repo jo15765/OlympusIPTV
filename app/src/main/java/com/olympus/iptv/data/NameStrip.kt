@@ -16,7 +16,8 @@ object NameStrip {
     ) {
         fun isVisibleAt(now: Long): Boolean {
             if (!isEventSlot) return true
-            if (eventStartMs <= 0L) return false
+            if (eventStartMs == 0L) return false
+            if (eventStartMs < 0L) return true
             return now >= (eventStartMs - PRE_EVENT_WINDOW_MS) && now < eventEndMs
         }
     }
@@ -72,7 +73,7 @@ object NameStrip {
         var hasSup = false
         for (i in s.indices) {
             val code = s[i].code
-            if (code in 0x02B0..0x02FF || code in 0x1D2C..0x1D6A || code in 0x2070..0x209F) {
+            if (code in 0x02B0..0x02FF || code in 0x1D2C..0x1DBF || code in 0x2070..0x209F) {
                 hasSup = true
                 break
             }
@@ -82,7 +83,7 @@ object NameStrip {
         for (i in s.indices) {
             val ch = s[i]
             val code = ch.code
-            if (code !in 0x02B0..0x02FF && code !in 0x1D2C..0x1D6A && code !in 0x2070..0x209F) {
+            if (code !in 0x02B0..0x02FF && code !in 0x1D2C..0x1DBF && code !in 0x2070..0x209F) {
                 out.append(ch)
             }
         }
@@ -179,13 +180,15 @@ object NameStrip {
                 }
                 if (!isPlaceholderEvent(cleanEpg)) {
                     val event = stripChannelPrefixFromEpg(cleanEpg, left)
-                    return StreamStatus(left, event, isEventSlot = true, eventStartMs = parsedStart, eventEndMs = parsedEnd)
+                    val start = if (parsedStart > 0L) parsedStart else -1L
+                    return StreamStatus(left, event, isEventSlot = true, eventStartMs = start, eventEndMs = parsedEnd)
                 }
                 if (isPlaceholderEvent(inlineEvent)) {
                     return StreamStatus(left, null, isEventSlot = true, eventStartMs = 0L, eventEndMs = 0L)
                 }
                 val cleanEvent = stripChannelPrefixFromEpg(inlineEvent, left)
-                return StreamStatus(left, cleanEvent, isEventSlot = true, eventStartMs = parsedStart, eventEndMs = parsedEnd)
+                val start = if (parsedStart > 0L) parsedStart else -1L
+                return StreamStatus(left, cleanEvent, isEventSlot = true, eventStartMs = start, eventEndMs = parsedEnd)
             } else if (isPlaceholderEvent(rightRaw)) {
                 // Blank or slot-number-only tail (`NFL  | 01 -`, `PRIME-CA | No Event`, `DK | No Event`)
                 return StreamStatus(left, null, isEventSlot = true, eventStartMs = 0L, eventEndMs = 0L)
@@ -247,7 +250,10 @@ object NameStrip {
         } else {
             status.cleanChannel
         }
-        val clean = apply(base, sanitizeStreams, emptyList()).ifBlank { base }.ifBlank { name.trim() }
+        val clean = apply(base, sanitizeStreams, emptyList())
+            .trim(' ', ':', '|', '-', '–', '—')
+            .ifBlank { base.trim(' ', ':', '|', '-', '–', '—') }
+            .ifBlank { name.trim(' ', ':', '|', '-', '–', '—') }
         if (shown.size > 8_000) shown.clear()
         shown[cacheKey] = clean
         return clean
@@ -295,10 +301,11 @@ object NameStrip {
             for (token in phrases) next = cutPhrase(next, token)
             for (token in prefixWords) next = cutPrefix(next, token)
             for (token in suffixWords) next = cutSuffix(next, token)
-            if (next.isBlank() || next == current) return current
+            next = next.trim(' ', ':', '|', '-', '–', '—')
+            if (next.isBlank() || next == current) return current.trim(' ', ':', '|', '-', '–', '—').ifBlank { current }
             current = next
         }
-        return current
+        return current.trim(' ', ':', '|', '-', '–', '—').ifBlank { current }
     }
 
     private fun plan(prefixes: List<String>, suffixes: List<String>): Plan {

@@ -50,10 +50,12 @@ internal class PhoneMediaControls(private val activity: PlayerActivity) {
                 activity.runOnUiThread { handle(action) }
             }
         })
-        @Suppress("DEPRECATION")
-        created.setFlags(
-            MediaSession.FLAG_HANDLES_MEDIA_BUTTONS or MediaSession.FLAG_HANDLES_TRANSPORT_CONTROLS
-        )
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            @Suppress("DEPRECATION")
+            created.setFlags(
+                MediaSession.FLAG_HANDLES_MEDIA_BUTTONS or MediaSession.FLAG_HANDLES_TRANSPORT_CONTROLS
+            )
+        }
         created.isActive = true
         session = created
         val filter = IntentFilter().apply {
@@ -115,9 +117,19 @@ internal class PhoneMediaControls(private val activity: PlayerActivity) {
             @Suppress("DEPRECATION")
             Notification.Builder(activity)
         }
+        val openIntent = PendingIntent.getActivity(
+            activity,
+            0,
+            Intent(activity, PlayerActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val subtitle = activity.binding.channelMeta.text?.toString()
+            ?.takeIf { it.isNotBlank() && it != "No EPG" && it != "Loading EPG…" }
+            ?: channel?.groupTitle.orEmpty()
         note.setSmallIcon(android.R.drawable.ic_media_play)
-            .setContentTitle(title)
-            .setContentText(channel?.groupTitle.orEmpty())
+            .setContentTitle(com.olympus.iptv.data.NameStrip.shown(title, channel?.groupTitle))
+            .setContentText(subtitle)
+            .setContentIntent(openIntent)
             .setOngoing(playing)
             .addAction(android.R.drawable.ic_media_previous, activity.getString(R.string.channel_down), pending(ACTION_DOWN))
             .addAction(

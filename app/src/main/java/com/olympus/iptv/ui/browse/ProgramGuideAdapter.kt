@@ -41,7 +41,18 @@ class ProgramGuideAdapter(
     private val slotMs = 30L * 60L * 1000L
     private val hourMs = 60L * 60L * 1000L
 
-    val slotPx = dp(148)
+    var slotPx = dp(240)
+        private set
+
+    fun setViewportWidth(widthPx: Int): Boolean {
+        if (widthPx <= 0) return false
+        val next = (widthPx / 3).coerceAtLeast(dp(148))
+        if (next == slotPx) return false
+        slotPx = next
+        blockCache.clear()
+        if (channels.isNotEmpty()) notifyItemRangeChanged(0, channels.size)
+        return true
+    }
     var windowStart = 0L
         private set
     var windowEnd = 0L
@@ -200,14 +211,11 @@ class ProgramGuideAdapter(
 
     private fun guideBlocks(channel: Channel, loaded: List<EpgProgram>?): List<Block> {
         if (channel.kind != ContentKind.LIVE || loaded == null || windowEnd <= windowStart) return emptyList()
-        val name = channel.name.trim()
+        val name = com.olympus.iptv.data.NameStrip.shown(channel.name, channel.groupTitle).trim()
         if (name.isEmpty()) return emptyList()
-        val now = System.currentTimeMillis()
-        val maxUpcomingStart = now + 30L * 60L * 1000L
         val clipped = ArrayList<EpgProgram>(loaded.size)
         for (program in loaded) {
-            if (program.endMillis <= now) continue
-            if (program.startMillis > maxUpcomingStart) continue
+            if (program.endMillis <= windowStart || program.startMillis >= windowEnd) continue
             val start = program.startMillis.coerceAtLeast(windowStart)
             val end = program.endMillis.coerceAtMost(windowEnd)
             if (end > start) clipped.add(program.copy(startMillis = start, endMillis = end))
@@ -374,7 +382,8 @@ class ProgramGuideAdapter(
                 view.setPaddingRelative(labelPad, 0, labelPad, 0)
                 return false
             }
-            val overflow = (scrollX - left).coerceAtLeast(0)
+            val visibleLeft = maxOf(left, 0)
+            val overflow = if (scrollX > visibleLeft) (scrollX - visibleLeft) else 0
             val maxShift = (width - labelMinVisible - labelPad).coerceAtLeast(0)
             val start = labelPad + overflow.coerceAtMost(maxShift)
             if (view.paddingStart != start || view.paddingEnd != labelPad) {
@@ -394,7 +403,8 @@ class ProgramGuideAdapter(
             slot: Slot
         ) {
             val hadFocus = view.hasFocus()
-            val kind = if (program != null) EpgProgramStyle.kind(program, channel) else EpgKind.OTHER
+            val isChannelFallback = program != null && isChannelFiller(program.title, com.olympus.iptv.data.NameStrip.shown(channel.name, channel.groupTitle))
+            val kind = if (program != null && !isChannelFallback) EpgProgramStyle.kind(program, channel) else EpgKind.OTHER
             view.tag = slot
             view.background = backgroundFor(kind, focused = false)
             view.setTextColor(primary)
@@ -441,12 +451,18 @@ class ProgramGuideAdapter(
         }
 
         private fun sportsTitle(title: String, channel: Channel, program: EpgProgram?): String {
-            val clean = com.olympus.iptv.data.NameStrip.shown(title, channel.groupTitle).ifBlank { title }
+            val clean = com.olympus.iptv.data.NameStrip.shown(title, channel.groupTitle)
+                .trim(' ', ':', '|', '-', '–', '—')
+                .ifBlank { title.trim(' ', ':', '|', '-', '–', '—') }
             if (program == null) return clean
             if (program.guideTitle.isNotEmpty()) {
                 val stripped = program.guideTitle.replace(LIVE_EVENT_PREFIX, "")
-                return com.olympus.iptv.data.NameStrip.shown(stripped, channel.groupTitle).ifBlank { stripped }
+                return com.olympus.iptv.data.NameStrip.shown(stripped, channel.groupTitle)
+                    .trim(' ', ':', '|', '-', '–', '—')
+                    .ifBlank { stripped.trim(' ', ':', '|', '-', '–', '—') }
             }
+            val isFallback = isChannelFiller(title, com.olympus.iptv.data.NameStrip.shown(channel.name, channel.groupTitle))
+            if (isFallback) return clean
             val now = System.currentTimeMillis()
             val timing = EpgTiming.tag(now, program.startMillis, program.endMillis)
             if (timing.isNullOrBlank()) return clean

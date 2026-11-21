@@ -915,8 +915,7 @@ internal fun BrowseActivity.removePlaylistAndRestart() {
                 Intent(screen(), LoginActivity::class.java)
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
             )
-            finish()
-            overridePendingTransition(0, 0)
+            finishNoAnim()
         }
     }
 
@@ -971,11 +970,19 @@ internal fun BrowseActivity.showLetterJump() {
 
 internal fun BrowseActivity.paintNowPlayingBar() {
         if (!viewReady()) return
-        binding.nowPlayingBar.visibility = View.GONE
         val app = application as OlympusIptvApp
         val channel = app.lastPlayed
-        val match = channel != null && app.lastPlayedPlaylistId == playlist?.id
+        val match = channel != null && !channel.streamUrl.isBlank() && app.lastPlayedPlaylistId == playlist?.id
         channelAdapter.setPlaying(if (match && channel?.kind == ContentKind.LIVE) channel.id else null)
+        if (!touchPrimary || !match || channel == null || binding.groupColumn.visibility != View.VISIBLE) {
+            binding.nowPlayingBar.visibility = View.GONE
+            return
+        }
+        val cleanName = com.olympus.iptv.data.NameStrip.shown(channel.name, channel.groupTitle)
+        val liveTitle = epgCache[channel.id]?.now?.title?.takeIf { !com.olympus.iptv.data.NameStrip.isPlaceholderEvent(it) }
+        binding.nowPlayingLabel.text = if (channel.kind == ContentKind.LIVE) "Continue Watching Live" else getString(R.string.now_playing)
+        binding.nowPlayingTitle.text = if (!liveTitle.isNullOrBlank()) "$cleanName · $liveTitle" else cleanName
+        binding.nowPlayingBar.visibility = View.VISIBLE
     }
 
 internal fun BrowseActivity.resumeNowPlaying() {
@@ -1282,16 +1289,47 @@ internal fun BrowseActivity.wireHomeContinueFocusChain() {
 
 internal fun BrowseActivity.paintHomeContinue() {
         if (!viewReady()) return
-        binding.homeContinue.visibility = View.GONE
-        binding.homeContinue.tag = null
-        landOnContinue = false
-        wireHomeContinueFocusChain()
-        if (GuideFeel.landOnContinueStrip(section == GuideSection.TV, binding.homeContinue.visibility == View.VISIBLE) &&
-            landOnContinue
-        ) {
-            focusHomeContinue()
-        } else if (landOnContinue) {
+        val isVod = section == GuideSection.MOVIES || section == GuideSection.SHOWS
+        val wanted = sectionKey(section)
+        val spot = if (isVod) recentEntries.firstOrNull { entrySection(it) == wanted && it.canResume() } else null
+        val savedId = playlist?.id
+        if (spot == null || savedId.isNullOrBlank() || spot.channelId.isNullOrBlank()) {
+            binding.homeContinue.visibility = View.GONE
+            binding.homeContinue.tag = null
             landOnContinue = false
+            wireHomeContinueFocusChain()
+            return
+        }
+        val channelId = spot.channelId
+        lifecycleScope.launch {
+            val channel = withContext(Dispatchers.IO) {
+                val db = (application as OlympusIptvApp).catalogDb
+                db.readChannel(savedId, libraryBucket(section), channelId)
+                    ?: db.readChannel(savedId, CatalogDb.VOD, channelId)
+                    ?: db.readChannel(savedId, CatalogDb.SERIES, channelId)
+            }
+            if (isDestroyed || channel == null || section == GuideSection.TV) {
+                binding.homeContinue.visibility = View.GONE
+                binding.homeContinue.tag = null
+                wireHomeContinueFocusChain()
+                return@launch
+            }
+            val clean = com.olympus.iptv.data.Titles.clean(channel.name)
+            val posMin = ((spot.positionMs ?: 0L) / 60_000L).coerceAtLeast(1L)
+            val durMin = ((spot.durationMs ?: 0L) / 60_000L).coerceAtLeast(posMin)
+            val leftMin = (durMin - posMin).coerceAtLeast(1L)
+            binding.homeContinueTitle.text = clean
+            binding.homeContinueMeta.text = if (durMin > posMin) {
+                "${leftMin}m remaining • ${channel.groupTitle.orEmpty()}"
+            } else {
+                "Resume at ${posMin}m • ${channel.groupTitle.orEmpty()}"
+            }
+            binding.homeContinue.tag = channel
+            binding.homeContinue.visibility = View.VISIBLE
+            wireHomeContinueFocusChain()
+            if (GuideFeel.landOnContinueStrip(false, true) && landOnContinue) {
+                focusHomeContinue()
+            }
         }
     }
 
@@ -1365,7 +1403,8 @@ internal fun BrowseActivity.fitChannelColumn() {
         val number = if (section == GuideSection.TV) (32f + 6f) * density else 0f
         val chrome = number + (6f + 6f + 18f + 8f + 8f) * density
         val parent = binding.guideRow.width.takeIf { it > 0 } ?: resources.displayMetrics.widthPixels
-        val capped = GuideFeel.columnWidth(widestNamePx(), chrome, parent)
+        val minGuideCol = (275f * density).toInt()
+        val capped = GuideFeel.columnWidth(widestNamePx(), chrome, parent).coerceAtLeast(minGuideCol)
         val params = binding.contentColumn.layoutParams as LinearLayout.LayoutParams
         if (params.width != capped || params.weight != 0f) {
             params.width = capped
@@ -1498,7 +1537,7 @@ internal fun BrowseActivity.refreshGroupCounts() {
         val app = application as OlympusIptvApp
         val hiddenChannels = activeConfig.hiddenChannels.orEmpty().toSet()
         val now = System.currentTimeMillis()
-        val minuteBucket = if (bucket == CatalogDb.LIVE) now / 60_000L else 0L
+        val minuteBucket = if (bucket == CatalogDb.LIVE) now / 300_000L else 0L
         lifecycleScope.launch {
             val stamp = withContext(Dispatchers.IO) { app.catalogDb.libraryStamp(saved.id) }
             if (token != groupCountToken || isDestroyed) return@launch
@@ -1830,7 +1869,7 @@ internal fun BrowseActivity.loadGroupPage(reset: Boolean) {
             if (sectionNow == GuideSection.TV && page.channels.isNotEmpty()) {
                 withContext(Dispatchers.IO) {
                     val db = (application as OlympusIptvApp).catalogDb
-                    for (ch in page.channels) {
+                    for (ch in page.channels.take(25)) {
                         if (epgCache.containsKey(ch.id)) continue
                         val cached = db.readEpg(saved.id, ch.epgChannelId ?: ch.id) ?: continue
                         epgCache[ch.id] = com.olympus.iptv.playlist.EpgUtils.nowNext(cached.second)
@@ -2292,7 +2331,150 @@ internal fun BrowseActivity.playCatchup(channel: Channel, program: EpgProgram) {
         }
     }
 
+internal fun BrowseActivity.showVodDetailSheet(channel: Channel) {
+        if (isDestroyed) return
+        val saved = playlist ?: return
+        val isSeries = !channel.seriesId.isNullOrBlank()
+        val cleanTitle = com.olympus.iptv.data.Titles.clean(channel.name)
+        val resume = resumeEntry(channel)
+        val sheet = BottomSheetDialog(this)
+        val density = resources.displayMetrics.density
+        val pad = (20 * density).toInt()
+        val box = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(pad, pad, pad, pad)
+            setBackgroundColor(getColor(R.color.bg_elevated))
+        }
+        val titleView = TextView(this).apply {
+            text = cleanTitle
+            textSize = 20f
+            setTextColor(getColor(R.color.text_primary))
+            setTypeface(null, android.graphics.Typeface.BOLD)
+        }
+        val metaView = TextView(this).apply {
+            text = channel.groupTitle.orEmpty()
+            textSize = 13f
+            setTextColor(getColor(R.color.accent))
+            setPadding(0, (4 * density).toInt(), 0, (10 * density).toInt())
+        }
+        val overviewView = TextView(this).apply {
+            text = "Loading synopsis & ratings…"
+            textSize = 14f
+            maxLines = 5
+            ellipsize = android.text.TextUtils.TruncateAt.END
+            setTextColor(getColor(R.color.text_secondary))
+            setPadding(0, 0, 0, (16 * density).toInt())
+        }
+        val playBtn = android.widget.Button(this).apply {
+            text = when {
+                isSeries -> "Browse Seasons & Episodes"
+                resume != null && resume.canResume() -> "▶ Resume (${((resume.positionMs ?: 0L) / 60_000L).coerceAtLeast(1L)}m)"
+                else -> "▶ Play Now"
+            }
+            setBackgroundResource(R.drawable.bg_button)
+            setTextColor(getColor(R.color.bg))
+            textSize = 15f
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setOnClickListener {
+                sheet.dismiss()
+                if (isSeries) {
+                    startActivity(EpisodesActivity.intent(this@showVodDetailSheet, saved.id, channel))
+                } else {
+                    playDirect(channel)
+                }
+            }
+        }
+        val row2 = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(0, (10 * density).toInt(), 0, 0)
+        }
+        val favBtn = android.widget.Button(this).apply {
+            val isFav = Favorites.matches(channel, favoriteIds)
+            text = if (isFav) "★ Favorited" else "☆ Add to Favorites"
+            setBackgroundResource(R.drawable.bg_button_secondary)
+            setTextColor(getColor(R.color.text_primary))
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginEnd = (8 * density).toInt()
+            }
+            setOnClickListener {
+                toggleGuideFavorite(channel)
+                val nowFav = Favorites.matches(channel, favoriteIds)
+                text = if (nowFav) "★ Favorited" else "☆ Add to Favorites"
+            }
+        }
+        val trailerBtn = android.widget.Button(this).apply {
+            text = "🎬 Watch Trailer"
+            setBackgroundResource(R.drawable.bg_button_secondary)
+            setTextColor(getColor(R.color.text_primary))
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+            setOnClickListener {
+                sheet.dismiss()
+                lifecycleScope.launch {
+                    val trailer = withContext(Dispatchers.IO) { TitleRatings.trailerFor(cleanTitle, isSeries) }
+                    if (trailer == null) {
+                        Toast.makeText(this@showVodDetailSheet, R.string.trailer_missing, Toast.LENGTH_SHORT).show()
+                    } else {
+                        val web = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/watch?v=${trailer.key}"))
+                        runCatching { startActivity(web) }
+                    }
+                }
+            }
+        }
+        row2.addView(favBtn)
+        row2.addView(trailerBtn)
+        box.addView(titleView)
+        box.addView(metaView)
+        box.addView(overviewView)
+        box.addView(playBtn)
+        box.addView(row2)
+        sheet.setContentView(box)
+        sheet.show()
+        playBtn.requestFocus()
+        lifecycleScope.launch {
+            val bundle = withContext(Dispatchers.IO) {
+                runCatching { TitleRatings.peek(cleanTitle, isSeries) ?: TitleRatings.loadScores(cleanTitle, isSeries) }.getOrNull()
+            }
+            if (!sheet.isShowing || isDestroyed) return@launch
+            if (bundle == null) {
+                overviewView.text = channel.groupTitle.orEmpty()
+                return@launch
+            }
+            val score = bundle.scoreLine(3)
+            if (score.isNotBlank()) metaView.text = listOf(score, channel.groupTitle.orEmpty()).filter { it.isNotBlank() }.joinToString("  •  ")
+            overviewView.text = bundle.overview.ifBlank { channel.groupTitle.orEmpty() }
+        }
+    }
+
 internal fun BrowseActivity.play(
+        channel: Channel,
+        queueOverride: List<Channel>? = null,
+        zapMode: String? = null,
+        rememberReturn: Boolean = true,
+        enterPip: Boolean = false
+    ) {
+        if (queueOverride == null && !enterPip && (channel.kind == ContentKind.VOD || !channel.seriesId.isNullOrBlank())) {
+            val savedId = playlist?.id.orEmpty()
+            val isSeries = !channel.seriesId.isNullOrBlank()
+            val targetId = if (isSeries) channel.seriesId!! else channel.id
+            val bucket = if (isSeries) CatalogDb.SERIES else CatalogDb.VOD
+            startActivity(
+                MediaDetailActivity.intent(
+                    this,
+                    playlistId = savedId,
+                    itemId = targetId,
+                    bucket = bucket,
+                    name = channel.name,
+                    logoUrl = channel.logoUrl,
+                    service = channel.groupTitle.orEmpty(),
+                    season = channel.season ?: 1
+                )
+            )
+            return
+        }
+        playDirect(channel, queueOverride, zapMode, rememberReturn, enterPip)
+    }
+
+internal fun BrowseActivity.playDirect(
         channel: Channel,
         queueOverride: List<Channel>? = null,
         zapMode: String? = null,
@@ -2375,3 +2557,13 @@ internal fun BrowseActivity.pagePrefetchRemain(categoryId: String?): Int {
         val count = groupCounts[categoryId] ?: 0
         return if (count >= LARGE_LIVE_GROUP) HUGE_PREFETCH_REMAIN else DEFAULT_PREFETCH_REMAIN
     }
+
+
+internal fun BrowseActivity.markPosterWatched(channel: Channel) {
+    val savedId = playlist?.id ?: return
+    val app = application as OlympusIptvApp
+    lifecycleScope.launch(Dispatchers.IO) {
+        app.catalogDb.markWatched(savedId, channel.id, channel.seriesId, channel.season)
+    }
+    Toast.makeText(this, "Marked watched", Toast.LENGTH_SHORT).show()
+}

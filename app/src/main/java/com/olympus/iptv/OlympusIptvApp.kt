@@ -27,6 +27,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.SupervisorJob
 import java.io.File
@@ -190,13 +191,61 @@ class OlympusIptvApp : Application() {
         appScope.launch {
             runCatching { com.olympus.iptv.playlist.TitleRatings.init(this@OlympusIptvApp, catalogDb) }
             runCatching { playlistStore.videoDecoder() }
+            runCatching { catalogDb.channelCount("") }
+            delay(8_000L)
             runCatching {
                 val saved = playlistStore.opening().first
-                if (saved != null) {
-                    catalogDb.warmDashboard(saved.id)
-                } else {
-                    catalogDb.channelCount("")
+                if (saved != null) catalogDb.warmDashboard(saved.id)
+            }
+        }
+    }
+
+
+    @Volatile private var cloudSyncJob: Job? = null
+
+    fun startCloudRealtimeSync() {
+        cloudSyncJob?.cancel()
+        cloudSyncJob = appScope.launch {
+            var activeEmail = ""
+            while (isActive) {
+                val saved = runCatching { playlistStore.session.first() }.getOrNull()
+                val email = saved?.email?.trim().orEmpty()
+                if (saved != null && email.isNotBlank()) {
+                    activeEmail = email
+                    val deviceId = runCatching { playlistStore.deviceId() }.getOrDefault("")
+                    if (deviceId.isNotBlank()) {
+                        val client = com.olympus.iptv.playlist.LineupClient(this@OlympusIptvApp)
+                        val sseJob = client.subscribeSyncEvents(this, email, deviceId) { table ->
+                            when (table) {
+                                "favorites" -> {
+                                    val localIds = playlistStore.favorites(saved.id)
+                                    val localRev = playlistStore.favoritesRevision(saved.id)
+                                    val synced = client.syncFavorites(email, deviceId, localIds, localRev)
+                                    if (synced != null && synced.first != localIds) {
+                                        playlistStore.saveFavorites(saved.id, synced.first, synced.second)
+                                    }
+                                }
+                                "recording_books" -> {
+                                    val localBook = playlistStore.recordingBook(saved.id)
+                                    val remoteBook = client.syncRecordings(email, deviceId, localBook)
+                                    if ((remoteBook.revision ?: 0L) > (localBook.revision ?: 0L)) {
+                                        playlistStore.saveRecordingBook(saved.id, remoteBook)
+                                        com.olympus.iptv.record.RecordingService.start(this@OlympusIptvApp)
+                                    }
+                                }
+                                else -> {
+                                    val localLineup = playlistStore.lineup(saved.id)
+                                    val merged = client.reconcile(email, deviceId, localLineup)
+                                    if ((merged.revision ?: 0L) > (localLineup.revision ?: 0L)) {
+                                        playlistStore.saveLineup(saved.id, merged)
+                                    }
+                                }
+                            }
+                        }
+                        sseJob.join()
+                    }
                 }
+                delay(if (activeEmail.isBlank()) 4_000L else 2_000L)
             }
         }
     }
@@ -251,6 +300,7 @@ class OlympusIptvApp : Application() {
             override fun onActivityDestroyed(activity: android.app.Activity) = Unit
         })
         epgRepository.attach(catalogDb, appScope)
+        startCloudRealtimeSync()
         appScope.launch {
             DashboardHost.start(this@OlympusIptvApp)
             delay(45_000L)

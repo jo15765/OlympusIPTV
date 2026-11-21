@@ -126,7 +126,6 @@ class BrowsePreviewController(
     }
 
     fun showGuidePip(channel: Channel, onExpand: (Channel) -> Unit) {
-        if (touchPrimary) return
         if (channel.kind != ContentKind.LIVE || !channel.seriesId.isNullOrBlank() || channel.streamUrl.isBlank()) return
         binding.previewCard.visibility = android.view.View.VISIBLE
         binding.previewCard.setOnClickListener { onExpand(channel) }

@@ -612,7 +612,8 @@ class BrowseActivity : AppCompatActivity(), ToolHost {
         isFavorite = { Favorites.matches(it, favoriteIds) },
         onFavorite = { toggleGuideFavorite(it) },
         onRecord = { offerRecording(it) },
-        epgProvider = { epgCache[it.id] }
+        epgProvider = { epgCache[it.id] },
+        onWatched = { markPosterWatched(it) }
     ).also { adapter ->
         adapter.continueLabel = { continueText(it) }
         adapter.continueProgress = { continueProgress(it) }

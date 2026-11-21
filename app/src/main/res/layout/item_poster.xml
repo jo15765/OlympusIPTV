@@ -1,62 +1,118 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/playTarget"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_margin="6dp"
+    android:layout_margin="7dp"
     android:background="@drawable/bg_focusable"
     android:clickable="true"
     android:focusable="true"
     android:focusableInTouchMode="true"
+    android:gravity="center_horizontal"
     android:orientation="vertical"
-    android:padding="6dp">
+    android:padding="5dp">
 
     <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="164dp">
+        android:layout_height="236dp"
+        android:background="@drawable/bg_poster_image"
+        android:clipToOutline="true">
 
         <ImageView
             android:id="@+id/logo"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:background="@drawable/bg_poster_image"
-            android:clipToOutline="true"
             android:contentDescription="@null"
             android:scaleType="centerCrop"
             android:src="@drawable/ic_channel_placeholder" />
 
+        <!-- Top-right green pill badge (no "TV Series" top banner) -->
         <TextView
             android:id="@+id/ratingBadge"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_height="24dp"
             android:layout_gravity="top|end"
-            android:layout_margin="6dp"
-            android:background="@drawable/bg_panel"
+            android:layout_margin="8dp"
+            android:background="@drawable/bg_emby_count_badge"
+            android:gravity="center"
+            android:minWidth="24dp"
             android:paddingHorizontal="7dp"
-            android:paddingVertical="3dp"
-            android:textColor="@color/accent"
+            android:textColor="#FFFFFF"
             android:textSize="12sp"
             android:textStyle="bold"
             android:visibility="gone" />
 
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:layout_gravity="bottom"
-            android:background="@drawable/bg_player_scrim" />
-
         <TextView
             android:id="@+id/posterMeta"
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_gravity="bottom"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:paddingHorizontal="8dp"
-            android:paddingBottom="8dp"
-            android:textColor="@color/text_primary"
-            android:textSize="11sp"
             android:visibility="gone" />
+
+        <!-- Focus/Hover Emby Overlay: centered Play circle + bottom action circles -->
+        <FrameLayout
+            android:id="@+id/posterHoverOverlay"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#550E1116"
+            android:visibility="gone">
+
+            <ImageView
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_gravity="center"
+                android:background="@drawable/bg_circle_play"
+                android:contentDescription="@string/play"
+                android:padding="13dp"
+                android:src="@drawable/ic_play_triangle"
+                app:tint="@color/text_primary" />
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom|end"
+                android:layout_margin="8dp"
+                android:orientation="horizontal">
+
+                <ImageButton
+                    android:id="@+id/btnPosterWatched"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:background="@drawable/bg_circle_action"
+                    android:contentDescription="Mark watched"
+                    android:focusable="false"
+                    android:padding="7dp"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/ic_check"
+                    app:tint="@color/text_primary" />
+
+                <ImageButton
+                    android:id="@+id/btnPosterFavorite"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:layout_marginStart="6dp"
+                    android:background="@drawable/bg_circle_action"
+                    android:contentDescription="@string/favorites"
+                    android:focusable="false"
+                    android:padding="7dp"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/ic_heart_outline"
+                    app:tint="@color/text_primary" />
+
+                <ImageButton
+                    android:id="@+id/btnPosterMore"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:layout_marginStart="6dp"
+                    android:background="@drawable/bg_circle_action"
+                    android:contentDescription="More options"
+                    android:focusable="false"
+                    android:padding="7dp"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/ic_more_dots"
+                    app:tint="@color/text_primary" />
+            </LinearLayout>
+        </FrameLayout>
 
         <ProgressBar
             android:id="@+id/watchProgress"
@@ -74,19 +130,22 @@
         android:id="@+id/name"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
+        android:layout_marginTop="8dp"
         android:ellipsize="end"
-        android:maxLines="2"
+        android:gravity="center"
+        android:maxLines="1"
         android:textColor="@color/text_primary"
-        android:textSize="13sp"
+        android:textSize="14sp"
         android:textStyle="bold" />
 
     <TextView
         android:id="@+id/group"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
         android:ellipsize="end"
+        android:gravity="center"
         android:maxLines="1"
         android:textColor="@color/text_secondary"
-        android:textSize="11sp" />
+        android:textSize="12sp" />
 </LinearLayout>

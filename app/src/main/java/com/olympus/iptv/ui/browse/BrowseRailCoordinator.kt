@@ -242,6 +242,17 @@ internal fun BrowseActivity.setSection(next: GuideSection) {
             episodePrefetchJob?.cancel()
             episodePrefetchIds = emptyList()
         }
+        if (next != GuideSection.TV && categoryAdapter.currentGenreFilter() != CategoryAdapter.GenreFilter.ALL) {
+            categoryAdapter.setGenreFilter(CategoryAdapter.GenreFilter.ALL)
+            paintGroupGenreChips()
+        }
+        (binding.categoryList.layoutManager as? androidx.recyclerview.widget.GridLayoutManager)?.let { glm ->
+            val targetSpan = com.olympus.iptv.ui.DeviceForm.categoryColumns(this)
+            if (glm.spanCount != targetSpan) {
+                glm.spanCount = targetSpan
+                binding.categoryList.recycledViewPool.clear()
+            }
+        }
         applyChannelLayout()
         kind = if (next == GuideSection.TV) ContentKind.LIVE else ContentKind.VOD
         selectedCategoryId = PlaylistLoader.FAVORITES_ID
@@ -443,9 +454,23 @@ internal fun BrowseActivity.paintProviderHealth() {
 
 internal fun BrowseActivity.runMagicCleanup() {
         val saved = playlist ?: return
-        val dialog = android.app.ProgressDialog(this)
-        dialog.setMessage(getString(R.string.magic_cleanup_running))
-        dialog.setCancelable(false)
+        val pad = (24 * resources.displayMetrics.density).toInt()
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(pad, pad, pad, pad)
+            addView(android.widget.ProgressBar(this@runMagicCleanup).apply { isIndeterminate = true })
+            addView(TextView(this@runMagicCleanup).apply {
+                text = getString(R.string.magic_cleanup_running)
+                setTextColor(getColor(R.color.text_primary))
+                setPadding((16 * resources.displayMetrics.density).toInt(), 0, 0, 0)
+            })
+        }
+        val dialog = AlertDialog.Builder(this)
+            .setView(row)
+            .setCancelable(false)
+            .create()
+        com.olympus.iptv.ui.DialogChrome.dress(dialog)
         dialog.show()
         lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) {
@@ -595,9 +620,23 @@ internal fun BrowseActivity.setupMobileChrome() {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
             override fun afterTextChanged(s: Editable?) {
-                categoryAdapter.setFilter(s?.toString().orEmpty())
+                val text = s?.toString().orEmpty()
+                categoryAdapter.setFilter(text)
+                binding.groupsFilter.setCompoundDrawablesRelativeWithIntrinsicBounds(
+                    0, 0, if (text.isNotEmpty()) android.R.drawable.ic_menu_close_clear_cancel else 0, 0
+                )
             }
         })
+        binding.groupsFilter.setOnTouchListener { _, event ->
+            if (event.action == MotionEvent.ACTION_UP && !binding.groupsFilter.text.isNullOrEmpty()) {
+                val endDrawable = binding.groupsFilter.compoundDrawablesRelative[2]
+                if (endDrawable != null && event.rawX >= (binding.groupsFilter.right - endDrawable.bounds.width() - binding.groupsFilter.paddingEnd)) {
+                    binding.groupsFilter.setText("")
+                    return@setOnTouchListener true
+                }
+            }
+            false
+        }
         binding.nowPlayingResume.setOnClickListener { resumeNowPlaying() }
         binding.nowPlayingBar.setOnClickListener { resumeNowPlaying() }
         binding.groupsRefresh.isEnabled = true
@@ -1150,3 +1189,78 @@ internal fun BrowseActivity.favoriteSection(sectionNow: GuideSection): String = 
         GuideSection.MOVIES -> Favorites.VOD
         GuideSection.SHOWS -> Favorites.SERIES
     }
+
+internal fun BrowseActivity.setupGroupGenreChips() {
+    val container = binding.groupGenreChips
+    container.removeAllViews()
+    val density = resources.displayMetrics.density
+    val padH = (14 * density).toInt()
+    val padV = (6 * density).toInt()
+    val gap = (8 * density).toInt()
+    val filters = CategoryAdapter.GenreFilter.values()
+    filters.forEachIndexed { idx, genre ->
+        val chip = TextView(this).apply {
+            tag = genre
+            text = genre.label
+            textSize = 13f
+            isFocusable = true
+            isFocusableInTouchMode = !touchPrimary
+            isClickable = true
+            gravity = Gravity.CENTER
+            setPadding(padH, padV, padH, padV)
+            setBackgroundResource(R.drawable.bg_chip)
+            minHeight = (36 * density).toInt()
+            setOnClickListener {
+                if (touchPrimary) Haptics.tick(this)
+                categoryAdapter.setGenreFilter(genre)
+                paintGroupGenreChips()
+                binding.categoryList.scrollToPosition(0)
+            }
+            setOnKeyListener { _, keyCode, event ->
+                if (event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener false
+                when (keyCode) {
+                    KeyEvent.KEYCODE_DPAD_DOWN -> {
+                        focusGroups()
+                        true
+                    }
+                    KeyEvent.KEYCODE_DPAD_UP -> {
+                        when {
+                            binding.homeContinue.visibility == View.VISIBLE -> binding.homeContinuePlay.requestFocus()
+                            binding.shortcutRow.visibility == View.VISIBLE -> binding.btnFavoritesSetup.requestFocus()
+                        }
+                        true
+                    }
+                    KeyEvent.KEYCODE_DPAD_LEFT -> {
+                        if (idx == 0) {
+                            sectionButton().requestFocus()
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                    else -> false
+                }
+            }
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { marginEnd = gap }
+        }
+        container.addView(chip)
+    }
+    paintGroupGenreChips()
+}
+
+internal fun BrowseActivity.paintGroupGenreChips() {
+    if (!viewReady()) return
+    val active = categoryAdapter.currentGenreFilter()
+    val container = binding.groupGenreChips
+    for (i in 0 until container.childCount) {
+        val chip = container.getChildAt(i) as? TextView ?: continue
+        val genre = chip.tag as? CategoryAdapter.GenreFilter ?: continue
+        val selected = genre == active
+        chip.isSelected = selected
+        chip.setTextColor(getColor(if (selected) R.color.accent else R.color.text_primary))
+        chip.setTypeface(null, if (selected) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
+    }
+}

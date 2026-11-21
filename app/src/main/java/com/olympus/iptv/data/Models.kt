@@ -124,6 +124,7 @@ data class EpgProgram(
 data class WatchEntry(
     val channelId: String? = null,
     val seriesId: String? = null,
+    val season: Int? = null,
     val name: String? = null,
     val section: String? = null,
     val positionMs: Long? = null,

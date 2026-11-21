@@ -140,7 +140,12 @@ class BrowseEpgController(
             val browse = activity as? BrowseActivity ?: return@post
             binding.programList.post {
                 if (binding.programPane.visibility == View.VISIBLE) {
+                    if (programAdapter.setViewportWidth(binding.programList.width)) {
+                        browse.buildProgramHeader()
+                    }
+                    browse.syncProgramRowHeight()
                     browse.alignGuide(binding.channelList, binding.programList)
+                    positionNowLine(programAdapter.scrollX)
                 }
             }
         }
