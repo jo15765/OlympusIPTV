@@ -1,9 +1,11 @@
 package com.olympus.iptv.ui.login
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.text.InputType
 import android.view.View
+import android.view.inputmethod.EditorInfo
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
@@ -24,6 +26,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
@@ -33,6 +36,8 @@ class LoginActivity : AppCompatActivity() {
     private lateinit var binding: ActivityLoginBinding
     private var mode: PlaylistType? = null
     private var connecting = false
+    private var dashBase = ""
+    private var knownDevice = ""
     private var passwordVisible = false
     private val loader = PlaylistLoader()
     private val http = OkHttpClient.Builder().callTimeout(8, TimeUnit.SECONDS).build()
@@ -79,6 +84,7 @@ class LoginActivity : AppCompatActivity() {
         binding.onboardingStep.text = getString(R.string.onboarding_step, 1, getString(R.string.onboarding_playlist))
         listOf(binding.inputEmail, binding.inputUrl, binding.inputUser, binding.inputPass, binding.inputZip)
             .forEach { SoftKeyboard.showWhenFocused(this, it) }
+        wireFieldOrder()
         if (com.olympus.iptv.ui.DeviceForm.isTouchPrimary(this)) {
             binding.btnPasteUrl.visibility = View.VISIBLE
             binding.btnPasteUrl.setOnClickListener { pasteInto(binding.inputUrl) }
@@ -90,7 +96,10 @@ class LoginActivity : AppCompatActivity() {
         }.onFailure { com.olympus.iptv.AppLog.error("Login", "Could not show the dashboard address", it) }
         lifecycleScope.launch {
             val deviceId = store.deviceId()
-            if (!isFinishing) binding.deviceId.text = getString(R.string.device_id_label, deviceId)
+            if (isFinishing) return@launch
+            knownDevice = deviceId
+            binding.deviceId.text = getString(R.string.device_id_label, deviceId)
+            if (dashBase.isNotBlank()) showDashboard(dashBase)
         }
         lifecycleScope.launch {
             val url = runCatching { LineupClient(this@LoginActivity).dashboardAddress() }.getOrNull()
@@ -99,8 +108,59 @@ class LoginActivity : AppCompatActivity() {
         lifecycleScope.launch {
             store.session.collect { saved ->
                 if (!connecting && saved != null && !saved.email.isNullOrBlank() && !isFinishing) {
-                    openBrowse(saved.id)
+                    connecting = true
+                    openGuide(saved.id)
                 }
+            }
+        }
+    }
+
+    private fun wireFieldOrder() {
+        val order = listOf(
+            binding.inputEmail,
+            binding.inputUrl,
+            binding.inputUser,
+            binding.inputPass,
+            binding.inputZip,
+            binding.checkInternational,
+            binding.checkVod,
+            binding.btnConnect
+        )
+        order.forEachIndexed { index, view ->
+            view.nextFocusUpId = order.getOrNull(index - 1)?.id ?: view.id
+            view.nextFocusDownId = order.getOrNull(index + 1)?.id ?: view.id
+            view.nextFocusLeftId = view.id
+            if (view !== binding.inputPass) view.nextFocusRightId = view.id
+        }
+        binding.inputPass.nextFocusRightId = binding.btnTogglePass.id
+        binding.btnTogglePass.nextFocusLeftId = binding.inputPass.id
+        binding.btnTogglePass.nextFocusRightId = binding.btnTogglePass.id
+        binding.btnTogglePass.nextFocusUpId = binding.inputUser.id
+        binding.btnTogglePass.nextFocusDownId = binding.inputZip.id
+        val next = listOf(
+            binding.inputEmail to binding.inputUrl,
+            binding.inputUrl to binding.inputUser,
+            binding.inputUser to binding.inputPass,
+            binding.inputPass to binding.inputZip
+        )
+        next.forEach { (from, to) ->
+            from.imeOptions = EditorInfo.IME_ACTION_NEXT
+            from.setOnEditorActionListener { _, actionId, _ ->
+                if (actionId == EditorInfo.IME_ACTION_NEXT || actionId == EditorInfo.IME_ACTION_DONE) {
+                    to.requestFocus()
+                    true
+                } else {
+                    false
+                }
+            }
+        }
+        binding.inputZip.imeOptions = EditorInfo.IME_ACTION_DONE
+        binding.inputZip.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_DONE) {
+                binding.btnConnect.requestFocus()
+                true
+            } else {
+                false
             }
         }
     }
@@ -115,13 +175,19 @@ class LoginActivity : AppCompatActivity() {
     }
 
     private fun showDashboard(url: String) {
-        binding.portalHint.text = getString(R.string.portal_hint, url)
-        binding.dashboardAddress.text = url
-        binding.qrCode.setImageBitmap(QrBitmap.encode(url, 256))
+        dashBase = url.substringBefore('?')
+        val shown = if (knownDevice.isBlank()) {
+            dashBase
+        } else {
+            dashBase + "?device=" + Uri.encode(knownDevice)
+        }
+        binding.portalHint.text = getString(R.string.portal_hint, shown)
+        binding.dashboardAddress.text = shown
+        binding.qrCode.setImageBitmap(QrBitmap.encode(shown, 256))
         binding.copyTvUrl.setOnClickListener {
             val clipboard = getSystemService(android.content.Context.CLIPBOARD_SERVICE)
                 as android.content.ClipboardManager
-            clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Olympus TV URL", url))
+            clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Olympus TV URL", shown))
             android.widget.Toast.makeText(this, R.string.copy_tv_url_done, android.widget.Toast.LENGTH_SHORT).show()
         }
     }
@@ -181,20 +247,20 @@ class LoginActivity : AppCompatActivity() {
         val user = binding.inputUser.text?.toString()?.trim().orEmpty()
         val pass = binding.inputPass.text?.toString()?.trim().orEmpty()
         if (!email.contains("@") || !email.contains(".")) {
-            showError(getString(R.string.login_email_required))
+            showProblem(getString(R.string.login_email_required))
             return
         }
-        if (!url.startsWith("http")) {
-            showError(getString(R.string.login_url_required))
+        if (!url.startsWith("http://") && !url.startsWith("https://")) {
+            showProblem(getString(R.string.login_url_required))
             return
         }
         if (user.isBlank() || pass.isBlank()) {
-            showError(getString(R.string.login_credentials_required))
+            showProblem(getString(R.string.login_credentials_required))
             return
         }
         val zip = binding.inputZip.text?.toString()?.filter { it.isDigit() }?.take(5).orEmpty()
         if (zip.length != 5) {
-            showError(getString(R.string.login_zip_required))
+            showProblem(getString(R.string.login_zip_required))
             return
         }
 
@@ -206,7 +272,7 @@ class LoginActivity : AppCompatActivity() {
             if (home == null) {
                 connecting = false
                 setBusy(false)
-                showError(getString(R.string.login_zip_invalid))
+                showProblem(getString(R.string.login_zip_invalid))
                 return@launch
             }
             val playlist = playlistFor(selected, email, url, user, pass, includeVod).copy(
@@ -217,10 +283,12 @@ class LoginActivity : AppCompatActivity() {
                 includeInternational = binding.checkInternational.isChecked
             )
             try {
-                val ok = loader.validate(playlist)
-                if (!ok) {
+                val ok = withTimeoutOrNull(20_000L) { loader.validate(playlist) }
+                if (ok != true) {
                     connecting = false
-                    showError(getString(R.string.error_load))
+                    showProblem(
+                        if (ok == null) getString(R.string.login_provider_timeout) else getString(R.string.error_load)
+                    )
                     return@launch
                 }
                 store.saveSession(playlist)
@@ -237,7 +305,7 @@ class LoginActivity : AppCompatActivity() {
                 throw cancelled
             } catch (e: Exception) {
                 connecting = false
-                showError(e.message ?: getString(R.string.error_load))
+                showProblem(e.message ?: getString(R.string.error_load))
             } finally {
                 setBusy(false)
             }
@@ -320,11 +388,8 @@ class LoginActivity : AppCompatActivity() {
         val next = if (skip) {
             Intent(this, BrowseActivity::class.java)
                 .putExtra(BrowseActivity.EXTRA_PLAYLIST_ID, playlistId)
-        } else if (com.olympus.iptv.ui.DeviceForm.isTouchPrimary(this)) {
-            Intent(this, FavoritesSetupActivity::class.java)
-                .putExtra(FavoritesSetupActivity.EXTRA_PLAYLIST_ID, playlistId)
         } else {
-            Intent(this, PairingStepActivity::class.java)
+            Intent(this, FavoritesSetupActivity::class.java)
                 .putExtra(FavoritesSetupActivity.EXTRA_PLAYLIST_ID, playlistId)
         }
         startActivity(next)
@@ -358,11 +423,17 @@ class LoginActivity : AppCompatActivity() {
         binding.btnConnect.text = getString(if (busy) R.string.loading else R.string.connect)
     }
 
+    private fun showProblem(message: String) {
+        if (isFinishing || isDestroyed) return
+        SoftKeyboard.hide(this)
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle(R.string.login_problem_title)
+            .setMessage(message)
+            .setPositiveButton(android.R.string.ok, null)
+            .show()
+    }
+
     private fun showError(message: String) {
-        binding.errorText.visibility = View.VISIBLE
-        binding.errorText.text = message
-        binding.errorText.post {
-            binding.errorText.requestRectangleOnScreen(android.graphics.Rect(0, 0, binding.errorText.width, binding.errorText.height), false)
-        }
+        showProblem(message)
     }
 }

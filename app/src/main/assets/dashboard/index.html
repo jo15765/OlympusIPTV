@@ -1345,6 +1345,8 @@
     <form class="card login" id="setup" hidden>
       <h2>Set up this device</h2>
       <p>Enter the account and playlist here. After you save, finish favorites and filters in this dashboard — they sync to the device.</p>
+      <label for="setupDevice">Device ID</label>
+      <input id="setupDevice" autocomplete="off" placeholder="Shown on the TV login screen" />
       <label for="setupEmail">Email</label>
       <input id="setupEmail" type="email" autocomplete="username" required />
       <label for="setupZip">ZIP code</label>
@@ -5904,9 +5906,13 @@
     setupForm.addEventListener("submit", async (event) => {
       event.preventDefault();
       const error = document.querySelector("#setupError");
-      error.textContent = "Checking the playlist…";
+      error.textContent = "Saving to the device…";
+      const presetDevice = new URLSearchParams(location.search).get("device") || "";
+      const deviceField = document.querySelector("#setupDevice");
+      if (deviceField && presetDevice && !deviceField.value.trim()) deviceField.value = presetDevice;
       const m3u = document.querySelector("#setupMode").value === "m3u";
       const payload = {
+        deviceId: deviceField ? deviceField.value.trim() : presetDevice,
         email: document.querySelector("#setupEmail").value.trim(),
         zip: document.querySelector("#setupZip").value.trim(),
         mode: m3u ? "m3u" : "xtream",
@@ -5929,7 +5935,7 @@
         const email = (body.email || payload.email || "").trim().toLowerCase();
         const deviceId = body.deviceId || "";
         document.querySelector("#address").textContent =
-          "Saved on the device. Finish favorites and filters here — they sync to the player.";
+          "Saved. The TV signs in on its own and starts loading channels.";
         if (!email) return;
         accountEmail = email;
         sessionStorage.setItem("olympus-email", email);
@@ -5948,6 +5954,9 @@
     const savedEmail = sessionStorage.getItem("olympus-email") || "";
     fetch("/api/setup").then((response) => response.json()).then((status) => {
       if (!status.ready) {
+        const presetDevice = new URLSearchParams(location.search).get("device") || "";
+        const deviceField = document.querySelector("#setupDevice");
+        if (deviceField && presetDevice) deviceField.value = presetDevice;
         setupForm.hidden = false;
         loginForm.hidden = true;
         return;

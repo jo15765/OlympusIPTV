@@ -38,6 +38,8 @@ object SoftKeyboard {
                 imm?.showSoftInput(view, flag)
                 WindowCompat.getInsetsController(activity.window, view)
                     .show(androidx.core.view.WindowInsetsCompat.Type.ime())
+                val rect = android.graphics.Rect(0, 0, view.width, view.height + (72 * view.resources.displayMetrics.density).toInt())
+                view.requestRectangleOnScreen(rect, true)
             }
         }
     }

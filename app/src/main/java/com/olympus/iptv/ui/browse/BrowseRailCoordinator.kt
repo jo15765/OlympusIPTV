@@ -289,6 +289,7 @@ internal fun BrowseActivity.rememberGuideSection(next: GuideSection) {
     }
 
 internal fun BrowseActivity.showDevicePane() {
+        settingsReturnCard = panes.cardAdminWeb
         epgPrefetchJob?.cancel()
         binding.btnAdmin.isSelected = true
         binding.btnAbout.isSelected = false
@@ -321,7 +322,8 @@ internal fun BrowseActivity.showDevicePane() {
         }
     }
 
-internal fun BrowseActivity.showAboutPane() {
+internal fun BrowseActivity.showAboutPane(fromAdmin: Boolean = false) {
+        settingsReturnCard = if (fromAdmin) panes.cardAdminAbout else null
         rememberReturnScreen()
         epgPrefetchJob?.cancel()
         binding.btnAbout.isSelected = true
@@ -349,6 +351,7 @@ internal fun BrowseActivity.showAboutPane() {
     }
 
 internal fun BrowseActivity.showAdminPane(focus: View = panes.cardAdminRefresh) {
+        settingsReturnCard = null
         rememberReturnScreen()
         epgPrefetchJob?.cancel()
         binding.btnAdmin.isSelected = true
@@ -378,10 +381,13 @@ internal fun BrowseActivity.showAdminPane(focus: View = panes.cardAdminRefresh) 
             paintBottomTabs()
             paintMobileSettingsChips()
         }
-        focus.post { if (focus.isShown) focus.requestFocus() }
+        focus.post {
+            if (!isDestroyed && focus.isShown) focus.requestFocus()
+        }
     }
 
 internal fun BrowseActivity.showAdminTools() {
+        settingsReturnCard = panes.cardAdminSetup
         val admin = panes.ensureAdmin()
         admin.root.visibility = View.VISIBLE
         admin.adminCards.visibility = View.GONE
@@ -729,13 +735,9 @@ internal fun BrowseActivity.onMobileBack() {
                 armGroupFocus()
                 focusGroups()
             }
-            panes.isDeviceVisible() ||
-                panes.isAboutVisible() ||
-                panes.isAdminVisible() ||
-                panes.isRefreshVisible() ||
-                panes.isVpnVisible() -> {
-                openSection(section)
-            }
+            settingsChildCard() != null -> showAdminPane(settingsChildCard() ?: panes.cardAdminRefresh)
+            browseToolHost.isToolVisible() -> goBackOneScreen()
+            panes.isAdminVisible() || panes.isAboutVisible() -> openSection(section)
             else -> Unit
         }
     }

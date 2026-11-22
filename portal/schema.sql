@@ -193,3 +193,21 @@ DROP TRIGGER IF EXISTS trg_recordings_notify ON recording_books;
 CREATE TRIGGER trg_recordings_notify
     AFTER INSERT OR UPDATE ON recording_books
     FOR EACH ROW EXECUTE FUNCTION notify_lineup_change();
+
+-- 11. Provider login saved from the web dashboard and pulled by the device
+CREATE TABLE IF NOT EXISTS provider_logins (
+    account_id      UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    device_code     TEXT NOT NULL,
+    revision        BIGINT NOT NULL DEFAULT 0,
+    login           JSONB NOT NULL DEFAULT '{}'::jsonb,
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (account_id, device_code),
+    CONSTRAINT chk_provider_login_object CHECK (jsonb_typeof(login) = 'object')
+);
+
+CREATE INDEX IF NOT EXISTS idx_provider_logins_device ON provider_logins(device_code);
+
+DROP TRIGGER IF EXISTS trg_provider_login_notify ON provider_logins;
+CREATE TRIGGER trg_provider_login_notify
+    AFTER INSERT OR UPDATE ON provider_logins
+    FOR EACH ROW EXECUTE FUNCTION notify_lineup_change();

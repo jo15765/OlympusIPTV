@@ -5,6 +5,29 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import java.io.File
 
+fun applyCloudReminders(
+    context: Context,
+    playlistId: String,
+    remote: List<com.olympus.iptv.playlist.LineupClient.RemoteReminder>
+) {
+    val items = remote.map { item ->
+        val start = item.startMillis
+        val lead = item.leadMinutes
+        ShowReminder().also {
+            it.id = item.id
+            it.playlistId = playlistId
+            it.channelId = item.channelId
+            it.channelName = item.channelName
+            it.channelNumber = item.channelNumber
+            it.title = item.title
+            it.startMillis = start
+            it.leadMinutes = lead
+            it.fireAt = (start - lead * 60_000L).coerceAtLeast(0L)
+        }
+    }
+    ReminderStore.replaceAll(context, items)
+}
+
 internal object ReminderStore {
     private val gson = Gson()
     private val type = object : TypeToken<List<ShowReminder>>() {}.type
@@ -56,6 +79,10 @@ internal object ReminderStore {
             if (next.size == current.size) return
             write(context, next)
         }
+    }
+
+    fun replaceAll(context: Context, items: List<ShowReminder>) {
+        synchronized(lock) { write(context, items) }
     }
 
     fun clear(context: Context) {

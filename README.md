@@ -6,7 +6,7 @@
 
 ### For the latest and greatest, build your own APK from this code.
 
-The latest signed file is **0.2.99** (versionCode 99): `C:\Users\chalu\Downloads\olympus-iptv-0.2.99.apk`. **One APK** installs on Android TV / set-top boxes and on phones and tablets. Install it over 0.2.98. The signing key is the same, so the saved account and playlist stay.
+The latest signed file is **0.2.103** (versionCode 103): `C:\Users\chalu\Downloads\olympus-iptv-0.2.103.apk`. **One APK** installs on Android TV / set-top boxes and on phones and tablets. Install it over 0.2.102. The signing key is the same, so the saved account and playlist stay.
 
 **This is a player only. You must provide your own streams.**
 
@@ -23,6 +23,7 @@ Olympus-IPTV does not include channels, movies, shows, or stream addresses. It p
 </div>
 
 - [Start here](#start-here)
+- [What's in 0.2.103](#whats-in-02103)
 - [What's in 0.2.92](#whats-in-0292)
 - [What's in 0.2.86](#whats-in-0286)
 - [What's in 0.2.83](#whats-in-0283)
@@ -54,14 +55,28 @@ Olympus-IPTV is one APK for Android TV / set-top boxes and for phones and tablet
 
 | | |
 | --- | --- |
-| Signed file | `C:\Users\chalu\Downloads\olympus-iptv-0.2.99.apk` |
-| What that file is | versionName **0.2.99**, versionCode **99** |
-| Source in this tree | versionName **0.2.99**, versionCode **99** |
-| What to run | Install the signed 0.2.99 APK, or run this source from Android Studio |
+| Signed file | `C:\Users\chalu\Downloads\olympus-iptv-0.2.103.apk` |
+| What that file is | versionName **0.2.103**, versionCode **103** |
+| Source in this tree | versionName **0.2.103**, versionCode **103** |
+| What to run | Install the signed 0.2.103 APK, or run this source from Android Studio |
 | Install | Over the existing copy (TV or phone). Uninstalling wipes the saved account, playlist, and favorites. Downloader works with the same file. |
 | Launcher name | Two centered lines: Olympus over IPTV |
 
-**0.2.99** is the current signed release. A frozen or stuttering live channel reloads itself, then switches to another feed of that same channel. The guide still paints the last group list immediately. Movies, shows, cloud sync, ratings, and the dashboard snapshot wait until that grid is up. The release copy in Downloads is the signed APK only. Movies and shows open the title page under [What's in 0.2.92](#whats-in-0292). It also restores cloud lineup push, the remote lineup revision, and recording sync, and keeps the live-games list, off-air hiding, and the shorter guide under [What's in 0.2.86](#whats-in-0286). Live Games Now skips 24/7 replay channels. Group counts use the stored event window and still leave out hidden channels. Two wrong parental PINs can email through Mailgun when that is configured. Sticks with a small heap still use the 16 MB image cache, RGB_565 posters, and a 10 second buffer. Larger boxes pre-warm only the next channel.
+**0.2.103** is the current signed release. Cloud setup and later cloud edits are described in [What's in 0.2.103](#whats-in-02103). The channel-loading screen leaves once live channels are saved, and the guide spinner clears if that load fails. A frozen or stuttering live channel reloads itself, then switches to another feed of that same channel. The guide still paints the last group list immediately. Movies, shows, cloud sync, ratings, and the dashboard snapshot wait until that grid is up. The release copy in Downloads is the signed APK only. Movies and shows open the title page under [What's in 0.2.92](#whats-in-0292). It also restores cloud lineup push, the remote lineup revision, and recording sync, and keeps the live-games list, off-air hiding, and the shorter guide under [What's in 0.2.86](#whats-in-0286). Live Games Now skips 24/7 replay channels. Group counts use the stored event window and still leave out hidden channels. Two wrong parental PINs can email through Mailgun when that is configured. Sticks with a small heap still use the 16 MB image cache, RGB_565 posters, and a 10 second buffer. Larger boxes pre-warm only the next channel.
+
+---
+
+<div align="center">
+
+## What's in 0.2.103
+
+</div>
+
+- On the login screen, Down and the keyboard Next key move in order: email, server URL, username, password, ZIP, the two checkboxes, then Connect. Left and right stay on the field you are typing in. The window pans that field above the keyboard so the dashboard label does not cover it.
+- Connect asks the provider to accept the URL, username, and password before it leaves this screen. If the provider does not answer within 20 seconds, or rejects the login, a popup says so and the form stays up. A good login opens auto-add favorites. The QR pairing step is gone.
+- The cloud setup form stores the email, ZIP, host, username, and password against the device ID shown on the TV. The QR code and the copied address already include that ID, so the form is filled in when it is opened from the TV. Restart the cloud portal after deploying this server so that save is live.
+- Every 10 seconds the app reads revision numbers from the cloud database. It rewrites the device only when a number is newer than the one it already applied. That covers the playlist login, lineup edits, favorites, recordings, reminders, and continue watching. The check runs before the device is set up, so a playlist saved on the cloud starts the channel list on the next pass. A live connection still applies a save as soon as the database has it.
+- Remove playlist shows “Removing playlist…” and then returns to the login screen. Back from a Settings page returns to that Settings card. Back from the Settings card grid still returns to the left rail.
 
 ---
 
@@ -353,13 +368,13 @@ HLS streams are saved by following the playlist. A direct stream is copied until
 
 While the app process is running it serves the dashboard on the home network. It starts on port **8765**. If that port is taken, it tries 8766 through 8776. Admin → Web-UI shows the address. Port 8443 stays with Cast. The address is `http://` plus the device’s own Wi-Fi address. HTML and JSON are gzip-compressed when the browser asks. The page itself is stored pre-compressed as `dashboard/portal-page.pack` so the asset packer does not treat it as a second `index.html`. `portal/data/store.json` is never packaged. Login and the header offer **Copy TV URL**. The server stops when the app process stops. Clients that are not on the home network are refused.
 
-Sign in with the email and the device id from Web-UI. Stream addresses are not sent to the page. Backup export downloads one JSON file of favorites, renames, parental PINs, strip rules, the rest of the lineup, and per-channel audio offsets. Import previews, then asks before it writes that file back.
+The same page on the cloud portal saves the playlist login for the device ID in the address. The app checks those revision numbers every 10 seconds and applies a section only when it changed. Sign in with the email and the device id from Web-UI. Stream addresses are not sent to the page. Backup export downloads one JSON file of favorites, renames, parental PINs, strip rules, the rest of the lineup, and per-channel audio offsets. Import previews, then asks before it writes that file back.
 
 The web Admin cards match the TV, and add Active Streams and the error log. Active Streams shows the provider’s active and max connection count. Addresses are listed when the login response includes them. Otherwise the page lists streams this device still has open. Logs rotate at 400 KB. Passwords and stream credentials are not written into the log.
 
 A VPN (PIA, Proton, Surfshark, Nord, or WireGuard) sends this app’s traffic through the tunnel. Home-network addresses, including the dashboard, stay on the LAN. If the first city does not answer, the backup city is tried. New streams wait until one answers.
 
-`portal/` is an older Node copy of the page for work on a PC. The device serves `app/src/main/assets/dashboard/`. A signed install does not need the Node server.
+`portal/` is the cloud server. The device also serves `app/src/main/assets/dashboard/` on the home network. A playlist typed on the cloud is stored for that device ID and pulled by the app. A playlist typed on the home-network page is saved on the device directly.
 
 ---
 
@@ -372,7 +387,7 @@ A VPN (PIA, Proton, Surfshark, Nord, or WireGuard) sends this app’s traffic th
 | Screen | What it does |
 | --- | --- |
 | Refresh Options | Checks the provider and saves channels that are not already on this device. The interval can be 30, 60, 120, 360, 720, or 1440 minutes. The default is 60. |
-| Web-UI | Email, device id, and dashboard address. Remove playlist clears this device’s account, library, favorites, lineup edits, recordings list, watch history, queue, and reminders, keeps the device id, and opens sign-in. |
+| Web-UI | Email, device id, and dashboard address. Remove playlist shows a spinner, then clears this device’s account, library, favorites, lineup edits, recordings list, watch history, queue, and reminders, keeps the device id, and opens sign-in. |
 | EPG edits | Countries, groups and channels, show everything again, the bulk stripper, the bulk group renamer, Sanitize, image removal, and the switch that fills an empty guide from channel names. Also Parental controls, **Hide empty groups** (on by default), **Guide density**, **Parental unlock time** (5–60 minutes), **Video decoder**, **TMDB items limit**, **PiP gestures**, and **Scrobbler**. |
 | VPN | PIA, Proton, Surfshark, Nord, and WireGuard, two cards across. Nord can use its access token in the password box. WireGuard takes a profile. Backup city is tried when the first city drops. |
 | Favorites setup | Opens auto-add again. When the catalog is already loaded it skips the pulling-channels splash. |
@@ -395,7 +410,7 @@ Parental controls list the Live TV groups that are visible on the guide. Set PIN
 - OK on a group card opens it. OK on a program plays it. In the player, OK shows play/pause and progress for 3 seconds. Info opens the full menu.
 - Hold OK on live TV for favorites, move up, move down, record, and Remind me. Hold OK on a movie or show for favorites, record, Add to Queue, and Ratings & reviews.
 - On the channel list or the program guide, number keys open the Channel dial.
-- Back steps one screen. Back on the rail does not quit the app.
+- Back steps one screen. Inside Settings, Back returns to the Settings card you opened. Back on the rail does not quit the app.
 - Hold Up or Down for 1.2 seconds on a long channel list, or press Right past a movie or show column, to open the A–Z jump.
 
 ---
@@ -408,7 +423,7 @@ Parental controls list the Live TV groups that are visible on the guide. Set PIN
 
 DataStore `olympus_iptv` holds the playlist, the session, favorites, the Queue, the device id, lineup edits, the last live channel, watch history (up to 60 rows per playlist), recordings plus SMB settings, picture mode, audio and subtitle language, guide density, quiet hours, parental unlock minutes, multi-view, the video decoder, the TMDB limit, PiP gestures, Scrobbler tokens, and per-channel lip-sync offsets. Reminders are in `reminders.json`. Admin → Web-UI → Remove playlist clears that account data and the SQLite library, keeps the device id, and returns to sign-in.
 
-The library is SQLite `olympus-iptv.db` (schema version 14): categories, channels, a disk cache of guide rows, watched episodes, and event-window columns used to hide off-air slots. Stream addresses stay in that database. They are not published to the dashboard. Once a day, guide rows older than 24 hours are deleted, then the database is vacuumed and the WAL is truncated. Installing 0.2.86 adds those columns on the existing database.
+The library is SQLite `olympus-iptv.db` (schema version 16): categories, channels, a disk cache of guide rows, watched episodes, and event-window columns used to hide off-air slots. Stream addresses stay in that database. They are not published to the dashboard. Once a day, guide rows older than 24 hours are deleted, then the database is vacuumed and the WAL is truncated.
 
 The SMB password, playlist password, and Scrobbler tokens stay on the device. Do not commit `local.properties`, the DataStore file, or a dashboard export that still has secrets.
 
@@ -442,7 +457,7 @@ The debug APK is `app/build/outputs/apk/debug/app-debug.apk`. Optional keys go i
 | `opensubtitles.apiKey` | OpenSubtitles under player Subtitles |
 | `mailgun.apiKey` + `mailgun.domain` + `mailgun.fromEmail` | Email after two wrong parental PINs |
 
-Release builds use R8, resource shrinking, and optimized resource shrinking. They keep `armeabi-v7a` and `arm64-v8a` only, and English resources only. A baseline profile covers the guide and the player. Gradle is set to work offline. The latest signed release is `C:\Users\chalu\Downloads\olympus-iptv-0.2.99.apk`.
+Release builds use R8, resource shrinking, and optimized resource shrinking. They keep `armeabi-v7a` and `arm64-v8a` only, and English resources only. A baseline profile covers the guide and the player. Gradle is set to work offline. The latest signed release is `C:\Users\chalu\Downloads\olympus-iptv-0.2.103.apk`.
 
 Libraries: Kotlin, AndroidX, ViewBinding, Media3 ExoPlayer (HLS and DASH), OkHttp, Gson, DataStore, Coil, profileinstaller, Google Cast / MediaRouter, and SMBJ. WorkManager is not a dependency. The dashboard is a page in the APK.
 
@@ -513,13 +528,13 @@ clearcast-tuner/
 
 - This is a player only. You must provide your own streams.
 - It is a beta.
-- **0.2.99** is the latest signed file (`olympus-iptv-0.2.99.apk`, versionCode 99). Install it over 0.2.98.
+- **0.2.103** is the latest signed file (`olympus-iptv-0.2.103.apk`, versionCode 103). Install it over 0.2.102.
 - `portal/data/store.json` is for the Node portal on a PC. It is not packaged in the APK.
 - Chromecast often cannot play provider IPTV/HLS. The Cast button warns before connecting.
 - Ratings, trailers, and New this week need the matching keys in `local.properties` at build time.
 - Live groups follow the provider’s category ids. A huge 24/7 card is usually one panel category.
 - Live groups with 250 or more channels use hour blocks of each channel name and page 20 channels at a time.
-- The dashboard is only for the home network, and only while the app process is running.
+- The on-device dashboard is only for the home network, and only while the app process is running. The cloud portal stores the playlist login and lineup edits for the device ID, and the app checks those revisions every 10 seconds.
 - The device has to stay able to run its recorder for a scheduled recording to start.
 - One recording at a time.
 - Resume applies to movies and episodes. Opening the app does not start the last live channel. There is no Continue strip above the groups.

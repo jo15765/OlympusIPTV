@@ -400,6 +400,109 @@ async function deleteReminder(accountId, deviceCode, id) {
   );
 }
 
+let providerTableReady = null;
+function ensureProviderTable() {
+  if (!providerTableReady) {
+    providerTableReady = pool.query(`
+      CREATE TABLE IF NOT EXISTS provider_logins (
+        account_id      UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+        device_code     TEXT NOT NULL,
+        revision        BIGINT NOT NULL DEFAULT 0,
+        login           JSONB NOT NULL DEFAULT '{}'::jsonb,
+        updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (account_id, device_code)
+      )
+    `).then(() => pool.query(
+      `CREATE INDEX IF NOT EXISTS idx_provider_logins_device ON provider_logins(device_code)`
+    )).catch((err) => {
+      providerTableReady = null;
+      throw err;
+    });
+  }
+  return providerTableReady;
+}
+
+async function upsertProviderLogin(accountId, deviceCode, login) {
+  await ensureProviderTable();
+  const rev = Date.now();
+  const payload = Object.assign({}, login, { revision: rev });
+  const { rows } = await pool.query(
+    `INSERT INTO provider_logins (account_id, device_code, revision, login, updated_at)
+     VALUES ($1, $2, $3, $4::jsonb, NOW())
+     ON CONFLICT (account_id, device_code) DO UPDATE SET
+       revision = EXCLUDED.revision,
+       login = EXCLUDED.login,
+       updated_at = NOW()
+     RETURNING revision`,
+    [accountId, deviceCode, rev, JSON.stringify(payload)]
+  );
+  return { revision: Number(rows[0]?.revision) || rev };
+}
+
+async function getProviderLogin(deviceCode) {
+  await ensureProviderTable();
+  const { rows } = await pool.query(
+    `SELECT a.email, p.device_code, p.revision, p.login
+     FROM provider_logins p
+     JOIN accounts a ON a.id = p.account_id
+     WHERE p.device_code = $1
+     ORDER BY p.updated_at DESC
+     LIMIT 1`,
+    [deviceCode]
+  );
+  if (!rows.length) return null;
+  const login = rows[0].login || {};
+  return Object.assign({}, login, {
+    email: rows[0].email,
+    deviceId: rows[0].device_code,
+    revision: Number(rows[0].revision) || Number(login.revision) || 0
+  });
+}
+
+async function getSyncStamp(deviceCode) {
+  await ensureProviderTable();
+  const login = await pool.query(
+    `SELECT revision FROM provider_logins WHERE device_code = $1 ORDER BY updated_at DESC LIMIT 1`,
+    [deviceCode]
+  );
+  const loginRev = Number(login.rows[0]?.revision) || 0;
+  const acct = await pool.query(
+    `SELECT account_id FROM provider_logins WHERE device_code = $1
+     UNION
+     SELECT account_id FROM devices WHERE device_code = $1
+     LIMIT 1`,
+    [deviceCode]
+  );
+  const accountId = acct.rows[0]?.account_id;
+  if (!accountId) {
+    return { login: loginRev, lineup: 0, favorites: 0, recordings: 0, reminders: 0, watch: 0 };
+  }
+  const { rows } = await pool.query(
+    `SELECT
+       COALESCE((SELECT revision FROM lineup_configs WHERE account_id = $1 AND device_code = $2), 0) AS lineup,
+       COALESCE((SELECT revision FROM favorites WHERE account_id = $1 AND device_code = '__shared__'), 0) AS favorites,
+       COALESCE((SELECT revision FROM recording_books WHERE account_id = $1 AND device_code = $2), 0) AS recordings,
+       COALESCE((
+         SELECT (EXTRACT(EPOCH FROM MAX(created_at)) * 1000)::bigint + COUNT(*)::bigint
+         FROM reminders WHERE account_id = $1 AND device_code = $2
+       ), 0) AS reminders,
+       COALESCE((
+         SELECT (EXTRACT(EPOCH FROM MAX(updated_at)) * 1000)::bigint
+         FROM watch_history WHERE account_id = $1
+       ), 0) AS watch`,
+    [accountId, deviceCode]
+  );
+  const row = rows[0] || {};
+  return {
+    login: loginRev,
+    lineup: Number(row.lineup) || 0,
+    favorites: Number(row.favorites) || 0,
+    recordings: Number(row.recordings) || 0,
+    reminders: Number(row.reminders) || 0,
+    watch: Number(row.watch) || 0
+  };
+}
+
 async function getSnapshot(accountId, deviceCode) {
   const { rows } = await pool.query(
     `SELECT library_stamp, channel_count, groups, countries
@@ -492,5 +595,8 @@ module.exports = {
   deleteReminder,
   getSnapshot,
   upsertSnapshot,
+  upsertProviderLogin,
+  getProviderLogin,
+  getSyncStamp,
   startNotificationListener
 };

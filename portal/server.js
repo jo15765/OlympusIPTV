@@ -88,8 +88,78 @@ app.get("/api/health", async (_req, res) => {
   }
 });
 
-app.get("/api/setup", (_req, res) => {
-  res.json({ ready: true, cloud: true, strictTokens: STRICT_TOKENS });
+app.get("/api/setup", async (req, res) => {
+  try {
+    const deviceId = String(req.query.device || req.query.deviceId || "").trim();
+    if (!deviceId) return res.json({ ready: false, cloud: true, strictTokens: STRICT_TOKENS });
+    const login = await db.getProviderLogin(deviceId);
+    res.json({ ready: Boolean(login), cloud: true, strictTokens: STRICT_TOKENS });
+  } catch (err) {
+    res.status(500).json({ ready: false, error: err.message });
+  }
+});
+
+app.post("/api/setup", async (req, res) => {
+  try {
+    const body = req.body || {};
+    const email = String(body.email || "").trim().toLowerCase();
+    const deviceId = String(body.deviceId || body.device || "").trim();
+    const zip = String(body.zip || "").replace(/\D/g, "").slice(0, 5);
+    const mode = body.mode === "m3u" ? "m3u" : "xtream";
+    const host = String(body.host || "").trim();
+    const url = String(body.url || "").trim();
+    const username = String(body.username || "").trim();
+    const password = String(body.password || "");
+    if (!email.includes("@") || zip.length !== 5) {
+      return res.status(400).json({ error: "Email and a 5-digit ZIP are required" });
+    }
+    if (!deviceId) {
+      return res.status(400).json({ error: "Enter the device ID shown on the TV" });
+    }
+    if (mode === "m3u" && !url.startsWith("http")) {
+      return res.status(400).json({ error: "M3U URL must start with http:// or https://" });
+    }
+    if (mode === "xtream" && (!host.startsWith("http") || !username || !password)) {
+      return res.status(400).json({ error: "Host, username, and password are required" });
+    }
+    const account = await db.ensureAccount(email);
+    await db.registerDevice(account.id, deviceId, "android", "");
+    const saved = await db.upsertProviderLogin(account.id, deviceId, {
+      mode,
+      host,
+      url,
+      username,
+      password,
+      zip,
+      includeVod: body.includeVod !== false,
+      includeInternational: Boolean(body.includeInternational)
+    });
+    res.json({ ok: true, email, deviceId, revision: saved.revision });
+  } catch (err) {
+    res.status(400).json({ error: err.message || "Could not save the playlist" });
+  }
+});
+
+app.get("/api/sync/stamp", async (req, res) => {
+  try {
+    const deviceId = String(req.query.deviceId || req.headers["x-device-id"] || "").trim();
+    if (!deviceId) return res.status(400).json({ error: "Device ID required" });
+    res.json({ ok: true, ...(await db.getSyncStamp(deviceId)) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/api/provider-login", async (req, res) => {
+  try {
+    const deviceId = String(req.query.deviceId || req.headers["x-device-id"] || "").trim();
+    if (!deviceId) return res.status(400).json({ error: "Device ID required" });
+    const login = await db.getProviderLogin(deviceId);
+    if (!login) return res.status(404).json({ error: "No playlist saved for this device" });
+    res.json({ ok: true, ...login });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ----------------------------------------------------------------------------

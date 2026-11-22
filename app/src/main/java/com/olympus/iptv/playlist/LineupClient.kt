@@ -127,6 +127,60 @@ class LineupClient(
         }
     }
 
+    /** Playlist login saved on the cloud dashboard for this device. Null when none is waiting. */
+    fun pullProviderLogin(deviceId: String): JsonObject? {
+        val cloud = BuildConfig.PORTAL_CLOUD_URL.trim()
+        if (!cloud.startsWith("http://") && !cloud.startsWith("https://")) return null
+        if (deviceId.isBlank()) return null
+        val url = "${baseUrl()}/api/provider-login?deviceId=${enc(deviceId)}"
+        return runCatching {
+            http.newCall(
+                Request.Builder().url(url).get().header("X-Device-Id", deviceId).build()
+            ).execute().use { resp ->
+                if (resp.code == 404) return null
+                if (!resp.isSuccessful) return null
+                JsonParser.parseString(resp.body?.string().orEmpty()).asJsonObject
+            }
+        }.getOrNull()
+    }
+
+    /** Revision numbers only. The app downloads a section when its number changes. */
+    fun pullSyncStamp(deviceId: String): JsonObject? {
+        val cloud = BuildConfig.PORTAL_CLOUD_URL.trim()
+        if (!cloud.startsWith("http://") && !cloud.startsWith("https://")) return null
+        if (deviceId.isBlank()) return null
+        val url = "${baseUrl()}/api/sync/stamp?deviceId=${enc(deviceId)}"
+        return runCatching {
+            http.newCall(
+                Request.Builder().url(url).get().header("X-Device-Id", deviceId).build()
+            ).execute().use { resp ->
+                if (!resp.isSuccessful) return null
+                JsonParser.parseString(resp.body?.string().orEmpty()).asJsonObject
+            }
+        }.getOrNull()
+    }
+
+    fun pullFavorites(email: String, deviceId: String): Pair<List<String>, Long>? {
+        val token = ensureDeviceToken(email, deviceId)
+        val url = "${baseUrl()}/api/favorites?email=${enc(email)}&deviceId=${enc(deviceId)}"
+        val body = runCatching { getJson(url, token, deviceId) }.getOrNull() ?: return null
+        val rev = body.get("revision")?.asLong ?: return null
+        val arr = body.getAsJsonArray("ids") ?: return emptyList<String>() to rev
+        val out = ArrayList<String>(arr.size())
+        arr.forEach { out.add(it.asString) }
+        return out to rev
+    }
+
+    fun pullRecordings(email: String, deviceId: String): RecordingBook? {
+        val token = ensureDeviceToken(email, deviceId)
+        val url = "${baseUrl()}/api/recordings?email=${enc(email)}&deviceId=${enc(deviceId)}"
+        return runCatching {
+            getJson(url, token, deviceId)?.getAsJsonObject("recordings")?.let {
+                gson.fromJson(it, RecordingBook::class.java)
+            }
+        }.getOrNull()
+    }
+
     fun remoteLineup(email: String, deviceId: String): LineupConfig? {
         val token = ensureDeviceToken(email, deviceId)
         val url = "${baseUrl()}/api/lineup?email=${enc(email)}&deviceId=${enc(deviceId)}"

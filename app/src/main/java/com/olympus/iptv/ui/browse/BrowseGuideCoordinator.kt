@@ -115,6 +115,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.text.NumberFormat
 
 internal fun BrowseActivity.refreshUnhealthy() {
@@ -165,7 +166,7 @@ internal fun BrowseActivity.wireLazyPanes() {
                 openEpgEdits()
             }
             admin.cardAdminVpn.setOnClickListener { showVpnPane() }
-            admin.cardAdminAbout.setOnClickListener { showAboutPane() }
+            admin.cardAdminAbout.setOnClickListener { showAboutPane(fromAdmin = true) }
             admin.cardAdminFavorites.setOnClickListener { openFavoritesSetup() }
             admin.cardAdminSetup.setOnClickListener { showAdminTools() }
             admin.adminToolsBack.setOnClickListener { showAdminPane(admin.cardAdminSetup) }
@@ -236,8 +237,8 @@ internal fun BrowseActivity.hostOnCreate(savedInstanceState: Bundle?) {
         }
         browseToolHost = BrowseToolHost(this, binding.toolOverlay)
         supportFragmentManager.setFragmentResultListener(EpgEditsFragment.RESULT_KEY, this) { _, _ ->
-            showBlank()
             applySavedLineup()
+            if (!isDestroyed) showAdminPane(panes.cardAdminEpg)
         }
         supportFragmentManager.addOnBackStackChangedListener {
             if (supportFragmentManager.findFragmentById(R.id.toolHost) == null) {
@@ -658,7 +659,7 @@ internal suspend fun BrowseActivity.bootstrap(savedIn: SavedPlaylist) {
                     val local = lineupJob.await()
                     applyFavorites(favoritesJob.await())
                     showLoading(true)
-                    app.catalogLiveReady?.await()
+                    withTimeoutOrNull(45_000L) { app.catalogLiveReady?.await() }
                     showLoading(false)
                     if (withContext(Dispatchers.IO) { db.hasLibrary(saved.id) }) {
                         val categories = withContext(Dispatchers.IO) {
@@ -724,6 +725,8 @@ internal suspend fun BrowseActivity.bootstrap(savedIn: SavedPlaylist) {
             if (!isDestroyed) {
                 android.widget.Toast.makeText(this, R.string.favorites_setup_guide_failed, android.widget.Toast.LENGTH_LONG).show()
             }
+        } finally {
+            if (!isDestroyed) showLoading(false)
         }
     }
 
@@ -1031,6 +1034,7 @@ internal fun BrowseActivity.applySavedLineup() {
 
 internal fun BrowseActivity.openEpgEdits() {
         val saved = playlist ?: return
+        settingsReturnCard = panes.cardAdminEpg
         showTool(EpgEditsFragment.newInstance(saved.id, kind, saved.includeVod))
     }
 
@@ -1050,6 +1054,15 @@ internal fun BrowseActivity.backFromOverlay() {
         rail.post { rail.requestFocus() }
     }
 
+internal fun BrowseActivity.settingsChildCard(): View? = when {
+        panes.isVpnVisible() -> panes.cardAdminVpn
+        panes.isRefreshVisible() -> panes.cardAdminRefresh
+        panes.isDeviceVisible() -> panes.cardAdminWeb
+        panes.adminOrNull?.adminTools?.visibility == View.VISIBLE -> panes.cardAdminSetup
+        panes.isAboutVisible() && settingsReturnCard != null -> settingsReturnCard
+        else -> null
+    }
+
 internal fun BrowseActivity.goBackOneScreen() {
         if (browseToolHost.isToolVisible()) {
             when (val tool = supportFragmentManager.findFragmentById(R.id.toolHost)) {
@@ -1066,20 +1079,9 @@ internal fun BrowseActivity.goBackOneScreen() {
             }
             return
         }
-        if (panes.isVpnVisible()) {
-            showAdminPane(panes.cardAdminVpn)
-            return
-        }
-        if (panes.isRefreshVisible()) {
-            showAdminPane(panes.cardAdminRefresh)
-            return
-        }
-        if (panes.isDeviceVisible()) {
-            showAdminPane(panes.cardAdminWeb)
-            return
-        }
-        if (panes.adminOrNull?.adminTools?.visibility == View.VISIBLE) {
-            showAdminPane(panes.ensureAdmin().cardAdminSetup)
+        val child = settingsChildCard()
+        if (child != null) {
+            showAdminPane(child)
             return
         }
         if (panes.isAdminVisible() ||
@@ -1299,6 +1301,20 @@ internal fun BrowseActivity.hostDispatchKey(event: KeyEvent): Boolean {
                 focusHandler.postDelayed(letterJumpHold, 1_200L)
             }
             if (event.action == KeyEvent.ACTION_UP) focusHandler.removeCallbacks(letterJumpHold)
+        }
+        if (event.action == KeyEvent.ACTION_DOWN && event.keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
+            val focused = currentFocus
+            val onPaneBack = focused === panes.deviceOrNull?.deviceBack ||
+                focused === panes.vpnOrNull?.vpnBack ||
+                focused === panes.refreshOrNull?.refreshBack ||
+                focused === panes.adminOrNull?.adminToolsBack
+            if (onPaneBack) {
+                val child = settingsChildCard()
+                if (child != null) {
+                    showAdminPane(child)
+                    return true
+                }
+            }
         }
         if (event.action == KeyEvent.ACTION_DOWN &&
             (event.keyCode == KeyEvent.KEYCODE_BACK ||
@@ -1530,7 +1546,7 @@ internal fun BrowseActivity.hostDispatchKey(event: KeyEvent): Boolean {
                     return true
                 }
                 KeyEvent.KEYCODE_DPAD_LEFT -> {
-                    binding.btnAdmin.requestFocus()
+                    showAdminPane(panes.cardAdminRefresh)
                     return true
                 }
                 KeyEvent.KEYCODE_DPAD_RIGHT -> return true

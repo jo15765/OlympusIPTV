@@ -132,6 +132,7 @@
                         android:clickable="true"
                         android:focusable="true"
                         android:gravity="center"
+                        android:nextFocusRight="@id/btnM3u"
                         android:paddingHorizontal="12dp"
                         android:text="@string/copy_tv_url"
                         android:textColor="@color/text_primary"
@@ -139,6 +140,14 @@
                         android:textStyle="bold" />
                 </LinearLayout>
             </LinearLayout>
+
+            <TextView
+                android:id="@+id/portalHint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp" />
         </LinearLayout>
 
         <FrameLayout
@@ -490,14 +499,6 @@
             </ScrollView>
         </FrameLayout>
     </LinearLayout>
-
-    <TextView
-        android:id="@+id/portalHint"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:textColor="@color/text_secondary"
-        android:textSize="12sp" />
 
     <TextView
         android:id="@+id/errorText"

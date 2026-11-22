@@ -198,21 +198,25 @@ class FavoritesSetupActivity : AppCompatActivity() {
         CatalogIngest.start(app, saved)
         val job = app.catalogRefresh
         var steady = 0
-        var lastKey = ""
+        var stuck = 0
+        var lastLive = -1
+        var lastPercent = -1
         while (job?.isActive == true && !isFinishing) {
             counts = withContext(Dispatchers.IO) { db.bucketCounts(saved.id) }
             val percent = CatalogIngest.progress.overall(saved.includeVod)
             publishCounts(counts, percent)
-            val key = "${counts[0]}:${counts[1]}:${counts[2]}"
-            val filled = counts[0] > 0 && (!saved.includeVod || (counts[1] > 0 && counts[2] > 0))
-            if (percent >= 100 && counts[0] > 0) break
-            if (key == lastKey && filled) {
+            // Live rows are enough to leave this screen. Movies and shows keep downloading behind it.
+            if (counts[0] > 0 && counts[0] == lastLive) {
                 steady += 1
-                if (steady >= 4) break
-            } else {
+                if (steady >= 2 || percent >= 100) break
+            } else if (counts[0] > 0) {
                 steady = 0
             }
-            lastKey = key
+            if (counts[0] == lastLive && percent == lastPercent) stuck += 1 else stuck = 0
+            lastLive = counts[0]
+            lastPercent = percent
+            // A provider that never finishes used to leave this spinner up with no error on screen.
+            if (counts[0] == 0 && stuck >= 45) break
             delay(800)
         }
         publishCounts(withContext(Dispatchers.IO) { db.bucketCounts(saved.id) }, 100)

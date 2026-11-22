@@ -108,6 +108,7 @@
     <string name="device_step_4">Show or hide countries, groups, and channels.</string>
     <string name="device_step_5">Those changes come back to this TV.</string>
     <string name="device_remove_playlist">Remove playlist</string>
+    <string name="device_removing_playlist">Removing playlist…</string>
     <string name="device_remove_playlist_hint">Clears this TV’s account, library, favorites, recordings list, and reminders, then opens sign-in.</string>
     <string name="device_remove_playlist_title">Remove playlist?</string>
     <string name="device_remove_playlist_message">This clears the account on this TV, the channel library, favorites, lineup edits, recordings list, watch history, queue, and reminders. The device ID stays. You will sign in again.</string>
@@ -126,6 +127,8 @@
     <string name="remove_favorite">Remove from favorites</string>
     <string name="no_favorites">No favorites yet. Open a channel and choose Add to favorites.</string>
     <string name="error_load">Could not load playlist. Check the URL or credentials.</string>
+    <string name="login_problem_title">Check the playlist</string>
+    <string name="login_provider_timeout">The provider did not answer. Check the server URL, username, and password.</string>
     <string name="error_playback">Playback failed</string>
     <string name="type_m3u">M3U</string>
     <string name="type_xtream">Xtream</string>

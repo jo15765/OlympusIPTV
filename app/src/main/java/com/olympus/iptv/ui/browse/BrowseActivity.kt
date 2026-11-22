@@ -561,6 +561,11 @@ class BrowseActivity : AppCompatActivity(), ToolHost {
 
     internal var landOnGroups = false
 
+    /** Settings card to restore when Back leaves a Settings &amp; Help submenu. */
+    internal var settingsReturnCard: android.view.View? = null
+
+    internal var removingPlaylist = false
+
     internal var landOnContinue = false
 
     internal var groupFocusTries = 0

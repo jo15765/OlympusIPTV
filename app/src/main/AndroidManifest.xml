@@ -33,7 +33,7 @@
             android:name=".ui.login.LoginActivity"
             android:exported="false"
             android:screenOrientation="landscape"
-            android:windowSoftInputMode="adjustResize" />
+            android:windowSoftInputMode="adjustPan" />
 
         <activity
             android:name=".ui.login.FavoritesSetupActivity"

@@ -1421,13 +1421,19 @@ object DashboardHost {
             return
         }
         val ok = try {
-            runBlocking { PlaylistLoader().validate(playlist) }
+            runBlocking {
+                kotlinx.coroutines.withTimeoutOrNull(20_000L) { PlaylistLoader().validate(playlist) }
+            }
         } catch (error: Exception) {
             writeJson(socket, 400, mapOf("error" to (error.message ?: "Could not reach the playlist")))
             return
         }
-        if (!ok) {
-            writeJson(socket, 400, mapOf("error" to "The playlist did not respond"))
+        if (ok != true) {
+            writeJson(
+                socket,
+                400,
+                mapOf("error" to "The provider did not answer. Check the URL, username, and password.")
+            )
             return
         }
         val deviceId = runBlocking {

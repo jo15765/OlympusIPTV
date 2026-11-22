@@ -30,6 +30,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.io.File
 
 class OlympusIptvApp : Application() {
@@ -213,32 +215,8 @@ class OlympusIptvApp : Application() {
                     val deviceId = runCatching { playlistStore.deviceId() }.getOrDefault("")
                     if (deviceId.isNotBlank()) {
                         val client = com.olympus.iptv.playlist.LineupClient(this@OlympusIptvApp)
-                        val sseJob = client.subscribeSyncEvents(this, email, deviceId) { table ->
-                            when (table) {
-                                "favorites" -> {
-                                    val localIds = playlistStore.favorites(saved.id)
-                                    val localRev = playlistStore.favoritesRevision(saved.id)
-                                    val synced = client.syncFavorites(email, deviceId, localIds, localRev)
-                                    if (synced != null && synced.first != localIds) {
-                                        playlistStore.saveFavorites(saved.id, synced.first, synced.second)
-                                    }
-                                }
-                                "recording_books" -> {
-                                    val localBook = playlistStore.recordingBook(saved.id)
-                                    val remoteBook = client.syncRecordings(email, deviceId, localBook)
-                                    if ((remoteBook.revision ?: 0L) > (localBook.revision ?: 0L)) {
-                                        playlistStore.saveRecordingBook(saved.id, remoteBook)
-                                        com.olympus.iptv.record.RecordingService.start(this@OlympusIptvApp)
-                                    }
-                                }
-                                else -> {
-                                    val localLineup = playlistStore.lineup(saved.id)
-                                    val merged = client.reconcile(email, deviceId, localLineup)
-                                    if ((merged.revision ?: 0L) > (localLineup.revision ?: 0L)) {
-                                        playlistStore.saveLineup(saved.id, merged)
-                                    }
-                                }
-                            }
+                        val sseJob = client.subscribeSyncEvents(this, email, deviceId) { _ ->
+                            pullCloudChanges()
                         }
                         sseJob.join()
                     }
@@ -246,6 +224,125 @@ class OlympusIptvApp : Application() {
                 delay(if (activeEmail.isBlank()) 4_000L else 2_000L)
             }
         }
+    }
+
+    @Volatile private var cloudLoginRevision = -1L
+    private val cloudPull = Mutex()
+    private val cloudStamps = HashMap<String, Long>()
+
+    /** Reads cloud revision numbers every 10 seconds and applies a section only when it changed. */
+    private fun watchCloudLogin() {
+        appScope.launch {
+            while (isActive) {
+                runCatching { pullCloudChanges() }
+                delay(10_000L)
+            }
+        }
+    }
+
+    private suspend fun pullCloudChanges() {
+        cloudPull.withLock {
+            val deviceId = runCatching { playlistStore.deviceId() }.getOrDefault("")
+            if (deviceId.isBlank()) return
+            val client = com.olympus.iptv.playlist.LineupClient(this)
+            val stamp = client.pullSyncStamp(deviceId) ?: return
+            fun number(key: String): Long {
+                val value = stamp.get(key) ?: return 0L
+                if (value.isJsonNull || !value.isJsonPrimitive) return 0L
+                return value.asLong
+            }
+            val loginRev = number("login")
+            if (cloudStamps["login"] != loginRev) {
+                if (loginRev == 0L || claimCloudLogin()) cloudStamps["login"] = loginRev
+            }
+            val saved = runCatching { playlistStore.session.first() }.getOrNull() ?: return
+            val email = saved.email?.trim().orEmpty()
+            if (email.isBlank()) return
+            val lineupRev = number("lineup")
+            if (cloudStamps["lineup"] != lineupRev) {
+                val local = playlistStore.lineup(saved.id)
+                val remote = runCatching { client.remoteLineup(email, deviceId) }.getOrNull()
+                if (remote != null) {
+                    if ((remote.revision ?: 0L) > (local.revision ?: 0L)) {
+                        playlistStore.saveLineup(saved.id, remote)
+                        val prefixes = remote.namePrefixes.orEmpty()
+                        val suffixes = remote.nameSuffixes.orEmpty()
+                        if (prefixes != local.namePrefixes.orEmpty() || suffixes != local.nameSuffixes.orEmpty()) {
+                            runCatching { catalogDb.rewriteNames(saved.id, prefixes, suffixes) }
+                        }
+                    }
+                    cloudStamps["lineup"] = lineupRev
+                }
+            }
+            val favoritesRev = number("favorites")
+            if (cloudStamps["favorites"] != favoritesRev) {
+                val localRev = playlistStore.favoritesRevision(saved.id)
+                val remote = runCatching { client.pullFavorites(email, deviceId) }.getOrNull()
+                if (remote != null) {
+                    if (remote.second > localRev) {
+                        playlistStore.saveFavorites(saved.id, remote.first, remote.second)
+                    }
+                    cloudStamps["favorites"] = favoritesRev
+                }
+            }
+            val recordingsRev = number("recordings")
+            if (cloudStamps["recordings"] != recordingsRev) {
+                val localBook = playlistStore.recordingBook(saved.id)
+                val remoteBook = runCatching { client.pullRecordings(email, deviceId) }.getOrNull()
+                if (remoteBook != null) {
+                    if ((remoteBook.revision ?: 0L) > (localBook.revision ?: 0L)) {
+                        playlistStore.saveRecordingBook(saved.id, remoteBook)
+                        com.olympus.iptv.record.RecordingService.start(this)
+                    }
+                    cloudStamps["recordings"] = recordingsRev
+                }
+            }
+            val remindersRev = number("reminders")
+            if (remindersRev == 0L && cloudStamps["reminders"] == null) {
+                cloudStamps["reminders"] = 0L
+            } else if (cloudStamps["reminders"] != remindersRev) {
+                val remote = runCatching { client.fetchRemoteReminders(email, deviceId) }.getOrNull()
+                if (remote != null) {
+                    com.olympus.iptv.remind.applyCloudReminders(this, saved.id, remote)
+                    cloudStamps["reminders"] = remindersRev
+                }
+            }
+            val watchRev = number("watch")
+            if (watchRev == 0L && cloudStamps["watch"] == null) {
+                cloudStamps["watch"] = 0L
+            } else if (cloudStamps["watch"] != watchRev) {
+                val remoteWatch = runCatching { client.fetchWatchHistory(email, deviceId) }.getOrNull()
+                if (remoteWatch != null) {
+                    val localWatch = playlistStore.recent(saved.id)
+                    for (entry in remoteWatch) {
+                        val cid = entry.channelId?.takeIf { it.isNotBlank() } ?: continue
+                        val localMatch = localWatch.firstOrNull { it.channelId == cid }
+                        if (localMatch == null || (entry.updatedAt ?: 0L) > (localMatch.updatedAt ?: 0L)) {
+                            playlistStore.rememberWatch(saved.id, entry)
+                        }
+                    }
+                    cloudStamps["watch"] = watchRev
+                }
+            }
+        }
+    }
+
+    private suspend fun claimCloudLogin(): Boolean {
+        val deviceId = runCatching { playlistStore.deviceId() }.getOrDefault("")
+        if (deviceId.isBlank()) return false
+        val json = com.olympus.iptv.playlist.LineupClient(this).pullProviderLogin(deviceId) ?: return false
+        val remote = com.olympus.iptv.playlist.CloudLogin.parse(json) ?: return false
+        val existing = runCatching { playlistStore.session.first() }.getOrNull()
+        if (com.olympus.iptv.playlist.CloudLogin.same(existing, remote)) {
+            cloudLoginRevision = remote.revision
+            return true
+        }
+        if (remote.revision > 0L && remote.revision == cloudLoginRevision) return true
+        val saved = com.olympus.iptv.playlist.CloudLogin.apply(this, remote)
+        cloudLoginRevision = remote.revision
+        catalogRefresh?.cancel()
+        com.olympus.iptv.playlist.CatalogIngest.start(this, saved)
+        return true
     }
 
     override fun onCreate() {
@@ -298,10 +395,8 @@ class OlympusIptvApp : Application() {
             override fun onActivityDestroyed(activity: android.app.Activity) = Unit
         })
         epgRepository.attach(catalogDb, appScope)
-        appScope.launch {
-            delay(8_000L)
-            startCloudRealtimeSync()
-        }
+        startCloudRealtimeSync()
+        watchCloudLogin()
         appScope.launch {
             DashboardHost.start(this@OlympusIptvApp)
             delay(45_000L)

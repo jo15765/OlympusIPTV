@@ -110,6 +110,7 @@ class BrowseLazyPanes(private val binding: ActivityBrowseBinding) {
     val cardAdminVpn get() = ensureAdmin().cardAdminVpn
     val cardAdminAbout get() = ensureAdmin().cardAdminAbout
     val cardAdminFavorites get() = ensureAdmin().cardAdminFavorites
+    val cardAdminSetup get() = ensureAdmin().cardAdminSetup
     val cardAdminVpnDetail get() = ensureAdmin().cardAdminVpnDetail
     val adminParentalSummary get() = ensureAdmin().adminParentalSummary
     val adminQuietToggle get() = ensureAdmin().adminQuietToggle

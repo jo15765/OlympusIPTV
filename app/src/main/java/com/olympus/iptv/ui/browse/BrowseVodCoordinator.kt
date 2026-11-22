@@ -9,6 +9,7 @@ import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import android.widget.ProgressBar
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
@@ -593,6 +594,7 @@ internal fun BrowseActivity.ensureRefreshLoop() {
     }
 
 internal fun BrowseActivity.showVpnPane() {
+        settingsReturnCard = panes.cardAdminVpn
         epgPrefetchJob?.cancel()
         binding.btnAdmin.isSelected = true
         binding.btnAbout.isSelected = false
@@ -611,6 +613,7 @@ internal fun BrowseActivity.showVpnPane() {
     }
 
 internal fun BrowseActivity.showRefreshPane() {
+        settingsReturnCard = panes.cardAdminRefresh
         epgPrefetchJob?.cancel()
         binding.btnAdmin.isSelected = true
         binding.btnAbout.isSelected = false
@@ -907,26 +910,51 @@ internal fun BrowseActivity.showDashboardUrl(url: String) {
     }
 
 internal fun BrowseActivity.removePlaylistAndRestart() {
-        val app = application as OlympusIptvApp
-        panes.deviceRemovePlaylist.isEnabled = false
-        lifecycleScope.launch {
-            withContext(Dispatchers.IO) {
-                runCatching { AppTunnel.disconnect(screen()) }
-                runCatching { stopService(Intent(screen(), RecordingService::class.java)) }
-                app.playlistStore.resetDevice()
-                app.catalogDb.wipeAll()
-                ReminderStore.clear(screen())
-                EpisodeCache.clear(filesDir)
-                runCatching { File(getExternalFilesDir(null), "recordings").deleteRecursively() }
-                runCatching { File(filesDir, "watchmode-week.json").delete() }
-                runCatching { File(filesDir, "fresh-cards.json").delete() }
-            }
-            startActivity(
-                Intent(screen(), LoginActivity::class.java)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+        if (removingPlaylist) return
+        removingPlaylist = true
+        panes.deviceOrNull?.deviceRemovePlaylist?.isEnabled = false
+        val density = resources.displayMetrics.density
+        val pad = (28 * density).toInt()
+        val spinner = ProgressBar(this).apply { isIndeterminate = true }
+        val wrap = FrameLayout(this).apply {
+            setPadding(pad, pad, pad, pad)
+            addView(
+                spinner,
+                FrameLayout.LayoutParams((56 * density).toInt(), (56 * density).toInt(), Gravity.CENTER)
             )
-            finishNoAnim()
         }
+        val dialog = androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle(R.string.device_removing_playlist)
+            .setView(wrap)
+            .setCancelable(false)
+            .create()
+        dialog.setOnShowListener {
+            val app = application as OlympusIptvApp
+            lifecycleScope.launch {
+                runCatching {
+                    withContext(Dispatchers.IO) {
+                        runCatching { AppTunnel.disconnect(screen()) }
+                        runCatching { stopService(Intent(screen(), RecordingService::class.java)) }
+                        app.playlistStore.resetDevice()
+                        app.catalogDb.wipeAll()
+                        ReminderStore.clear(screen())
+                        EpisodeCache.clear(filesDir)
+                        runCatching { File(getExternalFilesDir(null), "recordings").deleteRecursively() }
+                        runCatching { File(filesDir, "watchmode-week.json").delete() }
+                        runCatching { File(filesDir, "fresh-cards.json").delete() }
+                    }
+                }.onFailure { error ->
+                    com.olympus.iptv.AppLog.error("Guide", "Remove playlist failed", error)
+                }
+                if (isDestroyed) return@launch
+                startActivity(
+                    Intent(screen(), LoginActivity::class.java)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                )
+                finishNoAnim()
+            }
+        }
+        dialog.show()
     }
 
 internal fun BrowseActivity.showBlank() {
@@ -1835,6 +1863,7 @@ internal fun BrowseActivity.loadGroupPage(reset: Boolean) {
         val pageLimit = pageSizeFor(categoryId)
         val groupName = selectedCategoryName.trim()
         channelJob = lifecycleScope.launch {
+            try {
             val page = withContext(Dispatchers.IO) {
                 val db = (application as OlympusIptvApp).catalogDb
                 if (pageCategory != null) {
@@ -1978,6 +2007,16 @@ internal fun BrowseActivity.loadGroupPage(reset: Boolean) {
                 focusOpenedGuide()
             }
             if (cursor == null && named.isNotEmpty()) restoreHeldChannel()
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                pageLoading = false
+                throw cancelled
+            } catch (error: Throwable) {
+                pageLoading = false
+                com.olympus.iptv.AppLog.error("Guide", "The channel list failed to load", error)
+                if (!stillShowing(query, sectionNow, categoryId)) return@launch
+                showChannelSkeleton(false)
+                finishChannelPane(emptyList())
+            }
         }
     }
 
