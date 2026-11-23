@@ -4,7 +4,6 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
-import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import coil.load
 import coil.size.Scale
@@ -14,6 +13,7 @@ import com.olympus.iptv.databinding.ItemCategoryBinding
 import com.olympus.iptv.ui.FocusMotion
 import com.olympus.iptv.ui.Haptics
 import com.olympus.iptv.ui.channelLogo
+import java.util.concurrent.atomic.AtomicInteger
 
 class CategoryAdapter(
     private val onSelect: (Category, Boolean) -> Unit,
@@ -36,6 +36,7 @@ class CategoryAdapter(
 
     private val allItems = mutableListOf<Category>()
     private val items = mutableListOf<Category>()
+    private val submitGeneration = AtomicInteger()
     private var selectedId: String? = null
     private var filterQuery = ""
     private var genreFilter = GenreFilter.ALL
@@ -132,24 +133,28 @@ class CategoryAdapter(
             matchesText && matchesGenre(category, genre)
         }
         val old = items.toList()
-        items.clear()
-        items.addAll(next)
         if (old.isEmpty() || next.isEmpty()) {
+            items.clear()
+            items.addAll(next)
             notifyDataSetChanged()
             return
         }
-        DiffUtil.calculateDiff(object : DiffUtil.Callback() {
-            override fun getOldListSize(): Int = old.size
-            override fun getNewListSize(): Int = next.size
-            override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean =
-                old[oldItemPosition].id == next[newItemPosition].id
-            override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
-                val a = old[oldItemPosition]
-                val b = next[newItemPosition]
-                return a.id == b.id && a.name == b.name &&
-                    (a.id == selectedId) == (b.id == selectedId)
-            }
-        }, true).dispatchUpdatesTo(this)
+        val token = submitGeneration.incrementAndGet()
+        ListDiff.dispatch(
+            submitGeneration,
+            token,
+            old,
+            next,
+            sameItem = { left, right -> left.id == right.id },
+            sameContent = { left, right ->
+                left.name == right.name && (left.id == selectedId) == (right.id == selectedId)
+            },
+            payload = { left, right -> if (left.name == right.name) DETAIL else null }
+        ) { diff, rows ->
+            items.clear()
+            items.addAll(rows)
+            diff.dispatchUpdatesTo(this)
+        }
     }
 
     override fun getItemId(position: Int): Long = stableRowId(items.getOrNull(position)?.id)

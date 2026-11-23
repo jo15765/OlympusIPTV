@@ -87,6 +87,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
 import kotlinx.coroutines.withContext
 
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class PlayerActivity : AppCompatActivity() {
     internal lateinit var binding: ActivityPlayerBinding
     internal fun tracksReady(): Boolean = ::binding.isInitialized
@@ -187,6 +188,7 @@ class PlayerActivity : AppCompatActivity() {
             hideHandler.postDelayed(this, 1_000L)
         }
     }
+    @get:androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
     internal val audioDelay = DelayAudioProcessor()
     private var leveler: android.media.audiofx.DynamicsProcessing? = null
     private var lastBackAt = 0L
@@ -765,6 +767,12 @@ class PlayerActivity : AppCompatActivity() {
             finish()
             return
         }
+        val upcomingUrls = listOfNotNull(
+            queue.getOrNull(index + 1)?.streamUrl,
+            queue.getOrNull(index - 1)?.streamUrl,
+            queue.getOrNull(index + 2)?.streamUrl
+        )
+        if (upcomingUrls.isNotEmpty()) com.olympus.iptv.playlist.HttpClients.warmStreamHosts(upcomingUrls)
         acceptReconnectAt = SystemClock.elapsedRealtime() + 2_000L
         resetChannelScopedWork()
         playJob?.cancel()
@@ -887,6 +895,7 @@ class PlayerActivity : AppCompatActivity() {
             } else {
                 val exo = player ?: return@launch
                 watchPlaybackEvents(exo)
+                exo.stop()
                 exo.setMediaItem(mediaItem(channel))
                 if (playAt > 0L) exo.seekTo(playAt)
                 exo.prepare()
@@ -1087,6 +1096,7 @@ class PlayerActivity : AppCompatActivity() {
                 }
             }
         }
+        @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
         val analytics = object : AnalyticsListener {
             override fun onVideoFrameProcessingOffset(
                 eventTime: AnalyticsListener.EventTime,
@@ -1185,9 +1195,18 @@ class PlayerActivity : AppCompatActivity() {
                 recoverFrozenLive(active, channel)
                 return@postDelayed
             }
-            if (recoverAttempt >= 2 && videoDecoder != PlayerDecoder.SOFTWARE) {
+            if (recoverAttempt >= 2 && !DeviceForm.isTelevision(this) && videoDecoder != PlayerDecoder.SOFTWARE) {
                 videoDecoder = PlayerDecoder.SOFTWARE
                 decoderDirty = true
+                recoverAttempt = 0
+                runCatching { active.stop() }
+                discardSparePlayers()
+                runCatching { active.release() }
+                if (player === active) player = null
+                playCurrent()
+                return@postDelayed
+            }
+            if (recoverAttempt >= 2 && DeviceForm.isTelevision(this)) {
                 recoverAttempt = 0
                 runCatching { active.stop() }
                 discardSparePlayers()
@@ -1232,12 +1251,9 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun showConnectingBadge(show: Boolean) {
         if (!::binding.isInitialized) return
-        if (show) {
-            paintConnectingBadge(
-                if (bufferStartedAt > 0L) SystemClock.elapsedRealtime() - bufferStartedAt else 0L
-            )
-            binding.connectingBadge.visibility = View.VISIBLE
-        } else {
+        val active = player
+        val isHealthy = active != null && (active.isPlaying || active.playbackState == Player.STATE_READY)
+        if (!show || isHealthy) {
             binding.connectingBadge.visibility = View.GONE
             binding.connectingBadge.setText(R.string.playback_connecting)
             if (binding.channelMeta.text == getString(R.string.playback_reconnecting)) {
@@ -1245,6 +1261,11 @@ class PlayerActivity : AppCompatActivity() {
                 binding.channelMeta.text = meta.ifBlank { current?.name.orEmpty() }
                 refreshEpgQuietly()
             }
+        } else {
+            paintConnectingBadge(
+                if (bufferStartedAt > 0L) SystemClock.elapsedRealtime() - bufferStartedAt else 0L
+            )
+            binding.connectingBadge.visibility = View.VISIBLE
         }
     }
 
@@ -1439,21 +1460,21 @@ class PlayerActivity : AppCompatActivity() {
                     !watchingCatchup &&
                     exo.videoFormat != null &&
                     lastVideoFrameAt > 0L &&
-                    now - lastVideoFrameAt >= 2_500L
+                    now - lastVideoFrameAt >= 7_500L
                 if (stallMarkAt == 0L || advanced) {
                     stallMarkPosition = pos
                     stallMarkAt = now
                     if (!frameFrozen) continue
                 }
                 val stuckMs = now - stallMarkAt
-                if (stuckMs >= 1_200L && !radioOn) {
+                if (stuckMs >= 2_500L && !radioOn) {
                     showConnectingBadge(true)
                 }
                 val frozen = frameFrozen ||
                     exo.playbackState == Player.STATE_BUFFERING ||
                     exo.playbackState == Player.STATE_IDLE ||
                     (exo.playbackState == Player.STATE_READY && !exo.isPlaying)
-                val limit = if (hadPlaybackReady) 2_500L else 5_000L
+                val limit = if (hadPlaybackReady) 7_500L else 10_000L
                 if (frozen && (frameFrozen || stuckMs >= limit)) recoverFrozenLive(exo, channel)
             }
         }
@@ -1463,7 +1484,7 @@ class PlayerActivity : AppCompatActivity() {
         val now = SystemClock.elapsedRealtime()
         if (player !== exo || current?.id != channel.id || isDestroyed) return
         if (!exo.playWhenReady || !isLiveNow(channel)) return
-        stallBusyUntil = now + 3_500L
+        stallBusyUntil = now + 10_000L
         stallStrikes += 1
         stallMarkAt = now
         stallMarkPosition = exo.currentPosition
@@ -1621,7 +1642,7 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun prepareSpare(direction: Int, channel: Channel?) {
         // Phones: one player only — no next/prev pre-buffer to save decoder/RAM.
-        if (touchPrimary) {
+        if (touchPrimary || com.olympus.iptv.ui.DeviceForm.isTelevision(this)) {
             clearSpare(direction)
             return
         }
@@ -1664,7 +1685,7 @@ class PlayerActivity : AppCompatActivity() {
     private fun preloadAround(playingId: String) {
         val now = current ?: return
         if (now.kind != ContentKind.LIVE) return
-        if (touchPrimary) {
+        if (touchPrimary || com.olympus.iptv.ui.DeviceForm.isTelevision(this)) {
             clearSpare(1)
             clearSpare(-1)
             return
@@ -1678,7 +1699,11 @@ class PlayerActivity : AppCompatActivity() {
             if (!isActive || current?.id != playingId) return@launch
             if (nextChannel != null) {
                 warmEpg(nextChannel)
-                prepareSpare(1, nextChannel)
+                if (!lowRam) {
+                    prepareSpare(1, nextChannel)
+                } else {
+                    clearSpare(1)
+                }
             } else {
                 clearSpare(1)
             }
@@ -2898,17 +2923,25 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun hookReconnect() {
         if (networkWatcher != null) return
-        val watcher = NetworkWatcher(this) { runOnUiThread { reconnectNow() } }
+        val watcher = NetworkWatcher(this) { force -> runOnUiThread { reconnectNow(force) } }
         watcher.start()
         networkWatcher = watcher
     }
 
-    private fun reconnectNow() {
+    private fun reconnectNow(force: Boolean = false) {
         val now = SystemClock.elapsedRealtime()
-        if (now < acceptReconnectAt || now - lastReconnectAt < 1_500L) return
+        if (force) {
+            acceptReconnectAt = 0L
+            com.olympus.iptv.playlist.HttpClients.evictConnections()
+        }
+        if (now < acceptReconnectAt || (!force && now - lastReconnectAt < 1_500L)) return
         val exo = player ?: return
         if (!exo.playWhenReady || current == null || isDestroyed) return
         lastReconnectAt = now
+        if (force) {
+            exo.stop()
+            exo.clearMediaItems()
+        }
         MobileBitrateCap.apply(this, exo)
         playCurrent()
     }

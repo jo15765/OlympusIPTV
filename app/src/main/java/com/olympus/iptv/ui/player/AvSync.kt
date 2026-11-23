@@ -8,7 +8,9 @@ import androidx.media3.common.util.Util
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.DefaultAudioSink
+import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import com.olympus.iptv.R
+import com.olympus.iptv.ui.DeviceForm
 import com.olympus.iptv.data.AvSyncStore
 import com.olympus.iptv.data.PlayerDecoder
 import java.nio.ByteBuffer
@@ -24,6 +26,9 @@ class DelayAudioProcessor : BaseAudioProcessor() {
     override fun onConfigure(inputAudioFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
         return inputAudioFormat
     }
+
+    /** A zero delay stays out of the PCM chain so AC-3 and E-AC-3 can pass through to the AVR. */
+    override fun isActive(): Boolean = delayMs != 0 && super.isActive()
 
     override fun onFlush() {
         applied = Int.MIN_VALUE
@@ -85,6 +90,9 @@ class OffsetRenderersFactory(
             else -> EXTENSION_RENDERER_MODE_OFF
         }
         setExtensionRendererMode(extension)
+        if (DeviceForm.isTelevision(context)) {
+            setMediaCodecSelector(TvSingleHardwareSelector)
+        }
     }
 
     override fun buildAudioSink(
@@ -97,6 +105,27 @@ class OffsetRenderersFactory(
             .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
             .setAudioProcessors(arrayOf(delay))
             .build()
+    }
+}
+
+/** One hardware video decoder, then software. Extra hardware codecs are what freeze a TV box. */
+@UnstableApi
+private object TvSingleHardwareSelector : MediaCodecSelector {
+    override fun getDecoderInfos(
+        mimeType: String,
+        requiresSecureDecoder: Boolean,
+        requiresTunnelingDecoder: Boolean
+    ): List<androidx.media3.exoplayer.mediacodec.MediaCodecInfo> {
+        val all = MediaCodecSelector.DEFAULT.getDecoderInfos(
+            mimeType,
+            requiresSecureDecoder,
+            requiresTunnelingDecoder
+        )
+        if (!mimeType.startsWith("video/")) return all
+        val hardware = all.filter { it.hardwareAccelerated }
+        val software = all.filter { !it.hardwareAccelerated }
+        val chosen = if (hardware.isEmpty()) software else listOf(hardware.first()) + software
+        return chosen.ifEmpty { all }
     }
 }
 

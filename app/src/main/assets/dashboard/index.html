@@ -5340,15 +5340,31 @@
       editor.hidden = true;
       document.querySelector("#deviceList").hidden = false;
     }
-    async function openDevice(deviceId) {
-      document.querySelector("#deviceListEmail").textContent = "Opening…";
+    async function loadDashboard(deviceId) {
+      const cacheKey = "olympus-dash-" + deviceId;
+      const headers = { "Content-Type": "application/json" };
+      let cached = null;
+      try { cached = JSON.parse(sessionStorage.getItem(cacheKey) || "null"); } catch (e) { cached = null; }
+      if (cached && cached.etag) headers["If-None-Match"] = "\"" + cached.etag + "\"";
       const response = await fetch("/api/login", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: accountEmail, deviceId })
+        headers: headers,
+        body: JSON.stringify({ email: accountEmail, deviceId: deviceId })
       });
+      if (response.status === 304 && cached && cached.body) return { ok: true, body: cached.body };
       const body = await response.json();
-      if (!response.ok) {
+      if (!response.ok) return { ok: false, body: body };
+      const etag = (response.headers.get("ETag") || "").replace(/"/g, "");
+      if (etag) {
+        try { sessionStorage.setItem(cacheKey, JSON.stringify({ etag: etag, body: body })); } catch (e) {}
+      }
+      return { ok: true, body: body };
+    }
+    async function openDevice(deviceId) {
+      document.querySelector("#deviceListEmail").textContent = "Opening…";
+      const loaded = await loadDashboard(deviceId);
+      const body = loaded.body || {};
+      if (!loaded.ok) {
         document.querySelector("#deviceListEmail").textContent = body.error || "Could not open that device";
         return;
       }
@@ -5857,13 +5873,9 @@
     async function refreshSessionCatalog() {
       if (!session || !accountEmail || !session.deviceId) return false;
       try {
-        const response = await fetch("/api/login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: accountEmail, deviceId: session.deviceId })
-        });
-        const body = await response.json();
-        if (!response.ok) return false;
+        const loaded = await loadDashboard(session.deviceId);
+        const body = loaded.body || {};
+        if (!loaded.ok) return false;
         session.catalog = body.catalog || session.catalog || { groups: [], channels: [], countries: [] };
         session.lineup = Object.assign(blankLineup(), body.lineup || session.lineup || {});
         session.favorites = body.favorites || session.favorites || { ids: [], revision: 0 };

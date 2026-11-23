@@ -14,7 +14,7 @@ import java.io.File
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
-class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext, "olympus-iptv.db", null, 16) {
+class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext, "olympus-iptv.db", null, 17) {
     private val filesDir = context.applicationContext.filesDir
     private val writer = ReentrantLock()
     private val dashLock = Any()
@@ -949,6 +949,13 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         val db = writableDatabase
         val newCategories = ArrayList<Category>()
         val newChannels = ArrayList<com.olympus.iptv.data.Channel>()
+        val bulk = channels.size >= 32 && bulkSearch.get() == 0
+        if (bulk) {
+            runCatching {
+                db.execSQL("DROP TRIGGER IF EXISTS channels_fts_insert")
+                db.execSQL("DROP TRIGGER IF EXISTS channels_fts_update")
+            }
+        }
         db.beginTransaction()
         try {
             val categoryStmt = db.compileStatement(
@@ -1047,6 +1054,12 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
             db.setTransactionSuccessful()
         } finally {
             db.endTransaction()
+            if (bulk) {
+                runCatching {
+                    ensureSearchTriggers(db)
+                    indexInsertedChannels(db, playlistId, bucket, newChannels.map { it.id })
+                }
+            }
         }
         if (newChannels.size >= 100) {
             runCatching { writableDatabase.execSQL("PRAGMA wal_checkpoint(PASSIVE)") }
@@ -1370,6 +1383,9 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
             // fills the real windows after the first screen is up.
             runCatching { File(filesDir, "event-windows.pending").writeText("1") }
         }
+        if (oldVersion < 17) {
+            ensureIndexes(db)
+        }
     }
 
     private fun ensureCatchupColumns(db: SQLiteDatabase) {
@@ -1456,6 +1472,9 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         db.execSQL(
             "CREATE INDEX IF NOT EXISTS idx_channels_bucket_cat_cover ON channels(playlist_id, bucket, category_id, name COLLATE NOCASE, id, logo_url, kind)"
         )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS idx_channels_logo ON channels(playlist_id, logo_url)"
+        )
     }
 
     fun maintainAfterRefresh() {
@@ -1464,6 +1483,100 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         runCatching { db.delete("epg_cache", "fetched_at < ?", arrayOf(cutoff.toString())) }
         runCatching { db.rawQuery("PRAGMA optimize", null).use { } }
         runCatching { db.execSQL("PRAGMA incremental_vacuum(200)") }
+    }
+
+    private val bulkSearch = java.util.concurrent.atomic.AtomicInteger(0)
+
+    /** Drops per-row search triggers for one catalog load. [endBulkSearch] rebuilds the index once. */
+    fun beginBulkSearch() = write {
+        if (bulkSearch.incrementAndGet() != 1) return@write
+        val db = writableDatabase
+        db.execSQL("DROP TRIGGER IF EXISTS channels_fts_insert")
+        db.execSQL("DROP TRIGGER IF EXISTS channels_fts_update")
+    }
+
+    fun endBulkSearch() = write {
+        if (bulkSearch.decrementAndGet() > 0) return@write
+        if (bulkSearch.get() < 0) bulkSearch.set(0)
+        val db = writableDatabase
+        ensureSearchTriggers(db)
+        runCatching { db.execSQL("INSERT INTO channels_fts(channels_fts) VALUES('rebuild')") }
+    }
+
+    private fun indexInsertedChannels(
+        db: SQLiteDatabase,
+        playlistId: String,
+        bucket: String,
+        ids: List<String>
+    ) {
+        if (ids.isEmpty()) return
+        val fts5 = db.rawQuery(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='channels_fts' AND sql LIKE '%fts5%'",
+            null
+        ).use { it.moveToFirst() }
+        val columns = if (fts5) "rowid, name, group_title" else "docid, name, group_title"
+        for (chunk in ids.chunked(400)) {
+            val marks = chunk.joinToString(",") { "?" }
+            db.execSQL(
+                """
+                INSERT INTO channels_fts($columns)
+                SELECT rowid, name, IFNULL(group_title, '') FROM channels
+                WHERE playlist_id=? AND bucket=? AND id IN ($marks)
+                """.trimIndent(),
+                arrayOf(playlistId, bucket, *chunk.toTypedArray())
+            )
+        }
+    }
+
+    private fun ensureSearchTriggers(db: SQLiteDatabase) {
+        val fts5 = fts5Available(db) && db.rawQuery(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='channels_fts' AND sql LIKE '%fts5%'",
+            null
+        ).use { it.moveToFirst() }
+        db.execSQL("DROP TRIGGER IF EXISTS channels_fts_insert")
+        db.execSQL("DROP TRIGGER IF EXISTS channels_fts_update")
+        if (fts5) {
+            db.execSQL(
+                """
+                CREATE TRIGGER IF NOT EXISTS channels_fts_insert AFTER INSERT ON channels BEGIN
+                    INSERT INTO channels_fts(rowid, name, group_title)
+                    VALUES (new.rowid, new.name, new.group_title);
+                END
+                """.trimIndent()
+            )
+            db.execSQL(
+                """
+                CREATE TRIGGER IF NOT EXISTS channels_fts_update AFTER UPDATE ON channels BEGIN
+                    INSERT INTO channels_fts(channels_fts, rowid, name, group_title)
+                    VALUES ('delete', old.rowid, old.name, old.group_title);
+                    INSERT INTO channels_fts(rowid, name, group_title)
+                    VALUES (new.rowid, new.name, new.group_title);
+                END
+                """.trimIndent()
+            )
+        } else if (db.rawQuery(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='channels_fts'",
+                null
+            ).use { it.moveToFirst() }
+        ) {
+            db.execSQL(
+                """
+                CREATE TRIGGER IF NOT EXISTS channels_fts_insert AFTER INSERT ON channels BEGIN
+                    INSERT INTO channels_fts(docid, name, group_title)
+                    VALUES (new.rowid, new.name, new.group_title);
+                END
+                """.trimIndent()
+            )
+            db.execSQL(
+                """
+                CREATE TRIGGER IF NOT EXISTS channels_fts_update AFTER UPDATE ON channels BEGIN
+                    DELETE FROM channels_fts WHERE docid = old.rowid;
+                    INSERT INTO channels_fts(docid, name, group_title)
+                    VALUES (new.rowid, new.name, new.group_title);
+                END
+                """.trimIndent()
+            )
+        }
     }
 
     private fun ensureSearch(db: SQLiteDatabase) {

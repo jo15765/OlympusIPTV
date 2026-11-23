@@ -212,7 +212,7 @@ internal fun BrowseActivity.hostOnCreate(savedInstanceState: Bundle?) {
         val orientation = if (form.isTelevision(this)) {
             android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
         } else if (form.isTouchPrimary(this)) {
-            android.content.pm.ActivityInfo.SCREEN_ORIENTATION_FULL_USER
+            android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         } else {
             android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
         }
@@ -232,6 +232,7 @@ internal fun BrowseActivity.hostOnCreate(savedInstanceState: Bundle?) {
         panes = BrowseLazyPanes(binding)
         wireLazyPanes()
         setContentView(binding.root)
+        watchBrowseWidth()
         binding.root.post {
             com.olympus.iptv.ui.RemoteTip.show(this, getString(R.string.remote_tip_browse), binding.root as? android.view.ViewGroup)
         }
@@ -1733,9 +1734,9 @@ internal fun BrowseActivity.applyGuideColumns() {
             binding.groupColumn.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
             binding.categoryList.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
         }
-        val showRail = showSettings && (!phoneChrome || !stacked)
+        val showRail = showSettings && !phoneChrome
         binding.mobileTopBar.visibility = if (phoneChrome) View.VISIBLE else View.GONE
-        binding.mobileBottomTabs.visibility = if (phoneChrome && stacked) View.VISIBLE else View.GONE
+        binding.mobileBottomTabs.visibility = if (phoneChrome) View.VISIBLE else View.GONE
         binding.navRail.visibility = if (showRail) View.VISIBLE else View.GONE
         binding.navDivider.visibility = if (showRail) View.VISIBLE else View.GONE
         if (!showGroups && focusIsIn(binding.groupColumn)) binding.groupColumn.clearFocus()

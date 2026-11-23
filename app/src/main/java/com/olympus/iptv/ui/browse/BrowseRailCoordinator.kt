@@ -1075,6 +1075,18 @@ internal fun BrowseActivity.activateNavItem(item: View) {
         }
     }
 
+internal fun BrowseActivity.watchBrowseWidth() {
+        binding.guideShell.addOnLayoutChangeListener { view, left, _, right, _, _, _, _, _ ->
+            val width = right - left
+            if (width <= 0 || kotlin.math.abs(width - lastGuideWidth) < 24) return@addOnLayoutChangeListener
+            lastGuideWidth = width
+            view.post {
+                if (!viewReady() || isDestroyed) return@post
+                hostOnConfigurationChanged()
+            }
+        }
+    }
+
 internal fun BrowseActivity.hostOnConfigurationChanged() {
         if (!viewReady()) return
         val phone = touchPrimary && com.olympus.iptv.ui.DeviceForm.isCompact(this)

@@ -71,6 +71,7 @@ object DashboardHost {
     private val started = AtomicBoolean(false)
     private val gson = Gson()
     private val requestGzip = ThreadLocal.withInitial { false }
+    private val requestValidator = ThreadLocal<String?>()
     private val removed = ConcurrentHashMap<String, MutableList<String>>()
     private val logoAllow = ConcurrentHashMap<String, Boolean>()
     @Volatile private var appContext: Context? = null
@@ -89,9 +90,13 @@ object DashboardHost {
     @Volatile private var guideHold: GuideHold? = null
     @Volatile private var catalogHold: Pair<CatalogDb.DashboardSnapshot, Map<String, Any>>? = null
 
-    private val workers = Executors.newFixedThreadPool(4) { runnable ->
+    private val workers = Executors.newFixedThreadPool(10) { runnable ->
         Thread(runnable, "dashboard-http").apply { isDaemon = true }
     }
+    private val logoWorkers = Executors.newFixedThreadPool(2) { runnable ->
+        Thread(runnable, "dashboard-logo").apply { isDaemon = true }
+    }
+    private val logoFetchLimiter = java.util.concurrent.Semaphore(3)
     private val logos by lazy {
         OkHttpClient.Builder()
             .connectTimeout(4, TimeUnit.SECONDS)
@@ -125,17 +130,20 @@ object DashboardHost {
                         }
                         com.olympus.iptv.vpn.AppTunnel.protect(client)
                         workers.execute {
+                            var handed = false
                             try {
-                                handle(app, client)
+                                handed = handle(app, client)
                             } catch (error: Throwable) {
                                 com.olympus.iptv.AppLog.error("Dashboard", "Request failed", error)
                                 runCatching {
                                     writeBytes(client, 500, "text/plain; charset=utf-8", "Dashboard error\n".toByteArray(), "no-store")
                                 }
                             } finally {
-                                try {
-                                    client.close()
-                                } catch (_: Exception) {
+                                if (!handed) {
+                                    try {
+                                        client.close()
+                                    } catch (_: Exception) {
+                                    }
                                 }
                             }
                         }
@@ -314,17 +322,17 @@ object DashboardHost {
         return host
     }
 
-    private fun handle(context: Context, socket: Socket) {
+    private fun handle(context: Context, socket: Socket): Boolean {
         if (!privateClient(socket.inetAddress)) {
             writeJson(socket, 403, mapOf("error" to "Dashboard is only available on the home network"))
-            return
+            return false
         }
         socket.soTimeout = 20000
         val input = BufferedInputStream(socket.getInputStream(), 8192)
-        val headerText = readHeader(input) ?: return
+        val headerText = readHeader(input) ?: return false
         val lines = headerText.split("\r\n")
-        val request = lines.firstOrNull()?.split(" ") ?: return
-        if (request.size < 2) return
+        val request = lines.firstOrNull()?.split(" ") ?: return false
+        if (request.size < 2) return false
         val method = request[0]
         val rawPath = request[1]
         val path = rawPath.substringBefore("?")
@@ -338,22 +346,42 @@ object DashboardHost {
         if (method == "PUT" && path == "/api/recordings/file") {
             if (length <= 0 || length > MAX_RECORDING_BYTES) {
                 writeJson(socket, 413, mapOf("error" to "Recording upload is too large"))
-                return
+                return false
             }
             writeRecording(context, socket, query, input, length)
-            return
+            return false
         }
         if (length > MAX_JSON_BYTES) {
             writeJson(socket, 413, mapOf("error" to "Request is too large"))
-            return
+            return false
         }
         val body = if (length > 0) readBytes(input, length) else ByteArray(0)
         requestGzip.set(headers["accept-encoding"].orEmpty().contains("gzip", ignoreCase = true))
+        requestValidator.set(headers["if-none-match"])
+        if (method == "GET" && path == "/api/logo") {
+            requestGzip.set(false)
+            logoWorkers.execute {
+                try {
+                    val app = context as? OlympusIptvApp ?: (context.applicationContext as OlympusIptvApp)
+                    serveLogo(app, socket, query["u"].orEmpty())
+                } catch (error: Throwable) {
+                    com.olympus.iptv.AppLog.error("Dashboard", "Logo request failed", error)
+                } finally {
+                    try {
+                        socket.close()
+                    } catch (_: Exception) {
+                    }
+                }
+            }
+            return true
+        }
         try {
             route(context, socket, method, path, query, body)
         } finally {
             requestGzip.set(false)
+            requestValidator.set(null)
         }
+        return false
     }
 
     private fun route(
@@ -683,6 +711,12 @@ object DashboardHost {
         val playlistId = gate.playlist.id
         clearGuideCache()
         val page = runBlocking { app.playlistStore.savedPage(playlistId) }
+        val stamp = app.catalogDb.libraryStamp(playlistId)
+        val etag = "$stamp-${page.favorites.lineup.revision ?: 0L}-${page.favorites.revision}-${page.refreshedAt}"
+        if (notModified(etag)) {
+            writeNotModified(socket, etag)
+            return
+        }
         writeJson(
             socket,
             200,
@@ -696,7 +730,8 @@ object DashboardHost {
                 "refreshedAt" to page.refreshedAt,
                 "favorites" to publicFavorites(app, playlistId, page.favorites),
                 "recordings" to page.recordings
-            )
+            ),
+            etag
         )
     }
 
@@ -738,7 +773,13 @@ object DashboardHost {
             writeJson(socket, 401, mapOf("error" to "Device not registered"))
             return
         }
-        writeJson(socket, 200, publicFavorites(app, gate.playlist.id))
+        val revision = runBlocking { app.playlistStore.favoritesRevision(gate.playlist.id) }
+        val etag = "fav-${gate.playlist.id}-$revision"
+        if (notModified(etag)) {
+            writeNotModified(socket, etag)
+            return
+        }
+        writeJson(socket, 200, publicFavorites(app, gate.playlist.id), etag)
     }
 
     private fun saveFavorites(app: OlympusIptvApp, socket: Socket, body: JsonObject) {
@@ -1022,7 +1063,12 @@ object DashboardHost {
             return
         }
         val config = filled(runBlocking { app.playlistStore.lineup(gate.playlist.id) })
-        writeJson(socket, 200, mapOf("lineup" to config))
+        val etag = "line-${gate.playlist.id}-${config.revision ?: 0L}"
+        if (notModified(etag)) {
+            writeNotModified(socket, etag)
+            return
+        }
+        writeJson(socket, 200, mapOf("lineup" to config), etag)
     }
 
     private fun saveLineup(app: OlympusIptvApp, socket: Socket, body: JsonObject) {
@@ -1293,37 +1339,46 @@ object DashboardHost {
         val file = File(app.cacheDir, "dashboard-logos/$hash")
         val typeFile = File(app.cacheDir, "dashboard-logos/$hash.type")
         if (!file.isFile || System.currentTimeMillis() - file.lastModified() > 7L * 24 * 60 * 60 * 1000) {
-            val request = Request.Builder().url(target).header("User-Agent", "Olympus-IPTV").build()
-            val fetched = runCatching {
-                logos.newCall(request).execute().use { response ->
-                    if (!response.isSuccessful) return@use false
-                    val type = response.header("Content-Type").orEmpty().substringBefore(";").ifBlank { "image/jpeg" }
-                    if (!type.startsWith("image/")) return@use false
-                    val declared = response.body?.contentLength() ?: -1L
-                    if (declared > MAX_LOGO_BYTES) return@use false
-                    val source = response.body?.source() ?: return@use false
-                    val buffer = okio.Buffer()
-                    var read = 0L
-                    while (!source.exhausted()) {
-                        val chunk = source.read(buffer, 64 * 1024)
-                        if (chunk < 0) break
-                        read += chunk
-                        if (read > MAX_LOGO_BYTES) {
-                            buffer.clear()
-                            return@use false
-                        }
-                    }
-                    val bytes = buffer.readByteArray()
-                    file.parentFile?.mkdirs()
-                    file.writeBytes(bytes)
-                    typeFile.writeText(type)
-                    logoMemCache.put(hash, type to bytes)
-                    true
-                }
-            }.getOrDefault(false)
-            if (!fetched || !file.isFile) {
-                writeJson(socket, 404, mapOf("error" to "Logo unavailable"))
+            val acquired = logoFetchLimiter.tryAcquire(2, TimeUnit.SECONDS)
+            if (!acquired) {
+                writeJson(socket, 503, mapOf("error" to "Logo fetch busy"))
                 return
+            }
+            try {
+                val request = Request.Builder().url(target).header("User-Agent", "Olympus-IPTV").build()
+                val fetched = runCatching {
+                    logos.newCall(request).execute().use { response ->
+                        if (!response.isSuccessful) return@use false
+                        val type = response.header("Content-Type").orEmpty().substringBefore(";").ifBlank { "image/jpeg" }
+                        if (!type.startsWith("image/")) return@use false
+                        val declared = response.body?.contentLength() ?: -1L
+                        if (declared > MAX_LOGO_BYTES) return@use false
+                        val source = response.body?.source() ?: return@use false
+                        val buffer = okio.Buffer()
+                        var read = 0L
+                        while (!source.exhausted()) {
+                            val chunk = source.read(buffer, 64 * 1024)
+                            if (chunk < 0) break
+                            read += chunk
+                            if (read > MAX_LOGO_BYTES) {
+                                buffer.clear()
+                                return@use false
+                            }
+                        }
+                        val bytes = buffer.readByteArray()
+                        file.parentFile?.mkdirs()
+                        file.writeBytes(bytes)
+                        typeFile.writeText(type)
+                        logoMemCache.put(hash, type to bytes)
+                        true
+                    }
+                }.getOrDefault(false)
+                if (!fetched || !file.isFile) {
+                    writeJson(socket, 404, mapOf("error" to "Logo unavailable"))
+                    return
+                }
+            } finally {
+                logoFetchLimiter.release()
             }
         }
         val type = if (typeFile.isFile) typeFile.readText() else "image/jpeg"
@@ -1629,24 +1684,23 @@ object DashboardHost {
     }
 
     private fun readHeader(input: java.io.InputStream): String? {
-        val out = ByteArrayOutputStream(512)
-        var previous = 0
+        val buffer = ByteArray(16384)
         var count = 0
-        while (count < 16384) {
+        var patternState = 0 // 0: none, 1: \r, 2: \r\n, 3: \r\n\r
+        while (count < buffer.size) {
             val next = input.read()
             if (next < 0) return null
-            out.write(next)
-            count += 1
-            if (previous == '\r'.code && next == '\n'.code && out.size() >= 4) {
-                val bytes = out.toByteArray()
-                val end = bytes.size
-                if (bytes[end - 4] == '\r'.code.toByte() && bytes[end - 3] == '\n'.code.toByte() &&
-                    bytes[end - 2] == '\r'.code.toByte() && bytes[end - 1] == '\n'.code.toByte()
-                ) {
-                    return String(bytes, Charsets.UTF_8)
+            buffer[count++] = next.toByte()
+            when (patternState) {
+                0 -> if (next == '\r'.code) patternState = 1
+                1 -> if (next == '\n'.code) patternState = 2 else patternState = if (next == '\r'.code) 1 else 0
+                2 -> if (next == '\r'.code) patternState = 3 else patternState = 0
+                3 -> if (next == '\n'.code) {
+                    return String(buffer, 0, count, Charsets.UTF_8)
+                } else {
+                    patternState = if (next == '\r'.code) 1 else 0
                 }
             }
-            previous = next
         }
         return null
     }
@@ -1662,8 +1716,30 @@ object DashboardHost {
         return if (offset == length) bytes else bytes.copyOf(offset)
     }
 
-    private fun writeJson(socket: Socket, code: Int, body: Any) {
-        writeBytes(socket, code, "application/json; charset=utf-8", gson.toJson(body).toByteArray(Charsets.UTF_8), "no-store")
+    private fun notModified(etag: String): Boolean {
+        val inbound = requestValidator.get()?.trim()?.removePrefix("W/")?.trim()?.trim('"')
+        return !inbound.isNullOrBlank() && inbound == etag
+    }
+
+    private fun writeNotModified(socket: Socket, etag: String) {
+        val output = BufferedOutputStream(socket.getOutputStream())
+        val head = "HTTP/1.1 304 Not Modified\r\nETag: \"$etag\"\r\nCache-Control: private, no-cache\r\n" +
+            "Content-Length: 0\r\nConnection: close\r\n\r\n"
+        output.write(head.toByteArray(Charsets.UTF_8))
+        output.flush()
+    }
+
+    private fun writeJson(socket: Socket, code: Int, body: Any, etag: String? = null) {
+        val cache = if (etag == null) "no-store" else "private, no-cache"
+        val extra = if (etag == null) "" else "ETag: \"$etag\"\r\n"
+        writeBytes(
+            socket,
+            code,
+            "application/json; charset=utf-8",
+            gson.toJson(body).toByteArray(Charsets.UTF_8),
+            cache,
+            extraHeaders = extra
+        )
     }
 
     private fun writeBytes(
@@ -1673,7 +1749,8 @@ object DashboardHost {
         body: ByteArray,
         cache: String,
         download: String? = null,
-        allowGzip: Boolean = true
+        allowGzip: Boolean = true,
+        extraHeaders: String = ""
     ) {
         val compressible = allowGzip && (
             type.startsWith("text/") ||
@@ -1689,7 +1766,7 @@ object DashboardHost {
         val encoding = if (payload != null) "Content-Encoding: gzip\r\nVary: Accept-Encoding\r\n" else ""
         val output = BufferedOutputStream(socket.getOutputStream())
         val disposition = if (download == null) "" else "Content-Disposition: attachment; filename=\"$download\"\r\n"
-        val head = "HTTP/1.1 $code ${reason(code)}\r\nContent-Type: $type\r\nContent-Length: ${outBody.size}\r\n$encoding$disposition" +
+        val head = "HTTP/1.1 $code ${reason(code)}\r\nContent-Type: $type\r\nContent-Length: ${outBody.size}\r\n$encoding$disposition$extraHeaders" +
             "Cache-Control: $cache\r\nConnection: close\r\n\r\n"
         output.write(head.toByteArray(Charsets.UTF_8))
         output.write(outBody)

@@ -92,8 +92,13 @@ class PlaylistStore(private val context: Context) {
     private var recordingsParsed: Pair<String?, Map<String, RecordingBook>>? = null
     private var queueParsed: Pair<String?, Map<String, List<QueueItem>>>? = null
     private var stringMapParsed: Pair<String?, Map<String, String>>? = null
+    @Volatile private var cachedPrefs: Preferences? = null
+
+    suspend fun currentPrefs(): Preferences =
+        cachedPrefs ?: context.dataStore.data.first().also { cachedPrefs = it }
 
     val session: Flow<SavedPlaylist?> = context.dataStore.data.map { prefs ->
+        cachedPrefs = prefs
         val raw = prefs[sessionKey].orEmpty()
         if (raw.isBlank()) null
         else runCatching { gson.fromJson(raw, SavedPlaylist::class.java) }.getOrNull()
@@ -109,7 +114,7 @@ class PlaylistStore(private val context: Context) {
     }
 
     suspend fun opening(): Pair<SavedPlaylist?, Boolean?> {
-        val prefs = context.dataStore.data.first()
+        val prefs = currentPrefs()
         val raw = prefs[sessionKey].orEmpty()
         val saved = if (raw.isBlank()) null
         else runCatching { gson.fromJson(raw, SavedPlaylist::class.java) }.getOrNull()
@@ -118,7 +123,7 @@ class PlaylistStore(private val context: Context) {
     }
 
     suspend fun favoritesSetupDone(): Boolean? {
-        val prefs = context.dataStore.data.first()
+        val prefs = currentPrefs()
         if (!prefs.contains(favoritesSetupKey)) return null
         return prefs[favoritesSetupKey] == true
     }
@@ -137,17 +142,17 @@ class PlaylistStore(private val context: Context) {
     }
 
     suspend fun deviceId(): String {
-        val existing = context.dataStore.data.first()[deviceKey]
+        val existing = currentPrefs()[deviceKey]
         if (!existing.isNullOrBlank()) return existing
         val created = newDeviceId()
         context.dataStore.edit { prefs ->
             if (prefs[deviceKey].isNullOrBlank()) prefs[deviceKey] = created
         }
-        return context.dataStore.data.first()[deviceKey] ?: created
+        return currentPrefs()[deviceKey] ?: created
     }
 
     suspend fun lineup(playlistId: String): LineupConfig {
-        val raw = context.dataStore.data.first()[lineupKey]
+        val raw = currentPrefs()[lineupKey]
         return parsedLineups(raw)[playlistId]?.copy() ?: LineupConfig()
     }
 
@@ -160,7 +165,7 @@ class PlaylistStore(private val context: Context) {
     }
 
     suspend fun catalogStamp(playlistId: String): String? {
-        return decodeStringMap(context.dataStore.data.first()[catalogStampKey])[playlistId]
+        return decodeStringMap(currentPrefs()[catalogStampKey])[playlistId]
     }
 
     suspend fun saveCatalogStamp(playlistId: String, stamp: String) {
@@ -172,7 +177,7 @@ class PlaylistStore(private val context: Context) {
     }
 
     suspend fun countryStamp(playlistId: String): String? {
-        return decodeStringMap(context.dataStore.data.first()[countryStampKey])[playlistId]
+        return decodeStringMap(currentPrefs()[countryStampKey])[playlistId]
     }
 
     suspend fun saveCountryStamp(playlistId: String, stamp: String) {
@@ -184,7 +189,7 @@ class PlaylistStore(private val context: Context) {
     }
 
     suspend fun refreshIntervalMinutes(): Int {
-        val saved = context.dataStore.data.first()[refreshIntervalKey] ?: DEFAULT_REFRESH_MINUTES
+        val saved = currentPrefs()[refreshIntervalKey] ?: DEFAULT_REFRESH_MINUTES
         return if (saved in REFRESH_INTERVALS) saved else DEFAULT_REFRESH_MINUTES
     }
 
@@ -196,14 +201,14 @@ class PlaylistStore(private val context: Context) {
     suspend fun pictureMode(): String = devicePrefs().pictureMode
 
     suspend fun autoFrameRate(): Boolean =
-        context.dataStore.data.first()[autoFrameKey] != false
+        currentPrefs()[autoFrameKey] != false
 
     suspend fun saveAutoFrameRate(enabled: Boolean) {
         context.dataStore.edit { prefs -> prefs[autoFrameKey] = enabled }
     }
 
     suspend fun activeProfile(): String =
-        context.dataStore.data.first()[profileKey]?.takeIf { it.isNotBlank() } ?: "Main"
+        currentPrefs()[profileKey]?.takeIf { it.isNotBlank() } ?: "Main"
 
     suspend fun saveActiveProfile(name: String) {
         val chosen = name.ifBlank { "Main" }
@@ -211,7 +216,7 @@ class PlaylistStore(private val context: Context) {
     }
 
     suspend fun profilePin(name: String): String? {
-        val raw = context.dataStore.data.first()[profilePinKey] ?: return null
+        val raw = currentPrefs()[profilePinKey] ?: return null
         val map = runCatching {
             gson.fromJson<Map<String, String>>(raw, object : com.google.gson.reflect.TypeToken<Map<String, String>>() {}.type)
         }.getOrNull() ?: return null
@@ -253,7 +258,7 @@ class PlaylistStore(private val context: Context) {
 
     suspend fun audioForChannel(channelId: String): String? {
         if (channelId.isBlank()) return null
-        return decodeStringMap(context.dataStore.data.first()[audioByChannelKey])[channelId]
+        return decodeStringMap(currentPrefs()[audioByChannelKey])[channelId]
             ?.takeIf { it.isNotBlank() }
     }
 
@@ -288,7 +293,7 @@ class PlaylistStore(private val context: Context) {
 
     suspend fun devicePrefs(): DevicePrefs {
         devicePrefsCache?.let { return it }
-        val prefs = context.dataStore.data.first()
+        val prefs = currentPrefs()
         val picture = prefs[pictureModeKey].orEmpty().let { if (it in PICTURE_MODES) it else PICTURE_FIT }
         val density = prefs[guideDensityKey].orEmpty().let { if (it in GUIDE_DENSITIES) it else GUIDE_COMFORTABLE }
         val parental = prefs[parentalTimeoutKey] ?: DEFAULT_PARENTAL_TIMEOUT
@@ -332,7 +337,7 @@ class PlaylistStore(private val context: Context) {
 
     suspend fun subtitleForChannel(channelId: String): String? {
         if (channelId.isBlank()) return null
-        return decodeStringMap(context.dataStore.data.first()[subtitleByChannelKey])[channelId]
+        return decodeStringMap(currentPrefs()[subtitleByChannelKey])[channelId]
             ?.takeIf { it.isNotBlank() }
     }
 
@@ -385,7 +390,7 @@ class PlaylistStore(private val context: Context) {
     suspend fun multiView(): Boolean = devicePrefs().multiView
 
     suspend fun lastGuideSection(): String {
-        val raw = context.dataStore.data.first()[lastGuideSectionKey].orEmpty()
+        val raw = currentPrefs()[lastGuideSectionKey].orEmpty()
         return when (raw.trim().lowercase()) {
             "vod", "movies" -> "vod"
             "series", "shows" -> "series"
@@ -403,7 +408,7 @@ class PlaylistStore(private val context: Context) {
     }
 
     suspend fun skipIntroSeries(): Set<String> =
-        decodeStringMap(context.dataStore.data.first()[skipIntroSeriesKey]).keys
+        decodeStringMap(currentPrefs()[skipIntroSeriesKey]).keys
 
     suspend fun rememberSkipIntro(seriesId: String) {
         val id = seriesId.trim()
@@ -421,7 +426,7 @@ class PlaylistStore(private val context: Context) {
     }
 
     suspend fun lastRefreshAt(playlistId: String): Long {
-        return decodeStringMap(context.dataStore.data.first()[refreshLastKey])[playlistId]?.toLongOrNull() ?: 0L
+        return decodeStringMap(currentPrefs()[refreshLastKey])[playlistId]?.toLongOrNull() ?: 0L
     }
 
     suspend fun saveLastRefreshAt(playlistId: String, at: Long) {
@@ -450,18 +455,18 @@ class PlaylistStore(private val context: Context) {
     }
 
     suspend fun lastChannelId(playlistId: String): String? {
-        val raw = context.dataStore.data.first()[lastChannelKey]
+        val raw = currentPrefs()[lastChannelKey]
         return decodeStringMap(raw)[playlistId]?.takeIf { it.isNotBlank() }
     }
 
     suspend fun previousChannelId(playlistId: String): String? {
-        val raw = context.dataStore.data.first()[previousChannelKey]
+        val raw = currentPrefs()[previousChannelKey]
         return decodeStringMap(raw)[playlistId]?.takeIf { it.isNotBlank() }
     }
 
     suspend fun recent(playlistId: String): List<WatchEntry> {
         val key = profileScope(playlistId)
-        val raw = context.dataStore.data.first()[watchKey]
+        val raw = currentPrefs()[watchKey]
         return parsedWatch(raw)[key].orEmpty().sortedByDescending { it.updatedAt ?: 0L }
     }
 
@@ -545,7 +550,7 @@ class PlaylistStore(private val context: Context) {
 
     suspend fun favorites(playlistId: String): List<String> {
         val key = profileScope(playlistId)
-        val raw = context.dataStore.data.first()[favoritesKey]
+        val raw = currentPrefs()[favoritesKey]
         return parsedFavorites(raw)[key].orEmpty()
     }
 
@@ -560,7 +565,7 @@ class PlaylistStore(private val context: Context) {
     suspend fun favoriteIds(playlistId: String): Set<String> = favorites(playlistId).toSet()
 
     suspend fun recordingBook(playlistId: String): RecordingBook {
-        val raw = context.dataStore.data.first()[recordingsKey]
+        val raw = currentPrefs()[recordingsKey]
         return parsedRecordings(raw)[playlistId] ?: RecordingBook()
     }
 
@@ -589,7 +594,7 @@ class PlaylistStore(private val context: Context) {
     }
 
     suspend fun favoritesRevision(playlistId: String): Long {
-        val raw = context.dataStore.data.first()[favoritesRevisionKey]
+        val raw = currentPrefs()[favoritesRevisionKey]
         return parsedRevisions(raw)[playlistId]?.toLongOrNull() ?: 0L
     }
 
@@ -602,7 +607,7 @@ class PlaylistStore(private val context: Context) {
     }
 
     suspend fun savedPage(playlistId: String): SavedPage {
-        val prefs = context.dataStore.data.first()
+        val prefs = currentPrefs()
         val favorites = favoritePage(playlistId, prefs)
         val refreshedAt = decodeStringMap(prefs[refreshLastKey])[playlistId]?.toLongOrNull() ?: 0L
         val raw = prefs[recordingsKey]
@@ -617,7 +622,7 @@ class PlaylistStore(private val context: Context) {
     }
 
     suspend fun favoritePage(playlistId: String): FavoritePage {
-        val prefs = context.dataStore.data.first()
+        val prefs = currentPrefs()
         val page = favoritePage(playlistId, prefs)
         val key = profileScope(playlistId)
         if (key == playlistId) return page
@@ -754,7 +759,7 @@ class PlaylistStore(private val context: Context) {
     }
 
     suspend fun playlistOrder(): List<String> {
-        val raw = context.dataStore.data.first()[playlistOrderKey]
+        val raw = currentPrefs()[playlistOrderKey]
         return decodeStringList(raw)
     }
 
@@ -795,7 +800,7 @@ class PlaylistStore(private val context: Context) {
 
     suspend fun videoDecoder(): String {
         videoDecoderCache?.let { return it }
-        val value = PlayerDecoder.normalize(context.dataStore.data.first()[videoDecoderKey])
+        val value = PlayerDecoder.normalize(currentPrefs()[videoDecoderKey])
         videoDecoderCache = value
         return value
     }
@@ -807,7 +812,7 @@ class PlaylistStore(private val context: Context) {
     }
 
     suspend fun tmdbItemsLimit(): Int {
-        val saved = context.dataStore.data.first()[tmdbItemsLimitKey] ?: DEFAULT_TMDB_ITEMS
+        val saved = currentPrefs()[tmdbItemsLimitKey] ?: DEFAULT_TMDB_ITEMS
         return saved.coerceIn(1, MAX_TMDB_ITEMS)
     }
 
@@ -817,7 +822,7 @@ class PlaylistStore(private val context: Context) {
     }
 
     suspend fun scrobblerProvider(): String {
-        val raw = context.dataStore.data.first()[scrobblerProviderKey].orEmpty()
+        val raw = currentPrefs()[scrobblerProviderKey].orEmpty()
         return when (raw) {
             ScrobblerIds.SIMKL, ScrobblerIds.TRAKT -> raw
             else -> ScrobblerIds.NONE
@@ -842,10 +847,10 @@ class PlaylistStore(private val context: Context) {
         }
     }
 
-    suspend fun simklToken(): String = context.dataStore.data.first()[simklTokenKey].orEmpty()
-    suspend fun simklClientId(): String = context.dataStore.data.first()[simklClientIdKey].orEmpty()
-    suspend fun traktToken(): String = context.dataStore.data.first()[traktTokenKey].orEmpty()
-    suspend fun traktClientId(): String = context.dataStore.data.first()[traktClientIdKey].orEmpty()
+    suspend fun simklToken(): String = currentPrefs()[simklTokenKey].orEmpty()
+    suspend fun simklClientId(): String = currentPrefs()[simklClientIdKey].orEmpty()
+    suspend fun traktToken(): String = currentPrefs()[traktTokenKey].orEmpty()
+    suspend fun traktClientId(): String = currentPrefs()[traktClientIdKey].orEmpty()
 
     suspend fun saveSimklCredentials(token: String, clientId: String) {
         context.dataStore.edit { prefs ->
@@ -877,26 +882,26 @@ class PlaylistStore(private val context: Context) {
         }
     }
 
-    suspend fun pipSwipeHome(): Boolean = context.dataStore.data.first()[pipSwipeHomeKey] ?: true
+    suspend fun pipSwipeHome(): Boolean = currentPrefs()[pipSwipeHomeKey] ?: true
 
     suspend fun savePipSwipeHome(enabled: Boolean) {
         context.dataStore.edit { prefs -> prefs[pipSwipeHomeKey] = enabled }
     }
 
-    suspend fun nightMode(): Boolean = context.dataStore.data.first()[nightModeKey] ?: false
+    suspend fun nightMode(): Boolean = currentPrefs()[nightModeKey] ?: false
 
     suspend fun saveNightMode(enabled: Boolean) {
         context.dataStore.edit { prefs -> prefs[nightModeKey] = enabled }
     }
 
-    suspend fun autoResume(): Boolean = context.dataStore.data.first()[autoResumeKey] ?: false
+    suspend fun autoResume(): Boolean = currentPrefs()[autoResumeKey] ?: false
 
     suspend fun saveAutoResume(enabled: Boolean) {
         context.dataStore.edit { prefs -> prefs[autoResumeKey] = enabled }
     }
 
     suspend fun scrobbleConfig(): ScrobbleConfig {
-        val prefs = context.dataStore.data.first()
+        val prefs = currentPrefs()
         val provider = when (prefs[scrobblerProviderKey].orEmpty()) {
             ScrobblerIds.SIMKL, ScrobblerIds.TRAKT -> prefs[scrobblerProviderKey].orEmpty()
             else -> ScrobblerIds.NONE
@@ -932,7 +937,7 @@ class PlaylistStore(private val context: Context) {
 
     suspend fun queue(playlistId: String): List<QueueItem> {
         val key = profileScope(playlistId)
-        val raw = context.dataStore.data.first()[queueKey]
+        val raw = currentPrefs()[queueKey]
         return parsedQueue(raw)[key].orEmpty()
     }
 

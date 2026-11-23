@@ -4,7 +4,6 @@ import android.content.Context
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import android.graphics.drawable.GradientDrawable
 import android.view.ViewOutlineProvider
@@ -18,6 +17,7 @@ import com.olympus.iptv.ui.Haptics
 import com.olympus.iptv.ui.channelLogo
 import com.olympus.iptv.ui.prefetchLogos
 import com.olympus.iptv.data.Channel
+import java.util.concurrent.atomic.AtomicInteger
 import com.olympus.iptv.data.ContentKind
 import com.olympus.iptv.data.EpgNowNext
 import com.olympus.iptv.databinding.ItemChannelBinding
@@ -49,6 +49,7 @@ class ChannelAdapter(
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     private val items = mutableListOf<Channel>()
+    private val submitGeneration = AtomicInteger()
     private var accentTint: android.content.res.ColorStateList? = null
     private var mutedTint: android.content.res.ColorStateList? = null
 
@@ -89,8 +90,17 @@ class ChannelAdapter(
 
     fun setPlaying(id: String?) {
         if (playingId == id) return
+        val prev = playingId
         playingId = id
-        if (items.isNotEmpty() && !posterMode) notifyItemRangeChanged(0, items.size)
+        if (items.isEmpty() || posterMode) return
+        if (prev != null) {
+            val oldIdx = items.indexOfFirst { it.id == prev }
+            if (oldIdx >= 0) notifyItemChanged(oldIdx, PAYLOAD_PLAYING)
+        }
+        if (id != null) {
+            val newIdx = items.indexOfFirst { it.id == id }
+            if (newIdx >= 0) notifyItemChanged(newIdx, PAYLOAD_PLAYING)
+        }
     }
 
     fun setGuideFocused(id: String?) {
@@ -122,16 +132,30 @@ class ChannelAdapter(
             return
         }
         val old = items.toList()
-        items.clear()
-        items.addAll(list)
-        DiffUtil.calculateDiff(object : DiffUtil.Callback() {
-            override fun getOldListSize(): Int = old.size
-            override fun getNewListSize(): Int = list.size
-            override fun areItemsTheSame(oldPosition: Int, newPosition: Int): Boolean =
-                old[oldPosition].id == list[newPosition].id
-            override fun areContentsTheSame(oldPosition: Int, newPosition: Int): Boolean =
-                old[oldPosition] == list[newPosition]
-        }).dispatchUpdatesTo(this)
+        if (old == list) return
+        val next = list.toList()
+        val token = submitGeneration.incrementAndGet()
+        ListDiff.dispatch(
+            submitGeneration,
+            token,
+            old,
+            next,
+            sameItem = { left, right -> left.id == right.id },
+            sameContent = { left, right -> left == right },
+            payload = { left, right ->
+                if (left.name != right.name || left.number != right.number || left.streamUrl != right.streamUrl) {
+                    null
+                } else if (left.logoUrl != right.logoUrl) {
+                    PAYLOAD_LOGO
+                } else {
+                    PAYLOAD_EPG
+                }
+            }
+        ) { diff, rows ->
+            items.clear()
+            items.addAll(rows)
+            diff.dispatchUpdatesTo(this)
+        }
     }
 
     fun append(more: List<Channel>) {
@@ -217,6 +241,7 @@ class ChannelAdapter(
         val row = holder as? Holder ?: return
         if (!holderMatchesMode(row)) return
         when {
+            payloads.contains(PAYLOAD_PLAYING) -> (row as? RowHolder)?.bindPlaying(items[position])
             payloads.contains(PAYLOAD_EPG) -> row.bindEpg(items[position])
             payloads.contains(PAYLOAD_FAVORITE) -> row.bindFavorite(items[position])
             payloads.contains(PAYLOAD_LOGO) -> row.bindLogo(items[position])
@@ -245,6 +270,17 @@ class ChannelAdapter(
             if (params != null && params.width != ViewGroup.LayoutParams.MATCH_PARENT) {
                 params.width = ViewGroup.LayoutParams.MATCH_PARENT
                 binding.root.layoutParams = params
+            }
+            binding.root.post {
+                val width = binding.root.width
+                val frame = binding.logo.parent as? View ?: return@post
+                if (width <= 0) return@post
+                val cap = (binding.root.resources.displayMetrics.heightPixels * 0.72f).toInt()
+                val height = (width * 1.35f).toInt().coerceAtMost(cap).coerceAtLeast(width)
+                if (frame.layoutParams.height != height) {
+                    frame.layoutParams.height = height
+                    frame.requestLayout()
+                }
             }
             binding.name.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 15f)
             binding.group.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12f)
@@ -425,6 +461,10 @@ class ChannelAdapter(
             }
         }
 
+        fun bindPlaying(item: Channel) {
+            com.olympus.iptv.ui.LiveBars.show(binding.liveBars, item.id == playingId)
+        }
+
         fun bindGuideHighlight(item: Channel) {
             val ctx = binding.root.context
             val active = !guideRowsFocusable && item.id == focusedId
@@ -550,6 +590,7 @@ class ChannelAdapter(
         private const val PAYLOAD_FAVORITE = "favorite"
         private const val PAYLOAD_LOGO = "logo"
         private const val PAYLOAD_GUIDE_FOCUS = "guide_focus"
+        private const val PAYLOAD_PLAYING = "playing"
 
         private fun logoPx(view: android.view.View, dp: Int): Int {
             val fromDp = (dp * view.resources.displayMetrics.density).toInt().coerceAtLeast(1)

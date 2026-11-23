@@ -35,7 +35,7 @@ class BrowsePreviewController(
     fun queue(channel: Channel, liveSection: Boolean) {
         if (!liveSection || channel.kind != ContentKind.LIVE || channel.streamUrl.isBlank()) return
         updateCaption(channel)
-        if (touchPrimary) return
+        if (touchPrimary || com.olympus.iptv.ui.DeviceForm.isTelevision(activity)) return
         if (channel.id == previewChannelId && previewPlayer != null) return
         previewJob?.cancel()
         previewJob = activity.lifecycleScope.launch {
@@ -47,6 +47,7 @@ class BrowsePreviewController(
     }
 
     fun start(channel: Channel) {
+        if (touchPrimary || com.olympus.iptv.ui.DeviceForm.isTelevision(activity)) return
         val player = previewPlayer ?: ExoPlayer.Builder(activity)
             .setLoadControl(
                 DefaultLoadControl.Builder()
@@ -110,6 +111,9 @@ class BrowsePreviewController(
         previewChannelId = null
         previewPlayer?.stop()
         previewPlayer?.clearMediaItems()
+        previewPlayer?.release()
+        previewPlayer = null
+        binding.previewPlayer.player = null
     }
 
     fun pause() {

@@ -55,7 +55,7 @@ class LineupClient(
         return DashboardHost.ensureReachable().trimEnd('/')
     }
 
-    fun dashboardAddress(): String = baseUrl()
+    fun dashboardAddress(): String = DashboardHost.url()
 
     private fun tokenKey(email: String, deviceId: String): String =
         "tok_${email.trim().lowercase()}_${deviceId.trim()}"
@@ -485,8 +485,6 @@ class LineupClient(
             .build()
 
         fun peekDashboardUrl(): String? {
-            val cloud = BuildConfig.PORTAL_CLOUD_URL.trim().trimEnd('/')
-            if (cloud.startsWith("http://") || cloud.startsWith("https://")) return cloud
             return DashboardHost.url()
         }
     }

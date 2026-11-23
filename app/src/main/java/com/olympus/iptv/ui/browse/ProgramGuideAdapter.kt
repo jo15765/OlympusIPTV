@@ -12,13 +12,13 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
 import android.widget.TextView
-import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import com.olympus.iptv.R
 import com.olympus.iptv.data.Channel
 import com.olympus.iptv.data.ContentKind
 import com.olympus.iptv.data.EpgProgram
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicInteger
 
 class ProgramGuideAdapter(
     context: Context,
@@ -57,6 +57,7 @@ class ProgramGuideAdapter(
         private set
     var windowEnd = 0L
         private set
+    private val submitGeneration = AtomicInteger()
     var scrollX = 0
     var rowHeight = dp(52)
     private val labelPad = dp(12)
@@ -112,16 +113,22 @@ class ProgramGuideAdapter(
             return
         }
         val old = channels.toList()
-        channels.clear()
-        channels.addAll(list)
-        DiffUtil.calculateDiff(object : DiffUtil.Callback() {
-            override fun getOldListSize(): Int = old.size
-            override fun getNewListSize(): Int = list.size
-            override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean =
-                old[oldItemPosition].id == list[newItemPosition].id
-            override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean =
-                old[oldItemPosition] == list[newItemPosition]
-        }, true).dispatchUpdatesTo(this)
+        if (old == list) return
+        val next = list.toList()
+        val token = submitGeneration.incrementAndGet()
+        ListDiff.dispatch(
+            submitGeneration,
+            token,
+            old,
+            next,
+            sameItem = { left, right -> left.id == right.id },
+            sameContent = { left, right -> left == right },
+            payload = { left, right -> if (left.name == right.name && left.logoUrl == right.logoUrl) "epg" else null }
+        ) { diff, rows ->
+            channels.clear()
+            channels.addAll(rows)
+            diff.dispatchUpdatesTo(this)
+        }
     }
 
     fun channelAt(index: Int): Channel? = channels.getOrNull(index)

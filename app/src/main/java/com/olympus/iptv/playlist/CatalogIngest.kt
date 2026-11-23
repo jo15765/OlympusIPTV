@@ -62,6 +62,7 @@ object CatalogIngest {
         liveReady: CompletableDeferred<Boolean>
     ) {
         val db = app.catalogDb
+        db.beginBulkSearch()
         var reached = false
         val international = app.playlistStore.lineup(playlist.id).includeInternational
         val scoped = playlist.copy(includeInternational = international)
@@ -92,6 +93,7 @@ object CatalogIngest {
                 if (movieJob.await()) reached = true
             }
         } finally {
+            runCatching { db.endBulkSearch() }
             if (!liveReady.isCompleted) liveReady.complete(false)
             if (reached) {
                 synchronized(settled) { settled.add(playlist.id) }

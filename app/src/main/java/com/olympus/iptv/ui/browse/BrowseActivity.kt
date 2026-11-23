@@ -695,6 +695,8 @@ class BrowseActivity : AppCompatActivity(), ToolHost {
 
     internal var guideDensity = PlaylistStore.GUIDE_COMFORTABLE
 
+    internal var lastGuideWidth = 0
+
 
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         super.onCreate(savedInstanceState)
