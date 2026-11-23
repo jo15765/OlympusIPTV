@@ -331,7 +331,7 @@
     <string name="lineup_space">Spc</string>
     <string name="lineup_delete">DEL</string>
     <string name="lineup_channels">Channels</string>
-    <string name="portal_base_url">https://10.0.2.2:8443</string>
+    <string name="portal_base_url">https://stream-me-service-api.getjohnathan.com</string>
     <string name="record">Record</string>
     <string name="nav_recordings">Recordings</string>
     <string name="record_title">Record</string>

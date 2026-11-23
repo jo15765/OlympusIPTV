@@ -6,6 +6,9 @@ import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import com.olympus.iptv.BuildConfig
+import com.olympus.iptv.data.Category
+import com.olympus.iptv.data.Channel
+import com.olympus.iptv.data.ContentKind
 import com.olympus.iptv.data.LineupConfig
 import com.olympus.iptv.data.RecordingBook
 import com.olympus.iptv.data.WatchEntry
@@ -340,6 +343,59 @@ class LineupClient(
         val startMillis: Long = 0L,
         val leadMinutes: Int = 15
     )
+
+    data class CloudCatalogResponse(
+        val categories: List<com.olympus.iptv.data.Category> = emptyList(),
+        val channels: List<com.olympus.iptv.data.Channel> = emptyList(),
+        val stamp: Long = 0L
+    )
+
+    fun fetchCloudCatalog(email: String, deviceId: String, kind: String): CloudCatalogResponse? {
+        val token = ensureDeviceToken(email, deviceId)
+        val url = "${baseUrl()}/api/catalog/sync?email=${enc(email)}&deviceId=${enc(deviceId)}&kind=$kind"
+        val json = getJson(url, token, deviceId) ?: return null
+        return runCatching {
+            val categories = json.getAsJsonArray("categories").orEmpty().map { el ->
+                val row = el.asJsonObject
+                Category(
+                    id = row.text("id"),
+                    name = row.text("name"),
+                    kind = contentKind(row.text("kind"))
+                )
+            }
+            val channels = json.getAsJsonArray("channels").orEmpty().map { el ->
+                val row = el.asJsonObject
+                Channel(
+                    id = row.text("id"),
+                    name = row.text("name"),
+                    streamUrl = row.text("streamUrl"),
+                    logoUrl = row.textOrNull("logoUrl"),
+                    groupTitle = row.textOrNull("groupTitle"),
+                    categoryId = row.textOrNull("categoryId"),
+                    kind = contentKind(row.text("kind")),
+                    seriesId = row.textOrNull("seriesId"),
+                    season = row.get("season")?.takeIf { !it.isJsonNull }?.asInt
+                )
+            }
+            CloudCatalogResponse(
+                categories = categories,
+                channels = channels,
+                stamp = json.get("stamp")?.takeIf { !it.isJsonNull }?.asLong ?: 0L
+            )
+        }.getOrNull()
+    }
+
+    private fun contentKind(raw: String): ContentKind =
+        if (raw.equals("vod", true) || raw.equals("series", true)) ContentKind.VOD else ContentKind.LIVE
+
+    private fun JsonObject.text(name: String): String =
+        get(name)?.takeIf { !it.isJsonNull }?.asString.orEmpty()
+
+    private fun JsonObject.textOrNull(name: String): String? =
+        get(name)?.takeIf { !it.isJsonNull }?.asString?.takeIf { it.isNotBlank() }
+
+    private fun JsonArray?.orEmpty(): List<com.google.gson.JsonElement> =
+        if (this == null) emptyList() else this.toList()
 
     fun fetchRemoteReminders(email: String, deviceId: String): List<RemoteReminder> {
         val token = ensureDeviceToken(email, deviceId)

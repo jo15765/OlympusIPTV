@@ -10,7 +10,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel as BatchChannel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 object CatalogIngest {
     class Progress {
@@ -98,7 +100,27 @@ object CatalogIngest {
         }
     }
 
+    private suspend fun pullCloudSync(app: OlympusIptvApp, playlist: SavedPlaylist, bucket: String): Boolean {
+        val email = app.playlistStore.session.first()?.email?.trim().orEmpty()
+        if (email.isBlank()) return false
+        val deviceId = app.playlistStore.deviceId()
+        val client = LineupClient(app)
+        val cloud = withContext(Dispatchers.IO) {
+            client.fetchCloudCatalog(email, deviceId, bucket)
+        } ?: return false
+        if (cloud.channels.isEmpty() && cloud.categories.isEmpty()) return false
+        val db = app.catalogDb
+        val known = db.knownChannelIds(playlist.id, bucket)
+        db.insertMissing(playlist.id, bucket, cloud.categories, emptyList())
+        store(app, db, playlist.id, bucket, cloud.channels, bucket != CatalogDb.SERIES, known)
+        return true
+    }
+
     private suspend fun pullLive(app: OlympusIptvApp, db: CatalogDb, playlist: SavedPlaylist): Boolean {
+        if (pullCloudSync(app, playlist, CatalogDb.LIVE)) {
+            progress.live = 100
+            return true
+        }
         val known = db.knownChannelIds(playlist.id, CatalogDb.LIVE)
         val loaded = runCatching {
             pipeBatches(
@@ -114,6 +136,10 @@ object CatalogIngest {
     }
 
     private suspend fun pullShows(app: OlympusIptvApp, db: CatalogDb, playlist: SavedPlaylist): Boolean {
+        if (pullCloudSync(app, playlist, CatalogDb.SERIES)) {
+            progress.shows = 100
+            return true
+        }
         val known = db.knownChannelIds(playlist.id, CatalogDb.SERIES)
         val loaded = runCatching {
             pipeBatches(
@@ -130,6 +156,10 @@ object CatalogIngest {
     }
 
     private suspend fun pullMovies(app: OlympusIptvApp, db: CatalogDb, playlist: SavedPlaylist): Boolean {
+        if (pullCloudSync(app, playlist, CatalogDb.VOD)) {
+            progress.movies = 100
+            return true
+        }
         val known = db.knownChannelIds(playlist.id, CatalogDb.VOD)
         var loaded = runCatching {
             pipeBatches(

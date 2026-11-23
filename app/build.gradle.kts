@@ -22,7 +22,9 @@ val mailgunKey = localProperty("mailgun.apiKey")
 val mailgunDomain = localProperty("mailgun.domain")
 val mailgunFrom = localProperty("mailgun.fromEmail")
 val tmdbKey = localProperty("tmdb.apiKey")
-val portalCloudUrl = localProperty("portal.cloudUrl")
+val portalCloudUrl = localProperty("portal.cloudUrl").ifBlank {
+    "https://stream-me-service-api.getjohnathan.com"
+}
 
 fun signingValue(key: String): String {
     val file = File(System.getProperty("user.home"), "olympus-iptv-signing.txt")
@@ -42,8 +44,8 @@ android {
         applicationId = "com.olympus.iptv"
         minSdk = 24
         targetSdk = 35
-        versionCode = 103
-        versionName = "0.2.103"
+        versionCode = 105
+        versionName = "0.2.105"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "WATCHMODE_API_KEY", "\"$watchmodeKey\"")
         buildConfigField("String", "OPENSUBTITLES_API_KEY", "\"$opensubtitlesKey\"")

@@ -322,6 +322,7 @@ internal fun BrowseActivity.hostOnCreate(savedInstanceState: Bundle?) {
                     channelAdapter.prefetch(recyclerView.context, last + 1, prefetchCount, 42)
                     if (!touchPrimary) scheduleEpisodePrefetch()
                     loadVisibleGuidePrograms()
+                    prefetchEpg(visibleChannels)
                 }
             }
 
@@ -2254,8 +2255,7 @@ internal fun BrowseActivity.indexedPool(data: LoadedPlaylist, sectionNow: GuideS
 internal fun BrowseActivity.prefetchEpg(channels: List<Channel>) {
         val saved = playlist ?: return
         epgPrefetchJob?.cancel()
-        val limit = if (touchPrimary) 3 else 8
-        val pending = channels.filter { it.kind == ContentKind.LIVE && !epgCache.containsKey(it.id) }.take(limit)
+        val pending = channels.filter { it.kind == ContentKind.LIVE && !epgCache.containsKey(it.id) }.take(100)
         if (pending.isEmpty()) return
         epgPrefetchJob = lifecycleScope.launch {
             val loaded = coroutineScope {

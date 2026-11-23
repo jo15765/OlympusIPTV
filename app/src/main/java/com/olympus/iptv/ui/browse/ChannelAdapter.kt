@@ -458,43 +458,34 @@ class ChannelAdapter(
 
         override fun bindEpg(item: Channel) {
             val context = binding.root.context
-            val card = DeviceForm.isCompact(context) &&
-                DeviceForm.isPortrait(context) &&
-                item.kind == ContentKind.LIVE &&
-                item.seriesId.isNullOrBlank()
-            if (!card) {
+            if (item.kind != ContentKind.LIVE || !item.seriesId.isNullOrBlank()) {
+                binding.epgNow.visibility = View.GONE
                 binding.epgProgress.visibility = View.GONE
                 binding.epgNext.visibility = View.GONE
-                val touch = DeviceForm.isTouchPrimary(context)
-                if (!touch || item.kind != ContentKind.LIVE || !item.seriesId.isNullOrBlank()) {
-                    binding.epgNow.visibility = View.GONE
-                    return
-                }
-                val line = epgProvider(item)?.nowLine().orEmpty()
-                binding.epgNow.text = line
-                binding.epgNow.visibility = if (line.isBlank()) View.GONE else View.VISIBLE
                 return
             }
             val info = epgProvider(item)
-            val now = info?.now
-            if (now == null) {
-                binding.epgNow.visibility = View.GONE
-                binding.epgProgress.visibility = View.GONE
-            } else {
-                binding.epgNow.text = now.title
+            val line = info?.nowLine()?.ifBlank { info.now?.title }.orEmpty()
+            if (line.isNotBlank()) {
+                binding.epgNow.text = line
                 binding.epgNow.visibility = View.VISIBLE
+            } else {
+                binding.epgNow.visibility = View.GONE
+            }
+            val now = info?.now
+            val card = DeviceForm.isCompact(context) && DeviceForm.isPortrait(context)
+            if (card && now != null && now.endMillis > now.startMillis) {
                 val span = now.endMillis - now.startMillis
-                val fraction = if (span > 0L) {
-                    ((System.currentTimeMillis() - now.startMillis) * 1000L / span).toInt()
-                } else {
-                    0
-                }
+                val fraction = ((System.currentTimeMillis() - now.startMillis) * 1000L / span).toInt()
                 binding.epgProgress.progress = fraction.coerceIn(0, 1000)
                 binding.epgProgress.visibility = View.VISIBLE
+                val next = info.nextLine()
+                binding.epgNext.text = next
+                binding.epgNext.visibility = if (next.isNotBlank()) View.VISIBLE else View.GONE
+            } else {
+                binding.epgProgress.visibility = View.GONE
+                binding.epgNext.visibility = View.GONE
             }
-            val next = info?.nextLine().orEmpty()
-            binding.epgNext.text = next
-            binding.epgNext.visibility = if (next.isBlank()) View.GONE else View.VISIBLE
         }
     }
 

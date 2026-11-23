@@ -6,7 +6,7 @@
 
 ### For the latest and greatest, build your own APK from this code.
 
-The latest signed file is **0.2.103** (versionCode 103): `C:\Users\chalu\Downloads\olympus-iptv-0.2.103.apk`. **One APK** installs on Android TV / set-top boxes and on phones and tablets. Install it over 0.2.102. The signing key is the same, so the saved account and playlist stay.
+The latest signed file is **0.2.105** (versionCode 105): `C:\Users\chalu\Downloads\olympus-iptv-0.2.105.apk`. **One APK** installs on Android TV / set-top boxes and on phones and tablets. Install it over 0.2.104. The signing key is the same, so the saved account and playlist stay. Cloud sync uses `https://stream-me-service-api.getjohnathan.com`, which reads and writes the Olympus-IPTV PostgreSQL database.
 
 **This is a player only. You must provide your own streams.**
 
@@ -23,6 +23,7 @@ Olympus-IPTV does not include channels, movies, shows, or stream addresses. It p
 </div>
 
 - [Start here](#start-here)
+- [What's in 0.2.105](#whats-in-02105)
 - [What's in 0.2.103](#whats-in-02103)
 - [What's in 0.2.92](#whats-in-0292)
 - [What's in 0.2.86](#whats-in-0286)
@@ -55,14 +56,29 @@ Olympus-IPTV is one APK for Android TV / set-top boxes and for phones and tablet
 
 | | |
 | --- | --- |
-| Signed file | `C:\Users\chalu\Downloads\olympus-iptv-0.2.103.apk` |
-| What that file is | versionName **0.2.103**, versionCode **103** |
-| Source in this tree | versionName **0.2.103**, versionCode **103** |
-| What to run | Install the signed 0.2.103 APK, or run this source from Android Studio |
+| Signed file | `C:\Users\chalu\Downloads\olympus-iptv-0.2.105.apk` |
+| What that file is | versionName **0.2.105**, versionCode **105** |
+| Source in this tree | versionName **0.2.105**, versionCode **105** |
+| Cloud API | `https://stream-me-service-api.getjohnathan.com` |
+| What to run | Install the signed 0.2.105 APK, or run this source from Android Studio |
 | Install | Over the existing copy (TV or phone). Uninstalling wipes the saved account, playlist, and favorites. Downloader works with the same file. |
 | Launcher name | Two centered lines: Olympus over IPTV |
 
-**0.2.103** is the current signed release. Cloud setup and later cloud edits are described in [What's in 0.2.103](#whats-in-02103). The channel-loading screen leaves once live channels are saved, and the guide spinner clears if that load fails. A frozen or stuttering live channel reloads itself, then switches to another feed of that same channel. The guide still paints the last group list immediately. Movies, shows, cloud sync, ratings, and the dashboard snapshot wait until that grid is up. The release copy in Downloads is the signed APK only. Movies and shows open the title page under [What's in 0.2.92](#whats-in-0292). It also restores cloud lineup push, the remote lineup revision, and recording sync, and keeps the live-games list, off-air hiding, and the shorter guide under [What's in 0.2.86](#whats-in-0286). Live Games Now skips 24/7 replay channels. Group counts use the stored event window and still leave out hidden channels. Two wrong parental PINs can email through Mailgun when that is configured. Sticks with a small heap still use the 16 MB image cache, RGB_565 posters, and a 10 second buffer. Larger boxes pre-warm only the next channel.
+**0.2.105** is the current signed release. Phones, tablets, and Android TV use this one APK, and both talk to `https://stream-me-service-api.getjohnathan.com`. That API reads and writes the Olympus-IPTV PostgreSQL tables (`accounts`, `devices`, `provider_logins`, `lineup_configs`, `favorites`, `recording_books`, `reminders`, and `watch_history`). Cloud setup and later cloud edits are described in [What's in 0.2.105](#whats-in-02105) and [What's in 0.2.103](#whats-in-02103). The channel-loading screen leaves once live channels are saved, and the guide spinner clears if that load fails. A frozen or stuttering live channel reloads itself, then switches to another feed of that same channel. The guide still paints the last group list immediately. Movies, shows, cloud sync, ratings, and the dashboard snapshot wait until that grid is up. The release copy in Downloads is the signed APK only. Movies and shows open the title page under [What's in 0.2.92](#whats-in-0292). It also restores cloud lineup push, the remote lineup revision, and recording sync, and keeps the live-games list, off-air hiding, and the shorter guide under [What's in 0.2.86](#whats-in-0286). Live Games Now skips 24/7 replay channels. Group counts use the stored event window and still leave out hidden channels. Two wrong parental PINs can email through Mailgun when that is configured. Sticks with a small heap still use the 16 MB image cache, RGB_565 posters, and a 10 second buffer. Larger boxes pre-warm only the next channel.
+
+---
+
+<div align="center">
+
+## What's in 0.2.105
+
+</div>
+
+- The phone, tablet, and TV builds call `https://stream-me-service-api.getjohnathan.com`. There is no separate mobile API.
+- Playlist login, lineup edits, favorites, recordings, reminders, and continue watching are stored in the Olympus-IPTV PostgreSQL database behind that hostname.
+- When that database already has a catalog, live channels, movies, and shows load from `cloud_categories` and `cloud_channels` instead of calling the provider again.
+- The guide prefetches the current program for the visible channels and shows the title on the row. Phone portrait still shows the progress bar and the next program.
+- The home-network dashboard on the device is unchanged. Cloud setup and cloud edits use the hostname above.
 
 ---
 
@@ -368,7 +384,7 @@ HLS streams are saved by following the playlist. A direct stream is copied until
 
 While the app process is running it serves the dashboard on the home network. It starts on port **8765**. If that port is taken, it tries 8766 through 8776. Admin → Web-UI shows the address. Port 8443 stays with Cast. The address is `http://` plus the device’s own Wi-Fi address. HTML and JSON are gzip-compressed when the browser asks. The page itself is stored pre-compressed as `dashboard/portal-page.pack` so the asset packer does not treat it as a second `index.html`. `portal/data/store.json` is never packaged. Login and the header offer **Copy TV URL**. The server stops when the app process stops. Clients that are not on the home network are refused.
 
-The same page on the cloud portal saves the playlist login for the device ID in the address. The app checks those revision numbers every 10 seconds and applies a section only when it changed. Sign in with the email and the device id from Web-UI. Stream addresses are not sent to the page. Backup export downloads one JSON file of favorites, renames, parental PINs, strip rules, the rest of the lineup, and per-channel audio offsets. Import previews, then asks before it writes that file back.
+The same page on `https://stream-me-service-api.getjohnathan.com` saves the playlist login for the device ID in the address. That site reads and writes the Olympus-IPTV PostgreSQL database. The app checks those revision numbers every 10 seconds and applies a section only when it changed. Sign in with the email and the device id from Web-UI. Stream addresses are not sent to the page. Backup export downloads one JSON file of favorites, renames, parental PINs, strip rules, the rest of the lineup, and per-channel audio offsets. Import previews, then asks before it writes that file back.
 
 The web Admin cards match the TV, and add Active Streams and the error log. Active Streams shows the provider’s active and max connection count. Addresses are listed when the login response includes them. Otherwise the page lists streams this device still has open. Logs rotate at 400 KB. Passwords and stream credentials are not written into the log.
 
@@ -457,7 +473,7 @@ The debug APK is `app/build/outputs/apk/debug/app-debug.apk`. Optional keys go i
 | `opensubtitles.apiKey` | OpenSubtitles under player Subtitles |
 | `mailgun.apiKey` + `mailgun.domain` + `mailgun.fromEmail` | Email after two wrong parental PINs |
 
-Release builds use R8, resource shrinking, and optimized resource shrinking. They keep `armeabi-v7a` and `arm64-v8a` only, and English resources only. A baseline profile covers the guide and the player. Gradle is set to work offline. The latest signed release is `C:\Users\chalu\Downloads\olympus-iptv-0.2.103.apk`.
+Release builds use R8, resource shrinking, and optimized resource shrinking. They keep `armeabi-v7a` and `arm64-v8a` only, and English resources only. A baseline profile covers the guide and the player. Gradle is set to work offline. The latest signed release is `C:\Users\chalu\Downloads\olympus-iptv-0.2.105.apk`. The cloud address is `portal.cloudUrl` in `local.properties`, and the build falls back to `https://stream-me-service-api.getjohnathan.com` when that line is empty.
 
 Libraries: Kotlin, AndroidX, ViewBinding, Media3 ExoPlayer (HLS and DASH), OkHttp, Gson, DataStore, Coil, profileinstaller, Google Cast / MediaRouter, and SMBJ. WorkManager is not a dependency. The dashboard is a page in the APK.
 
@@ -528,7 +544,7 @@ clearcast-tuner/
 
 - This is a player only. You must provide your own streams.
 - It is a beta.
-- **0.2.103** is the latest signed file (`olympus-iptv-0.2.103.apk`, versionCode 103). Install it over 0.2.102.
+- **0.2.105** is the latest signed file (`olympus-iptv-0.2.105.apk`, versionCode 105). Install it over 0.2.104. Phones and TVs both use `https://stream-me-service-api.getjohnathan.com`.
 - `portal/data/store.json` is for the Node portal on a PC. It is not packaged in the APK.
 - Chromecast often cannot play provider IPTV/HLS. The Cast button warns before connecting.
 - Ratings, trailers, and New this week need the matching keys in `local.properties` at build time.
