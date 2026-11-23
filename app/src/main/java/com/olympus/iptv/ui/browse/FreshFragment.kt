@@ -980,6 +980,26 @@ class FreshFragment : Fragment() {
 
                 bindArt(rowBinding.freshPoster, title.logoUrl, 160, 220)
 
+                val frame = rowBinding.freshPoster.parent as? View
+                val width = rowBinding.root.width
+                if (width > 0 && frame != null) {
+                    val height = (width * 1.32f).toInt().coerceAtLeast(width)
+                    if (frame.layoutParams.height != height) {
+                        frame.layoutParams.height = height
+                        frame.layoutParams = frame.layoutParams
+                    }
+                } else if (frame != null) {
+                    rowBinding.root.post {
+                        val w = rowBinding.root.width
+                        if (w <= 0) return@post
+                        val height = (w * 1.32f).toInt().coerceAtLeast(w)
+                        if (frame.layoutParams.height != height) {
+                            frame.layoutParams.height = height
+                            frame.requestLayout()
+                        }
+                    }
+                }
+
                 val touch = com.olympus.iptv.ui.DeviceForm.isTouchPrimary(requireContext())
                 rowBinding.root.setOnFocusChangeListener { _, hasFocus ->
                     rowBinding.freshHoverOverlay.visibility = if (hasFocus) View.VISIBLE else View.GONE

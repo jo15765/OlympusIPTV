@@ -217,6 +217,42 @@ class CategoryAdapter(
 
     inner class Holder(private val binding: ItemCategoryBinding) :
         RecyclerView.ViewHolder(binding.root) {
+        private var phoneStyled = false
+        private var heightPosted = false
+
+        private fun syncPhoneHeight(density: Float) {
+            val width = binding.root.width
+            if (width > 0 && density > 0f) {
+                val widthDp = width / density
+                val grown = if (widthDp > 200f) {
+                    (width * 0.72f).toInt().coerceAtMost(
+                        (binding.root.resources.displayMetrics.heightPixels * 0.42f).toInt()
+                    )
+                } else {
+                    (72 * density).toInt()
+                }
+                if (binding.root.minimumHeight != grown) binding.root.minimumHeight = grown
+            } else if (!heightPosted) {
+                val fallback = (72 * density).toInt()
+                if (binding.root.minimumHeight < fallback) binding.root.minimumHeight = fallback
+                heightPosted = true
+                binding.root.post {
+                    heightPosted = false
+                    val w = binding.root.width
+                    if (w <= 0 || density <= 0f) return@post
+                    val widthDp = w / density
+                    val grown = if (widthDp > 200f) {
+                        (w * 0.72f).toInt().coerceAtMost(
+                            (binding.root.resources.displayMetrics.heightPixels * 0.42f).toInt()
+                        )
+                    } else {
+                        (72 * density).toInt()
+                    }
+                    if (binding.root.minimumHeight != grown) binding.root.minimumHeight = grown
+                }
+            }
+        }
+
         fun bind(item: Category) {
             binding.label.text = com.olympus.iptv.data.NameImages.strip(item.name)
             binding.icon.setImageResource(icon(item))
@@ -226,31 +262,31 @@ class CategoryAdapter(
             binding.root.isSelected = item.id == selectedId
             showDetail(item)
             if (phoneListMode) {
-                binding.root.isFocusableInTouchMode = false
-                binding.root.minimumHeight =
-                    (64 * binding.root.resources.displayMetrics.density).toInt()
-                androidx.core.widget.TextViewCompat.setAutoSizeTextTypeWithDefaults(
-                    binding.label,
-                    androidx.core.widget.TextViewCompat.AUTO_SIZE_TEXT_TYPE_NONE
-                )
-                androidx.core.widget.TextViewCompat.setAutoSizeTextTypeWithDefaults(
-                    binding.detail,
-                    androidx.core.widget.TextViewCompat.AUTO_SIZE_TEXT_TYPE_NONE
-                )
-                binding.label.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 16f)
-                binding.detail.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 13f)
-                val cardParams = binding.root.layoutParams
-                if (cardParams != null && cardParams.width != ViewGroup.LayoutParams.MATCH_PARENT) {
-                    cardParams.width = ViewGroup.LayoutParams.MATCH_PARENT
-                    binding.root.layoutParams = cardParams
+                val density = binding.root.resources.displayMetrics.density
+                if (!phoneStyled) {
+                    phoneStyled = true
+                    binding.root.isFocusableInTouchMode = false
+                    androidx.core.widget.TextViewCompat.setAutoSizeTextTypeWithDefaults(
+                        binding.label,
+                        androidx.core.widget.TextViewCompat.AUTO_SIZE_TEXT_TYPE_NONE
+                    )
+                    androidx.core.widget.TextViewCompat.setAutoSizeTextTypeWithDefaults(
+                        binding.detail,
+                        androidx.core.widget.TextViewCompat.AUTO_SIZE_TEXT_TYPE_NONE
+                    )
+                    binding.label.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 16f)
+                    binding.detail.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 13f)
+                    val pad = (12 * density).toInt()
+                    binding.root.setPadding(pad, pad, pad, pad)
+                    val gap = (4 * density).toInt()
+                    val cardParams = binding.root.layoutParams
+                    if (cardParams != null) {
+                        cardParams.width = ViewGroup.LayoutParams.MATCH_PARENT
+                        (cardParams as? ViewGroup.MarginLayoutParams)?.setMargins(gap, gap, gap, gap)
+                        binding.root.layoutParams = cardParams
+                    }
                 }
-                val pad = (12 * binding.root.resources.displayMetrics.density).toInt()
-                binding.root.setPadding(pad, pad, pad, pad)
-                (binding.root.layoutParams as? ViewGroup.MarginLayoutParams)?.let { params ->
-                    val gap = (4 * binding.root.resources.displayMetrics.density).toInt()
-                    params.setMargins(gap, gap, gap, gap)
-                    binding.root.layoutParams = params
-                }
+                syncPhoneHeight(density)
             }
             binding.root.setOnClickListener {
                 if (phoneListMode) Haptics.tick(binding.root)

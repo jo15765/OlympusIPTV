@@ -134,9 +134,13 @@ object DashboardHost {
                             try {
                                 handed = handle(app, client)
                             } catch (error: Throwable) {
-                                com.olympus.iptv.AppLog.error("Dashboard", "Request failed", error)
-                                runCatching {
-                                    writeBytes(client, 500, "text/plain; charset=utf-8", "Dashboard error\n".toByteArray(), "no-store")
+                                if (error is java.net.SocketTimeoutException || error.cause is java.net.SocketTimeoutException) {
+                                    // A client connected and never sent a request. Close it and keep the guide moving.
+                                } else {
+                                    com.olympus.iptv.AppLog.error("Dashboard", "Request failed", error)
+                                    runCatching {
+                                        writeBytes(client, 500, "text/plain; charset=utf-8", "Dashboard error\n".toByteArray(), "no-store")
+                                    }
                                 }
                             } finally {
                                 if (!handed) {
@@ -248,7 +252,8 @@ object DashboardHost {
 
     private fun refreshAddress() {
         val options = rankedSites()
-        val reachable = options.filter { portOpen(it.second, port) }
+        val listening = server?.let { it.isBound && !it.isClosed } == true
+        val reachable = if (listening) options else options.filter { portOpen(it.second, port) }
         val chosen = (if (reachable.isNotEmpty()) reachable else options)
             .minByOrNull { it.first }
             ?.second
@@ -327,7 +332,7 @@ object DashboardHost {
             writeJson(socket, 403, mapOf("error" to "Dashboard is only available on the home network"))
             return false
         }
-        socket.soTimeout = 20000
+        socket.soTimeout = 8000
         val input = BufferedInputStream(socket.getInputStream(), 8192)
         val headerText = readHeader(input) ?: return false
         val lines = headerText.split("\r\n")
@@ -447,8 +452,25 @@ object DashboardHost {
                 val payload = json(body)
                 val action = payload.get("action")?.asString.orEmpty()
                 val text = payload.get("text")?.asString.orEmpty()
-                RemotePad.post(action, text)
-                writeJson(socket, 200, mapOf("ok" to true))
+                val delivered = RemotePad.post(action, text)
+                if (action.trim().equals("play", ignoreCase = true) && text.isNotBlank() && RemotePad.commands.subscriptionCount.value == 0) {
+                    app.appScope.launch {
+                        val resolved = RemotePad.resolveChannel(app, null, text) ?: return@launch
+                        val (savedId, channel) = resolved
+                        if (channel.streamUrl.isNotBlank()) {
+                            val intent = com.olympus.iptv.ui.player.PlayerActivity.intent(
+                                app,
+                                channel,
+                                "",
+                                "",
+                                0,
+                                savedId
+                            ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                            runCatching { app.startActivity(intent) }
+                        }
+                    }
+                }
+                writeJson(socket, 200, mapOf("ok" to true, "delivered" to delivered))
             }
             method == "GET" && path == "/api/remote/favorites" -> remoteFavorites(app, socket)
             method == "POST" && path == "/api/remote/favorites" -> saveRemoteFavorites(app, socket, json(body))
@@ -1083,11 +1105,22 @@ object DashboardHost {
             return
         }
         val incoming = body.get("lineup")?.let { gson.fromJson(it, LineupConfig::class.java) } ?: LineupConfig()
+        val baseRev = current.revision ?: 0L
         val next = filled(incoming).let { config ->
-            if ((config.revision ?: 0L) == 0L) config.copy(revision = System.currentTimeMillis()) else config
+            val bumped = maxOf(config.revision ?: 0L, System.currentTimeMillis(), baseRev + 1L)
+            config.copy(revision = bumped)
         }
-        if (gson.toJson(next) != gson.toJson(current)) {
+        if (gson.toJson(next.copy(revision = baseRev)) != gson.toJson(current)) {
             runBlocking { app.playlistStore.saveLineup(gate.playlist.id, next) }
+            val email = gate.playlist.email?.trim().orEmpty()
+            if (email.isNotBlank()) {
+                app.appScope.launch {
+                    val deviceId = runCatching { app.playlistStore.deviceId() }.getOrDefault("")
+                    if (deviceId.isNotBlank()) {
+                        runCatching { com.olympus.iptv.playlist.LineupClient(app).push(email, deviceId, next, baseRev) }
+                    }
+                }
+            }
         }
         writeJson(socket, 200, mapOf("ok" to true, "lineup" to next))
     }

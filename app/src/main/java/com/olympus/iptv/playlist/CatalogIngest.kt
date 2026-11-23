@@ -31,6 +31,14 @@ object CatalogIngest {
     val progress = Progress()
     private val loader = PlaylistLoader()
     private val settled = HashSet<String>()
+    private val reported = HashSet<String>()
+
+    private fun report(message: String, error: Throwable? = null) {
+        val key = message.take(180)
+        val fresh = synchronized(reported) { reported.add(key) }
+        if (!fresh) return
+        com.olympus.iptv.AppLog.error("Catalog", message, error)
+    }
 
     fun alreadySettled(playlistId: String): Boolean = synchronized(settled) { playlistId in settled }
 
@@ -49,7 +57,8 @@ object CatalogIngest {
             } catch (cancelled: CancellationException) {
                 if (!liveReady.isCompleted) liveReady.cancel(cancelled)
                 throw cancelled
-            } catch (_: Exception) {
+            } catch (error: Exception) {
+                report("Catalog ingest stopped: ${error.message ?: error.javaClass.simpleName}", error)
                 if (!liveReady.isCompleted) liveReady.complete(false)
             }
         }
@@ -70,6 +79,7 @@ object CatalogIngest {
             if (playlist.type != PlaylistType.XTREAM) {
                 val fresh = runCatching { CountryIndex.annotate(loader.load(scoped)) }.getOrNull()
                 if (fresh == null) {
+                    report("Playlist did not load for ${playlist.name}")
                     liveReady.complete(false)
                     return
                 }
@@ -104,13 +114,29 @@ object CatalogIngest {
 
     private suspend fun pullCloudSync(app: OlympusIptvApp, playlist: SavedPlaylist, bucket: String): Boolean {
         val email = app.playlistStore.session.first()?.email?.trim().orEmpty()
-        if (email.isBlank()) return false
+        if (email.isBlank()) {
+            report("Cloud $bucket catalog skipped: no signed-in email")
+            return false
+        }
         val deviceId = app.playlistStore.deviceId()
         val client = LineupClient(app)
-        val cloud = withContext(Dispatchers.IO) {
-            client.fetchCloudCatalog(email, deviceId, bucket)
-        } ?: return false
-        if (cloud.channels.isEmpty() && cloud.categories.isEmpty()) return false
+        val fetched = runCatching {
+            withContext(Dispatchers.IO) {
+                client.fetchCloudCatalog(email, deviceId, bucket)
+            }
+        }
+        val cloud = fetched.getOrElse { error ->
+            report("Cloud $bucket catalog request failed: ${error.message ?: error.javaClass.simpleName}", error)
+            return false
+        }
+        if (cloud == null) {
+            report("Cloud $bucket catalog request returned nothing")
+            return false
+        }
+        if (cloud.channels.isEmpty() && cloud.categories.isEmpty()) {
+            report("Cloud $bucket catalog is empty, so the app is loading channels from the provider instead")
+            return false
+        }
         val db = app.catalogDb
         val known = db.knownChannelIds(playlist.id, bucket)
         db.insertMissing(playlist.id, bucket, cloud.categories, emptyList())
@@ -130,7 +156,13 @@ object CatalogIngest {
             ) { send ->
                 loader.loadLive(playlist, onPercent = { progress.live = it.coerceIn(0, 99) }) { batch -> send(batch) }
             }
-        }.getOrNull() ?: return false
+        }.getOrElse { error ->
+            report("Live channels did not load from the provider: ${error.message ?: error.javaClass.simpleName}", error)
+            return false
+        }
+        if (loaded.liveChannels.isEmpty()) {
+            report("Provider returned 0 live channels for ${playlist.xtreamHost ?: playlist.m3uUrl ?: playlist.name}")
+        }
         progress.live = 100
         db.insertMissing(playlist.id, CatalogDb.LIVE, loaded.liveCategories, emptyList())
         store(app, db, playlist.id, CatalogDb.LIVE, loaded.liveChannels, true, known)
@@ -149,9 +181,15 @@ object CatalogIngest {
             ) { send ->
                 loader.loadShows(playlist, onPercent = { progress.shows = it.coerceIn(0, 99) }) { batch -> send(batch) }
             }
-        }.getOrNull() ?: return false
+        }.getOrElse { error ->
+            report("Shows did not load: ${error.message ?: error.javaClass.simpleName}", error)
+            return false
+        }
         progress.shows = 100
-        if (loaded.seriesLoadFailed) return false
+        if (loaded.seriesLoadFailed) {
+            report("Shows did not load: ${loaded.seriesLoadError ?: "provider request failed"}")
+            return false
+        }
         db.insertMissing(playlist.id, CatalogDb.SERIES, loaded.seriesCategories.orEmpty(), emptyList())
         store(app, db, playlist.id, CatalogDb.SERIES, loaded.seriesChannels.orEmpty(), false, known)
         return true
@@ -187,7 +225,14 @@ object CatalogIngest {
                 }
             }.getOrNull()
         }
-        if (loaded == null || loaded.vodLoadFailed) return false
+        if (loaded == null) {
+            report("Movies did not load from the provider")
+            return false
+        }
+        if (loaded.vodLoadFailed) {
+            report("Movies did not load: ${loaded.vodLoadError ?: "provider request failed"}")
+            return false
+        }
         progress.movies = 100
         db.insertMissing(playlist.id, CatalogDb.VOD, loaded.vodCategories, emptyList())
         store(app, db, playlist.id, CatalogDb.VOD, loaded.vodChannels, true, known)

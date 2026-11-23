@@ -90,9 +90,6 @@ class OffsetRenderersFactory(
             else -> EXTENSION_RENDERER_MODE_OFF
         }
         setExtensionRendererMode(extension)
-        if (DeviceForm.isTelevision(context)) {
-            setMediaCodecSelector(TvSingleHardwareSelector)
-        }
     }
 
     override fun buildAudioSink(
@@ -105,27 +102,6 @@ class OffsetRenderersFactory(
             .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
             .setAudioProcessors(arrayOf(delay))
             .build()
-    }
-}
-
-/** One hardware video decoder, then software. Extra hardware codecs are what freeze a TV box. */
-@UnstableApi
-private object TvSingleHardwareSelector : MediaCodecSelector {
-    override fun getDecoderInfos(
-        mimeType: String,
-        requiresSecureDecoder: Boolean,
-        requiresTunnelingDecoder: Boolean
-    ): List<androidx.media3.exoplayer.mediacodec.MediaCodecInfo> {
-        val all = MediaCodecSelector.DEFAULT.getDecoderInfos(
-            mimeType,
-            requiresSecureDecoder,
-            requiresTunnelingDecoder
-        )
-        if (!mimeType.startsWith("video/")) return all
-        val hardware = all.filter { it.hardwareAccelerated }
-        val software = all.filter { !it.hardwareAccelerated }
-        val chosen = if (hardware.isEmpty()) software else listOf(hardware.first()) + software
-        return chosen.ifEmpty { all }
     }
 }
 

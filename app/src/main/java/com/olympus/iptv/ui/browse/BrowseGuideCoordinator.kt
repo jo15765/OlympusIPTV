@@ -1165,6 +1165,13 @@ internal fun BrowseActivity.hostOnStop() {
     }
 
 internal fun BrowseActivity.hostOnDestroy() {
+        foldDisplayListener?.let { listener ->
+            runCatching {
+                getSystemService(android.hardware.display.DisplayManager::class.java)
+                    ?.unregisterDisplayListener(listener)
+            }
+        }
+        foldDisplayListener = null
         com.olympus.iptv.portal.DashboardHost.removeUrlListener(dashboardUrls)
         runCatching { browseToolHost.release() }
         if (previewReady()) previewCtl.release()
@@ -1181,13 +1188,13 @@ internal fun BrowseActivity.adoptRemoteLineup() {
             val stored = withContext(Dispatchers.IO) { app.playlistStore.lineup(saved.id) }
             val stamp = withContext(Dispatchers.IO) { app.catalogDb.libraryStamp(saved.id) }
             if (isDestroyed || playlist?.id != saved.id) return@launch
-            val revisionChanged = (stored.revision ?: 0L) != (activeConfig.revision ?: 0L)
+            val lineupChanged = stored != activeConfig
             val stampChanged = stamp != seenLibraryStamp
-            if (!revisionChanged && !stampChanged) {
+            if (!lineupChanged && !stampChanged) {
                 holdChannelId = null
                 return@launch
             }
-            if (revisionChanged) {
+            if (lineupChanged) {
                 app.stagedLineup = saved.id to stored
                 activeConfig = stored
                 epgRepo.useNameEpg(stored.nameEpg == true)
@@ -1197,7 +1204,7 @@ internal fun BrowseActivity.adoptRemoteLineup() {
             val guide = binding.contentColumn.visibility == View.VISIBLE
             if (guide) holdChannelId = holdChannelId ?: visibleFocusId()
             if (stampChanged) reloadRenamedGroups()
-            if (!stampChanged && cards && loaded != null) render(restoreFocus = false, reloadChannels = guide && !cards)
+            if (!stampChanged && cards && loaded != null) render(restoreFocus = false, reloadChannels = guide)
             if (guide && !cards) showChannels()
         }
     }
@@ -1713,8 +1720,8 @@ internal fun BrowseActivity.applyGuideColumns() {
         val phoneCards = touchPrimary && com.olympus.iptv.ui.DeviceForm.isCompact(this)
         val stacked = phoneCards && com.olympus.iptv.ui.DeviceForm.isPortrait(this)
         val phoneChrome = phoneCards
-        // Phones keep full-size cards in both orientations. Tablets and TV use the hour grid.
-        val showPrograms = live && full && !phoneCards && guideMenu == GuideMenu.PROGRAMS
+        // Live TV Guide shows side-by-side Channel List + EPG Program Grid timeline across TV, Tablet, and Mobile.
+        val showPrograms = live && full
         setNavExpanded(true)
         val blockChannels = live && guideMenu == GuideMenu.PROGRAMS && !phoneChrome
         channelAdapter.guideRowsFocusable = !blockChannels
@@ -1788,7 +1795,7 @@ internal fun BrowseActivity.applyGuideColumns() {
         val programs = binding.programPane.layoutParams as LinearLayout.LayoutParams
         val density = resources.displayMetrics.density
         binding.channelList.setHasFixedSize(!phoneCards)
-        if (tablet && showGroups) {
+        if (tablet && showGroups && showChannels) {
             val groups = binding.groupColumn.layoutParams as LinearLayout.LayoutParams
             val width = (260 * density).toInt()
             if (groups.width != width || groups.weight != 0f) {
@@ -1804,33 +1811,19 @@ internal fun BrowseActivity.applyGuideColumns() {
                 binding.groupColumn.layoutParams = groups
             }
         }
-        if (phoneCards && showChannels) {
-            content.width = 0
-            content.weight = 1f
-            programs.width = 0
-            programs.weight = 0f
-        } else if (tablet && showChannels && showPrograms) {
-            content.width = 0
-            content.weight = 1f
-            programs.width = 0
-            programs.weight = 1.4f
-        } else if (showChannels && showPrograms && !full) {
-            content.width = ((if (guideMenu == GuideMenu.SETTINGS) 180 else 220) * density).toInt()
-            content.weight = 0f
-            programs.width = 0
-            programs.weight = 1f
-        } else if (showChannels && showPrograms) {
-            content.weight = 0f
-            programs.width = 0
-            programs.weight = 1.5f
-        } else {
-            content.width = 0
-            content.weight = if (showChannels) 1f else 0f
-            programs.width = 0
-            programs.weight = 0f
+        val nextContentW = if (showChannels && showPrograms) ((if (phoneCards) 150 else 220) * density).toInt() else 0
+        val nextContentWeight = if (showChannels && !showPrograms) 1f else 0f
+        if (content.width != nextContentW || content.weight != nextContentWeight) {
+            content.width = nextContentW
+            content.weight = nextContentWeight
+            binding.contentColumn.layoutParams = content
         }
-        binding.contentColumn.layoutParams = content
-        binding.programPane.layoutParams = programs
+        val nextProgramsWeight = if (showChannels && showPrograms) 1f else 0f
+        if (programs.width != 0 || programs.weight != nextProgramsWeight) {
+            programs.width = 0
+            programs.weight = nextProgramsWeight
+            binding.programPane.layoutParams = programs
+        }
         binding.previewCard.visibility = View.GONE
         if (previewReady()) previewCtl.pause()
         styleGuideHeader()
@@ -2288,9 +2281,9 @@ internal fun BrowseActivity.prefetchEpg(channels: List<Channel>) {
                 }.awaitAll()
             }
             if (!isActive) return@launch
-            loaded.forEach { (id, nowNext) ->
-                rememberEpg(id, nowNext)
-                channelAdapter.notifyEpgChanged(id)
+            loaded.forEach { (id, nowNext) -> rememberEpg(id, nowNext) }
+            if (loaded.isNotEmpty()) {
+                channelAdapter.notifyItemRangeChanged(0, channelAdapter.itemCount, ChannelAdapter.PAYLOAD_EPG)
             }
         }
     }

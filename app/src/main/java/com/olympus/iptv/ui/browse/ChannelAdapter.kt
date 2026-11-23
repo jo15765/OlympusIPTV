@@ -265,25 +265,52 @@ class ChannelAdapter(
     }
 
     inner class PosterHolder(private val binding: ItemPosterBinding) : Holder(binding.root) {
+        private var heightPosted = false
+
+        init {
+            binding.name.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 15f)
+            binding.group.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12f)
+            binding.logo.clipToOutline = true
+            binding.logo.outlineProvider = ViewOutlineProvider.BACKGROUND
+            binding.logo.scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
+            binding.playTarget.isFocusable = true
+            binding.playTarget.isFocusableInTouchMode = true
+        }
+
+        private fun syncPosterHeight() {
+            val frame = binding.logo.parent as? View ?: return
+            val width = binding.root.width
+            if (width > 0) {
+                val height = (width * 1.32f).toInt().coerceAtLeast(width)
+                val lp = frame.layoutParams
+                if (lp != null && lp.height != height) {
+                    lp.height = height
+                    frame.layoutParams = lp
+                }
+            } else if (!heightPosted) {
+                heightPosted = true
+                binding.root.post {
+                    heightPosted = false
+                    val w = binding.root.width
+                    if (w <= 0) return@post
+                    val f = binding.logo.parent as? View ?: return@post
+                    val height = (w * 1.32f).toInt().coerceAtLeast(w)
+                    val lp = f.layoutParams
+                    if (lp != null && lp.height != height) {
+                        lp.height = height
+                        f.layoutParams = lp
+                    }
+                }
+            }
+        }
+
         override fun bind(item: Channel, position: Int, full: Boolean) {
             val params = binding.root.layoutParams
             if (params != null && params.width != ViewGroup.LayoutParams.MATCH_PARENT) {
                 params.width = ViewGroup.LayoutParams.MATCH_PARENT
                 binding.root.layoutParams = params
             }
-            binding.root.post {
-                val width = binding.root.width
-                val frame = binding.logo.parent as? View ?: return@post
-                if (width <= 0) return@post
-                val cap = (binding.root.resources.displayMetrics.heightPixels * 0.72f).toInt()
-                val height = (width * 1.35f).toInt().coerceAtMost(cap).coerceAtLeast(width)
-                if (frame.layoutParams.height != height) {
-                    frame.layoutParams.height = height
-                    frame.requestLayout()
-                }
-            }
-            binding.name.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 15f)
-            binding.group.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12f)
+            syncPosterHeight()
             binding.name.text = displayName(item)
             val resume = continueLabel(item)
             val detail = detailOf(item.id)
@@ -300,8 +327,6 @@ class ChannelAdapter(
             binding.btnPosterFavorite.setOnClickListener { onFavorite(item) }
             binding.btnPosterMore.setOnClickListener { onLongClick(item) }
 
-            binding.playTarget.isFocusable = true
-            binding.playTarget.isFocusableInTouchMode = true
             val touch = DeviceForm.isTouchPrimary(binding.root.context)
             binding.playTarget.setOnClickListener {
                 if (touch) Haptics.tick(binding.playTarget)
@@ -345,19 +370,7 @@ class ChannelAdapter(
         }
 
         override fun bindLogo(item: Channel) {
-            val density = binding.root.resources.displayMetrics.density
-            val compact = DeviceForm.isCompact(binding.root.context)
-            val wide = compact && !DeviceForm.isPortrait(binding.root.context)
-            val targetH = ((if (wide) 210 else if (compact) 196 else 236) * density).toInt()
-            val frame = binding.logo.parent as? View
-            if (frame?.layoutParams != null && frame.layoutParams.height != targetH) {
-                frame.layoutParams.height = targetH
-                frame.requestLayout()
-            }
-            binding.logo.clipToOutline = true
-            binding.logo.outlineProvider = ViewOutlineProvider.BACKGROUND
             loadLogo(binding.logo, item.logoUrl, 240, poster = true, cornerPx = 0f)
-            binding.logo.scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
         }
 
         override fun bindFavorite(item: Channel) {
@@ -385,16 +398,17 @@ class ChannelAdapter(
                 val phoneCard = DeviceForm.isTouchPrimary(ctx) && DeviceForm.isCompact(ctx)
                 val portraitCard = phoneCard && DeviceForm.isPortrait(ctx)
                 val params = binding.root.layoutParams
-                if (params != null && params.width != ViewGroup.LayoutParams.MATCH_PARENT) {
-                    params.width = ViewGroup.LayoutParams.MATCH_PARENT
-                }
-                if ((phoneCard || guideRowHeight <= 0) && params != null) {
-                    val wrap = ViewGroup.LayoutParams.WRAP_CONTENT
-                    if (params.height != wrap) params.height = wrap
-                    binding.root.layoutParams = params
-                } else if (guideRowHeight > 0 && params != null && params.height != guideRowHeight) {
-                    params.height = guideRowHeight
-                    binding.root.layoutParams = params
+                if (params != null) {
+                    val targetHeight = if (phoneCard || guideRowHeight <= 0) {
+                        ViewGroup.LayoutParams.WRAP_CONTENT
+                    } else {
+                        guideRowHeight
+                    }
+                    if (params.width != ViewGroup.LayoutParams.MATCH_PARENT || params.height != targetHeight) {
+                        params.width = ViewGroup.LayoutParams.MATCH_PARENT
+                        params.height = targetHeight
+                        binding.root.layoutParams = params
+                    }
                 }
                 binding.number.visibility = View.VISIBLE
                 binding.number.text = (position + 1).toString()
@@ -417,19 +431,23 @@ class ChannelAdapter(
                 hideActions()
                 val density = binding.root.resources.displayMetrics.density
                 val touch = DeviceForm.isTouchPrimary(binding.root.context)
-                if (phoneCard) {
-                    val padV = ((if (portraitCard) 12 else 10) * density).toInt()
-                    val padH = (12 * density).toInt()
+                val padV = if (phoneCard) ((if (portraitCard) 12 else 10) * density).toInt() else 0
+                val padH = ((if (phoneCard) 12 else 6) * density).toInt()
+                if (binding.playTarget.paddingLeft != padH || binding.playTarget.paddingTop != padV) {
                     binding.playTarget.setPadding(padH, padV, padH, padV)
-                    binding.root.setPadding(padH, (4 * density).toInt(), padH, (4 * density).toInt())
-                } else {
-                    val padH = (6 * density).toInt()
-                    binding.playTarget.setPadding(padH, 0, padH, 0)
-                    binding.root.setPadding(0, 0, 0, 0)
+                }
+                val rootPadH = if (phoneCard) padH else 0
+                val rootPadV = if (phoneCard) (4 * density).toInt() else 0
+                if (binding.root.paddingLeft != rootPadH || binding.root.paddingTop != rootPadV) {
+                    binding.root.setPadding(rootPadH, rootPadV, rootPadH, rootPadV)
                 }
                 val logo = ((if (phoneCard) 40 else if (guideRowHeight > 0) 18 else 24) * density).toInt()
-                binding.logo.layoutParams.width = logo
-                binding.logo.layoutParams.height = logo
+                val logoLp = binding.logo.layoutParams
+                if (logoLp != null && (logoLp.width != logo || logoLp.height != logo)) {
+                    logoLp.width = logo
+                    logoLp.height = logo
+                    binding.logo.layoutParams = logoLp
+                }
                 bindLogo(item)
                 bindEpg(item)
                 bindGuideHighlight(item)
@@ -586,7 +604,7 @@ class ChannelAdapter(
     companion object {
         private const val VIEW_ROW = 0
         private const val VIEW_POSTER = 1
-        private const val PAYLOAD_EPG = "epg"
+        internal const val PAYLOAD_EPG = "epg"
         private const val PAYLOAD_FAVORITE = "favorite"
         private const val PAYLOAD_LOGO = "logo"
         private const val PAYLOAD_GUIDE_FOCUS = "guide_focus"

@@ -959,10 +959,12 @@ class PlayerActivity : AppCompatActivity() {
             )
         sidecar?.let { builder.setSubtitleConfigurations(listOf(it)) }
         if (channel.kind == ContentKind.LIVE) {
+            // Never speed up past 1.00x (which eats the live buffer cushion),
+            // and allow gentle 0.98x drift recovery to absorb jitter without spooling.
             builder.setLiveConfiguration(
                 MediaItem.LiveConfiguration.Builder()
-                    .setMinPlaybackSpeed(1.0f)
-                    .setMaxPlaybackSpeed(1.0f)
+                    .setMinPlaybackSpeed(0.98f)
+                    .setMaxPlaybackSpeed(1.00f)
                     .build()
             )
         }
@@ -975,12 +977,45 @@ class PlayerActivity : AppCompatActivity() {
         decoderDirty = false
         val control = PlayerBuffers.live(DeviceForm.isLowRam(this))
         val http = StreamHeaders.httpFactory(this, { playlistId }, { current })
+        val loadPolicy = object : androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy(3) {
+            override fun getRetryDelayMsFor(loadErrorInfo: androidx.media3.exoplayer.upstream.LoadErrorHandlingPolicy.LoadErrorInfo): Long {
+                val base = super.getRetryDelayMsFor(loadErrorInfo)
+                return if (base == androidx.media3.common.C.TIME_UNSET) base else base.coerceAtMost(2_500L)
+            }
+        }
+        val mediaSourceFactory = DefaultMediaSourceFactory(this)
+            .setDataSourceFactory(http)
+            .setLoadErrorHandlingPolicy(loadPolicy)
+        val adaptiveFactory = androidx.media3.exoplayer.trackselection.AdaptiveTrackSelection.Factory(
+            15_000,
+            5_000,
+            15_000,
+            0.65f
+        )
+        val trackSelector = androidx.media3.exoplayer.trackselection.DefaultTrackSelector(this, adaptiveFactory).apply {
+            setParameters(
+                buildUponParameters()
+                    .setAllowVideoMixedMimeTypeAdaptiveness(true)
+                    .setAllowAudioMixedMimeTypeAdaptiveness(true)
+                    .setAllowVideoNonSeamlessAdaptiveness(true)
+                    .setExceedRendererCapabilitiesIfNecessary(true)
+            )
+        }
+        val liveSpeedControl = androidx.media3.exoplayer.DefaultLivePlaybackSpeedControl.Builder()
+            .setFallbackMinPlaybackSpeed(0.98f)
+            .setFallbackMaxPlaybackSpeed(1.00f)
+            .build()
         return ExoPlayer.Builder(this)
             .setRenderersFactory(OffsetRenderersFactory(this, mode, audioDelay))
+            .setTrackSelector(trackSelector)
             .setLoadControl(control)
-            .setMediaSourceFactory(DefaultMediaSourceFactory(this).setDataSourceFactory(http))
+            .setMediaSourceFactory(mediaSourceFactory)
+            .setLivePlaybackSpeedControl(liveSpeedControl)
+            .setWakeMode(androidx.media3.common.C.WAKE_MODE_NETWORK)
+            .setHandleAudioBecomingNoisy(true)
             .build()
             .also { exo ->
+                exo.videoChangeFrameRateStrategy = androidx.media3.common.C.VIDEO_CHANGE_FRAME_RATE_STRATEGY_OFF
                 MobileBitrateCap.apply(this, exo)
                 exo.addListener(trackListener)
                 watchPlaybackEvents(exo)
@@ -1140,18 +1175,7 @@ class PlayerActivity : AppCompatActivity() {
         val token = ++bufferWatchToken
         val started = bufferStartedAt
         val live = current?.kind == ContentKind.LIVE && current?.seriesId.isNullOrBlank()
-        if (live && hadPlaybackReady && SystemClock.elapsedRealtime() >= stallBusyUntil) {
-            val now = SystemClock.elapsedRealtime()
-            rebufferAt.addLast(now)
-            while (rebufferAt.isNotEmpty() && now - rebufferAt.first() > 20_000L) rebufferAt.removeFirst()
-            if (rebufferAt.size >= 3) {
-                rebufferAt.clear()
-                val active = player
-                val channel = current
-                if (active != null && channel != null) recoverFrozenLive(active, channel)
-            }
-        }
-        // After first paint, live rebuffers constantly — do not cover a working picture.
+        // After first paint, live rebuffers briefly on jitter — never tear down a working stream.
         // Initial connect also waits briefly so READY/first-frame can clear without a flash.
         val pictureUp = hadPlaybackReady && live && player?.videoFormat != null
         if (pictureUp) showConnectingBadge(false)
@@ -1186,7 +1210,7 @@ class PlayerActivity : AppCompatActivity() {
             if (active.playbackState != Player.STATE_BUFFERING || active.isPlaying) return@postDelayed
             paintConnectingBadge(SystemClock.elapsedRealtime() - started)
         }, 2_000L)
-        hideHandler.postDelayed({
+        if (!pictureUp) hideHandler.postDelayed({
             if (isDestroyed || token != bufferWatchToken) return@postDelayed
             val active = player ?: return@postDelayed
             if (active.playbackState != Player.STATE_BUFFERING || active.isPlaying) return@postDelayed
@@ -1216,7 +1240,7 @@ class PlayerActivity : AppCompatActivity() {
                 return@postDelayed
             }
             recoverLive(active, channel, null)
-        }, 10_000L)
+        }, 12_000L)
     }
 
     private fun onBufferingEnded() {
@@ -1433,15 +1457,11 @@ class PlayerActivity : AppCompatActivity() {
                 }
                 val now = SystemClock.elapsedRealtime()
                 if (now < stallBusyUntil) {
-                    stallMarkPosition = exo.currentPosition
-                    stallMarkAt = now
+                    stallMarkAt = 0L
                     continue
                 }
-                val pos = exo.currentPosition
-                val advanced = stallMarkPosition != Long.MIN_VALUE && pos >= stallMarkPosition + 400L
-                val framesMoving = lastVideoFrameAt > 0L && now - lastVideoFrameAt < 1_500L
-                val healthy = exo.playbackState == Player.STATE_READY && exo.isPlaying && (advanced || framesMoving)
-                if (healthy) {
+                val playing = exo.playbackState == Player.STATE_READY && exo.isPlaying
+                if (playing) {
                     showConnectingBadge(false)
                     if (::binding.isInitialized && binding.channelMeta.text == getString(R.string.playback_reconnecting)) {
                         val meta = intent.getStringExtra(EXTRA_META).orEmpty()
@@ -1449,33 +1469,25 @@ class PlayerActivity : AppCompatActivity() {
                         refreshEpgQuietly()
                     }
                     if (stallHealthySince == 0L) stallHealthySince = now
-                    stallMarkPosition = pos
-                    stallMarkAt = now
+                    stallMarkAt = 0L
                     if (now - stallHealthySince >= 15_000L) stallStrikes = 0
                     continue
                 }
                 stallHealthySince = 0L
-                val frameFrozen = hadPlaybackReady &&
-                    !radioOn &&
-                    !watchingCatchup &&
-                    exo.videoFormat != null &&
-                    lastVideoFrameAt > 0L &&
-                    now - lastVideoFrameAt >= 7_500L
-                if (stallMarkAt == 0L || advanced) {
-                    stallMarkPosition = pos
+                if (stallMarkAt == 0L) {
                     stallMarkAt = now
-                    if (!frameFrozen) continue
+                    continue
                 }
                 val stuckMs = now - stallMarkAt
-                if (stuckMs >= 2_500L && !radioOn) {
+                if (stuckMs >= 3_500L && !radioOn) {
                     showConnectingBadge(true)
                 }
-                val frozen = frameFrozen ||
-                    exo.playbackState == Player.STATE_BUFFERING ||
+                val trulyStuck = exo.playbackState == Player.STATE_BUFFERING ||
                     exo.playbackState == Player.STATE_IDLE ||
                     (exo.playbackState == Player.STATE_READY && !exo.isPlaying)
-                val limit = if (hadPlaybackReady) 7_500L else 10_000L
-                if (frozen && (frameFrozen || stuckMs >= limit)) recoverFrozenLive(exo, channel)
+                if (trulyStuck && stuckMs >= 20_000L) {
+                    recoverFrozenLive(exo, channel)
+                }
             }
         }
     }
@@ -1499,12 +1511,35 @@ class PlayerActivity : AppCompatActivity() {
         if (!watchingCatchup && stallStrikes >= 2) {
             switchToBackup(stallTried) { switched ->
                 if (!switched && !isDestroyed && player === exo && current?.id == channel.id) {
-                    reloadLiveEdge(exo, channel)
+                    rebuildLivePlayer(exo, channel)
                 }
             }
             return
         }
         reloadLiveEdge(exo, channel)
+    }
+
+    /** Fully tears down a wedged MediaCodec/ExoPlayer instance and brings up a clean player at the live edge. */
+    private fun rebuildLivePlayer(stale: ExoPlayer, channel: Channel) {
+        if (player !== stale || isDestroyed) return
+        runCatching {
+            val fresh = newPlayer()
+            player = fresh
+            binding.playerView.player = fresh
+            runCatching { stale.stop() }
+            runCatching { stale.release() }
+            lastVideoFrameAt = 0L
+            hadPlaybackReady = false
+            bufferStartedAt = 0L
+            bufferWatchToken += 1
+            fresh.setMediaItem(mediaItem(channel))
+            if (!watchingCatchup) fresh.seekToDefaultPosition()
+            fresh.prepare()
+            fresh.playWhenReady = true
+            holdRadioSurface()
+        }.onFailure { error ->
+            PlaybackTrace.loadFailed(channel, null, error.message)
+        }
     }
 
     private fun reloadLiveEdge(exo: ExoPlayer, channel: Channel) {
@@ -2349,16 +2384,20 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
+    private var lastAppliedFrameRateHz = 0f
+
     internal fun matchFrameRate() {
         if (!autoFrameRate || Build.VERSION.SDK_INT < 30 || !::binding.isInitialized) return
+        if (isLiveNow()) return
         val fps = player?.videoFormat?.frameRate ?: return
         val target = FrameRateMatch.targetHz(fps)
-        if (target <= 0f) return
+        if (target <= 0f || target == lastAppliedFrameRateHz) return
         val surfaceView = binding.playerView.videoSurfaceView as? android.view.SurfaceView ?: return
         val surface = surfaceView.holder.surface
         if (!surface.isValid) return
+        lastAppliedFrameRateHz = target
         runCatching {
-            surface.setFrameRate(target, android.view.Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE)
+            surface.setFrameRate(target, android.view.Surface.FRAME_RATE_COMPATIBILITY_DEFAULT)
         }
     }
 
@@ -2384,14 +2423,11 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun applyRemote(command: com.olympus.iptv.portal.RemotePad.Command) {
         when (command.action) {
-            "up" -> previousChannel()
-            "down" -> nextChannel()
-            "left" -> onKeyDown(KeyEvent.KEYCODE_DPAD_LEFT, null)
-            "right" -> onKeyDown(KeyEvent.KEYCODE_DPAD_RIGHT, null)
-            "ok" -> {
-                if (binding.catchupStart.visibility == View.VISIBLE && catchupUrl != null) playCatchupFromStart()
-                else togglePause()
-            }
+            "up" -> dispatchPlayerRemoteKey(KeyEvent.KEYCODE_DPAD_UP)
+            "down" -> dispatchPlayerRemoteKey(KeyEvent.KEYCODE_DPAD_DOWN)
+            "left" -> dispatchPlayerRemoteKey(KeyEvent.KEYCODE_DPAD_LEFT)
+            "right" -> dispatchPlayerRemoteKey(KeyEvent.KEYCODE_DPAD_RIGHT)
+            "ok" -> dispatchPlayerRemoteKey(KeyEvent.KEYCODE_DPAD_CENTER)
             "back" -> handlePlayerBack()
             "text" -> {
                 val typed = command.text.trim()
@@ -2402,24 +2438,101 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
+    private fun dispatchPlayerRemoteKey(code: Int) {
+        val now = android.os.SystemClock.uptimeMillis()
+        val down = KeyEvent(
+            now,
+            now,
+            KeyEvent.ACTION_DOWN,
+            code,
+            0,
+            0,
+            android.view.KeyCharacterMap.VIRTUAL_KEYBOARD,
+            0,
+            0,
+            android.view.InputDevice.SOURCE_DPAD
+        )
+        val up = KeyEvent(
+            now,
+            now + 10L,
+            KeyEvent.ACTION_UP,
+            code,
+            0,
+            0,
+            android.view.KeyCharacterMap.VIRTUAL_KEYBOARD,
+            0,
+            0,
+            android.view.InputDevice.SOURCE_DPAD
+        )
+        val handledDown = dispatchKeyEvent(down)
+        val handledUp = dispatchKeyEvent(up)
+        if (handledDown) return
+        val direction = when (code) {
+            KeyEvent.KEYCODE_DPAD_LEFT -> View.FOCUS_LEFT
+            KeyEvent.KEYCODE_DPAD_RIGHT -> View.FOCUS_RIGHT
+            KeyEvent.KEYCODE_DPAD_UP -> View.FOCUS_UP
+            KeyEvent.KEYCODE_DPAD_DOWN -> View.FOCUS_DOWN
+            else -> 0
+        }
+        if (direction != 0) {
+            val overlayOpen = binding.playbackMenu.visibility == View.VISIBLE ||
+                binding.subtitlePanel.visibility == View.VISIBLE ||
+                playbackErrorOpen() ||
+                transportShowing()
+            if (overlayOpen) {
+                val root = window.decorView as? android.view.ViewGroup
+                val focused = currentFocus
+                val next = focused?.focusSearch(direction)
+                    ?: root?.let { android.view.FocusFinder.getInstance().findNextFocus(it, focused, direction) }
+                if (next != null && next != focused) {
+                    next.requestFocus()
+                    return
+                }
+            }
+            if (code == KeyEvent.KEYCODE_DPAD_RIGHT) {
+                val exo = player
+                if (exo != null && !isLiveNow() && exo.isCurrentMediaItemSeekable) {
+                    val dur = exo.duration.takeIf { it > 0L } ?: Long.MAX_VALUE
+                    exo.seekTo((exo.currentPosition + 10_000L).coerceAtMost(dur))
+                    showTransportChrome()
+                } else {
+                    showTransportChrome()
+                }
+            } else if (code == KeyEvent.KEYCODE_DPAD_LEFT) {
+                val exo = player
+                if (exo != null && !isLiveNow() && exo.isCurrentMediaItemSeekable) {
+                    exo.seekTo((exo.currentPosition - 10_000L).coerceAtLeast(0L))
+                    showTransportChrome()
+                }
+            }
+            return
+        }
+        if (code == KeyEvent.KEYCODE_DPAD_CENTER && !handledUp) {
+            currentFocus?.performClick()
+        }
+    }
+
     private fun playById(id: String) {
         val wanted = id.trim()
         if (wanted.isBlank()) return
-        val found = queue.indexOfFirst { it.id == wanted }
+        val bare = if (wanted.contains(':')) wanted.substringAfter(':') else wanted
+        val found = queue.indexOfFirst { it.id == bare || it.id == wanted }
         if (found >= 0) {
             index = found
             playCurrent()
             return
         }
-        val savedId = playlistId ?: return
         lifecycleScope.launch {
-            val channel = withContext(Dispatchers.IO) {
-                val db = (application as OlympusIptvApp).catalogDb
-                db.readChannel(savedId, CatalogDb.LIVE, wanted)
-                    ?: db.readChannel(savedId, CatalogDb.VOD, wanted)
-                    ?: db.readChannel(savedId, CatalogDb.SERIES, wanted)
+            val resolved = withContext(Dispatchers.IO) {
+                com.olympus.iptv.portal.RemotePad.resolveChannel(
+                    application as OlympusIptvApp,
+                    playlistId,
+                    wanted
+                )
             } ?: return@launch
             if (isDestroyed) return@launch
+            val (savedId, channel) = resolved
+            if (playlistId.isNullOrBlank()) playlistId = savedId
             current = channel
             queue = listOf(channel)
             index = 0
@@ -2937,6 +3050,8 @@ class PlayerActivity : AppCompatActivity() {
         if (now < acceptReconnectAt || (!force && now - lastReconnectAt < 1_500L)) return
         val exo = player ?: return
         if (!exo.playWhenReady || current == null || isDestroyed) return
+        // Never interrupt a healthy playing stream on transient background network callbacks.
+        if (!force && exo.isPlaying && exo.playbackState == Player.STATE_READY) return
         lastReconnectAt = now
         if (force) {
             exo.stop()

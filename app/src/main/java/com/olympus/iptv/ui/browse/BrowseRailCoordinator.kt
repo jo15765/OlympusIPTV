@@ -1076,15 +1076,93 @@ internal fun BrowseActivity.activateNavItem(item: View) {
     }
 
 internal fun BrowseActivity.watchBrowseWidth() {
+        if (!touchPrimary) return
+        watchFoldDisplay()
         binding.guideShell.addOnLayoutChangeListener { view, left, _, right, _, _, _, _, _ ->
             val width = right - left
             if (width <= 0 || kotlin.math.abs(width - lastGuideWidth) < 24) return@addOnLayoutChangeListener
+            if (lastGuideWidth == 0) {
+                lastGuideWidth = width
+                return@addOnLayoutChangeListener
+            }
             lastGuideWidth = width
+            if (guideWidthPosted) return@addOnLayoutChangeListener
+            guideWidthPosted = true
             view.post {
+                guideWidthPosted = false
                 if (!viewReady() || isDestroyed) return@post
                 hostOnConfigurationChanged()
             }
         }
+    }
+
+internal fun BrowseActivity.watchFoldDisplay() {
+        if (foldDisplayListener != null) return
+        val bounds = if (android.os.Build.VERSION.SDK_INT >= 30) {
+            windowManager.currentWindowMetrics.bounds
+        } else {
+            null
+        }
+        lastDisplayWidth = bounds?.width() ?: resources.displayMetrics.widthPixels
+        lastDisplayHeight = bounds?.height() ?: resources.displayMetrics.heightPixels
+        val manager = getSystemService(android.hardware.display.DisplayManager::class.java) ?: return
+        val listener = object : android.hardware.display.DisplayManager.DisplayListener {
+            override fun onDisplayAdded(displayId: Int) {}
+            override fun onDisplayRemoved(displayId: Int) {}
+            override fun onDisplayChanged(displayId: Int) {
+                if (displayId != android.view.Display.DEFAULT_DISPLAY || isDestroyed) return
+                // Ignore refresh-rate / brightness display changes that do not change window size.
+                val nowBounds = if (android.os.Build.VERSION.SDK_INT >= 30) {
+                    windowManager.currentWindowMetrics.bounds
+                } else {
+                    null
+                }
+                val w = nowBounds?.width() ?: resources.displayMetrics.widthPixels
+                val h = nowBounds?.height() ?: resources.displayMetrics.heightPixels
+                val maxW = if (android.os.Build.VERSION.SDK_INT >= 30) {
+                    windowManager.maximumWindowMetrics.bounds.width()
+                } else {
+                    w
+                }
+                val sizeChanged = kotlin.math.abs(w - lastDisplayWidth) >= 24 || kotlin.math.abs(h - lastDisplayHeight) >= 24
+                val letterboxed = w > 0 && maxW > w * 5 / 4 && foldRecreateAttempt < 1
+                if (!sizeChanged && !letterboxed) return
+                binding.root.post {
+                    if (!viewReady() || isDestroyed) return@post
+                    adoptFoldWindow()
+                }
+            }
+        }
+        foldDisplayListener = listener
+        manager.registerDisplayListener(listener, android.os.Handler(android.os.Looper.getMainLooper()))
+    }
+
+internal fun BrowseActivity.adoptFoldWindow() {
+        if (!touchPrimary || !viewReady() || isDestroyed) return
+        val bounds = if (android.os.Build.VERSION.SDK_INT >= 30) {
+            windowManager.currentWindowMetrics.bounds
+        } else {
+            null
+        }
+        val current = bounds?.width() ?: resources.displayMetrics.widthPixels
+        val height = bounds?.height() ?: resources.displayMetrics.heightPixels
+        val largest = if (android.os.Build.VERSION.SDK_INT >= 30) {
+            windowManager.maximumWindowMetrics.bounds.width()
+        } else {
+            current
+        }
+        if (current > 0 && largest > current * 5 / 4 && foldRecreateAttempt < 1) {
+            requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            foldRecreateAttempt += 1
+            recreate()
+            return
+        }
+        if (kotlin.math.abs(current - lastDisplayWidth) < 24 && kotlin.math.abs(height - lastDisplayHeight) < 24) {
+            return
+        }
+        lastDisplayWidth = current
+        lastDisplayHeight = height
+        hostOnConfigurationChanged()
     }
 
 internal fun BrowseActivity.hostOnConfigurationChanged() {
@@ -1101,33 +1179,66 @@ internal fun BrowseActivity.hostOnConfigurationChanged() {
         relayoutBrowseGrids()
         binding.root.post {
             if (!viewReady() || isDestroyed) return@post
-            relayoutBrowseGrids()
+            relayoutBrowseGrids(onlyIfChanged = true)
         }
     }
 
-internal fun BrowseActivity.relayoutBrowseGrids() {
-        val categoryState = binding.categoryList.layoutManager?.onSaveInstanceState()
-        val channelState = binding.channelList.layoutManager?.onSaveInstanceState()
-        binding.categoryList.recycledViewPool.clear()
-        binding.channelList.recycledViewPool.clear()
+internal fun BrowseActivity.relayoutBrowseGrids(onlyIfChanged: Boolean = false) {
         applyGuideColumns()
         applyChannelLayout()
-        val categorySpan = com.olympus.iptv.ui.DeviceForm.categoryColumns(this)
-        binding.categoryList.layoutManager =
-            androidx.recyclerview.widget.GridLayoutManager(this, categorySpan)
-        val posters = section != GuideSection.TV
-        val posterSpan = com.olympus.iptv.ui.DeviceForm.contentColumns(this)
-        binding.channelList.layoutManager = if (posters) {
-            androidx.recyclerview.widget.GridLayoutManager(this, posterSpan)
+        val density = resources.displayMetrics.density
+        val shell = binding.guideShell.width
+        val categoryPx = if (binding.contentColumn.visibility != View.VISIBLE) {
+            shell.takeIf { it > 0 } ?: binding.categoryList.width
         } else {
-            androidx.recyclerview.widget.LinearLayoutManager(this)
+            binding.categoryList.width.takeIf { it > 0 } ?: binding.groupColumn.width
         }
-        binding.categoryList.layoutManager?.onRestoreInstanceState(categoryState)
-        binding.channelList.layoutManager?.onRestoreInstanceState(channelState)
-        categoryAdapter.notifyDataSetChanged()
-        channelAdapter.notifyDataSetChanged()
-        binding.categoryList.requestLayout()
-        binding.channelList.requestLayout()
+        val channelPx = if (binding.groupColumn.visibility != View.VISIBLE) {
+            shell.takeIf { it > 0 } ?: binding.channelList.width
+        } else {
+            binding.channelList.width.takeIf { it > 0 } ?: binding.contentColumn.width
+        }
+        val categorySpan = if (categoryPx > 0 && density > 0f) {
+            com.olympus.iptv.ui.DeviceForm.categoryColumnsFor((categoryPx / density).toInt())
+        } else {
+            com.olympus.iptv.ui.DeviceForm.categoryColumns(this)
+        }
+        val posters = channelAdapter.posterMode || section != GuideSection.TV
+        val posterSpan = if (channelPx > 0 && density > 0f) {
+            com.olympus.iptv.ui.DeviceForm.contentColumnsFor((channelPx / density).toInt())
+        } else {
+            com.olympus.iptv.ui.DeviceForm.contentColumns(this)
+        }
+        val existingCat = binding.categoryList.layoutManager as? androidx.recyclerview.widget.GridLayoutManager
+        val catNeedsSwap = existingCat == null || existingCat.spanCount != categorySpan
+        val existingChan = binding.channelList.layoutManager
+        val chanNeedsSwap = if (posters) {
+            existingChan !is androidx.recyclerview.widget.GridLayoutManager || existingChan.spanCount != posterSpan
+        } else {
+            existingChan == null || existingChan is androidx.recyclerview.widget.GridLayoutManager
+        }
+        if (onlyIfChanged && !catNeedsSwap && !chanNeedsSwap) return
+        if (catNeedsSwap || !onlyIfChanged) {
+            val categoryState = binding.categoryList.layoutManager?.onSaveInstanceState()
+            binding.categoryList.recycledViewPool.clear()
+            binding.categoryList.layoutManager =
+                androidx.recyclerview.widget.GridLayoutManager(this, categorySpan)
+            binding.categoryList.layoutManager?.onRestoreInstanceState(categoryState)
+            categoryAdapter.notifyDataSetChanged()
+            binding.categoryList.requestLayout()
+        }
+        if (chanNeedsSwap || !onlyIfChanged) {
+            val channelState = binding.channelList.layoutManager?.onSaveInstanceState()
+            binding.channelList.recycledViewPool.clear()
+            binding.channelList.layoutManager = if (posters) {
+                androidx.recyclerview.widget.GridLayoutManager(this, posterSpan)
+            } else {
+                androidx.recyclerview.widget.LinearLayoutManager(this)
+            }
+            binding.channelList.layoutManager?.onRestoreInstanceState(channelState)
+            channelAdapter.notifyDataSetChanged()
+            binding.channelList.requestLayout()
+        }
         binding.guideRow.requestLayout()
         if (binding.groupPills.visibility == View.VISIBLE) syncGroupPills()
         paintBottomTabs()

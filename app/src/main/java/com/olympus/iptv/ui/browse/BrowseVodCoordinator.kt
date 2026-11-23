@@ -1167,9 +1167,11 @@ internal fun BrowseActivity.reloadFavorites() {
             com.olympus.iptv.playlist.HostWarmup.launch(app, saved.id, ids)
             if (ids == favoriteOrder) return@launch
             applyFavorites(ids)
-            if (selectedCategoryId == PlaylistLoader.FAVORITES_ID &&
+            val onFavs = selectedCategoryId == PlaylistLoader.FAVORITES_ID &&
                 binding.contentColumn.visibility == View.VISIBLE
-            ) {
+            if (loaded != null && binding.groupColumn.visibility == View.VISIBLE) {
+                render(restoreFocus = false, reloadChannels = onFavs)
+            } else if (onFavs) {
                 showChannels()
             }
         }
@@ -1441,7 +1443,7 @@ internal fun BrowseActivity.fitChannelColumn() {
         val number = if (section == GuideSection.TV) (32f + 6f) * density else 0f
         val chrome = number + (6f + 6f + 18f + 8f + 8f) * density
         val parent = binding.guideRow.width.takeIf { it > 0 } ?: resources.displayMetrics.widthPixels
-        val minGuideCol = (275f * density).toInt()
+        val minGuideCol = ((if (touchPrimary) 150f else 220f) * density).toInt()
         val capped = GuideFeel.columnWidth(widestNamePx(), chrome, parent).coerceAtLeast(minGuideCol)
         val params = binding.contentColumn.layoutParams as LinearLayout.LayoutParams
         if (params.width != capped || params.weight != 0f) {

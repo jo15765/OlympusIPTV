@@ -52,7 +52,13 @@ internal class NetworkWatcher(
         val request = NetworkRequest.Builder()
             .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
             .build()
-        runCatching { manager.registerNetworkCallback(request, next) }
+        runCatching {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+                manager.registerDefaultNetworkCallback(next)
+            } else {
+                manager.registerNetworkCallback(request, next)
+            }
+        }
         callback = next
         val listener: (TunnelState) -> Unit = { state ->
             if (state is TunnelState.On) onReconnect(true)

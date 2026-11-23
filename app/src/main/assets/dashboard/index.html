@@ -737,27 +737,90 @@
       overflow: auto;
       padding-right: 4px;
     }
-    .quick-fav { flex-shrink: 0; margin-bottom: 14px; }
-    .quick-head { display: flex; justify-content: space-between; gap: 16px; align-items: center; }
-    .quick-head h2, .fav-head h2 { font-size: 22px; font-weight: 700; }
-    #quickStatus {
+    .fav-top-head { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; flex-shrink: 0; }
+    .fav-top-head h2 { font-size: 24px; font-weight: 700; margin: 0; }
+    .fav-top-head .hint { margin-top: 3px; }
+    .fav-subtabs {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: var(--elev);
+      border: 1px solid var(--stroke);
+      border-radius: 10px;
+      padding: 4px;
+      margin: 12px 0 12px;
+      flex-shrink: 0;
+      align-self: flex-start;
+    }
+    .fav-subtab {
+      border: 0;
+      border-radius: 8px;
+      padding: 7px 20px;
+      font-size: 13px;
+      font-weight: 700;
+      background: transparent;
+      color: var(--muted);
+      transition: background 0.14s ease, color 0.14s ease;
+    }
+    .fav-subtab:hover { color: var(--text); }
+    .fav-subtab[aria-selected="true"] {
+      background: var(--accent);
+      color: var(--accent-ink);
+    }
+    .fav-surface {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      background: var(--elev);
+      border: 1px solid var(--stroke);
+      border-radius: 12px;
+      padding: 16px 18px;
+      overflow: hidden;
+    }
+    .fav-surface[hidden] { display: none; }
+    .fav-surface-scroll {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      padding-right: 4px;
+    }
+    .fav-surface-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 14px;
+      flex-wrap: wrap;
+      flex-shrink: 0;
+    }
+    .fav-surface-head h3 {
       margin: 0;
-      max-width: 460px;
+      font-size: 18px;
+      font-weight: 700;
+      text-transform: none;
+      letter-spacing: -0.01em;
+      color: var(--text);
+    }
+    .fav-surface-head .hint { margin-top: 3px; }
+    #quickStatus {
+      margin: 8px 0 0;
       padding: 7px 12px;
       border-radius: 10px;
-      background: #243044;
-      color: #b9d4ff;
+      background: var(--panel);
+      border: 1px solid var(--stroke);
+      color: var(--accent);
       font-size: 12px;
       line-height: 1.35;
       text-align: left;
     }
+    #quickStatus:empty { display: none; }
     .intl-switch {
       display: inline-flex;
       align-items: center;
       gap: 10px;
-      margin: 12px 0 0;
+      margin: 12px 0 2px;
       color: var(--text);
-      font-size: 14px;
+      font-size: 13px;
       cursor: pointer;
     }
     .intl-switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
@@ -765,7 +828,7 @@
       width: 38px;
       height: 22px;
       border-radius: 999px;
-      background: #3a3f4c;
+      background: var(--stroke);
       position: relative;
       flex-shrink: 0;
     }
@@ -777,132 +840,279 @@
       width: 16px;
       height: 16px;
       border-radius: 50%;
-      background: #fff;
+      background: var(--text);
       transition: transform 0.15s ease;
     }
-    .intl-switch input:checked + .switch { background: #d7a24a; }
-    .intl-switch input:checked + .switch::after { transform: translateX(16px); }
+    .intl-switch input:checked + .switch { background: var(--accent); }
+    .intl-switch input:checked + .switch::after { transform: translateX(16px); background: var(--accent-ink); }
     .intl-switch input:focus-visible + .switch { outline: 2px solid var(--focus); outline-offset: 2px; }
-    .quick-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 12px; }
+    .quick-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 8px; }
     .quick-card {
       display: flex;
       align-items: center;
       gap: 12px;
       text-align: left;
-      background: #2a2e38;
+      background: var(--side);
       color: var(--text);
-      border: 1px solid #3c404a;
+      border: 1px solid var(--stroke);
       border-radius: 12px;
       padding: 12px 14px;
-      min-height: 72px;
+      min-height: 68px;
+      transition: border-color 0.14s ease, background 0.14s ease;
     }
     .quick-card strong { display: block; font-size: 14px; }
-    .quick-copy { min-width: 0; }
+    .quick-copy { flex: 1; min-width: 0; }
     .quick-copy span { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; font-weight: 400; line-height: 1.3; }
-    .quick-card[aria-pressed="true"], .quick-card:hover, .quick-card:focus-visible { border-color: #d7b56a; background: #2c291f; }
+    .quick-card[aria-pressed="true"], .quick-card:hover, .quick-card:focus-visible { border-color: var(--accent); background: var(--panel); }
+    .quick-check {
+      width: 20px;
+      height: 20px;
+      border-radius: 5px;
+      border: 1.5px solid var(--stroke);
+      background: var(--elev);
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+      color: transparent;
+      transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+    }
+    .quick-check svg { width: 13px; height: 13px; }
+    .quick-card[aria-pressed="true"] .quick-check {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: var(--accent-ink);
+    }
+    .quick-chev { color: var(--muted); font-size: 16px; line-height: 1; opacity: 0.65; flex-shrink: 0; }
     .quick-icon {
       width: 38px;
       height: 38px;
       border-radius: 10px;
-      background: #1b1e26;
+      background: var(--elev);
+      border: 1px solid var(--stroke);
       display: grid;
       place-items: center;
       flex-shrink: 0;
-      color: #d5d8df;
+      color: var(--text);
     }
     .quick-icon svg { width: 20px; height: 20px; }
     .quick-icon.gold { color: #e0b15a; }
     .quick-icon.orange { color: #e08a3a; }
     .quick-icon.red { color: #e25b4a; }
     .quick-icon.blue { color: #7eb6ff; }
-    .quick-icon.filo { background: conic-gradient(from 20deg, #5b8def, #e06ad4, #f0a04a, #5b8def); }
-    .quick-icon.directv { grid-template-columns: 1fr 1fr; gap: 3px; padding: 8px; background: #1b1e26; }
+    .quick-icon.filo { background: conic-gradient(from 20deg, #5b8def, #e06ad4, #f0a04a, #5b8def); border-color: transparent; }
+    .quick-icon.directv { grid-template-columns: 1fr 1fr; gap: 3px; padding: 8px; background: var(--elev); }
     .quick-icon.directv i { border-radius: 2px; display: block; }
     .quick-icon.directv i:nth-child(1) { background: #7b6cff; }
     .quick-icon.directv i:nth-child(2) { background: #f0a04a; }
     .quick-icon.directv i:nth-child(3) { background: #5b8def; }
     .quick-icon.directv i:nth-child(4) { background: #e6c94a; }
-    .fav-head { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; flex-shrink: 0; }
-    .fav-head .hint { margin-top: 4px; }
-    .fav-search { width: min(340px, 42%); }
-    .fav-search-field { position: relative; }
-    .fav-search input { border-color: #d7b56a; background: #242833; padding-right: 36px; }
-    .fav-search .mag {
+    .quick-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid var(--stroke);
+      flex-shrink: 0;
+    }
+    .quick-summary { font-size: 13px; color: var(--muted); }
+    .quick-apply {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 18px;
+      border-radius: 10px;
+      border: 0;
+      background: var(--accent);
+      color: var(--accent-ink);
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .quick-apply:disabled { opacity: 0.45; cursor: default; }
+    .fav-search-bar {
+      position: relative;
+      margin-top: 12px;
+      flex-shrink: 0;
+    }
+    .fav-search-bar input {
+      width: 100%;
+      padding: 10px 36px 10px 38px;
+      border-radius: 10px;
+      border: 1px solid var(--stroke);
+      background: var(--side);
+      color: var(--text);
+      font-size: 14px;
+    }
+    .fav-search-bar input:focus { border-color: var(--accent); outline: none; }
+    .fav-search-bar .mag-left {
       position: absolute;
-      right: 10px;
-      top: 8px;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
       width: 16px;
       height: 16px;
-      color: #c5cad3;
+      color: var(--muted);
       pointer-events: none;
     }
-    .fav-search .hint { margin-top: 4px; text-align: right; }
-    .fav-board, #favoriteResults {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
+    .fav-search-controls {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+      flex-shrink: 0;
+    }
+    .fav-region-select {
+      width: auto;
+      min-width: 136px;
+      padding: 6px 10px;
+      font-size: 12px;
+      border-radius: 8px;
+      background: var(--side);
+      border: 1px solid var(--stroke);
+      color: var(--text);
+    }
+    .fav-results-head {
+      margin: 12px 0 6px;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--muted);
+      flex-shrink: 0;
+    }
+    .fav-manage-tools {
+      display: flex;
+      align-items: center;
       gap: 8px;
-      align-content: start;
+      flex-wrap: wrap;
+    }
+    .fav-tool-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 700;
+      background: var(--side);
+      color: var(--text);
+      border: 1px solid var(--stroke);
+    }
+    .fav-tool-btn:hover { border-color: var(--accent); background: var(--panel); }
+    .fav-tool-btn svg { width: 14px; height: 14px; }
+    .fav-tool-btn.danger {
+      background: rgba(224, 122, 114, 0.14);
+      color: var(--danger);
+      border-color: rgba(224, 122, 114, 0.45);
+    }
+    .fav-tool-btn.danger:hover { background: rgba(224, 122, 114, 0.24); border-color: var(--danger); }
+    .fav-board, #favoriteResults {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
     }
     .fav-board { flex: 1; min-height: 0; overflow: auto; margin-top: 10px; padding-right: 4px; }
-    #favoriteResults { flex-shrink: 0; max-height: 220px; overflow: auto; margin-top: 8px; }
+    #favoriteResults { flex: 1; min-height: 0; overflow: auto; margin-top: 4px; padding-right: 4px; }
     #favoriteResults:empty, #favoriteResults[hidden] { display: none; }
     .fav-row {
       display: grid;
-      grid-template-columns: 16px 40px minmax(0, 1fr) auto;
+      grid-template-columns: 16px 26px 44px minmax(0, 1fr) auto;
       gap: 10px;
       align-items: center;
-      min-height: 56px;
+      min-height: 54px;
       margin: 0;
-      padding: 6px 10px;
-      background: #23262f;
-      border: 1px solid transparent;
-      border-radius: 12px;
+      padding: 7px 12px;
+      background: var(--side);
+      border: 1px solid var(--stroke);
+      border-radius: 10px;
+      transition: border-color 0.12s ease, background 0.12s ease;
     }
-    .fav-row:hover, .fav-row:focus-within, .fav-row.dragover { border-color: #d7b56a; background: #2c291f; }
-    .fav-row .fav-actions { visibility: hidden; }
-    .fav-row:hover .fav-actions, .fav-row:focus-within .fav-actions { visibility: visible; }
+    .fav-row.search-row {
+      grid-template-columns: 44px minmax(0, 1fr) auto;
+    }
+    .fav-row:hover, .fav-row:focus-within, .fav-row.dragover { border-color: var(--accent); background: var(--panel); }
+    .fav-num {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
     .fav-logo, .fav-logo img, .fav-logo .fav-mark {
-      width: 36px;
-      height: 36px;
-      border-radius: 8px;
-      background: #1b1e26;
+      width: 44px;
+      height: 32px;
+      border-radius: 7px;
+      background: var(--elev);
       object-fit: contain;
     }
-    .fav-logo { overflow: hidden; display: grid; place-items: center; }
-    .fav-logo .fav-mark { display: grid; place-items: center; color: var(--accent); font-weight: 700; font-size: 14px; }
+    .fav-logo { overflow: hidden; display: grid; place-items: center; border: 1px solid var(--stroke); }
+    .fav-logo .fav-mark { display: grid; place-items: center; color: var(--accent); font-weight: 700; font-size: 13px; border: 0; }
     .fav-copy { min-width: 0; }
-    .fav-sub { color: var(--muted); font-size: 11px; line-height: 1.2; }
-    .fav-title { font-weight: 700; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .fav-actions { display: flex; align-items: center; gap: 4px; }
+    .fav-sub { color: var(--muted); font-size: 11px; line-height: 1.25; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .fav-title { font-weight: 700; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+    .fav-actions { display: flex; align-items: center; gap: 6px; }
+    .fav-hover-actions { display: flex; align-items: center; gap: 2px; opacity: 0; transition: opacity 0.12s ease; }
+    .fav-row:hover .fav-hover-actions, .fav-row:focus-within .fav-hover-actions { opacity: 1; }
     .fav-step {
       width: 26px;
       height: 26px;
       border: 0;
       border-radius: 6px;
       background: transparent;
-      color: #c5cad3;
+      color: var(--muted);
       padding: 0;
       display: grid;
       place-items: center;
     }
-    .fav-step svg { width: 16px; height: 16px; }
-    .fav-step:hover { background: #2e333d; }
-    .fav-remove, .fav-add {
+    .fav-step svg { width: 15px; height: 15px; }
+    .fav-step:hover { background: var(--elev); color: var(--text); }
+    .fav-remove-x {
+      width: 28px;
+      height: 28px;
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1;
+      display: grid;
+      place-items: center;
+    }
+    .fav-remove-x:hover { background: rgba(224, 122, 114, 0.18); color: var(--danger); }
+    .fav-add {
       display: inline-flex;
       align-items: center;
       gap: 4px;
-      border: 0;
       border-radius: 8px;
-      padding: 6px 10px;
+      padding: 6px 14px;
       font-size: 12px;
-      font-weight: 600;
+      font-weight: 700;
+      background: var(--accent);
+      color: var(--accent-ink);
+      border: 1px solid var(--accent);
     }
-    .fav-remove { background: #5a3030; color: #f3d2ce; }
-    .fav-remove svg, .fav-add svg { width: 14px; height: 14px; }
-    .fav-add { background: #2a2e38; color: var(--text); border: 1px solid #3c404a; }
-    .fav-add.on { background: #3a3218; color: #e6c98a; border-color: #d7b56a; }
-    .fav-empty { grid-column: 1 / -1; color: var(--muted); margin: 8px 2px; }
-    #quickSportsPanel { margin-top: 8px; }
+    .fav-add.on { background: var(--panel); color: var(--accent); border-color: var(--accent); }
+    .fav-empty { color: var(--muted); margin: 14px 4px; font-size: 13px; }
+    .fav-manage-foot {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 10px;
+      padding-top: 8px;
+      border-top: 1px solid var(--stroke);
+      flex-shrink: 0;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    #quickSportsPanel {
+      margin-top: 12px;
+      padding: 12px 14px;
+      border-radius: 10px;
+      background: var(--side);
+      border: 1px solid var(--stroke);
+    }
     .sport-row { display: flex; flex-wrap: wrap; gap: 6px; }
     .sport-row button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
     .team-box { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 4px 12px; max-height: 168px; overflow: auto; margin: 8px 0; }
@@ -1188,22 +1398,24 @@
       display: flex;
       align-items: center;
       gap: 6px;
-      margin-top: 8px;
+      margin-top: 10px;
       flex-wrap: wrap;
+      flex-shrink: 0;
     }
     .fav-filter-row button {
       border-radius: 999px;
-      padding: 5px 12px;
+      padding: 5px 14px;
       font-size: 12px;
       font-weight: 700;
-      background: #2a2e38;
+      background: var(--side);
       color: var(--muted);
-      border: 1px solid #3c404a;
+      border: 1px solid var(--stroke);
     }
+    .fav-filter-row button:hover { color: var(--text); border-color: var(--accent); }
     .fav-filter-row button[aria-pressed="true"] {
-      background: #2c291f;
-      color: var(--accent);
-      border-color: #d7b56a;
+      background: var(--accent);
+      color: var(--accent-ink);
+      border-color: var(--accent);
     }
     .remote-layout {
       display: grid;
@@ -1887,96 +2099,181 @@
       </section>
 
       <section class="card panel" id="panelFavorites" hidden>
-        <div class="quick-fav">
-          <div class="quick-head">
-            <div>
-              <h2>Auto-add to favorites</h2>
-              <p class="hint" id="catalogLoadingBanner" hidden aria-live="polite">Catalog still loading on the device… auto-add unlocks when groups arrive.</p>
-              <p class="hint" id="quickStatus">Add a few channels you watch, then search below for anything else. Off keeps Countries on USA only.</p>
-            </div>
-            <button class="section-save" type="button">Save</button>
-          </div>
-          <label class="intl-switch"><input id="includeInternational" type="checkbox" /><span class="switch" aria-hidden="true"></span> Include International Channels</label>
-          <div class="preset-subhead">Essentials &amp; Sports</div>
-          <div class="quick-cards" id="quickCardsWrap">
-            <button class="quick-card" id="quickLocal" type="button">
-              <span class="quick-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8M12 17v4"/></svg></span>
-              <span class="quick-copy"><strong>Local Major Networks</strong><span>ABC, Fox, NBC, CBS, and the stations near you</span></span>
-            </button>
-            <button class="quick-card" id="quickSportsNets" type="button">
-              <span class="quick-icon gold" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 4h8v5a4 4 0 0 1-8 0V4z"/><path d="M8 6H5.5A2.5 2.5 0 0 0 8 10M16 6h2.5A2.5 2.5 0 0 1 16 10M9 20h6M12 13v3"/></svg></span>
-              <span class="quick-copy"><strong>Major Sports Networks</strong><span>ESPN, Fox Sports, SEC, ACC, and more</span></span>
-            </button>
-            <button class="quick-card" id="quickTeams" type="button" aria-pressed="false">
-              <span class="quick-icon orange" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><path d="M12 4v16M4 12h16M6.5 7.5c3 1.5 8 1.5 11 0M6.5 16.5c3-1.5 8-1.5 11 0"/></svg></span>
-              <span class="quick-copy"><strong>Sports</strong><span>Pick a league, then the teams</span></span>
-            </button>
-          </div>
-          <div class="preset-subhead">Streaming Lineup Bundles</div>
-          <div class="quick-cards">
-            <button class="quick-card" id="quickSlingBlue" type="button">
-              <span class="quick-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8M12 17v4"/></svg></span>
-              <span class="quick-copy"><strong>Blue</strong><span>USA Network, news, and your local stations</span></span>
-            </button>
-            <button class="quick-card" id="quickSlingOrange" type="button">
-              <span class="quick-icon red" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 7.5v9l8-4.5z"/></svg></span>
-              <span class="quick-copy"><strong>Orange</strong><span>ESPN, Disney, CNN, and your local stations</span></span>
-            </button>
-            <button class="quick-card" id="quickFilo" type="button">
-              <span class="quick-icon filo" aria-hidden="true"></span>
-              <span class="quick-copy"><strong>Filo</strong><span>Hallmark, HGTV, MTV, and the entertainment lineup</span></span>
-            </button>
-            <button class="quick-card" id="quickUtoob" type="button">
-              <span class="quick-icon red" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 7.5v9l8-4.5z"/></svg></span>
-              <span class="quick-copy"><strong>UToob</strong><span>Locals, sports, news, and cable</span></span>
-            </button>
-            <button class="quick-card" id="quickFubo" type="button">
-              <span class="quick-icon blue" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><path d="M4 12h16M12 4c2.2 2.4 2.2 13.6 0 16M12 4c-2.2 2.4-2.2 13.6 0 16"/></svg></span>
-              <span class="quick-copy"><strong>Foooooobowed</strong><span>Sports, locals, and the Pro lineup</span></span>
-            </button>
-            <button class="quick-card" id="quickDirectv" type="button">
-              <span class="quick-icon directv" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
-              <span class="quick-copy"><strong>DurictTV Streamer</strong><span>Entertainment package and your local stations</span></span>
-            </button>
-            <button class="quick-card" id="quickFrndly" type="button">
-              <span class="quick-icon gold" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20s-7-4.4-7-9a4 4 0 0 1 7-2 4 4 0 0 1 7 2c0 4.6-7 9-7 9z"/></svg></span>
-              <span class="quick-copy"><strong>YourFriendlyTV</strong><span>Hallmark, Lifetime, classic TV, and the family lineup</span></span>
-            </button>
-            <button class="quick-card" id="quickHulu" type="button">
-              <span class="quick-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8M12 17v4"/></svg></span>
-              <span class="quick-copy"><strong>HoolaHoop Live TV</strong><span>Locals, sports, news, and the live lineup</span></span>
-            </button>
-          </div>
-          <div id="quickSportsPanel" hidden>
-            <div class="sport-row" id="sportRow"></div>
-            <div class="team-box" id="teamBox"></div>
-            <button class="primary" id="quickAddTeams" type="button">Add selected teams</button>
-          </div>
-        </div>
-        <div class="fav-head">
+        <div class="fav-top-head">
           <div>
-            <h2>Favorites <span id="favoriteCount" class="hint" style="font-weight:normal"></span></h2>
-            <p class="hint" id="favoriteOrderNote">Drag to reorder. Drag items up/down or click remove to manage.</p>
-            <div class="fav-filter-row" id="favFilterRow">
-              <button type="button" data-fav-kind="all" aria-pressed="true">All</button>
-              <button type="button" data-fav-kind="live" aria-pressed="false">Live TV</button>
-              <button type="button" data-fav-kind="vod" aria-pressed="false">Movies</button>
-              <button type="button" data-fav-kind="series" aria-pressed="false">Shows</button>
-              <button type="button" id="favClearAllBtn" style="margin-left:auto;color:#e07a72;border-color:rgba(224,122,114,0.45)">Clear All</button>
+            <h2>Favorites</h2>
+            <p class="hint">Build, search, and manage your favorite channels, movies, and shows.</p>
+          </div>
+          <button class="section-save" type="button">Save</button>
+        </div>
+        <div class="fav-subtabs" role="tablist" aria-label="Favorites sections">
+          <button class="fav-subtab" id="favSubTabAuto" type="button" role="tab" aria-selected="true" data-fav-sub="auto">Auto Build</button>
+          <button class="fav-subtab" id="favSubTabSearch" type="button" role="tab" aria-selected="false" data-fav-sub="search">Search</button>
+          <button class="fav-subtab" id="favSubTabManage" type="button" role="tab" aria-selected="false" data-fav-sub="manage">Manage</button>
+        </div>
+
+        <div class="fav-surface" id="favPaneAuto" role="tabpanel" aria-labelledby="favSubTabAuto">
+          <div class="fav-surface-scroll">
+            <div class="fav-surface-head">
+              <div>
+                <h3>Auto-add to favorites</h3>
+                <p class="hint">Select content packages below to quickly add popular channels. You can fine-tune your favorites in the Search and Manage tabs.</p>
+                <p class="hint" id="catalogLoadingBanner" hidden aria-live="polite">Catalog still loading on the device… auto-add unlocks when groups arrive.</p>
+              </div>
+            </div>
+            <p id="quickStatus"></p>
+            <label class="intl-switch"><input id="includeInternational" type="checkbox" /><span class="switch" aria-hidden="true"></span> Include International Channels</label>
+            <div class="preset-subhead">Essentials &amp; Sports</div>
+            <div class="quick-cards" id="quickCardsWrap">
+              <button class="quick-card" id="quickLocal" type="button" aria-pressed="false" data-quick-mode="local" data-quick-city="1">
+                <span class="quick-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8M12 17v4"/></svg></span>
+                <span class="quick-copy"><strong>Local Major Networks</strong><span>ABC, Fox, NBC, CBS, and the stations near you</span></span>
+                <span class="quick-check" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></span>
+                <span class="quick-chev" aria-hidden="true">›</span>
+              </button>
+              <button class="quick-card" id="quickSportsNets" type="button" aria-pressed="false" data-quick-mode="sports">
+                <span class="quick-icon gold" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 4h8v5a4 4 0 0 1-8 0V4z"/><path d="M8 6H5.5A2.5 2.5 0 0 0 8 10M16 6h2.5A2.5 2.5 0 0 1 16 10M9 20h6M12 13v3"/></svg></span>
+                <span class="quick-copy"><strong>Major Sports Networks</strong><span>ESPN, Fox Sports, SEC, ACC, and more</span></span>
+                <span class="quick-check" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></span>
+                <span class="quick-chev" aria-hidden="true">›</span>
+              </button>
+              <button class="quick-card" id="quickTeams" type="button" aria-pressed="false">
+                <span class="quick-icon orange" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><path d="M12 4v16M4 12h16M6.5 7.5c3 1.5 8 1.5 11 0M6.5 16.5c3-1.5 8-1.5 11 0"/></svg></span>
+                <span class="quick-copy"><strong>Sports</strong><span>Pick a league, then the teams</span></span>
+                <span class="quick-check" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></span>
+                <span class="quick-chev" aria-hidden="true">›</span>
+              </button>
+            </div>
+            <div id="quickSportsPanel" hidden>
+              <div class="sport-row" id="sportRow"></div>
+              <div class="team-box" id="teamBox"></div>
+              <button class="primary" id="quickAddTeams" type="button">Add selected teams</button>
+            </div>
+            <div class="preset-subhead">Streaming Lineup Bundles</div>
+            <div class="quick-cards">
+              <button class="quick-card" id="quickSlingBlue" type="button" aria-pressed="false" data-quick-mode="sling-blue" data-quick-city="1">
+                <span class="quick-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8M12 17v4"/></svg></span>
+                <span class="quick-copy"><strong>Blue</strong><span>USA Network, news, and your local stations</span></span>
+                <span class="quick-check" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></span>
+                <span class="quick-chev" aria-hidden="true">›</span>
+              </button>
+              <button class="quick-card" id="quickSlingOrange" type="button" aria-pressed="false" data-quick-mode="sling-orange">
+                <span class="quick-icon red" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 7.5v9l8-4.5z"/></svg></span>
+                <span class="quick-copy"><strong>Orange</strong><span>ESPN, Disney, CNN, and your local stations</span></span>
+                <span class="quick-check" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></span>
+                <span class="quick-chev" aria-hidden="true">›</span>
+              </button>
+              <button class="quick-card" id="quickFilo" type="button" aria-pressed="false" data-quick-mode="filo">
+                <span class="quick-icon filo" aria-hidden="true"></span>
+                <span class="quick-copy"><strong>Filo</strong><span>Hallmark, HGTV, MTV, and the entertainment lineup</span></span>
+                <span class="quick-check" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></span>
+                <span class="quick-chev" aria-hidden="true">›</span>
+              </button>
+              <button class="quick-card" id="quickUtoob" type="button" aria-pressed="false" data-quick-mode="utoob" data-quick-city="1">
+                <span class="quick-icon red" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 7.5v9l8-4.5z"/></svg></span>
+                <span class="quick-copy"><strong>UToob</strong><span>Locals, sports, news, and cable</span></span>
+                <span class="quick-check" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></span>
+                <span class="quick-chev" aria-hidden="true">›</span>
+              </button>
+              <button class="quick-card" id="quickFubo" type="button" aria-pressed="false" data-quick-mode="fubo" data-quick-city="1">
+                <span class="quick-icon blue" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><path d="M4 12h16M12 4c2.2 2.4 2.2 13.6 0 16M12 4c-2.2 2.4-2.2 13.6 0 16"/></svg></span>
+                <span class="quick-copy"><strong>Foooooobowed</strong><span>Sports, locals, and the Pro lineup</span></span>
+                <span class="quick-check" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></span>
+                <span class="quick-chev" aria-hidden="true">›</span>
+              </button>
+              <button class="quick-card" id="quickDirectv" type="button" aria-pressed="false" data-quick-mode="directv" data-quick-city="1">
+                <span class="quick-icon directv" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+                <span class="quick-copy"><strong>DurictTV Streamer</strong><span>Entertainment package and your local stations</span></span>
+                <span class="quick-check" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></span>
+                <span class="quick-chev" aria-hidden="true">›</span>
+              </button>
+              <button class="quick-card" id="quickFrndly" type="button" aria-pressed="false" data-quick-mode="frndly">
+                <span class="quick-icon gold" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20s-7-4.4-7-9a4 4 0 0 1 7-2 4 4 0 0 1 7 2c0 4.6-7 9-7 9z"/></svg></span>
+                <span class="quick-copy"><strong>YourFriendlyTV</strong><span>Hallmark, Lifetime, classic TV, and the family lineup</span></span>
+                <span class="quick-check" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></span>
+                <span class="quick-chev" aria-hidden="true">›</span>
+              </button>
+              <button class="quick-card" id="quickHulu" type="button" aria-pressed="false" data-quick-mode="hulu" data-quick-city="1">
+                <span class="quick-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8M12 17v4"/></svg></span>
+                <span class="quick-copy"><strong>HoolaHoop Live TV</strong><span>Locals, sports, news, and the live lineup</span></span>
+                <span class="quick-check" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></span>
+                <span class="quick-chev" aria-hidden="true">›</span>
+              </button>
             </div>
           </div>
-          <div class="fav-search">
-            <div class="fav-search-field">
-              <input id="favoriteSearch" type="search" placeholder="Find a channel, movie, or show" />
-              <button class="search-clear" type="button" data-clear="#favoriteSearch" hidden aria-label="Clear search" style="right:32px">×</button>
-              <svg class="mag" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="6"/><path d="M16 16l4 4"/></svg>
-            </div>
-            <p class="hint" id="favoriteNote">Type at least two letters.</p>
+          <div class="quick-footer">
+            <span class="quick-summary" id="quickSelectionSummary">Select one or more packages above to add</span>
+            <button class="quick-apply" id="quickApplyBtn" type="button" disabled>Apply Selection ›</button>
           </div>
         </div>
-        <div id="favoriteResults" hidden></div>
-        <div class="fav-board" id="favoriteOrder"></div>
-        <p class="hint" id="favoriteUndo" hidden style="margin-top:10px"></p>
+
+        <div class="fav-surface" id="favPaneSearch" role="tabpanel" aria-labelledby="favSubTabSearch" hidden>
+          <div class="fav-surface-head">
+            <div>
+              <h3>Search Channels, Movies, or Shows</h3>
+              <p class="hint">Find and add specific content to your favorites.</p>
+            </div>
+          </div>
+          <div class="fav-search-bar">
+            <svg class="mag-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="6"/><path d="M16 16l4 4"/></svg>
+            <input id="favoriteSearch" type="search" placeholder="Find a channel, movie, or show" />
+            <button class="search-clear" type="button" data-clear="#favoriteSearch" hidden aria-label="Clear search">×</button>
+          </div>
+          <div class="fav-search-controls">
+            <div class="fav-filter-row" id="favSearchFilterRow" style="margin-top:0">
+              <button type="button" data-search-kind="all" aria-pressed="true">All</button>
+              <button type="button" data-search-kind="live" aria-pressed="false">Live TV</button>
+              <button type="button" data-search-kind="vod" aria-pressed="false">Movies</button>
+              <button type="button" data-search-kind="series" aria-pressed="false">Shows</button>
+            </div>
+            <select class="fav-region-select" id="favSearchRegion" aria-label="Filter region">
+              <option value="allowed">All Allowed Regions</option>
+              <option value="us">USA Only</option>
+              <option value="all">All Regions</option>
+            </select>
+          </div>
+          <div class="fav-results-head" id="favoriteNote">Type at least two letters.</div>
+          <div id="favoriteResults" hidden></div>
+        </div>
+
+        <div class="fav-surface" id="favPaneManage" role="tabpanel" aria-labelledby="favSubTabManage" hidden>
+          <div class="fav-surface-head">
+            <div>
+              <h3>Favorites <span id="favoriteCount" class="hint" style="font-weight:normal"></span></h3>
+              <p class="hint" id="favoriteOrderNote">Drag to reorder. Use the arrows or Remove to manage your list. Changes sync to the device.</p>
+            </div>
+            <div class="fav-manage-tools">
+              <button class="fav-tool-btn" id="favAutoSortBtn" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M11 5h10M11 9h7M11 13h4M3 17l3 3 3-3M6 18V4"/></svg>
+                Auto Sort
+              </button>
+              <button class="fav-tool-btn" id="favDedupBtn" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>
+                Remove Duplicates
+              </button>
+              <button class="fav-tool-btn danger" id="favClearAllBtn" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>
+                Clear All
+              </button>
+            </div>
+          </div>
+          <div class="fav-search-bar">
+            <svg class="mag-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="6"/><path d="M16 16l4 4"/></svg>
+            <input id="favoriteManageFilter" type="search" placeholder="Find a channel, movie, or show…" />
+            <button class="search-clear" type="button" data-clear="#favoriteManageFilter" hidden aria-label="Clear filter">×</button>
+          </div>
+          <div class="fav-filter-row" id="favFilterRow">
+            <button type="button" data-fav-kind="all" aria-pressed="true">All</button>
+            <button type="button" data-fav-kind="live" aria-pressed="false">Live TV</button>
+            <button type="button" data-fav-kind="vod" aria-pressed="false">Movies</button>
+            <button type="button" data-fav-kind="series" aria-pressed="false">Shows</button>
+          </div>
+          <div class="fav-board" id="favoriteOrder"></div>
+          <div class="fav-manage-foot">
+            <span id="favoriteUndo" hidden></span>
+            <span id="favManageCountFoot" style="margin-left:auto">0 items</span>
+          </div>
+        </div>
       </section>
 
       <section class="card panel" id="panelReminders" hidden>
@@ -3546,8 +3843,13 @@
         play.type = "button";
         play.className = "group-step";
         play.title = "Play on TV";
+        play.setAttribute("aria-label", "Play on TV");
         play.textContent = "▶";
-        play.addEventListener("click", () => sendRemote("play", channel.id));
+        play.addEventListener("click", async (event) => {
+          event.stopPropagation();
+          const ok = await sendRemote("play", channel.id);
+          if (ok) showToast("Playing " + (channelName(channel) || channel.name || "channel") + " on TV");
+        });
         row.append(grip, pick, logo, copy, probe, up, down, shown, play);
         box.append(row);
       });
@@ -3923,20 +4225,21 @@
       box.append(image);
       return box;
     }
-    function favoriteCopy(label) {
+    function favoriteCopy(label, fallbackSub) {
       const parts = favoriteParts(label);
       const copy = document.createElement("div");
       copy.className = "fav-copy";
-      if (parts.sub) {
-        const sub = document.createElement("div");
-        sub.className = "fav-sub";
-        sub.textContent = parts.sub;
-        copy.append(sub);
-      }
       const title = document.createElement("div");
       title.className = "fav-title";
       title.textContent = parts.title || label;
       copy.append(title);
+      const subText = parts.sub || fallbackSub || "";
+      if (subText) {
+        const sub = document.createElement("div");
+        sub.className = "fav-sub";
+        sub.textContent = subText;
+        copy.append(sub);
+      }
       return copy;
     }
     function favStep(direction, action) {
@@ -3953,8 +4256,10 @@
     function favRemove(action) {
       const button = document.createElement("button");
       button.type = "button";
-      button.className = "fav-remove";
-      button.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M9 7V5h6v2M8 7l1 13h6l1-13"/></svg> Remove';
+      button.className = "fav-remove-x";
+      button.title = "Remove from favorites";
+      button.setAttribute("aria-label", "Remove from favorites");
+      button.textContent = "×";
       button.addEventListener("click", (event) => { event.stopPropagation(); action(); });
       return button;
     }
@@ -3964,32 +4269,48 @@
       const scroll = box.scrollTop;
       box.replaceChildren();
       const allIds = (session.favorites && session.favorites.ids) || [];
-      const ids = favKindFilter === "all"
-        ? allIds
-        : allIds.filter((id) => {
-            const raw = String(id);
-            if (favKindFilter === "live") return !raw.startsWith("vod:") && !raw.startsWith("series:");
-            return raw.startsWith(favKindFilter + ":");
-          });
       const labels = (session.favorites && session.favorites.labels) || {};
       const logos = (session.favorites && session.favorites.logos) || {};
+      const filterText = (document.querySelector("#favoriteManageFilter")?.value || "").trim().toLowerCase();
+      const ids = allIds.filter((id) => {
+        const raw = String(id);
+        if (favKindFilter === "live" && (raw.startsWith("vod:") || raw.startsWith("series:"))) return false;
+        if (favKindFilter === "vod" && !raw.startsWith("vod:")) return false;
+        if (favKindFilter === "series" && !raw.startsWith("series:")) return false;
+        if (filterText) {
+          const text = String(labels[id] || id).toLowerCase();
+          if (!text.includes(filterText)) return false;
+        }
+        return true;
+      });
       const countEl = document.querySelector("#favoriteCount");
-      if (countEl) countEl.textContent = allIds.length ? "(" + allIds.length + ")" : "";
+      if (countEl) countEl.textContent = "(" + allIds.length + ")";
+      const footCount = document.querySelector("#favManageCountFoot");
+      if (footCount) {
+        footCount.textContent = ids.length === allIds.length
+          ? allIds.length + (allIds.length === 1 ? " item" : " items")
+          : ids.length + " of " + allIds.length + " items";
+      }
       updateDashboardKpis();
-      document.querySelector("#favoriteOrderNote").textContent = ids.length
-        ? "Drag to reorder. Use the arrows or Remove on a row. Changes sync to the device."
-        : "Add from the cards above or search below — favorites sync to the device as you go.";
+      document.querySelector("#favoriteOrderNote").textContent = allIds.length
+        ? "Drag to reorder. Use the arrows or Remove to manage your list. Changes sync to the device."
+        : "Add packages in Auto Build or find channels in Search — favorites sync to the device as you go.";
       if (!ids.length) {
         const empty = document.createElement("p");
         empty.className = "fav-empty";
-        empty.textContent = catalogIsReady()
-          ? "No favorites yet. Use an auto-add card above, or type two letters to search."
-          : "Waiting for the catalog… auto-add and search unlock when groups arrive.";
+        empty.textContent = !allIds.length
+          ? (catalogIsReady()
+              ? "No favorites yet. Use Auto Build or Search to add channels, movies, or shows."
+              : "Waiting for the catalog… auto-add and search unlock when groups arrive.")
+          : "No favorites match the current filter.";
         box.append(empty);
         return;
       }
-      ids.forEach((id, index) => {
+      ids.forEach((id, visibleIndex) => {
+        const fullIndex = allIds.indexOf(id);
         const label = labels[id] || id;
+        const raw = String(id);
+        const kindLabel = raw.startsWith("vod:") ? "Movie" : (raw.startsWith("series:") ? "Show" : "Live TV");
         const row = document.createElement("div");
         row.className = "fav-row";
         row.addEventListener("dragover", (event) => {
@@ -4012,30 +4333,31 @@
           event.dataTransfer.effectAllowed = "move";
           event.dataTransfer.setData("text/plain", favoriteDragId);
         });
-        const actions = document.createElement("div");
-        actions.className = "fav-actions";
+        const num = document.createElement("span");
+        num.className = "fav-num";
+        num.textContent = String(visibleIndex + 1);
+        const hoverActions = document.createElement("div");
+        hoverActions.className = "fav-hover-actions";
         const tvBtn = document.createElement("button");
         tvBtn.type = "button";
         tvBtn.className = "fav-step";
         tvBtn.title = "Play on TV";
         tvBtn.setAttribute("aria-label", "Play on TV");
         tvBtn.textContent = "▶";
-        tvBtn.addEventListener("click", (event) => {
+        tvBtn.addEventListener("click", async (event) => {
           event.stopPropagation();
-          const rawId = String(id).includes(":") ? String(id).split(":").slice(1).join(":") : String(id);
-          fetch("/api/remote", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ action: "play", text: rawId })
-          }).catch(() => {});
+          const ok = await sendRemote("play", raw);
+          if (ok) showToast("Playing " + favoriteParts(label).title + " on TV");
         });
-        actions.append(
+        hoverActions.append(
           tvBtn,
-          favStep(-1, () => moveFavorite(index, -1)),
-          favStep(1, () => moveFavorite(index, 1)),
-          favRemove(() => toggleWebFavorite(id, false))
+          favStep(-1, () => moveFavorite(fullIndex, -1)),
+          favStep(1, () => moveFavorite(fullIndex, 1))
         );
-        row.append(grip, favoriteRowLogo(favoriteParts(label).title, logos[id] || ""), favoriteCopy(label), actions);
+        const actions = document.createElement("div");
+        actions.className = "fav-actions";
+        actions.append(hoverActions, favRemove(() => toggleWebFavorite(id, false)));
+        row.append(grip, num, favoriteRowLogo(favoriteParts(label).title, logos[id] || ""), favoriteCopy(label, kindLabel), actions);
         box.append(row);
       });
       requestAnimationFrame(() => { box.scrollTop = scroll; });
@@ -4071,6 +4393,7 @@
       commitFavoriteOrder(ids);
     }
     let favoriteToken = 0;
+    let favSearchKind = "all";
     async function renderFavorites() {
       renderFavoriteOrder();
       const query = document.querySelector("#favoriteSearch").value.trim().toLowerCase();
@@ -4083,36 +4406,43 @@
         return;
       }
       box.hidden = false;
+      note.textContent = "Searching…";
       const token = ++favoriteToken;
       const params = new URLSearchParams({
         email: session.email,
         deviceId: session.deviceId,
         q: query,
-        limit: "40"
+        limit: "60"
       });
       const response = await fetch("/api/catalog/search?" + params);
       const body = await response.json().catch(() => ({}));
       if (token !== favoriteToken) return;
       const saved = new Set((session.favorites && session.favorites.ids) || []);
-      const sections = [["LIVE", "TV", "live"], ["VOD", "Movies", "vod"], ["SERIES", "Shows", "series"]];
-      const channels = (body.channels || []).filter((channel) => channelFromAllowedCountry(channel));
+      const regionMode = document.querySelector("#favSearchRegion")?.value || "allowed";
+      const sections = [["LIVE", "Live TV", "live"], ["VOD", "Movies", "vod"], ["SERIES", "Shows", "series"]];
+      const channels = (body.channels || []).filter((channel) => {
+        if (regionMode === "all") return true;
+        if (regionMode === "us") {
+          const code = String(channel.country || "").trim().toUpperCase();
+          return !code || code === "US" || code === "USA";
+        }
+        return channelFromAllowedCountry(channel);
+      });
       let shown = 0;
       for (const [kind, label, prefix] of sections) {
+        if (favSearchKind !== "all" && favSearchKind !== prefix) continue;
         const hits = channels.filter((channel) => String(channel.kind || "LIVE").toUpperCase() === kind);
         if (!hits.length) continue;
-        const heading = document.createElement("h3");
-        heading.textContent = label;
-        heading.style.gridColumn = "1 / -1";
-        box.appendChild(heading);
         for (const channel of hits) {
           const key = prefix + ":" + channel.id;
           const title = channel.name || channel.id;
+          const groupLabel = channel.groupName || channel.categoryName || label;
           const row = document.createElement("div");
-          row.className = "fav-row";
+          row.className = "fav-row search-row";
           const button = document.createElement("button");
           button.type = "button";
           button.className = "fav-add" + (saved.has(key) ? " on" : "");
-          button.textContent = saved.has(key) ? "Added" : "Add";
+          button.textContent = saved.has(key) ? "✓ Added" : "+ Add";
           button.setAttribute("aria-label", (saved.has(key) ? "Remove " : "Add ") + title + " " + label.toLowerCase());
           button.addEventListener("click", () => toggleWebFavorite(key, !saved.has(key)));
           const playHit = document.createElement("button");
@@ -4120,20 +4450,24 @@
           playHit.className = "fav-step";
           playHit.title = "Play on TV";
           playHit.textContent = "▶";
-          playHit.addEventListener("click", () => {
-            sendRemote("play", channel.id);
-            showToast("Playing " + title + " on TV");
+          playHit.addEventListener("click", async (event) => {
+            event.stopPropagation();
+            const ok = await sendRemote("play", key || channel.id);
+            if (ok) showToast("Playing " + title + " on TV");
           });
+          const chev = document.createElement("span");
+          chev.className = "quick-chev";
+          chev.setAttribute("aria-hidden", "true");
+          chev.textContent = "›";
           const actions = document.createElement("div");
           actions.className = "fav-actions";
-          actions.style.visibility = "visible";
-          actions.append(playHit, button);
-          row.append(document.createElement("span"), favoriteRowLogo(title, channel.logo || channel.logoUrl || ""), favoriteCopy(title), actions);
+          actions.append(playHit, button, chev);
+          row.append(favoriteRowLogo(title, channel.logo || channel.logoUrl || ""), favoriteCopy(title, groupLabel), actions);
           box.appendChild(row);
           shown += 1;
         }
       }
-      note.textContent = shown ? shown + " matches. Movies and shows show up after the TV opens once." : "Nothing matched. Movies and shows show up after the TV opens once.";
+      note.textContent = shown ? "Results (" + shown + ")" : "Nothing matched. Movies and shows show up after the TV opens once.";
     }
     let favoriteUndoKey = "";
     let favoriteUndoTimer = 0;
@@ -4991,51 +5325,64 @@
       else if (body.already > 0) status.textContent = "Those channels are already in Favorites.";
       else status.textContent = "No matching channels were found.";
     }
-    document.querySelector("#quickLocal").addEventListener("click", async () => {
-      if (quickBusy) return;
-      quickBusy = true;
-      document.querySelector("#quickStatus").textContent = "Finding channels near you…";
-      const body = await quickAdd("local");
-      quickBusy = false;
-      if (body) quickResult(body, body.market || "");
-    });
-    document.querySelector("#quickSlingBlue").addEventListener("click", async () => {
-      if (quickBusy) return;
-      quickBusy = true;
-      document.querySelector("#quickStatus").textContent = "Adding Blue…";
-      const body = await quickAdd("sling-blue");
-      quickBusy = false;
-      if (body) quickResult(body, body.market || "");
-    });
-    async function addPackage(mode, label, withCity) {
-      if (quickBusy) return;
-      quickBusy = true;
-      document.querySelector("#quickStatus").textContent = "Adding " + label + "…";
-      const body = await quickAdd(mode);
-      quickBusy = false;
-      if (body) quickResult(body, withCity ? (body.market || "") : null);
+    const quickSelectedModes = new Map();
+    function updateQuickSelectionSummary() {
+      const summary = document.querySelector("#quickSelectionSummary");
+      const applyBtn = document.querySelector("#quickApplyBtn");
+      const count = quickSelectedModes.size;
+      if (summary) {
+        summary.textContent = count
+          ? count + (count === 1 ? " package selected" : " packages selected") + " · Click Apply Selection to add"
+          : "Select one or more packages above to add";
+      }
+      if (applyBtn) applyBtn.disabled = quickBusy || count === 0 || !catalogIsReady();
     }
-    document.querySelector("#quickFilo").addEventListener("click", () => addPackage("filo", "Filo", false));
-    document.querySelector("#quickUtoob").addEventListener("click", () => addPackage("utoob", "UToob", true));
-    document.querySelector("#quickFubo").addEventListener("click", () => addPackage("fubo", "Foooooobowed", true));
-    document.querySelector("#quickDirectv").addEventListener("click", () => addPackage("directv", "DurictTV Streamer", true));
-    document.querySelector("#quickFrndly").addEventListener("click", () => addPackage("frndly", "YourFriendlyTV", false));
-    document.querySelector("#quickHulu").addEventListener("click", () => addPackage("hulu", "HoolaHoop Live TV", true));
-    document.querySelector("#quickSlingOrange").addEventListener("click", async () => {
-      if (quickBusy) return;
-      quickBusy = true;
-      document.querySelector("#quickStatus").textContent = "Adding Orange…";
-      const body = await quickAdd("sling-orange");
-      quickBusy = false;
-      if (body) quickResult(body, null);
+    document.querySelectorAll(".quick-card[data-quick-mode]").forEach((card) => {
+      card.addEventListener("click", () => {
+        if (quickBusy) return;
+        const mode = card.getAttribute("data-quick-mode") || "";
+        if (!mode) return;
+        const withCity = card.getAttribute("data-quick-city") === "1";
+        if (quickSelectedModes.has(mode)) {
+          quickSelectedModes.delete(mode);
+          card.setAttribute("aria-pressed", "false");
+        } else {
+          quickSelectedModes.set(mode, { withCity });
+          card.setAttribute("aria-pressed", "true");
+        }
+        updateQuickSelectionSummary();
+      });
     });
-    document.querySelector("#quickSportsNets").addEventListener("click", async () => {
-      if (quickBusy) return;
+    document.querySelector("#quickApplyBtn")?.addEventListener("click", async () => {
+      if (quickBusy || !quickSelectedModes.size) return;
       quickBusy = true;
-      document.querySelector("#quickStatus").textContent = "Adding channels…";
-      const body = await quickAdd("sports");
+      updateQuickSelectionSummary();
+      const status = document.querySelector("#quickStatus");
+      const entries = Array.from(quickSelectedModes.entries());
+      let totalAdded = 0;
+      let totalAlready = 0;
+      let market = "";
+      for (let i = 0; i < entries.length; i += 1) {
+        const [mode, info] = entries[i];
+        if (status) status.textContent = "Applying package " + (i + 1) + " of " + entries.length + "…";
+        const body = await quickAdd(mode);
+        if (body) {
+          totalAdded += Number(body.added || 0);
+          totalAlready += Number(body.already || 0);
+          if (info.withCity && body.market) market = body.market;
+        }
+      }
+      quickSelectedModes.clear();
+      document.querySelectorAll(".quick-card[data-quick-mode]").forEach((c) => c.setAttribute("aria-pressed", "false"));
       quickBusy = false;
-      if (body) quickResult(body, null);
+      updateQuickSelectionSummary();
+      if (status) {
+        if (totalAdded > 0 && market) status.textContent = "Added " + totalAdded + " channels for " + market + ".";
+        else if (totalAdded > 0) status.textContent = "Added " + totalAdded + " channels to Favorites.";
+        else if (totalAlready > 0) status.textContent = "Those channels are already in Favorites.";
+        else status.textContent = "No matching channels were found.";
+      }
+      if (totalAdded > 0) showToast("Added " + totalAdded + " channels to Favorites");
     });
     document.querySelector("#quickTeams").addEventListener("click", () => {
       const panel = document.querySelector("#quickSportsPanel");
@@ -5457,24 +5804,102 @@
     });
     async function sendRemote(action, text) {
       try {
-        await fetch("/api/remote", {
+        const response = await fetch("/api/remote", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ action, text: text || "" })
         });
-      } catch (err) {}
+        if (!response.ok) {
+          showToast("TV remote is only available on the local TV dashboard.");
+          return false;
+        }
+        return true;
+      } catch (err) {
+        showToast("Could not reach the TV.");
+        return false;
+      }
     }
     document.querySelectorAll("[data-remote]").forEach((button) => {
       button.addEventListener("click", () => sendRemote(button.getAttribute("data-remote")));
     });
     const remoteSend = document.querySelector("#remoteSend");
     if (remoteSend) {
-      remoteSend.addEventListener("click", () => {
+      remoteSend.addEventListener("click", async () => {
         const field = document.querySelector("#remoteText");
-        sendRemote("text", field ? field.value : "");
+        const val = field ? field.value.trim() : "";
+        if (!val) return;
+        const ok = await sendRemote("text", val);
+        if (ok) showToast("Sent to TV: " + val);
       });
     }
     let favKindFilter = "all";
+    function showFavSubTab(which) {
+      const target = which === "search" || which === "manage" ? which : "auto";
+      document.querySelectorAll(".fav-subtab").forEach((btn) => {
+        btn.setAttribute("aria-selected", String(btn.getAttribute("data-fav-sub") === target));
+      });
+      const paneAuto = document.querySelector("#favPaneAuto");
+      const paneSearch = document.querySelector("#favPaneSearch");
+      const paneManage = document.querySelector("#favPaneManage");
+      if (paneAuto) paneAuto.hidden = target !== "auto";
+      if (paneSearch) paneSearch.hidden = target !== "search";
+      if (paneManage) paneManage.hidden = target !== "manage";
+      if (target === "manage") renderFavoriteOrder();
+      if (target === "search") {
+        const input = document.querySelector("#favoriteSearch");
+        if (input && !input.disabled) input.focus();
+      }
+    }
+    document.querySelectorAll(".fav-subtab").forEach((btn) => {
+      btn.addEventListener("click", () => showFavSubTab(btn.getAttribute("data-fav-sub") || "auto"));
+    });
+    document.querySelectorAll("#favSearchFilterRow button").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        favSearchKind = btn.getAttribute("data-search-kind") || "all";
+        document.querySelectorAll("#favSearchFilterRow button").forEach((b) => {
+          b.setAttribute("aria-pressed", String(b === btn));
+        });
+        renderFavorites();
+      });
+    });
+    document.querySelector("#favSearchRegion")?.addEventListener("change", () => renderFavorites());
+    document.querySelector("#favoriteManageFilter")?.addEventListener("input", debounce(renderFavoriteOrder, 100));
+    document.querySelector("#favAutoSortBtn")?.addEventListener("click", async () => {
+      const allIds = ((session && session.favorites && session.favorites.ids) || []).slice();
+      if (allIds.length < 2) return;
+      const labels = (session.favorites && session.favorites.labels) || {};
+      allIds.sort((a, b) => {
+        const nameA = favoriteParts(labels[a] || a).title.toLowerCase();
+        const nameB = favoriteParts(labels[b] || b).title.toLowerCase();
+        return nameA.localeCompare(nameB, undefined, { numeric: true });
+      });
+      await commitFavoriteOrder(allIds);
+      showToast("Sorted " + allIds.length + " favorites A–Z");
+    });
+    document.querySelector("#favDedupBtn")?.addEventListener("click", async () => {
+      const allIds = ((session && session.favorites && session.favorites.ids) || []).slice();
+      if (!allIds.length) return;
+      const labels = (session.favorites && session.favorites.labels) || {};
+      const seenIds = new Set();
+      const seenTitles = new Set();
+      const unique = [];
+      for (const id of allIds) {
+        if (seenIds.has(id)) continue;
+        const normTitle = favoriteParts(labels[id] || id).title.trim().toLowerCase();
+        const key = (String(id).startsWith("vod:") ? "vod:" : String(id).startsWith("series:") ? "series:" : "live:") + normTitle;
+        if (normTitle && seenTitles.has(key)) continue;
+        seenIds.add(id);
+        if (normTitle) seenTitles.add(key);
+        unique.push(id);
+      }
+      const removedCount = allIds.length - unique.length;
+      if (!removedCount) {
+        showToast("No duplicate favorites found");
+        return;
+      }
+      await commitFavoriteOrder(unique);
+      showToast("Removed " + removedCount + (removedCount === 1 ? " duplicate" : " duplicates"));
+    });
     document.querySelectorAll("#favFilterRow button").forEach((btn) => {
       btn.addEventListener("click", () => {
         favKindFilter = btn.getAttribute("data-fav-kind") || "all";
@@ -5713,7 +6138,10 @@
         playBtn.style.padding = "4px 8px";
         playBtn.style.fontSize = "12px";
         playBtn.textContent = "▶ Play";
-        playBtn.addEventListener("click", () => sendRemote("play", row.id));
+        playBtn.addEventListener("click", async () => {
+          const ok = await sendRemote("play", row.id);
+          if (ok) showToast("Playing " + (row.name || row.id) + " on TV");
+        });
         const up = document.createElement("button");
         up.type = "button";
         up.className = "secondary";
@@ -5840,23 +6268,24 @@
     function paintCatalogReady(ready) {
       const banner = document.querySelector("#catalogLoadingBanner");
       const status = document.querySelector("#quickStatus");
-      const cards = document.querySelector(".quick-cards");
+      const cardGroups = document.querySelectorAll(".quick-cards");
       const search = document.querySelector("#favoriteSearch");
       const note = document.querySelector("#favoriteNote");
       if (banner) {
         banner.hidden = !!ready;
         banner.setAttribute("aria-busy", ready ? "false" : "true");
       }
-      if (status) {
-        status.textContent = ready
-          ? "Add a few channels you watch, then search below for anything else. Off keeps Countries on USA only."
-          : "Catalog still loading on the device… auto-add unlocks when groups arrive.";
+      if (status && !ready) {
+        status.textContent = "Catalog still loading on the device… auto-add unlocks when groups arrive.";
+      } else if (status && status.textContent.startsWith("Catalog still loading")) {
+        status.textContent = "";
       }
-      if (cards) {
+      cardGroups.forEach((cards) => {
         cards.style.opacity = ready ? "1" : "0.45";
         cards.style.pointerEvents = ready ? "" : "none";
         cards.setAttribute("aria-disabled", ready ? "false" : "true");
-      }
+      });
+      updateQuickSelectionSummary();
       if (search) {
         search.disabled = !ready;
         search.placeholder = ready

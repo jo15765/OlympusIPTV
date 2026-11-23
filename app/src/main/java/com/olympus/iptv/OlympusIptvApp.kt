@@ -259,14 +259,21 @@ class OlympusIptvApp : Application() {
             val email = saved.email?.trim().orEmpty()
             if (email.isBlank()) return
             val lineupRev = number("lineup")
-            if (cloudStamps["lineup"] != lineupRev) {
+            val prevLineupRev = cloudStamps["lineup"]
+            if (prevLineupRev != lineupRev) {
                 val local = playlistStore.lineup(saved.id)
                 val remote = runCatching { client.remoteLineup(email, deviceId) }.getOrNull()
                 if (remote != null) {
-                    if ((remote.revision ?: 0L) > (local.revision ?: 0L)) {
-                        playlistStore.saveLineup(saved.id, remote)
-                        val prefixes = remote.namePrefixes.orEmpty()
-                        val suffixes = remote.nameSuffixes.orEmpty()
+                    val cloudChanged = prevLineupRev != null && lineupRev != prevLineupRev
+                    if (cloudChanged || (remote.revision ?: 0L) > (local.revision ?: 0L)) {
+                        val applied = if (cloudChanged && (remote.revision ?: 0L) <= (local.revision ?: 0L)) {
+                            remote.copy(revision = maxOf(System.currentTimeMillis(), (local.revision ?: 0L) + 1L))
+                        } else {
+                            remote
+                        }
+                        playlistStore.saveLineup(saved.id, applied)
+                        val prefixes = applied.namePrefixes.orEmpty()
+                        val suffixes = applied.nameSuffixes.orEmpty()
                         if (prefixes != local.namePrefixes.orEmpty() || suffixes != local.nameSuffixes.orEmpty()) {
                             runCatching { catalogDb.rewriteNames(saved.id, prefixes, suffixes) }
                         }
@@ -275,22 +282,26 @@ class OlympusIptvApp : Application() {
                 }
             }
             val favoritesRev = number("favorites")
-            if (cloudStamps["favorites"] != favoritesRev) {
+            val prevFavRev = cloudStamps["favorites"]
+            if (prevFavRev != favoritesRev) {
                 val localRev = playlistStore.favoritesRevision(saved.id)
                 val remote = runCatching { client.pullFavorites(email, deviceId) }.getOrNull()
                 if (remote != null) {
-                    if (remote.second > localRev) {
+                    val cloudChanged = prevFavRev != null && favoritesRev != prevFavRev
+                    if (cloudChanged || remote.second > localRev) {
                         playlistStore.saveFavorites(saved.id, remote.first, remote.second)
                     }
                     cloudStamps["favorites"] = favoritesRev
                 }
             }
             val recordingsRev = number("recordings")
-            if (cloudStamps["recordings"] != recordingsRev) {
+            val prevRecRev = cloudStamps["recordings"]
+            if (prevRecRev != recordingsRev) {
                 val localBook = playlistStore.recordingBook(saved.id)
                 val remoteBook = runCatching { client.pullRecordings(email, deviceId) }.getOrNull()
                 if (remoteBook != null) {
-                    if ((remoteBook.revision ?: 0L) > (localBook.revision ?: 0L)) {
+                    val cloudChanged = prevRecRev != null && recordingsRev != prevRecRev
+                    if (cloudChanged || (remoteBook.revision ?: 0L) > (localBook.revision ?: 0L)) {
                         playlistStore.saveRecordingBook(saved.id, remoteBook)
                         com.olympus.iptv.record.RecordingService.start(this)
                     }

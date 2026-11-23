@@ -47,9 +47,9 @@ object StreamHeaders {
         if (cached != null) return cached
         val loaded = runCatching {
             val file = File(context.applicationContext.filesDir, FILE)
-            if (!file.exists()) return Pair(null, null)
+            if (!file.exists()) return@runCatching Pair(null, null)
             val row = JSONObject(file.readText()).optJSONObject(playlistId)?.optJSONObject(channel.id)
-                ?: return Pair(null, null)
+                ?: return@runCatching Pair(null, null)
             Pair(row.optString("ua").ifBlank { null }, row.optString("ref").ifBlank { null })
         }.getOrNull() ?: Pair(null, null)
         synchronized(memory) { memory[key(playlistId, channel.id)] = loaded }
@@ -65,8 +65,8 @@ object StreamHeaders {
             val pair = lookup(context, playlistId(), channel())
             val factory = DefaultHttpDataSource.Factory()
                 .setUserAgent(pair.userAgent?.ifBlank { null } ?: "Olympus-IPTV")
-                .setConnectTimeoutMs(15_000)
-                .setReadTimeoutMs(20_000)
+                .setConnectTimeoutMs(10_000)
+                .setReadTimeoutMs(15_000)
                 .setAllowCrossProtocolRedirects(true)
             val referer = pair.referer
             if (!referer.isNullOrBlank()) {

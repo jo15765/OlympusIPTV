@@ -2,6 +2,9 @@ package com.olympus.iptv
 
 import android.content.Context
 import android.os.Looper
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
 import java.io.PrintWriter
@@ -13,19 +16,23 @@ import java.util.Locale
 object AppLog {
     private const val MAX_BYTES = 400_000
     private const val ACTIVE = "olympus-iptv-log.txt"
+    private const val PENDING_CRASH = "pending-crash.json"
     private val archivedName = Regex("olympus-iptv-log-[0-9A-Za-z-]+\\.txt")
     private val lock = Any()
     private var file: File? = null
+    private var appContext: Context? = null
     private var previous: Thread.UncaughtExceptionHandler? = null
 
     data class Entry(val name: String, val bytes: Long, val current: Boolean)
 
     fun install(context: Context) {
+        appContext = context.applicationContext
         file = File(context.filesDir, ACTIVE)
+        flushPendingCrash(context.applicationContext)
         if (previous == null) {
             previous = Thread.getDefaultUncaughtExceptionHandler()
             Thread.setDefaultUncaughtExceptionHandler { thread, error ->
-                runCatching { error("Crash", "Uncaught on ${thread.name}", error) }
+                runCatching { recordCrashSync("Uncaught on ${thread.name}", error) }
                 val oom = error is OutOfMemoryError ||
                     generateSequence(error.cause) { it.cause }.any { it is OutOfMemoryError }
                 if (oom) {
@@ -98,10 +105,106 @@ object AppLog {
                 rotateIfNeeded(current)
                 FileOutputStream(current, true).use { output ->
                     output.write(body.toByteArray(Charsets.UTF_8))
-                    output.fd.sync()
+                    if (level == "ERROR") output.fd.sync()
                 }
             }
+            if (level == "ERROR" && appContext != null) {
+                uploadCloudError(appContext!!, tag, message, error)
+            }
         } catch (_: Throwable) {
+        }
+    }
+
+    private fun recordCrashSync(message: String, error: Throwable) {
+        val ctx = appContext ?: return
+        val safeMsg = redact(message)
+        val safeStack = redact(
+            StringWriter().also { error.printStackTrace(PrintWriter(it)) }.toString()
+        )
+        // Write to local log with fsync, without launching an async upload that would be killed.
+        val current = file
+        if (current != null) {
+            val stamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
+            val body = "$stamp ERROR Crash $safeMsg\n$safeStack\n"
+            runCatching {
+                synchronized(lock) {
+                    rotateIfNeeded(current)
+                    FileOutputStream(current, true).use { output ->
+                        output.write(body.toByteArray(Charsets.UTF_8))
+                        output.fd.sync()
+                    }
+                }
+            }
+        }
+        // Persist a pending crash payload so even if the process dies before HTTP completes, next launch uploads it.
+        val pending = File(ctx.filesDir, PENDING_CRASH)
+        val payload = com.google.gson.JsonObject().apply {
+            addProperty("tag", "Crash")
+            addProperty("message", safeMsg)
+            addProperty("stack", safeStack)
+        }
+        runCatching {
+            FileOutputStream(pending, false).use { out ->
+                out.write(payload.toString().toByteArray(Charsets.UTF_8))
+                out.fd.sync()
+            }
+        }
+        // Try a bounded synchronous upload before the process terminates.
+        val app = ctx.applicationContext as? OlympusIptvApp ?: return
+        val worker = Thread({
+            runCatching {
+                val prefs = runCatching { kotlinx.coroutines.runBlocking { app.playlistStore.currentPrefs() } }.getOrNull()
+                val email = runCatching {
+                    kotlinx.coroutines.runBlocking { app.playlistStore.session.first()?.email }
+                }.getOrNull()
+                val deviceId = runCatching {
+                    kotlinx.coroutines.runBlocking { app.playlistStore.deviceId() }
+                }.getOrDefault("__shared__")
+                if (prefs != null || deviceId.isNotBlank()) {
+                    val sent = com.olympus.iptv.playlist.LineupClient(app)
+                        .uploadErrorLog(email, deviceId, "Crash", safeMsg, safeStack)
+                    if (sent) runCatching { pending.delete() }
+                }
+            }
+        }, "crash-upload")
+        worker.isDaemon = true
+        worker.start()
+        runCatching { worker.join(1_500L) }
+    }
+
+    private fun flushPendingCrash(context: Context) {
+        val app = context.applicationContext as? OlympusIptvApp ?: return
+        val pending = File(app.filesDir, PENDING_CRASH)
+        if (!pending.exists()) return
+        app.appScope.launch(Dispatchers.IO) {
+            val raw = runCatching { pending.readText(Charsets.UTF_8) }.getOrNull() ?: return@launch
+            val obj = runCatching { com.google.gson.JsonParser.parseString(raw).asJsonObject }.getOrNull()
+                ?: run {
+                    runCatching { pending.delete() }
+                    return@launch
+                }
+            val tag = obj.get("tag")?.asString ?: "Crash"
+            val msg = obj.get("message")?.asString.orEmpty()
+            val stack = obj.get("stack")?.asString
+            val email = runCatching { app.playlistStore.session.first()?.email }.getOrNull()
+            val deviceId = runCatching { app.playlistStore.deviceId() }.getOrDefault("__shared__")
+            val sent = com.olympus.iptv.playlist.LineupClient(app).uploadErrorLog(email, deviceId, tag, msg, stack)
+            if (sent) runCatching { pending.delete() }
+        }
+    }
+
+    private fun uploadCloudError(context: Context, tag: String, message: String, error: Throwable?) {
+        val app = context.applicationContext as? OlympusIptvApp ?: return
+        val safeMsg = redact(message)
+        val safeStack = if (error != null) {
+            val writer = StringWriter()
+            error.printStackTrace(PrintWriter(writer))
+            redact(writer.toString())
+        } else null
+        app.appScope.launch(Dispatchers.IO) {
+            val email = runCatching { app.playlistStore.session.first()?.email }.getOrNull()
+            val deviceId = runCatching { app.playlistStore.deviceId() }.getOrDefault("__shared__")
+            com.olympus.iptv.playlist.LineupClient(app).uploadErrorLog(email, deviceId, tag, safeMsg, safeStack)
         }
     }
 

@@ -697,6 +697,16 @@ class BrowseActivity : AppCompatActivity(), ToolHost {
 
     internal var lastGuideWidth = 0
 
+    internal var guideWidthPosted = false
+
+    internal var foldDisplayListener: android.hardware.display.DisplayManager.DisplayListener? = null
+
+    internal var foldRecreateAttempt = 0
+
+    internal var lastDisplayWidth = 0
+
+    internal var lastDisplayHeight = 0
+
 
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         super.onCreate(savedInstanceState)
@@ -720,14 +730,20 @@ class BrowseActivity : AppCompatActivity(), ToolHost {
             val id = command.text.trim()
             if (id.isEmpty()) return
             lifecycleScope.launch {
-                val saved = playlist ?: return@launch
-                val channel = withContext(Dispatchers.IO) {
-                    val db = (application as OlympusIptvApp).catalogDb
-                    db.readChannel(saved.id, com.olympus.iptv.playlist.CatalogDb.LIVE, id)
-                        ?: db.readChannel(saved.id, com.olympus.iptv.playlist.CatalogDb.VOD, id)
-                        ?: db.readChannel(saved.id, com.olympus.iptv.playlist.CatalogDb.SERIES, id)
+                val resolved = withContext(Dispatchers.IO) {
+                    com.olympus.iptv.portal.RemotePad.resolveChannel(
+                        application as OlympusIptvApp,
+                        playlist?.id,
+                        id
+                    )
+                } ?: return@launch
+                if (isDestroyed) return@launch
+                val (_, channel) = resolved
+                if (channel.streamUrl.isNotBlank()) {
+                    play(channel, queueOverride = listOf(channel))
+                } else {
+                    play(channel)
                 }
-                if (channel != null && !isDestroyed) play(channel)
             }
             return
         }
@@ -768,10 +784,58 @@ class BrowseActivity : AppCompatActivity(), ToolHost {
             }
             else -> return
         }
-        val down = android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, code)
-        val up = android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, code)
-        dispatchKeyEvent(down)
-        dispatchKeyEvent(up)
+        dispatchSyntheticRemoteKey(code)
+    }
+
+    private fun dispatchSyntheticRemoteKey(code: Int) {
+        val now = android.os.SystemClock.uptimeMillis()
+        val down = android.view.KeyEvent(
+            now,
+            now,
+            android.view.KeyEvent.ACTION_DOWN,
+            code,
+            0,
+            0,
+            android.view.KeyCharacterMap.VIRTUAL_KEYBOARD,
+            0,
+            0,
+            android.view.InputDevice.SOURCE_DPAD
+        )
+        val up = android.view.KeyEvent(
+            now,
+            now + 10L,
+            android.view.KeyEvent.ACTION_UP,
+            code,
+            0,
+            0,
+            android.view.KeyCharacterMap.VIRTUAL_KEYBOARD,
+            0,
+            0,
+            android.view.InputDevice.SOURCE_DPAD
+        )
+        val handledDown = dispatchKeyEvent(down)
+        val handledUp = dispatchKeyEvent(up)
+        if (handledDown) return
+        val direction = when (code) {
+            android.view.KeyEvent.KEYCODE_DPAD_LEFT -> android.view.View.FOCUS_LEFT
+            android.view.KeyEvent.KEYCODE_DPAD_RIGHT -> android.view.View.FOCUS_RIGHT
+            android.view.KeyEvent.KEYCODE_DPAD_UP -> android.view.View.FOCUS_UP
+            android.view.KeyEvent.KEYCODE_DPAD_DOWN -> android.view.View.FOCUS_DOWN
+            else -> 0
+        }
+        if (direction != 0) {
+            val root = window.decorView as? android.view.ViewGroup ?: return
+            val focused = currentFocus
+            val next = focused?.focusSearch(direction)
+                ?: android.view.FocusFinder.getInstance().findNextFocus(root, focused, direction)
+            if (next != null && next != focused) {
+                next.requestFocus()
+            }
+            return
+        }
+        if (code == android.view.KeyEvent.KEYCODE_DPAD_CENTER && !handledUp) {
+            currentFocus?.performClick()
+        }
     }
 
     override fun onStart() {

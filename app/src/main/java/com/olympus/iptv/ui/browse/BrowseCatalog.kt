@@ -48,8 +48,10 @@ internal fun BrowseActivity.forYouChannels(config: LineupConfig): List<Channel> 
 internal fun BrowseActivity.libraryFavorites(sectionNow: GuideSection, config: LineupConfig): List<Channel> {
     val saved = playlist ?: return emptyList()
     val section = favoriteSection(sectionNow)
-    val keys = favoriteOrder.filter { Favorites.inSection(it, section) }
-    val ids = keys.map { it.substringAfter(':') }
+    val allKeys = (favoriteOrder + favoriteIds).distinct()
+    val keys = allKeys.filter { Favorites.inSection(it, section) }
+    val ids = (keys.map { it.substringAfter(':') } + favoriteIds.map { it.substringAfter(':') }).distinct()
+    if (ids.isEmpty()) return emptyList()
     val rows = (application as OlympusIptvApp).catalogDb.readChannelsByIds(
         saved.id,
         libraryBucket(sectionNow),
@@ -57,7 +59,21 @@ internal fun BrowseActivity.libraryFavorites(sectionNow: GuideSection, config: L
     ).map { channel ->
         if (section == Favorites.SERIES && channel.seriesId.isNullOrBlank()) channel.copy(seriesId = channel.id) else channel
     }
-    return prepareGroup(Favorites.ordered(keys, rows.associateBy { it.id }, favoriteIds), config)
+    val byId = rows.associateBy { it.id }
+    val ordered = ArrayList<Channel>()
+    val seen = HashSet<String>()
+    for (key in keys) {
+        val channel = byId[key.substringAfter(':')] ?: continue
+        if (seen.add(channel.id) && Favorites.matches(channel, favoriteIds)) {
+            ordered.add(channel)
+        }
+    }
+    for (channel in rows) {
+        if (seen.add(channel.id) && Favorites.matches(channel, favoriteIds)) {
+            ordered.add(channel)
+        }
+    }
+    return prepareGroup(ordered, config, allowHideOffAir = false)
 }
 
 internal fun BrowseActivity.topWatchedFavorites(sectionNow: GuideSection, config: LineupConfig): List<Channel> {
@@ -104,7 +120,11 @@ internal fun BrowseActivity.withoutEmptyGroups(categories: List<com.olympus.iptv
     }
 }
 
-internal fun BrowseActivity.prepareGroup(channels: List<Channel>, config: LineupConfig): List<Channel> {
+internal fun BrowseActivity.prepareGroup(
+    channels: List<Channel>,
+    config: LineupConfig,
+    allowHideOffAir: Boolean = true
+): List<Channel> {
     val hidden = config.hiddenChannels.orEmpty()
     val hiddenSet = if (hidden.isEmpty()) emptySet() else hidden.toSet()
     val now = System.currentTimeMillis()
@@ -112,7 +132,7 @@ internal fun BrowseActivity.prepareGroup(channels: List<Channel>, config: Lineup
     val out = ArrayList<Channel>(channels.size)
     for (channel in channels) {
         if (channel.id in hiddenSet) continue
-        if (isLiveGuide && channel.kind == com.olympus.iptv.data.ContentKind.LIVE) {
+        if (allowHideOffAir && isLiveGuide && channel.kind == com.olympus.iptv.data.ContentKind.LIVE) {
             val cachedEpg = epgCache[channel.id]?.now ?: epgCache[channel.id]?.next
             val status = com.olympus.iptv.data.NameStrip.inspect(
                 rawChannel = channel.name,

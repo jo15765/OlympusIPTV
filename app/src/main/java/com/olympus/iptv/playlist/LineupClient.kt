@@ -353,7 +353,7 @@ class LineupClient(
     fun fetchCloudCatalog(email: String, deviceId: String, kind: String): CloudCatalogResponse? {
         val token = ensureDeviceToken(email, deviceId)
         val url = "${baseUrl()}/api/catalog/sync?email=${enc(email)}&deviceId=${enc(deviceId)}&kind=$kind"
-        val json = getJson(url, token, deviceId) ?: return null
+        val json = getJson(url, token, deviceId, catalogHttp) ?: return null
         return runCatching {
             val categories = json.getAsJsonArray("categories").orEmpty().map { el ->
                 val row = el.asJsonObject
@@ -383,6 +383,26 @@ class LineupClient(
                 stamp = json.get("stamp")?.takeIf { !it.isJsonNull }?.asLong ?: 0L
             )
         }.getOrNull()
+    }
+
+    fun uploadErrorLog(
+        email: String?,
+        deviceId: String,
+        tag: String,
+        message: String,
+        stackTrace: String? = null
+    ): Boolean {
+        val payload = JsonObject().apply {
+            if (!email.isNullOrBlank()) addProperty("email", email)
+            addProperty("deviceId", deviceId)
+            addProperty("platform", "android")
+            addProperty("tag", tag)
+            addProperty("message", message)
+            if (!stackTrace.isNullOrBlank()) addProperty("stackTrace", stackTrace)
+            addProperty("appVersion", BuildConfig.VERSION_NAME)
+        }
+        return runCatching { postJsonRaw("${baseUrl()}/api/logs/error", payload, null, deviceId) != null }
+            .getOrDefault(false)
     }
 
     private fun contentKind(raw: String): ContentKind =
@@ -446,10 +466,10 @@ class LineupClient(
         runCatching { postJson("${baseUrl()}/api/catalog", payload, token, deviceId) }
     }
 
-    private fun getJson(url: String, token: String?, deviceId: String): JsonObject? {
+    private fun getJson(url: String, token: String?, deviceId: String, client: OkHttpClient = http): JsonObject? {
         val builder = Request.Builder().url(url).get().header("X-Device-Id", deviceId)
         if (!token.isNullOrBlank()) builder.header("X-Device-Token", token)
-        return http.newCall(builder.build()).execute().use { resp ->
+        return client.newCall(builder.build()).execute().use { resp ->
             if (!resp.isSuccessful) throw IOException("HTTP ${resp.code}")
             JsonParser.parseString(resp.body?.string().orEmpty()).asJsonObject
         }
@@ -476,6 +496,11 @@ class LineupClient(
         private val defaultHttp = OkHttpClient.Builder()
             .connectTimeout(6, TimeUnit.SECONDS)
             .readTimeout(10, TimeUnit.SECONDS)
+            .build()
+
+        private val catalogHttp = OkHttpClient.Builder()
+            .connectTimeout(20, TimeUnit.SECONDS)
+            .readTimeout(90, TimeUnit.SECONDS)
             .build()
 
         private val sseHttp = OkHttpClient.Builder()

@@ -97,6 +97,12 @@ class PlaylistStore(private val context: Context) {
     suspend fun currentPrefs(): Preferences =
         cachedPrefs ?: context.dataStore.data.first().also { cachedPrefs = it }
 
+    private suspend fun editPrefs(block: suspend (androidx.datastore.preferences.core.MutablePreferences) -> Unit): Preferences {
+        val updated = context.dataStore.edit { prefs -> block(prefs) }
+        cachedPrefs = updated
+        return updated
+    }
+
     val session: Flow<SavedPlaylist?> = context.dataStore.data.map { prefs ->
         cachedPrefs = prefs
         val raw = prefs[sessionKey].orEmpty()
@@ -129,13 +135,13 @@ class PlaylistStore(private val context: Context) {
     }
 
     suspend fun setFavoritesSetupDone(done: Boolean) {
-        context.dataStore.edit { prefs ->
+        editPrefs { prefs ->
             prefs[favoritesSetupKey] = done
         }
     }
 
     suspend fun saveSession(playlist: SavedPlaylist) {
-        context.dataStore.edit { prefs ->
+        editPrefs { prefs ->
             prefs[sessionKey] = gson.toJson(playlist)
             prefs[key] = gson.toJson(listOf(playlist))
         }
@@ -145,7 +151,7 @@ class PlaylistStore(private val context: Context) {
         val existing = currentPrefs()[deviceKey]
         if (!existing.isNullOrBlank()) return existing
         val created = newDeviceId()
-        context.dataStore.edit { prefs ->
+        editPrefs { prefs ->
             if (prefs[deviceKey].isNullOrBlank()) prefs[deviceKey] = created
         }
         return currentPrefs()[deviceKey] ?: created
@@ -169,7 +175,7 @@ class PlaylistStore(private val context: Context) {
     }
 
     suspend fun saveCatalogStamp(playlistId: String, stamp: String) {
-        context.dataStore.edit { prefs ->
+        editPrefs { prefs ->
             val map = decodeStringMap(prefs[catalogStampKey])
             map[playlistId] = stamp
             prefs[catalogStampKey] = gson.toJson(map)
@@ -181,7 +187,7 @@ class PlaylistStore(private val context: Context) {
     }
 
     suspend fun saveCountryStamp(playlistId: String, stamp: String) {
-        context.dataStore.edit { prefs ->
+        editPrefs { prefs ->
             val map = decodeStringMap(prefs[countryStampKey])
             map[playlistId] = stamp
             prefs[countryStampKey] = gson.toJson(map)
@@ -195,7 +201,7 @@ class PlaylistStore(private val context: Context) {
 
     suspend fun saveRefreshIntervalMinutes(minutes: Int) {
         val chosen = if (minutes in REFRESH_INTERVALS) minutes else DEFAULT_REFRESH_MINUTES
-        context.dataStore.edit { prefs -> prefs[refreshIntervalKey] = chosen }
+        editPrefs { prefs -> prefs[refreshIntervalKey] = chosen }
     }
 
     suspend fun pictureMode(): String = devicePrefs().pictureMode
@@ -204,7 +210,7 @@ class PlaylistStore(private val context: Context) {
         currentPrefs()[autoFrameKey] != false
 
     suspend fun saveAutoFrameRate(enabled: Boolean) {
-        context.dataStore.edit { prefs -> prefs[autoFrameKey] = enabled }
+        editPrefs { prefs -> prefs[autoFrameKey] = enabled }
     }
 
     suspend fun activeProfile(): String =
@@ -212,7 +218,7 @@ class PlaylistStore(private val context: Context) {
 
     suspend fun saveActiveProfile(name: String) {
         val chosen = name.ifBlank { "Main" }
-        context.dataStore.edit { prefs -> prefs[profileKey] = chosen }
+        editPrefs { prefs -> prefs[profileKey] = chosen }
     }
 
     suspend fun profilePin(name: String): String? {
@@ -224,7 +230,7 @@ class PlaylistStore(private val context: Context) {
     }
 
     suspend fun saveProfilePin(name: String, pin: String?) {
-        context.dataStore.edit { prefs ->
+        editPrefs { prefs ->
             val raw = prefs[profilePinKey]
             val map = runCatching {
                 gson.fromJson<MutableMap<String, String>>(
@@ -244,7 +250,7 @@ class PlaylistStore(private val context: Context) {
 
     suspend fun savePictureMode(mode: String) {
         val chosen = if (mode in PICTURE_MODES) mode else PICTURE_FIT
-        context.dataStore.edit { prefs -> prefs[pictureModeKey] = chosen }
+        editPrefs { prefs -> prefs[pictureModeKey] = chosen }
         bumpDevicePrefs { it.copy(pictureMode = chosen) }
     }
 
@@ -252,7 +258,7 @@ class PlaylistStore(private val context: Context) {
 
     suspend fun saveAudioLanguage(language: String) {
         val chosen = language.trim().ifBlank { DEFAULT_AUDIO_LANGUAGE }
-        context.dataStore.edit { prefs -> prefs[audioLanguageKey] = chosen }
+        editPrefs { prefs -> prefs[audioLanguageKey] = chosen }
         bumpDevicePrefs { it.copy(audioLanguage = chosen) }
     }
 
@@ -266,7 +272,7 @@ class PlaylistStore(private val context: Context) {
         if (channelId.isBlank()) return
         val chosen = language.trim()
         if (chosen.isBlank()) return
-        context.dataStore.edit { prefs ->
+        editPrefs { prefs ->
             val map = decodeStringMap(prefs[audioByChannelKey])
             map[channelId] = chosen
             prefs[audioByChannelKey] = gson.toJson(map)
@@ -323,7 +329,7 @@ class PlaylistStore(private val context: Context) {
     suspend fun hideEmptyGroups(): Boolean = devicePrefs().hideEmptyGroups
 
     suspend fun saveHideEmptyGroups(hide: Boolean) {
-        context.dataStore.edit { prefs -> prefs[hideEmptyGroupsKey] = hide }
+        editPrefs { prefs -> prefs[hideEmptyGroupsKey] = hide }
         bumpDevicePrefs { it.copy(hideEmptyGroups = hide) }
     }
 
@@ -331,7 +337,7 @@ class PlaylistStore(private val context: Context) {
 
     suspend fun saveSubtitleLanguage(language: String) {
         val chosen = language.trim().ifBlank { SUBTITLE_OFF }
-        context.dataStore.edit { prefs -> prefs[subtitleLanguageKey] = chosen }
+        editPrefs { prefs -> prefs[subtitleLanguageKey] = chosen }
         bumpDevicePrefs { it.copy(subtitleLanguage = chosen) }
     }
 
@@ -344,7 +350,7 @@ class PlaylistStore(private val context: Context) {
     suspend fun saveSubtitleForChannel(channelId: String, language: String) {
         if (channelId.isBlank()) return
         val chosen = language.trim().ifBlank { SUBTITLE_OFF }
-        context.dataStore.edit { prefs ->
+        editPrefs { prefs ->
             val map = decodeStringMap(prefs[subtitleByChannelKey])
             map[channelId] = chosen
             prefs[subtitleByChannelKey] = gson.toJson(map)
@@ -357,7 +363,7 @@ class PlaylistStore(private val context: Context) {
 
     suspend fun saveGuideDensity(density: String) {
         val chosen = if (density in GUIDE_DENSITIES) density else GUIDE_COMFORTABLE
-        context.dataStore.edit { prefs -> prefs[guideDensityKey] = chosen }
+        editPrefs { prefs -> prefs[guideDensityKey] = chosen }
         bumpDevicePrefs { it.copy(guideDensity = chosen) }
     }
 
@@ -370,7 +376,7 @@ class PlaylistStore(private val context: Context) {
     suspend fun saveQuietHours(enabled: Boolean, startMinute: Int = DEFAULT_QUIET_START, endMinute: Int = DEFAULT_QUIET_END) {
         val start = startMinute.coerceIn(0, 24 * 60 - 1)
         val end = endMinute.coerceIn(0, 24 * 60 - 1)
-        context.dataStore.edit { prefs ->
+        editPrefs { prefs ->
             prefs[quietHoursKey] = enabled
             prefs[quietStartKey] = start
             prefs[quietEndKey] = end
@@ -383,7 +389,7 @@ class PlaylistStore(private val context: Context) {
 
     suspend fun saveParentalTimeoutMinutes(minutes: Int) {
         val chosen = if (minutes in PARENTAL_TIMEOUTS) minutes else DEFAULT_PARENTAL_TIMEOUT
-        context.dataStore.edit { prefs -> prefs[parentalTimeoutKey] = chosen }
+        editPrefs { prefs -> prefs[parentalTimeoutKey] = chosen }
         bumpDevicePrefs { it.copy(parentalTimeoutMinutes = chosen) }
     }
 
@@ -404,7 +410,7 @@ class PlaylistStore(private val context: Context) {
             "series", "shows" -> "series"
             else -> "live"
         }
-        context.dataStore.edit { prefs -> prefs[lastGuideSectionKey] = chosen }
+        editPrefs { prefs -> prefs[lastGuideSectionKey] = chosen }
     }
 
     suspend fun skipIntroSeries(): Set<String> =
@@ -413,7 +419,7 @@ class PlaylistStore(private val context: Context) {
     suspend fun rememberSkipIntro(seriesId: String) {
         val id = seriesId.trim()
         if (id.isEmpty()) return
-        context.dataStore.edit { prefs ->
+        editPrefs { prefs ->
             val map = decodeStringMap(prefs[skipIntroSeriesKey])
             map[id] = "1"
             prefs[skipIntroSeriesKey] = gson.toJson(map)
@@ -421,7 +427,7 @@ class PlaylistStore(private val context: Context) {
     }
 
     suspend fun saveMultiView(enabled: Boolean) {
-        context.dataStore.edit { prefs -> prefs[multiViewKey] = enabled }
+        editPrefs { prefs -> prefs[multiViewKey] = enabled }
         bumpDevicePrefs { it.copy(multiView = enabled) }
     }
 
@@ -430,7 +436,7 @@ class PlaylistStore(private val context: Context) {
     }
 
     suspend fun saveLastRefreshAt(playlistId: String, at: Long) {
-        context.dataStore.edit { prefs ->
+        editPrefs { prefs ->
             val map = decodeStringMap(prefs[refreshLastKey])
             map[playlistId] = at.toString()
             prefs[refreshLastKey] = gson.toJson(map)
@@ -438,7 +444,7 @@ class PlaylistStore(private val context: Context) {
     }
 
     suspend fun saveLineup(playlistId: String, config: LineupConfig) {
-        context.dataStore.edit { prefs ->
+        editPrefs { prefs ->
             val map = decodeLineups(prefs[lineupKey])
             map[playlistId] = config
             prefs[lineupKey] = gson.toJson(map)
@@ -482,7 +488,7 @@ class PlaylistStore(private val context: Context) {
         val channelId = entry.channelId?.takeIf { it.isNotBlank() } ?: return
         if (playlistId.isBlank()) return
         val key = profileScope(playlistId)
-        context.dataStore.edit { prefs ->
+        editPrefs { prefs ->
             val map = decodeWatch(prefs[watchKey])
             val prior = map[key].orEmpty().firstOrNull { it.channelId == channelId }
             val nextPos = entry.positionMs ?: 0L
@@ -492,7 +498,7 @@ class PlaylistStore(private val context: Context) {
                 kotlin.math.abs(nextPos - priorPos) < 30_000L &&
                 (entry.durationMs ?: 0L) == (prior.durationMs ?: 0L)
             ) {
-                return@edit
+                return@editPrefs
             }
             val kept = map[key].orEmpty().filter { it.channelId != channelId }
             map[key] = listOf(entry.copy(channelId = channelId)) + kept
@@ -521,7 +527,7 @@ class PlaylistStore(private val context: Context) {
 
     suspend fun rememberChannel(playlistId: String, channelId: String) {
         if (playlistId.isBlank() || channelId.isBlank()) return
-        context.dataStore.edit { prefs ->
+        editPrefs { prefs ->
             val lastMap = decodeStringMap(prefs[lastChannelKey])
             val previous = lastMap[playlistId]
             if (!previous.isNullOrBlank() && previous != channelId) {
@@ -570,7 +576,7 @@ class PlaylistStore(private val context: Context) {
     }
 
     suspend fun saveRecordingBook(playlistId: String, book: RecordingBook) {
-        context.dataStore.edit { prefs ->
+        editPrefs { prefs ->
             val map = decodeBooks(prefs[recordingsKey])
             map[playlistId] = book
             prefs[recordingsKey] = gson.toJson(map)
@@ -639,7 +645,7 @@ class PlaylistStore(private val context: Context) {
 
     suspend fun saveFavorites(playlistId: String, ids: List<String>, revision: Long) {
         val key = profileScope(playlistId)
-        context.dataStore.edit { prefs ->
+        editPrefs { prefs ->
             val map = decodeFavorites(prefs[favoritesKey])
             map[key] = ids
             prefs[favoritesKey] = gson.toJson(map)
@@ -657,7 +663,7 @@ class PlaylistStore(private val context: Context) {
     suspend fun setFavorite(playlistId: String, channelId: String, favorite: Boolean): Long {
         val revision = System.currentTimeMillis()
         val key = profileScope(playlistId)
-        context.dataStore.edit { prefs ->
+        editPrefs { prefs ->
             val map = decodeFavorites(prefs[favoritesKey])
             val ids = map[key]?.toMutableList() ?: mutableListOf()
             if (favorite) {
@@ -690,14 +696,14 @@ class PlaylistStore(private val context: Context) {
     }
 
     suspend fun clearSession() {
-        context.dataStore.edit { prefs ->
+        editPrefs { prefs ->
             prefs.remove(sessionKey)
             prefs[key] = gson.toJson(emptyList<SavedPlaylist>())
         }
     }
 
     suspend fun resetDevice() {
-        context.dataStore.edit { prefs ->
+        editPrefs { prefs ->
             prefs.remove(sessionKey)
             prefs[key] = gson.toJson(emptyList<SavedPlaylist>())
             prefs.remove(favoritesKey)
@@ -764,7 +770,7 @@ class PlaylistStore(private val context: Context) {
     }
 
     suspend fun savePlaylistOrder(ids: List<String>) {
-        context.dataStore.edit { prefs ->
+        editPrefs { prefs ->
             prefs[playlistOrderKey] = gson.toJson(ids)
         }
     }
@@ -807,7 +813,7 @@ class PlaylistStore(private val context: Context) {
 
     suspend fun saveVideoDecoder(type: String) {
         val chosen = PlayerDecoder.normalize(type)
-        context.dataStore.edit { prefs -> prefs[videoDecoderKey] = chosen }
+        editPrefs { prefs -> prefs[videoDecoderKey] = chosen }
         videoDecoderCache = chosen
     }
 
@@ -818,7 +824,7 @@ class PlaylistStore(private val context: Context) {
 
     suspend fun saveTmdbItemsLimit(limit: Int) {
         val chosen = limit.coerceIn(1, MAX_TMDB_ITEMS)
-        context.dataStore.edit { prefs -> prefs[tmdbItemsLimitKey] = chosen }
+        editPrefs { prefs -> prefs[tmdbItemsLimitKey] = chosen }
     }
 
     suspend fun scrobblerProvider(): String {
@@ -834,7 +840,7 @@ class PlaylistStore(private val context: Context) {
             ScrobblerIds.SIMKL, ScrobblerIds.TRAKT -> provider
             else -> ScrobblerIds.NONE
         }
-        context.dataStore.edit { prefs ->
+        editPrefs { prefs ->
             prefs[scrobblerProviderKey] = chosen
             // Mutex: only one scrobbler active.
             if (chosen == ScrobblerIds.SIMKL) {
@@ -853,7 +859,7 @@ class PlaylistStore(private val context: Context) {
     suspend fun traktClientId(): String = currentPrefs()[traktClientIdKey].orEmpty()
 
     suspend fun saveSimklCredentials(token: String, clientId: String) {
-        context.dataStore.edit { prefs ->
+        editPrefs { prefs ->
             prefs[simklTokenKey] = token.trim()
             prefs[simklClientIdKey] = clientId.trim()
             prefs[scrobblerProviderKey] = ScrobblerIds.SIMKL
@@ -863,7 +869,7 @@ class PlaylistStore(private val context: Context) {
     }
 
     suspend fun saveTraktCredentials(token: String, clientId: String) {
-        context.dataStore.edit { prefs ->
+        editPrefs { prefs ->
             prefs[traktTokenKey] = token.trim()
             prefs[traktClientIdKey] = clientId.trim()
             prefs[scrobblerProviderKey] = ScrobblerIds.TRAKT
@@ -873,7 +879,7 @@ class PlaylistStore(private val context: Context) {
     }
 
     suspend fun clearScrobbler() {
-        context.dataStore.edit { prefs ->
+        editPrefs { prefs ->
             prefs[scrobblerProviderKey] = ScrobblerIds.NONE
             prefs.remove(simklTokenKey)
             prefs.remove(simklClientIdKey)
@@ -885,19 +891,19 @@ class PlaylistStore(private val context: Context) {
     suspend fun pipSwipeHome(): Boolean = currentPrefs()[pipSwipeHomeKey] ?: true
 
     suspend fun savePipSwipeHome(enabled: Boolean) {
-        context.dataStore.edit { prefs -> prefs[pipSwipeHomeKey] = enabled }
+        editPrefs { prefs -> prefs[pipSwipeHomeKey] = enabled }
     }
 
     suspend fun nightMode(): Boolean = currentPrefs()[nightModeKey] ?: false
 
     suspend fun saveNightMode(enabled: Boolean) {
-        context.dataStore.edit { prefs -> prefs[nightModeKey] = enabled }
+        editPrefs { prefs -> prefs[nightModeKey] = enabled }
     }
 
     suspend fun autoResume(): Boolean = currentPrefs()[autoResumeKey] ?: false
 
     suspend fun saveAutoResume(enabled: Boolean) {
-        context.dataStore.edit { prefs -> prefs[autoResumeKey] = enabled }
+        editPrefs { prefs -> prefs[autoResumeKey] = enabled }
     }
 
     suspend fun scrobbleConfig(): ScrobbleConfig {
@@ -944,7 +950,7 @@ class PlaylistStore(private val context: Context) {
     suspend fun addQueue(playlistId: String, item: QueueItem) {
         if (playlistId.isBlank() || item.id.isBlank()) return
         val key = profileScope(playlistId)
-        context.dataStore.edit { prefs ->
+        editPrefs { prefs ->
             val map = decodeQueue(prefs[queueKey])
             val list = map[key]?.toMutableList() ?: mutableListOf()
             if (list.none { it.bucket == item.bucket && it.id == item.id }) list.add(item)
@@ -956,7 +962,7 @@ class PlaylistStore(private val context: Context) {
 
     suspend fun removeQueue(playlistId: String, bucket: String, id: String) {
         val key = profileScope(playlistId)
-        context.dataStore.edit { prefs ->
+        editPrefs { prefs ->
             val map = decodeQueue(prefs[queueKey])
             map[key] = map[key].orEmpty().filterNot { it.bucket == bucket && it.id == id }
             prefs[queueKey] = gson.toJson(map)
@@ -980,7 +986,7 @@ class PlaylistStore(private val context: Context) {
     }
 
     suspend fun add(playlist: SavedPlaylist) {
-        context.dataStore.edit { prefs ->
+        editPrefs { prefs ->
             val current = prefs[key]?.let {
                 runCatching { gson.fromJson<List<SavedPlaylist>>(it, listType) }.getOrDefault(emptyList())
             } ?: emptyList()
@@ -989,7 +995,7 @@ class PlaylistStore(private val context: Context) {
     }
 
     suspend fun remove(id: String) {
-        context.dataStore.edit { prefs ->
+        editPrefs { prefs ->
             val current = prefs[key]?.let {
                 runCatching { gson.fromJson<List<SavedPlaylist>>(it, listType) }.getOrDefault(emptyList())
             } ?: emptyList()
