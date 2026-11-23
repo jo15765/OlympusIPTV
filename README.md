@@ -6,7 +6,7 @@
 
 ### For the latest and greatest, build your own APK from this code.
 
-The latest signed file is **0.2.105** (versionCode 105): `C:\Users\chalu\Downloads\olympus-iptv-0.2.105.apk`. **One APK** installs on Android TV / set-top boxes and on phones and tablets. Install it over 0.2.104. The signing key is the same, so the saved account and playlist stay. Cloud sync uses `https://stream-me-service-api.getjohnathan.com`, which reads and writes the Olympus-IPTV PostgreSQL database.
+The latest signed file is **0.2.110** (versionCode 110): `C:\Users\chalu\Downloads\olympus-iptv-0.2.110.apk`. **One APK** installs on Android TV / set-top boxes and on phones and tablets. Install it over 0.2.109. The signing key is the same, so the saved account and playlist stay. Cloud sync uses `https://stream-me-service-api.getjohnathan.com`, which reads and writes the Olympus-IPTV PostgreSQL database.
 
 **This is a player only. You must provide your own streams.**
 
@@ -23,6 +23,11 @@ Olympus-IPTV does not include channels, movies, shows, or stream addresses. It p
 </div>
 
 - [Start here](#start-here)
+- [What's in 0.2.110](#whats-in-02110)
+- [What's in 0.2.109](#whats-in-02109)
+- [What's in 0.2.108](#whats-in-02108)
+- [What's in 0.2.107](#whats-in-02107)
+- [What's in 0.2.106](#whats-in-02106)
 - [What's in 0.2.105](#whats-in-02105)
 - [What's in 0.2.103](#whats-in-02103)
 - [What's in 0.2.92](#whats-in-0292)
@@ -56,15 +61,69 @@ Olympus-IPTV is one APK for Android TV / set-top boxes and for phones and tablet
 
 | | |
 | --- | --- |
-| Signed file | `C:\Users\chalu\Downloads\olympus-iptv-0.2.105.apk` |
-| What that file is | versionName **0.2.105**, versionCode **105** |
-| Source in this tree | versionName **0.2.105**, versionCode **105** |
+| Signed file | `C:\Users\chalu\Downloads\olympus-iptv-0.2.110.apk` |
+| What that file is | versionName **0.2.110**, versionCode **110** |
+| Source in this tree | versionName **0.2.110**, versionCode **110** |
 | Cloud API | `https://stream-me-service-api.getjohnathan.com` |
-| What to run | Install the signed 0.2.105 APK, or run this source from Android Studio |
+| What to run | Install the signed 0.2.110 APK, or run this source from Android Studio |
 | Install | Over the existing copy (TV or phone). Uninstalling wipes the saved account, playlist, and favorites. Downloader works with the same file. |
 | Launcher name | Two centered lines: Olympus over IPTV |
 
-**0.2.105** is the current signed release. Phones, tablets, and Android TV use this one APK, and both talk to `https://stream-me-service-api.getjohnathan.com`. That API reads and writes the Olympus-IPTV PostgreSQL tables (`accounts`, `devices`, `provider_logins`, `lineup_configs`, `favorites`, `recording_books`, `reminders`, and `watch_history`). Cloud setup and later cloud edits are described in [What's in 0.2.105](#whats-in-02105) and [What's in 0.2.103](#whats-in-02103). The channel-loading screen leaves once live channels are saved, and the guide spinner clears if that load fails. A frozen or stuttering live channel reloads itself, then switches to another feed of that same channel. The guide still paints the last group list immediately. Movies, shows, cloud sync, ratings, and the dashboard snapshot wait until that grid is up. The release copy in Downloads is the signed APK only. Movies and shows open the title page under [What's in 0.2.92](#whats-in-0292). It also restores cloud lineup push, the remote lineup revision, and recording sync, and keeps the live-games list, off-air hiding, and the shorter guide under [What's in 0.2.86](#whats-in-0286). Live Games Now skips 24/7 replay channels. Group counts use the stored event window and still leave out hidden channels. Two wrong parental PINs can email through Mailgun when that is configured. Sticks with a small heap still use the 16 MB image cache, RGB_565 posters, and a 10 second buffer. Larger boxes pre-warm only the next channel.
+**0.2.110** is the current signed release. See [What's in 0.2.110](#whats-in-02110). **0.2.109** remains the rotation fix. See [What's in 0.2.109](#whats-in-02109). **0.2.108** remains the rail-tap fix. See [What's in 0.2.108](#whats-in-02108). **0.2.107** remains the phone guide fix. See [What's in 0.2.107](#whats-in-02107). **0.2.106** remains the reconnect fix. After a reconnect, the player puts the channel title back and refreshes the guide line. See [What's in 0.2.106](#whats-in-02106). **0.2.105** remains the cloud-sync release. Phones, tablets, and Android TV use this one APK, and both talk to `https://stream-me-service-api.getjohnathan.com`. That API reads and writes the Olympus-IPTV PostgreSQL tables (`accounts`, `devices`, `provider_logins`, `lineup_configs`, `favorites`, `recording_books`, `reminders`, and `watch_history`). Cloud setup and later cloud edits are described in [What's in 0.2.105](#whats-in-02105) and [What's in 0.2.103](#whats-in-02103). The channel-loading screen leaves once live channels are saved, and the guide spinner clears if that load fails. A frozen or stuttering live channel reloads itself, then switches to another feed of that same channel. The guide still paints the last group list immediately. Movies, shows, cloud sync, ratings, and the dashboard snapshot wait until that grid is up. The release copy in Downloads is the signed APK only. Movies and shows open the title page under [What's in 0.2.92](#whats-in-0292). It also restores cloud lineup push, the remote lineup revision, and recording sync, and keeps the live-games list, off-air hiding, and the shorter guide under [What's in 0.2.86](#whats-in-0286). Live Games Now skips 24/7 replay channels. Group counts use the stored event window and still leave out hidden channels. Two wrong parental PINs can email through Mailgun when that is configured. Sticks with a small heap still use the 16 MB image cache, RGB_565 posters, and a 10 second buffer. Larger boxes pre-warm only the next channel.
+
+---
+
+<div align="center">
+
+## What's in 0.2.110
+
+</div>
+
+- Add locals for a ZIP such as 30677 uses the nearest market that actually has stations. Watkinsville matches Atlanta ABC, CBS, NBC, and FOX even when the group title is not the usual local group.
+- A live channel that falls behind the broadcast, or hits a missing segment, jumps back to the live edge instead of logging a playback failure.
+
+---
+
+<div align="center">
+
+## What's in 0.2.109
+
+</div>
+
+- Turning a phone from portrait to landscape redraws Live, Movies, and Shows at the new size. Cards stay full width with readable titles. The section you were on stays open.
+
+---
+
+<div align="center">
+
+## What's in 0.2.108
+
+</div>
+
+- Turning a phone from portrait to landscape rebuilds the guide in place. The section you were on stays open.
+- A tap on Live, Movies, Shows, or the other left-rail items opens that screen on the first tap.
+
+---
+
+<div align="center">
+
+## What's in 0.2.107
+
+</div>
+
+- On a phone, the guide loads the current program for the rows on screen, so scrolling and the channel buttons stay responsive.
+- The favorite button stays on a portrait channel row.
+- A favorite saved on the web dashboard refreshes the open channel list. Lineup edits still apply on the next cloud check. Reminder time changes and deletes from the web use the same reminder list the phone reads.
+
+---
+
+<div align="center">
+
+## What's in 0.2.106
+
+</div>
+
+- When a frozen channel finishes reconnecting, the player clears the Reconnecting label, restores the channel title, and refreshes the guide line.
 
 ---
 
@@ -159,10 +218,10 @@ There is **no separate mobile APK**. Compact means a touch device whose smallest
 | Columns | Category and poster grids follow the width: 1 column under 600dp, 2 from 600dp, 3 from 900dp. TV stays at 3 |
 | Group filter | Typeahead under Groups. Portrait Live also shows group chips |
 | Now playing | The resume strip above the groups stays hidden. The live channel you were watching stays marked in the list. Search can still show that stream |
-| Live “now” | A portrait phone shows the current title, a gold progress bar, and the next title on the row. A landscape phone and a TV keep the hour-by-hour guide |
+| Live “now” | A phone, portrait or landscape, shows the current title, a gold progress bar, and the next title on the row. A tablet and a TV keep the hour-by-hour guide |
 | Pull to refresh | Swipe down on the groups list or the channel list to refresh quietly |
 | Haptics | Light feedback on Play, group open, PIN set / unlock / wrong PIN, pull to refresh, and the player gesture pill |
-| Live play | A portrait phone opens the channel list. A landscape phone opens the hour guide |
+| Live play | A phone opens the channel list in portrait and in landscape. A tablet and a TV open the hour guide |
 | Playlist links | **Paste playlist URL** on the phone login screen. An `.m3u` or `.m3u8` link, or `olympusiptv://add?url=`, fills Add Playlist. The phone keyboard opens on search and URL fields. TV keeps the keyboard off until it is asked for |
 | First run | The QR stays on the first login screen. Continue on a phone goes to favorites and does not open a second QR page. TV still gets the pairing step. Turning the phone does not cancel an open guide |
 | Local channels | ZIP matching uses the four nearest markets, including Athens, Augusta, Macon, Savannah, and Columbus GA next to Atlanta, so 30677 and 30605 can find a Georgia market |
@@ -218,7 +277,7 @@ It walks through enabling unknown sources on an Onn box, installing Downloader b
 When an account is already saved, the app opens on the rail and the group cards. The channel list and the guide stay hidden until a card is opened. It does not start the last channel. The rail title is **Olympus IPTV** on one line. Above the group cards, Live TV shows the current date and time (`MM/DD/YYYY  hh:mm AM/PM`).
 
 1. **TV, Movies, or Shows.** Group cards fill the space beside the rail. The number of cards in a row follows the screen: 3 on a TV, and fewer on a phone (see [Phones and tablets](#phones-and-tablets)). Live TV also has **Live Games Now** after For You. A card shows the group name and, once counted, how many channels or titles it holds. Live counts leave out hidden channels and event slots that are off air. Moving across the cards does not load channels.
-2. **OK on a card**, or Right from a card on the right edge, opens that group. On TV, and on a landscape phone, a Live group under 250 channels opens the side-by-side EPG and lands on the program that is on now. A portrait phone opens the channel list, with now and next on each row. A Live group with **250 or more** channels still opens the guide, but fills it with **hour blocks of each channel name** (no provider EPG download). Channels page in **20** at a time. Movies and Shows land on the first title.
+2. **OK on a card**, or Right from a card on the right edge, opens that group. On TV and on a tablet, a Live group under 250 channels opens the side-by-side EPG and lands on the program that is on now. A phone opens the channel list, with now and next on each row, in portrait and in landscape. A Live group with **250 or more** channels still opens the guide, but fills it with **hour blocks of each channel name** (no provider EPG download). Channels page in **20** at a time. Movies and Shows land on the first title.
 3. **Right** from a channel moves into the guide and later in time. **Left** from the program on now returns to the group cards.
 4. **Back** from the channel list or the guide returns to the group cards. Back from the cards returns to the rail. Back on the rail does not quit the app.
 5. **Left** during full-screen playback returns to the channel list, or steps live timeshift when the stream allows it. **Back** during live playback returns to the channel and guide.
@@ -473,7 +532,7 @@ The debug APK is `app/build/outputs/apk/debug/app-debug.apk`. Optional keys go i
 | `opensubtitles.apiKey` | OpenSubtitles under player Subtitles |
 | `mailgun.apiKey` + `mailgun.domain` + `mailgun.fromEmail` | Email after two wrong parental PINs |
 
-Release builds use R8, resource shrinking, and optimized resource shrinking. They keep `armeabi-v7a` and `arm64-v8a` only, and English resources only. A baseline profile covers the guide and the player. Gradle is set to work offline. The latest signed release is `C:\Users\chalu\Downloads\olympus-iptv-0.2.105.apk`. The cloud address is `portal.cloudUrl` in `local.properties`, and the build falls back to `https://stream-me-service-api.getjohnathan.com` when that line is empty.
+Release builds use R8, resource shrinking, and optimized resource shrinking. They keep `armeabi-v7a` and `arm64-v8a` only, and English resources only. A baseline profile covers the guide and the player. Gradle is set to work offline. The latest signed release is `C:\Users\chalu\Downloads\olympus-iptv-0.2.110.apk`. The cloud address is `portal.cloudUrl` in `local.properties`, and the build falls back to `https://stream-me-service-api.getjohnathan.com` when that line is empty.
 
 Libraries: Kotlin, AndroidX, ViewBinding, Media3 ExoPlayer (HLS and DASH), OkHttp, Gson, DataStore, Coil, profileinstaller, Google Cast / MediaRouter, and SMBJ. WorkManager is not a dependency. The dashboard is a page in the APK.
 
@@ -544,7 +603,7 @@ clearcast-tuner/
 
 - This is a player only. You must provide your own streams.
 - It is a beta.
-- **0.2.105** is the latest signed file (`olympus-iptv-0.2.105.apk`, versionCode 105). Install it over 0.2.104. Phones and TVs both use `https://stream-me-service-api.getjohnathan.com`.
+- **0.2.110** is the latest signed file (`olympus-iptv-0.2.110.apk`, versionCode 110). Install it over 0.2.109. Phones and TVs both use `https://stream-me-service-api.getjohnathan.com`.
 - `portal/data/store.json` is for the Node portal on a PC. It is not packaged in the APK.
 - Chromecast often cannot play provider IPTV/HLS. The Cast button warns before connecting.
 - Ratings, trailers, and New this week need the matching keys in `local.properties` at build time.

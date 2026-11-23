@@ -702,10 +702,15 @@ class BrowseActivity : AppCompatActivity(), ToolHost {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.RESUMED) {
                 com.olympus.iptv.portal.RemotePad.commands.collect { command ->
-                    runOnUiThread { applyDashboardRemote(command) }
+                    if (!isDestroyed) applyDashboardRemote(command)
                 }
             }
         }
+    }
+
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        hostOnConfigurationChanged()
     }
 
     private fun applyDashboardRemote(command: com.olympus.iptv.portal.RemotePad.Command) {

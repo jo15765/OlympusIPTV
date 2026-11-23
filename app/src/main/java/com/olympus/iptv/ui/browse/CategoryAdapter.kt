@@ -223,9 +223,22 @@ class CategoryAdapter(
             if (phoneListMode) {
                 binding.root.isFocusableInTouchMode = false
                 binding.root.minimumHeight =
-                    (56 * binding.root.resources.displayMetrics.density).toInt()
-                binding.label.textSize = 15f
-                binding.detail.textSize = 12f
+                    (64 * binding.root.resources.displayMetrics.density).toInt()
+                androidx.core.widget.TextViewCompat.setAutoSizeTextTypeWithDefaults(
+                    binding.label,
+                    androidx.core.widget.TextViewCompat.AUTO_SIZE_TEXT_TYPE_NONE
+                )
+                androidx.core.widget.TextViewCompat.setAutoSizeTextTypeWithDefaults(
+                    binding.detail,
+                    androidx.core.widget.TextViewCompat.AUTO_SIZE_TEXT_TYPE_NONE
+                )
+                binding.label.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 16f)
+                binding.detail.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 13f)
+                val cardParams = binding.root.layoutParams
+                if (cardParams != null && cardParams.width != ViewGroup.LayoutParams.MATCH_PARENT) {
+                    cardParams.width = ViewGroup.LayoutParams.MATCH_PARENT
+                    binding.root.layoutParams = cardParams
+                }
                 val pad = (12 * binding.root.resources.displayMetrics.density).toInt()
                 binding.root.setPadding(pad, pad, pad, pad)
                 (binding.root.layoutParams as? ViewGroup.MarginLayoutParams)?.let { params ->

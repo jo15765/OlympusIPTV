@@ -46,6 +46,14 @@ object PlaybackTrace {
         )
     }
 
+    fun liveCatchUp(channel: Channel, attempt: Int, behind: Boolean) {
+        val why = if (behind) "playback fell behind the live window" else "a live segment was gone"
+        AppLog.info(
+            "Player",
+            "Catch up to live attempt=$attempt ${label(channel)} ${streamHint(channel.streamUrl)} hint=$why"
+        )
+    }
+
     fun recover(channel: Channel, attempt: Int, behindLive: Boolean) {
         AppLog.info(
             "Player",

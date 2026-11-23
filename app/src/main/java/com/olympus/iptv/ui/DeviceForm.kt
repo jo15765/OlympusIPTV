@@ -38,8 +38,9 @@ object DeviceForm {
         return power.isPowerSaveMode
     }
 
-    /** Poster columns: 2 on a portrait phone, 4 on a tablet, 5 on TV / wide screens. */
+    /** Poster columns. A phone stays at 2 so a turn to landscape widens the cards instead of slicing them. */
     fun contentColumns(context: Context): Int {
+        if (isCompact(context)) return 2
         val width = context.resources.configuration.screenWidthDp
         return when {
             isTelevision(context) || width >= 1000 -> 6
@@ -48,9 +49,10 @@ object DeviceForm {
         }
     }
 
-    /** Category card columns: locked to 3 on TV set-top boxes, 2 on compact phones, 3–4 on tablets/wide screens. */
+    /** Category card columns. Phones stay at 2 in both orientations so the titles stay full size. */
     fun categoryColumns(context: Context): Int {
         if (isTelevision(context)) return 3
+        if (isCompact(context)) return 2
         val width = context.resources.configuration.screenWidthDp
         return when {
             width >= 1100 -> 4

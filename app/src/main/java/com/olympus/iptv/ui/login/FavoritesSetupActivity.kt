@@ -506,9 +506,15 @@ class FavoritesSetupActivity : AppCompatActivity() {
     private suspend fun guideChannels(): List<AutoFavorites.GuideChannel> {
         channels?.let { return it }
         val loaded = withContext(Dispatchers.IO) {
-            (application as OlympusIptvApp).catalogDb
-                .channelsInGroups(playlistId, AutoFavorites.groups)
-                .map { AutoFavorites.GuideChannel(it.id, it.name, it.group) }
+            val db = (application as OlympusIptvApp).catalogDb
+            val merged = LinkedHashMap<String, AutoFavorites.GuideChannel>()
+            for (row in db.channelsInGroups(playlistId, AutoFavorites.groups)) {
+                merged[row.id] = AutoFavorites.GuideChannel(row.id, row.name, row.group)
+            }
+            for (row in db.localCandidateChannels(playlistId)) {
+                merged.putIfAbsent(row.id, AutoFavorites.GuideChannel(row.id, row.name, row.group))
+            }
+            merged.values.toList()
         }
         if (loaded.isNotEmpty()) channels = loaded
         return loaded

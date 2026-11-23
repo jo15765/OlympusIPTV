@@ -673,6 +673,29 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
 
     data class NamedChannel(val id: String, val name: String, val group: String)
 
+    /** Live rows whose names carry a market, so ZIP matching does not depend on the group title. */
+    fun localCandidateChannels(playlistId: String): List<NamedChannel> = read {
+        if (playlistId.isBlank()) return emptyList()
+        val found = ArrayList<NamedChannel>()
+        readableDatabase.rawQuery(
+            "SELECT id, name, IFNULL(group_title, '') FROM channels " +
+                "WHERE playlist_id=? AND bucket=? AND (name LIKE '%|%' OR IFNULL(group_title, '') LIKE 'USA |%') " +
+                "LIMIT 20000",
+            arrayOf(playlistId, LIVE)
+        ).use { cursor ->
+            while (cursor.moveToNext()) {
+                found.add(
+                    NamedChannel(
+                        id = cursor.getString(0),
+                        name = cursor.getString(1) ?: "",
+                        group = NameImages.strip(cursor.getString(2) ?: "")
+                    )
+                )
+            }
+        }
+        found
+    }
+
     fun channelsInGroups(playlistId: String, groups: List<String>): List<NamedChannel> = read {
         if (playlistId.isBlank() || groups.isEmpty()) return emptyList()
         val wanted = groups.map { NameImages.strip(it) }.toHashSet()

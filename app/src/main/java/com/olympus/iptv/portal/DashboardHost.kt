@@ -1264,7 +1264,12 @@ object DashboardHost {
         val stamp = app.catalogDb.libraryStamp(playlistId)
         val held = guideHold
         if (held != null && held.playlistId == playlistId && held.stamp == stamp) return held.rows
-        val rows = app.catalogDb.liveGuide(playlistId)
+        val merged = LinkedHashMap<String, AutoFavorites.GuideChannel>()
+        for (row in app.catalogDb.liveGuide(playlistId)) merged[row.id] = row
+        for (row in app.catalogDb.localCandidateChannels(playlistId)) {
+            merged.putIfAbsent(row.id, AutoFavorites.GuideChannel(row.id, row.name, row.group))
+        }
+        val rows = merged.values.toList()
         guideHold = GuideHold(playlistId, stamp, rows)
         return rows
     }

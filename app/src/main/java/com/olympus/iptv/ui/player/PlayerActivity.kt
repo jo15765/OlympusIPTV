@@ -952,9 +952,8 @@ class PlayerActivity : AppCompatActivity() {
         if (channel.kind == ContentKind.LIVE) {
             builder.setLiveConfiguration(
                 MediaItem.LiveConfiguration.Builder()
-                    .setTargetOffsetMs(8_000)
-                    .setMinOffsetMs(2_000)
-                    .setMaxOffsetMs(24_000)
+                    .setMinPlaybackSpeed(1.0f)
+                    .setMaxPlaybackSpeed(1.0f)
                     .build()
             )
         }
@@ -1020,7 +1019,9 @@ class PlayerActivity : AppCompatActivity() {
                         channel.kind == ContentKind.LIVE &&
                         channel.seriesId.isNullOrBlank()
                     ) {
-                        PlaybackTrace.error(channel, error, recovering = true)
+                        val http = PlaybackTrace.httpStatus(error)
+                        val catchUp = error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW || http == 404
+                        if (!catchUp) PlaybackTrace.error(channel, error, recovering = true)
                         recoverLive(exo, channel, error)
                     } else {
                         PlaybackTrace.error(channel, error, recovering = false)
@@ -1204,6 +1205,11 @@ class PlayerActivity : AppCompatActivity() {
         bufferStartedAt = 0L
         bufferWatchToken += 1
         showConnectingBadge(false)
+        if (binding.channelMeta.text == getString(R.string.playback_reconnecting)) {
+            val meta = intent.getStringExtra(EXTRA_META).orEmpty()
+            binding.channelMeta.text = meta.ifBlank { current?.name.orEmpty() }
+            refreshEpgQuietly()
+        }
         val firstReady = !hadPlaybackReady
         if (started <= 0L) {
             hadPlaybackReady = true
@@ -1234,6 +1240,11 @@ class PlayerActivity : AppCompatActivity() {
         } else {
             binding.connectingBadge.visibility = View.GONE
             binding.connectingBadge.setText(R.string.playback_connecting)
+            if (binding.channelMeta.text == getString(R.string.playback_reconnecting)) {
+                val meta = intent.getStringExtra(EXTRA_META).orEmpty()
+                binding.channelMeta.text = meta.ifBlank { current?.name.orEmpty() }
+                refreshEpgQuietly()
+            }
         }
     }
 
@@ -1261,13 +1272,13 @@ class PlayerActivity : AppCompatActivity() {
         val token = playbackToken
         recoverJob?.cancel()
         val behind = error?.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW
-        val http = (error?.cause as? HttpDataSource.InvalidResponseCodeException)?.responseCode
-            ?: (error?.cause?.cause as? HttpDataSource.InvalidResponseCodeException)?.responseCode
+        val http = PlaybackTrace.httpStatus(error)
+        val catchUp = behind || http == 404
         recoverAttempt += 1
-        PlaybackTrace.recover(channel, recoverAttempt, behind)
+        if (catchUp) PlaybackTrace.liveCatchUp(channel, recoverAttempt, behind) else PlaybackTrace.recover(channel, recoverAttempt, behind)
         // 403/401 are provider denials — retrying forever freezes the session and spams the log.
         val hardFail = http == 401 || http == 403 || recoverAttempt >= MAX_LIVE_RECOVER
-        if (error != null) noteStreamFailure(channel)
+        if (error != null && !catchUp) noteStreamFailure(channel)
         if (hardFail) {
             val sibling = com.olympus.iptv.playlist.ChannelFailover.alternate(
                 channel,
@@ -1294,10 +1305,11 @@ class PlayerActivity : AppCompatActivity() {
             hadPlaybackReady = false
             bufferStartedAt = 0L
             bufferWatchToken += 1
-            exo.playWhenReady = true
-            if (behind || channel.kind == ContentKind.LIVE) {
-                exo.seekToDefaultPosition()
+            if (catchUp || channel.kind == ContentKind.LIVE) {
+                reloadLiveEdge(exo, channel)
+                return@launch
             }
+            exo.playWhenReady = true
             exo.prepare()
             exo.playWhenReady = true
         }
@@ -1409,6 +1421,12 @@ class PlayerActivity : AppCompatActivity() {
                 val framesMoving = lastVideoFrameAt > 0L && now - lastVideoFrameAt < 1_500L
                 val healthy = exo.playbackState == Player.STATE_READY && exo.isPlaying && (advanced || framesMoving)
                 if (healthy) {
+                    showConnectingBadge(false)
+                    if (::binding.isInitialized && binding.channelMeta.text == getString(R.string.playback_reconnecting)) {
+                        val meta = intent.getStringExtra(EXTRA_META).orEmpty()
+                        binding.channelMeta.text = meta.ifBlank { current?.name.orEmpty() }
+                        refreshEpgQuietly()
+                    }
                     if (stallHealthySince == 0L) stallHealthySince = now
                     stallMarkPosition = pos
                     stallMarkAt = now
@@ -1421,19 +1439,21 @@ class PlayerActivity : AppCompatActivity() {
                     !watchingCatchup &&
                     exo.videoFormat != null &&
                     lastVideoFrameAt > 0L &&
-                    now - lastVideoFrameAt >= LIVE_STALL_MS
+                    now - lastVideoFrameAt >= 2_500L
                 if (stallMarkAt == 0L || advanced) {
                     stallMarkPosition = pos
                     stallMarkAt = now
                     if (!frameFrozen) continue
                 }
                 val stuckMs = now - stallMarkAt
+                if (stuckMs >= 1_200L && !radioOn) {
+                    showConnectingBadge(true)
+                }
                 val frozen = frameFrozen ||
                     exo.playbackState == Player.STATE_BUFFERING ||
                     exo.playbackState == Player.STATE_IDLE ||
-                    exo.playbackState == Player.STATE_ENDED ||
                     (exo.playbackState == Player.STATE_READY && !exo.isPlaying)
-                val limit = if (hadPlaybackReady) LIVE_STALL_MS else 8_000L
+                val limit = if (hadPlaybackReady) 2_500L else 5_000L
                 if (frozen && (frameFrozen || stuckMs >= limit)) recoverFrozenLive(exo, channel)
             }
         }
@@ -1441,9 +1461,9 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun recoverFrozenLive(exo: ExoPlayer, channel: Channel) {
         val now = SystemClock.elapsedRealtime()
-        if (now < stallBusyUntil || player !== exo || current?.id != channel.id || isDestroyed) return
+        if (player !== exo || current?.id != channel.id || isDestroyed) return
         if (!exo.playWhenReady || !isLiveNow(channel)) return
-        stallBusyUntil = now + 8_000L
+        stallBusyUntil = now + 3_500L
         stallStrikes += 1
         stallMarkAt = now
         stallMarkPosition = exo.currentPosition
@@ -1451,6 +1471,7 @@ class PlayerActivity : AppCompatActivity() {
         PlaybackTrace.recover(channel, stallStrikes, behindLive = true)
         if (::binding.isInitialized) {
             binding.channelMeta.text = getString(R.string.playback_reconnecting)
+            paintConnectingBadge(now - bufferStartedAt.let { if (it > 0) it else now })
             binding.connectingBadge.setText(R.string.playback_reconnecting_pill)
             binding.connectingBadge.visibility = View.VISIBLE
         }

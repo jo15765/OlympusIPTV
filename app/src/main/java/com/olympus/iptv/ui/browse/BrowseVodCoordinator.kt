@@ -1168,7 +1168,7 @@ internal fun BrowseActivity.reloadFavorites() {
             if (ids == favoriteOrder) return@launch
             applyFavorites(ids)
             if (selectedCategoryId == PlaylistLoader.FAVORITES_ID &&
-                binding.groupColumn.visibility == View.VISIBLE
+                binding.contentColumn.visibility == View.VISIBLE
             ) {
                 showChannels()
             }

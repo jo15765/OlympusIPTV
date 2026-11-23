@@ -1050,7 +1050,76 @@ internal fun BrowseActivity.focusNav(direction: Int) {
         val items = navItems().filter { it.visibility == View.VISIBLE }
         val index = items.indexOf(currentFocus)
         val next = if (index < 0) 0 else index + direction
-        if (next in items.indices) items[next].requestFocus()
+        if (next in items.indices) {
+            items[next].requestFocus()
+            if (touchPrimary) activateNavItem(items[next])
+        }
+    }
+
+internal fun BrowseActivity.activateNavItem(item: View) {
+        when (item) {
+            binding.tabLive -> openSection(GuideSection.TV)
+            binding.tabVod -> openSection(GuideSection.MOVIES)
+            binding.tabShows -> openSection(GuideSection.SHOWS)
+            binding.btnSearch -> openSearch()
+            binding.btnLibrary -> {
+                val saved = playlist ?: return
+                startActivity(LibraryActivity.intent(this, saved.id))
+            }
+            binding.btnRecord -> {
+                val saved = playlist ?: return
+                startActivity(com.olympus.iptv.record.RecordActivity.intent(this, saved.id))
+            }
+            binding.btnAdmin -> showAdminPane()
+            binding.btnAbout -> showAboutPane()
+        }
+    }
+
+internal fun BrowseActivity.hostOnConfigurationChanged() {
+        if (!viewReady()) return
+        val phone = touchPrimary && com.olympus.iptv.ui.DeviceForm.isCompact(this)
+        if (phone) {
+            channelAdapter.guideRowHeight = 0
+            if (guideMenu == GuideMenu.PROGRAMS) guideMenu = GuideMenu.CHANNELS
+        }
+        skipGuideTransition = true
+        binding.categoryList.setHasFixedSize(false)
+        binding.channelList.setHasFixedSize(false)
+        androidx.core.view.ViewCompat.requestApplyInsets(binding.guideShell)
+        relayoutBrowseGrids()
+        binding.root.post {
+            if (!viewReady() || isDestroyed) return@post
+            relayoutBrowseGrids()
+        }
+    }
+
+internal fun BrowseActivity.relayoutBrowseGrids() {
+        val categoryState = binding.categoryList.layoutManager?.onSaveInstanceState()
+        val channelState = binding.channelList.layoutManager?.onSaveInstanceState()
+        binding.categoryList.recycledViewPool.clear()
+        binding.channelList.recycledViewPool.clear()
+        applyGuideColumns()
+        applyChannelLayout()
+        val categorySpan = com.olympus.iptv.ui.DeviceForm.categoryColumns(this)
+        binding.categoryList.layoutManager =
+            androidx.recyclerview.widget.GridLayoutManager(this, categorySpan)
+        val posters = section != GuideSection.TV
+        val posterSpan = com.olympus.iptv.ui.DeviceForm.contentColumns(this)
+        binding.channelList.layoutManager = if (posters) {
+            androidx.recyclerview.widget.GridLayoutManager(this, posterSpan)
+        } else {
+            androidx.recyclerview.widget.LinearLayoutManager(this)
+        }
+        binding.categoryList.layoutManager?.onRestoreInstanceState(categoryState)
+        binding.channelList.layoutManager?.onRestoreInstanceState(channelState)
+        categoryAdapter.notifyDataSetChanged()
+        channelAdapter.notifyDataSetChanged()
+        binding.categoryList.requestLayout()
+        binding.channelList.requestLayout()
+        binding.guideRow.requestLayout()
+        if (binding.groupPills.visibility == View.VISIBLE) syncGroupPills()
+        paintBottomTabs()
+        paintMobileSettingsChips()
     }
 
 internal fun BrowseActivity.sectionButton(): View = when (section) {

@@ -105,10 +105,11 @@
 
         <activity
             android:name=".ui.browse.BrowseActivity"
+            android:configChanges="keyboard|keyboardHidden|orientation|screenSize|screenLayout|smallestScreenSize"
             android:exported="true"
             android:banner="@drawable/tv_banner"
             android:logo="@mipmap/ic_launcher"
-            android:screenOrientation="landscape">
+            android:screenOrientation="fullUser">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

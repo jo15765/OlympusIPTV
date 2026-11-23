@@ -241,6 +241,13 @@ class ChannelAdapter(
 
     inner class PosterHolder(private val binding: ItemPosterBinding) : Holder(binding.root) {
         override fun bind(item: Channel, position: Int, full: Boolean) {
+            val params = binding.root.layoutParams
+            if (params != null && params.width != ViewGroup.LayoutParams.MATCH_PARENT) {
+                params.width = ViewGroup.LayoutParams.MATCH_PARENT
+                binding.root.layoutParams = params
+            }
+            binding.name.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 15f)
+            binding.group.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12f)
             binding.name.text = displayName(item)
             val resume = continueLabel(item)
             val detail = detailOf(item.id)
@@ -303,9 +310,13 @@ class ChannelAdapter(
 
         override fun bindLogo(item: Channel) {
             val density = binding.root.resources.displayMetrics.density
-            val targetH = ((if (DeviceForm.isCompact(binding.root.context)) 196 else 236) * density).toInt()
-            if (binding.logo.layoutParams != null && binding.logo.layoutParams.height != targetH) {
-                (binding.logo.parent as? View)?.layoutParams?.height = targetH
+            val compact = DeviceForm.isCompact(binding.root.context)
+            val wide = compact && !DeviceForm.isPortrait(binding.root.context)
+            val targetH = ((if (wide) 210 else if (compact) 196 else 236) * density).toInt()
+            val frame = binding.logo.parent as? View
+            if (frame?.layoutParams != null && frame.layoutParams.height != targetH) {
+                frame.layoutParams.height = targetH
+                frame.requestLayout()
             }
             binding.logo.clipToOutline = true
             binding.logo.outlineProvider = ViewOutlineProvider.BACKGROUND
@@ -334,15 +345,17 @@ class ChannelAdapter(
 
         override fun bind(item: Channel, position: Int, full: Boolean) {
             if (full) {
-                val portraitCard = DeviceForm.isCompact(binding.root.context) &&
-                    DeviceForm.isPortrait(binding.root.context)
+                val ctx = binding.root.context
+                val phoneCard = DeviceForm.isTouchPrimary(ctx) && DeviceForm.isCompact(ctx)
+                val portraitCard = phoneCard && DeviceForm.isPortrait(ctx)
                 val params = binding.root.layoutParams
-                if (portraitCard && params != null) {
+                if (params != null && params.width != ViewGroup.LayoutParams.MATCH_PARENT) {
+                    params.width = ViewGroup.LayoutParams.MATCH_PARENT
+                }
+                if ((phoneCard || guideRowHeight <= 0) && params != null) {
                     val wrap = ViewGroup.LayoutParams.WRAP_CONTENT
-                    if (params.height != wrap) {
-                        params.height = wrap
-                        binding.root.layoutParams = params
-                    }
+                    if (params.height != wrap) params.height = wrap
+                    binding.root.layoutParams = params
                 } else if (guideRowHeight > 0 && params != null && params.height != guideRowHeight) {
                     params.height = guideRowHeight
                     binding.root.layoutParams = params
@@ -352,8 +365,8 @@ class ChannelAdapter(
                 binding.logo.background = null
                 binding.logo.setPadding(0, 0, 0, 0)
                 binding.name.text = com.olympus.iptv.data.NameStrip.shown(item.name, item.groupTitle)
-                binding.name.maxLines = if (guideRowHeight > 0) 2 else 1
-                binding.name.textSize = if (guideRowHeight > 0) 13f else 15f
+                binding.name.maxLines = if (phoneCard || guideRowHeight > 0) 2 else 1
+                binding.name.textSize = if (phoneCard) 16f else if (guideRowHeight > 0) 13f else 15f
                 val badge = qualityBadgeFor(item.name)
                 if (badge == null) {
                     binding.qualityBadge.visibility = View.GONE
@@ -367,22 +380,24 @@ class ChannelAdapter(
                 binding.country.visibility = View.GONE
                 hideActions()
                 val density = binding.root.resources.displayMetrics.density
-                val padH = (6 * density).toInt()
-                binding.playTarget.setPadding(padH, 0, padH, 0)
                 val touch = DeviceForm.isTouchPrimary(binding.root.context)
-                if (portraitCard) {
-                    val padV = (12 * density).toInt()
+                if (phoneCard) {
+                    val padV = ((if (portraitCard) 12 else 10) * density).toInt()
                     val padH = (12 * density).toInt()
                     binding.playTarget.setPadding(padH, padV, padH, padV)
                     binding.root.setPadding(padH, (4 * density).toInt(), padH, (4 * density).toInt())
+                } else {
+                    val padH = (6 * density).toInt()
+                    binding.playTarget.setPadding(padH, 0, padH, 0)
+                    binding.root.setPadding(0, 0, 0, 0)
                 }
-                val logo = ((if (portraitCard) 36 else if (guideRowHeight > 0) 18 else 24) * density).toInt()
+                val logo = ((if (phoneCard) 40 else if (guideRowHeight > 0) 18 else 24) * density).toInt()
                 binding.logo.layoutParams.width = logo
                 binding.logo.layoutParams.height = logo
                 bindLogo(item)
                 bindEpg(item)
                 bindGuideHighlight(item)
-                if (touch && guideRowHeight <= 0) {
+                if (touch && (phoneCard || guideRowHeight <= 0)) {
                     binding.favorite.visibility = View.VISIBLE
                     binding.favorite.isFocusable = false
                     binding.favorite.isFocusableInTouchMode = false
@@ -419,8 +434,8 @@ class ChannelAdapter(
             binding.name.setTextColor(
                 ctx.getColor(if (active) R.color.accent else R.color.text_primary)
             )
-            val portraitCard = DeviceForm.isCompact(ctx) && DeviceForm.isPortrait(ctx)
-            if (portraitCard) {
+            val phoneCard = DeviceForm.isTouchPrimary(ctx) && DeviceForm.isCompact(ctx)
+            if (phoneCard) {
                 binding.playTarget.setBackgroundResource(R.drawable.bg_focusable)
             } else {
                 // Never draw a focus rectangle around the channel name row in the live EPG grid.
@@ -473,7 +488,7 @@ class ChannelAdapter(
                 binding.epgNow.visibility = View.GONE
             }
             val now = info?.now
-            val card = DeviceForm.isCompact(context) && DeviceForm.isPortrait(context)
+            val card = DeviceForm.isTouchPrimary(context) && DeviceForm.isCompact(context)
             if (card && now != null && now.endMillis > now.startMillis) {
                 val span = now.endMillis - now.startMillis
                 val fraction = ((System.currentTimeMillis() - now.startMillis) * 1000L / span).toInt()

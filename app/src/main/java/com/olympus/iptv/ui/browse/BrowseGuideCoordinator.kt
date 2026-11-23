@@ -208,11 +208,15 @@ internal fun BrowseActivity.wireLazyPanes() {
 
 
 internal fun BrowseActivity.hostOnCreate(savedInstanceState: Bundle?) {
-        if (com.olympus.iptv.ui.DeviceForm.isTouchPrimary(this) &&
-            requestedOrientation != android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-        ) {
-            requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        val form = com.olympus.iptv.ui.DeviceForm
+        val orientation = if (form.isTelevision(this)) {
+            android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        } else if (form.isTouchPrimary(this)) {
+            android.content.pm.ActivityInfo.SCREEN_ORIENTATION_FULL_USER
+        } else {
+            android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
         }
+        if (requestedOrientation != orientation) requestedOrientation = orientation
         try {
         programAdapter = ProgramGuideAdapter(
             context = this,
@@ -408,6 +412,14 @@ internal fun BrowseActivity.hostOnCreate(savedInstanceState: Bundle?) {
         binding.tabLive.setOnClickListener { openSection(GuideSection.TV) }
         binding.tabVod.setOnClickListener { openSection(GuideSection.MOVIES) }
         binding.tabShows.setOnClickListener { openSection(GuideSection.SHOWS) }
+        if (touchPrimary) {
+            listOf(
+                binding.btnSearch, binding.tabLive, binding.tabVod, binding.tabShows,
+                binding.btnLibrary, binding.btnRecord, binding.btnAdmin, binding.btnAbout
+            ).forEach { item ->
+                item.isFocusableInTouchMode = false
+            }
+        }
         binding.btnQueue.setOnClickListener {
             val saved = playlist ?: return@setOnClickListener
             startActivity(LibraryActivity.intent(this, saved.id, tab = 0))
@@ -1697,12 +1709,11 @@ internal fun BrowseActivity.applyGuideColumns() {
         val tablet = touchPrimary && !com.olympus.iptv.ui.DeviceForm.isCompact(this)
         val showGroups = !full || tablet
         val showChannels = full
-        val stacked = touchPrimary &&
-            com.olympus.iptv.ui.DeviceForm.isCompact(this) &&
-            com.olympus.iptv.ui.DeviceForm.isPortrait(this)
-        val phoneChrome = touchPrimary && com.olympus.iptv.ui.DeviceForm.isCompact(this)
-        // Portrait phones use stacked now/next cards. Landscape and TV use the hour grid.
-        val showPrograms = live && full && !stacked && guideMenu == GuideMenu.PROGRAMS
+        val phoneCards = touchPrimary && com.olympus.iptv.ui.DeviceForm.isCompact(this)
+        val stacked = phoneCards && com.olympus.iptv.ui.DeviceForm.isPortrait(this)
+        val phoneChrome = phoneCards
+        // Phones keep full-size cards in both orientations. Tablets and TV use the hour grid.
+        val showPrograms = live && full && !phoneCards && guideMenu == GuideMenu.PROGRAMS
         setNavExpanded(true)
         val blockChannels = live && guideMenu == GuideMenu.PROGRAMS && !phoneChrome
         channelAdapter.guideRowsFocusable = !blockChannels
@@ -1722,10 +1733,11 @@ internal fun BrowseActivity.applyGuideColumns() {
             binding.groupColumn.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
             binding.categoryList.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
         }
+        val showRail = showSettings && (!phoneChrome || !stacked)
         binding.mobileTopBar.visibility = if (phoneChrome) View.VISIBLE else View.GONE
-        binding.mobileBottomTabs.visibility = if (phoneChrome) View.VISIBLE else View.GONE
-        binding.navRail.visibility = if (showSettings && !phoneChrome) View.VISIBLE else View.GONE
-        binding.navDivider.visibility = if (showSettings && !phoneChrome) View.VISIBLE else View.GONE
+        binding.mobileBottomTabs.visibility = if (phoneChrome && stacked) View.VISIBLE else View.GONE
+        binding.navRail.visibility = if (showRail) View.VISIBLE else View.GONE
+        binding.navDivider.visibility = if (showRail) View.VISIBLE else View.GONE
         if (!showGroups && focusIsIn(binding.groupColumn)) binding.groupColumn.clearFocus()
         binding.groupColumn.visibility = if (showGroups) View.VISIBLE else View.GONE
         binding.shortcutRow.visibility = if (showGroups && live) View.VISIBLE else View.GONE
@@ -1774,7 +1786,7 @@ internal fun BrowseActivity.applyGuideColumns() {
         val content = binding.contentColumn.layoutParams as LinearLayout.LayoutParams
         val programs = binding.programPane.layoutParams as LinearLayout.LayoutParams
         val density = resources.displayMetrics.density
-        binding.channelList.setHasFixedSize(!stacked)
+        binding.channelList.setHasFixedSize(!phoneCards)
         if (tablet && showGroups) {
             val groups = binding.groupColumn.layoutParams as LinearLayout.LayoutParams
             val width = (260 * density).toInt()
@@ -1791,7 +1803,7 @@ internal fun BrowseActivity.applyGuideColumns() {
                 binding.groupColumn.layoutParams = groups
             }
         }
-        if (stacked && showChannels) {
+        if (phoneCards && showChannels) {
             content.width = 0
             content.weight = 1f
             programs.width = 0
@@ -1846,11 +1858,9 @@ internal fun BrowseActivity.openFullGuide() {
         binding.categoryList.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
         binding.groupColumn.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
         if (focusIsIn(binding.categoryList)) currentFocus?.clearFocus()
-        // Portrait phones use stacked now/next cards. Landscape, tablets, and TV use the hour grid.
-        val portraitPhone = touchPrimary &&
-            com.olympus.iptv.ui.DeviceForm.isCompact(this) &&
-            com.olympus.iptv.ui.DeviceForm.isPortrait(this)
-        if (section == GuideSection.TV && !portraitPhone) {
+        // Phones use stacked now/next cards. Tablets and TV use the hour grid.
+        val phoneCards = touchPrimary && com.olympus.iptv.ui.DeviceForm.isCompact(this)
+        if (section == GuideSection.TV && !phoneCards) {
             if (guideMenu != GuideMenu.PROGRAMS) previousMenu = guideMenu
             guideMenu = GuideMenu.PROGRAMS
         } else {
@@ -2252,10 +2262,21 @@ internal fun BrowseActivity.indexedPool(data: LoadedPlaylist, sectionNow: GuideS
         return map[categoryId].orEmpty()
     }
 
+internal fun BrowseActivity.onScreenChannels(): List<Channel> {
+        val layout = binding.channelList.layoutManager as? androidx.recyclerview.widget.LinearLayoutManager
+        val first = layout?.findFirstVisibleItemPosition() ?: -1
+        val last = layout?.findLastVisibleItemPosition() ?: -1
+        if (first < 0 || last < first || visibleChannels.isEmpty()) return visibleChannels.take(8)
+        val end = (last + 4).coerceAtMost(visibleChannels.lastIndex)
+        return visibleChannels.subList(first.coerceAtMost(end), end + 1).toList()
+    }
+
 internal fun BrowseActivity.prefetchEpg(channels: List<Channel>) {
         val saved = playlist ?: return
         epgPrefetchJob?.cancel()
-        val pending = channels.filter { it.kind == ContentKind.LIVE && !epgCache.containsKey(it.id) }.take(100)
+        val window = if (touchPrimary) onScreenChannels() else channels
+        val limit = if (touchPrimary) 8 else 24
+        val pending = window.filter { it.kind == ContentKind.LIVE && !epgCache.containsKey(it.id) }.take(limit)
         if (pending.isEmpty()) return
         epgPrefetchJob = lifecycleScope.launch {
             val loaded = coroutineScope {
