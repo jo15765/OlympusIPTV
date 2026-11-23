@@ -20,9 +20,15 @@ object DeviceForm {
 
     fun isTelevision(context: Context): Boolean {
         cachedTelevision?.let { return it }
-        val uiMode = context.applicationContext.getSystemService(Context.UI_MODE_SERVICE) as? UiModeManager
-        val tv = uiMode?.currentModeType == Configuration.UI_MODE_TYPE_TELEVISION ||
-            context.applicationContext.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
+        val app = context.applicationContext
+        val pm = app.packageManager
+        val uiMode = app.getSystemService(Context.UI_MODE_SERVICE) as? UiModeManager
+        val fireTv = pm.hasSystemFeature("amazon.hardware.fire_tv") ||
+            (Build.MANUFACTURER.equals("Amazon", ignoreCase = true) &&
+                Build.MODEL.startsWith("AFT", ignoreCase = true))
+        val tv = fireTv ||
+            uiMode?.currentModeType == Configuration.UI_MODE_TYPE_TELEVISION ||
+            pm.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
         cachedTelevision = tv
         return tv
     }
@@ -103,7 +109,14 @@ object DeviceForm {
         val manager = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
         @Suppress("DEPRECATION")
         val low = manager?.isLowRamDevice == true
-        return isLowRam(low, Runtime.getRuntime().maxMemory())
+        val smallTotalRam = if (manager != null) {
+            val info = ActivityManager.MemoryInfo()
+            manager.getMemoryInfo(info)
+            info.totalMem in 1L..2_200_000_000L
+        } else {
+            false
+        }
+        return smallTotalRam || isLowRam(low, Runtime.getRuntime().maxMemory())
     }
 
     fun isLowRam(lowRamDevice: Boolean, maxMemoryBytes: Long): Boolean =

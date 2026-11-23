@@ -868,9 +868,10 @@ class XtreamClient(
             val body = response.body ?: return emptyList()
             val total = body.contentLength()
             val counted = ProgressStream(body.byteStream(), total, onPercent)
-            val stream = BufferedInputStream(counted, 256 * 1024)
+            val lowHeap = Runtime.getRuntime().maxMemory() <= 268_435_456L
+            val stream = BufferedInputStream(counted, if (lowHeap) 64 * 1024 else 256 * 1024)
             val kind = peekJsonKind(stream)
-            if (kind != '['.code) {
+            if (kind != '['.code || lowHeap) {
                 val sink = ChannelSink(onCount, onBatch)
                 val fields = HashMap<String, String>(8)
                 try {

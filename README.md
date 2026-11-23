@@ -6,7 +6,7 @@
 
 ### For the latest and greatest, build your own APK from this code.
 
-The latest signed file is **0.2.118** (versionCode 118): `C:\Users\chalu\Downloads\olympus-iptv-0.2.118.apk`. **One APK** installs on Android TV / set-top boxes and on phones and tablets. Install it over 0.2.117. The signing key is the same, so the saved account and playlist stay. Cloud sync uses `https://stream-me-service-api.getjohnathan.com`, which reads and writes the Olympus-IPTV PostgreSQL database.
+The latest signed file is **0.2.127** (versionCode 127): `C:\Users\chalu\Downloads\olympus-iptv-0.2.127.apk`. **One APK** installs on Android TV / set-top boxes, Amazon Fire TV Sticks, and phones and tablets. Install it over any prior build. The signing key is the same, so the saved account and playlist stay. Cloud sync uses `https://stream-me-service-api.getjohnathan.com`, which reads and writes the Olympus-IPTV PostgreSQL database.
 
 **This is a player only. You must provide your own streams.**
 
@@ -23,6 +23,7 @@ Olympus-IPTV does not include channels, movies, shows, or stream addresses. It p
 </div>
 
 - [Start here](#start-here)
+- [What's in 0.2.127](#whats-in-02127)
 - [What's in 0.2.118](#whats-in-02118)
 - [What's in 0.2.117](#whats-in-02117)
 - [What's in 0.2.116](#whats-in-02116)
@@ -69,15 +70,41 @@ Olympus-IPTV is one APK for Android TV / set-top boxes and for phones and tablet
 
 | | |
 | --- | --- |
-| Signed file | `C:\Users\chalu\Downloads\olympus-iptv-0.2.118.apk` |
-| What that file is | versionName **0.2.118**, versionCode **118** |
-| Source in this tree | versionName **0.2.118**, versionCode **118** |
+| Signed file | `C:\Users\chalu\Downloads\olympus-iptv-0.2.127.apk` |
+| What that file is | versionName **0.2.127**, versionCode **127** |
+| Source in this tree | versionName **0.2.127**, versionCode **127** |
 | Cloud API | `https://stream-me-service-api.getjohnathan.com` |
-| What to run | Install the signed 0.2.118 APK, or run this source from Android Studio |
-| Install | Over the existing copy (TV or phone). Uninstalling wipes the saved account, playlist, and favorites. Downloader works with the same file. |
+| What to run | Install the signed 0.2.127 APK, or run this source from Android Studio |
+| Install | Over the existing copy (TV, Fire Stick, or phone). Uninstalling wipes the saved account, playlist, and favorites. Downloader works with the same file. |
 | Launcher name | Two centered lines: Olympus over IPTV |
 
-**0.2.118** is the current signed release. See [What's in 0.2.118](#whats-in-02118). **0.2.117** remains the prior signed build. See [What's in 0.2.117](#whats-in-02117). **0.2.116** remains the television startup build. See [What's in 0.2.116](#whats-in-02116). **0.2.115** remains the television startup fix. See [What's in 0.2.115](#whats-in-02115). **0.2.114** remains the phone and Galaxy Fold card resize. See [What's in 0.2.114](#whats-in-02114). **0.2.113** remains the speed pass. See [What's in 0.2.113](#whats-in-02113). **0.2.112** remains the reconnect-label fix. See [What's in 0.2.112](#whats-in-02112). **0.2.111** remains the larger live buffer. See [What's in 0.2.111](#whats-in-02111). **0.2.110** remains the locals and live-window fix. See [What's in 0.2.110](#whats-in-02110). **0.2.109** rebuilt the phone grid on rotation, and the Galaxy Fold still stayed in the narrow window until 0.2.114. See [What's in 0.2.109](#whats-in-02109). **0.2.108** remains the rail-tap fix. See [What's in 0.2.108](#whats-in-02108). **0.2.107** remains the phone guide fix. See [What's in 0.2.107](#whats-in-02107). **0.2.106** remains the reconnect fix. After a reconnect, the player puts the channel title back and refreshes the guide line. See [What's in 0.2.106](#whats-in-02106). **0.2.105** remains the cloud-sync release. Phones, tablets, and Android TV use this one APK, and both talk to `https://stream-me-service-api.getjohnathan.com`. That API reads and writes the Olympus-IPTV PostgreSQL tables (`accounts`, `devices`, `provider_logins`, `lineup_configs`, `favorites`, `recording_books`, `reminders`, and `watch_history`). Cloud setup and later cloud edits are described in [What's in 0.2.105](#whats-in-02105) and [What's in 0.2.103](#whats-in-02103). The channel-loading screen leaves once live channels are saved, and the guide spinner clears if that load fails. A frozen or stuttering live channel reloads itself, then switches to another feed of that same channel. The guide still paints the last group list immediately. Movies, shows, cloud sync, ratings, and the dashboard snapshot wait until that grid is up. The release copy in Downloads is the signed APK only. Movies and shows open the title page under [What's in 0.2.92](#whats-in-0292). It also restores cloud lineup push, the remote lineup revision, and recording sync, and keeps the live-games list, off-air hiding, and the shorter guide under [What's in 0.2.86](#whats-in-0286). Live Games Now skips 24/7 replay channels. Group counts use the stored event window and still leave out hidden channels. Two wrong parental PINs can email through Mailgun when that is configured. Sticks with a small heap still use the 16 MB image cache, RGB_565 posters, and a 10 second buffer. Larger boxes pre-warm only the next channel.
+**0.2.127** is the current signed release. See [What's in 0.2.127](#whats-in-02127). **0.2.118** remains the prior signed build. See [What's in 0.2.118](#whats-in-02118). **0.2.117** remains the prior signed build. See [What's in 0.2.117](#whats-in-02117). **0.2.116** remains the television startup build. See [What's in 0.2.116](#whats-in-02116). **0.2.115** remains the television startup fix. See [What's in 0.2.115](#whats-in-02115). **0.2.114** remains the phone and Galaxy Fold card resize. See [What's in 0.2.114](#whats-in-02114). **0.2.113** remains the speed pass. See [What's in 0.2.113](#whats-in-02113). **0.2.112** remains the reconnect-label fix. See [What's in 0.2.112](#whats-in-02112). **0.2.111** remains the larger live buffer. See [What's in 0.2.111](#whats-in-02111). **0.2.110** remains the locals and live-window fix. See [What's in 0.2.110](#whats-in-02110). **0.2.109** rebuilt the phone grid on rotation, and the Galaxy Fold still stayed in the narrow window until 0.2.114. See [What's in 0.2.109](#whats-in-02109). **0.2.108** remains the rail-tap fix. See [What's in 0.2.108](#whats-in-02108). **0.2.107** remains the phone guide fix. See [What's in 0.2.107](#whats-in-02107). **0.2.106** remains the reconnect fix. After a reconnect, the player puts the channel title back and refreshes the guide line. See [What's in 0.2.106](#whats-in-02106). **0.2.105** remains the cloud-sync release. Phones, tablets, and Android TV use this one APK, and both talk to `https://stream-me-service-api.getjohnathan.com`. That API reads and writes the Olympus-IPTV PostgreSQL tables (`accounts`, `devices`, `provider_logins`, `lineup_configs`, `favorites`, `recording_books`, `reminders`, and `watch_history`). Cloud setup and later cloud edits are described in [What's in 0.2.105](#whats-in-02105) and [What's in 0.2.103](#whats-in-02103). The channel-loading screen leaves once live channels are saved, and the guide spinner clears if that load fails. A frozen or stuttering live channel reloads itself, then switches to another feed of that same channel. The guide still paints the last group list immediately. Movies, shows, cloud sync, ratings, and the dashboard snapshot wait until that grid is up. The release copy in Downloads is the signed APK only. Movies and shows open the title page under [What's in 0.2.92](#whats-in-0292). It also restores cloud lineup push, the remote lineup revision, and recording sync, and keeps the live-games list, off-air hiding, and the shorter guide under [What's in 0.2.86](#whats-in-0286). Live Games Now skips 24/7 replay channels. Group counts use the stored event window and still leave out hidden channels. Two wrong parental PINs can email through Mailgun when that is configured. Sticks with a small heap still use the 16 MB image cache, RGB_565 posters, and a 10 second buffer. Larger boxes pre-warm only the next channel.
+
+---
+
+<div align="center">
+
+## What's in 0.2.127
+
+</div>
+
+- **Amazon Fire TV Stick playlist optimization**:
+  - Eliminated per-batch hash file rewrites during catalog ingest (reads once, writes once per bucket) to prevent flash I/O thrashing and memory pressure on Fire Sticks.
+  - Low-RAM and Fire Stick devices now ingest Live TV first so the guide opens immediately, then load Shows and Movies sequentially only when VOD is enabled.
+  - Added single-threaded streaming `JsonReader` parsing on 256 MB heap devices (`XtreamClient`) and explicit Amazon Fire TV / ≤2.2 GB RAM detection (`DeviceForm`).
+- **Live TV playback stability (no more 15-second spooling/replays or freezes)**:
+  - Removed the false-positive `frameFrozen` / `lastVideoFrameAt` watchdog check that tore down healthy streams and caused the provider to replay the last few seconds; recovery now only triggers if the player is genuinely stuck not playing for 20 seconds, and rebuilds the player if a hardware decoder wedges.
+  - Removed `TvSingleHardwareSelector` so Android TV uses `MediaCodecSelector.DEFAULT` instead of dropping to CPU software decoding.
+  - Switched `NetworkWatcher` to `registerDefaultNetworkCallback` and guarded `reconnectNow()` so background network events never interrupt a playing stream.
+  - Added `WAKE_MODE_NETWORK`, disabled mid-stream live frame-rate surface switches, kept live speed at `0.98x–1.00x` so ExoPlayer never drains its own cushion, and tuned live buffers (`15s–40s`, `2s` start, `3.5s` rebuffer).
+- **Web dashboard TV Remote & Play button fixes**:
+  - Fixed TV Remote Left and Right (plus Up, Down, OK, and Back) on both the guide and player with proper `SOURCE_DPAD` key dispatch and `focusSearch` fallback.
+  - Fixed the `▶` Play button across Channels, Favorites (Search & Manage), and TV Remote Favorites to resolve kind-prefixed IDs (`live:`/`vod:`/`series:`), launch playback immediately on the TV even from other screens, and show toast confirmation.
+- **Web dashboard → set-top box sync & Favorites redesign**:
+  - Fixed split-pane TV guide refreshes (`adoptRemoteLineup` and `reloadFavorites`), guaranteed revision bumps on local dashboard saves, mirrored local dashboard lineup saves to the cloud, and fixed stale DataStore preference cache reads.
+  - Redesigned the web dashboard Favorites tab into **Auto Build**, **Search**, and **Manage** sub-tabs.
+- **UI responsiveness & cloud crash reporting**:
+  - Fixed Samsung adaptive refresh-rate switches (120Hz↔60Hz) from rebuilding browse grids on touch, eliminated redundant adapter layout passes, and added synchronous crash persistence/upload with log redaction.
 
 ---
 
@@ -697,7 +724,7 @@ clearcast-tuner/
 
 - This is a player only. You must provide your own streams.
 - It is a beta.
-- **0.2.118** is the latest signed file (`olympus-iptv-0.2.118.apk`, versionCode 118). Install it over 0.2.117. Phones and TVs both use `https://stream-me-service-api.getjohnathan.com`.
+- **0.2.127** is the latest signed file (`olympus-iptv-0.2.127.apk`, versionCode 127). Install it over any prior build. Phones, Android TVs, and Fire TV Sticks all use `https://stream-me-service-api.getjohnathan.com`.
 - `portal/data/store.json` is for the Node portal on a PC. It is not packaged in the APK.
 - Chromecast often cannot play provider IPTV/HLS. The Cast button warns before connecting.
 - Ratings, trailers, and New this week need the matching keys in `local.properties` at build time.

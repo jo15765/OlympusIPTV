@@ -57,7 +57,7 @@ object CatalogIngest {
             } catch (cancelled: CancellationException) {
                 if (!liveReady.isCompleted) liveReady.cancel(cancelled)
                 throw cancelled
-            } catch (error: Exception) {
+            } catch (error: Throwable) {
                 report("Catalog ingest stopped: ${error.message ?: error.javaClass.simpleName}", error)
                 if (!liveReady.isCompleted) liveReady.complete(false)
             }
@@ -71,6 +71,7 @@ object CatalogIngest {
         liveReady: CompletableDeferred<Boolean>
     ) {
         val db = app.catalogDb
+        val lowRam = com.olympus.iptv.ui.DeviceForm.isLowRam(app)
         db.beginBulkSearch()
         var reached = false
         val international = app.playlistStore.lineup(playlist.id).includeInternational
@@ -84,23 +85,47 @@ object CatalogIngest {
                     return
                 }
                 StreamHeaders.remember(app, scoped.id, fresh.liveChannels + fresh.vodChannels)
-                store(app, db, scoped.id, CatalogDb.LIVE, fresh.liveChannels, true, db.knownChannelIds(scoped.id, CatalogDb.LIVE))
+                val liveHashes = CatalogCache(app).readHashes(scoped.id, CatalogDb.LIVE).toMutableMap()
+                store(db, scoped.id, CatalogDb.LIVE, fresh.liveChannels, true, db.knownChannelIds(scoped.id, CatalogDb.LIVE), liveHashes)
+                CatalogCache(app).writeHashes(scoped.id, CatalogDb.LIVE, liveHashes)
                 db.insertMissing(scoped.id, CatalogDb.LIVE, fresh.liveCategories, emptyList())
                 reached = true
                 liveReady.complete(true)
-                store(app, db, scoped.id, CatalogDb.VOD, fresh.vodChannels, true, db.knownChannelIds(scoped.id, CatalogDb.VOD))
-                db.insertMissing(scoped.id, CatalogDb.VOD, fresh.vodCategories, emptyList())
+                if (scoped.includeVod) {
+                    val vodHashes = CatalogCache(app).readHashes(scoped.id, CatalogDb.VOD).toMutableMap()
+                    store(db, scoped.id, CatalogDb.VOD, fresh.vodChannels, true, db.knownChannelIds(scoped.id, CatalogDb.VOD), vodHashes)
+                    CatalogCache(app).writeHashes(scoped.id, CatalogDb.VOD, vodHashes)
+                    db.insertMissing(scoped.id, CatalogDb.VOD, fresh.vodCategories, emptyList())
+                }
                 return
             }
-            coroutineScope {
-                val liveJob = async { pullLive(app, db, scoped) }
-                val showJob = async { pullShows(app, db, scoped) }
-                val movieJob = async { pullMovies(app, db, scoped) }
-                val live = liveJob.await()
+            if (lowRam) {
+                // Fire Stick / low-RAM devices: ingest one bucket at a time so Live opens fast without OOM.
+                val live = pullLive(app, db, scoped)
                 reached = live || reached
                 if (!liveReady.isCompleted) liveReady.complete(live)
-                if (showJob.await()) reached = true
-                if (movieJob.await()) reached = true
+                if (scoped.includeVod) {
+                    if (pullShows(app, db, scoped)) reached = true
+                    if (pullMovies(app, db, scoped)) reached = true
+                } else {
+                    progress.shows = 100
+                    progress.movies = 100
+                }
+            } else {
+                coroutineScope {
+                    val liveJob = async { pullLive(app, db, scoped) }
+                    val showJob = if (scoped.includeVod) async { pullShows(app, db, scoped) } else null
+                    val movieJob = if (scoped.includeVod) async { pullMovies(app, db, scoped) } else null
+                    val live = liveJob.await()
+                    reached = live || reached
+                    if (!liveReady.isCompleted) liveReady.complete(live)
+                    if (showJob != null && showJob.await()) reached = true
+                    if (movieJob != null && movieJob.await()) reached = true
+                    if (!scoped.includeVod) {
+                        progress.shows = 100
+                        progress.movies = 100
+                    }
+                }
             }
         } finally {
             runCatching { db.endBulkSearch() }
@@ -139,8 +164,11 @@ object CatalogIngest {
         }
         val db = app.catalogDb
         val known = db.knownChannelIds(playlist.id, bucket)
+        val cache = CatalogCache(app)
+        val hashes = cache.readHashes(playlist.id, bucket).toMutableMap()
         db.insertMissing(playlist.id, bucket, cloud.categories, emptyList())
-        store(app, db, playlist.id, bucket, cloud.channels, bucket != CatalogDb.SERIES, known)
+        store(db, playlist.id, bucket, cloud.channels, bucket != CatalogDb.SERIES, known, hashes)
+        cache.writeHashes(playlist.id, bucket, hashes)
         return true
     }
 
@@ -150,13 +178,16 @@ object CatalogIngest {
             return true
         }
         val known = db.knownChannelIds(playlist.id, CatalogDb.LIVE)
+        val cache = CatalogCache(app)
+        val hashes = cache.readHashes(playlist.id, CatalogDb.LIVE).toMutableMap()
         val loaded = runCatching {
             pipeBatches(
-                write = { batch -> store(app, db, playlist.id, CatalogDb.LIVE, batch, true, known) }
+                write = { batch -> store(db, playlist.id, CatalogDb.LIVE, batch, true, known, hashes) }
             ) { send ->
                 loader.loadLive(playlist, onPercent = { progress.live = it.coerceIn(0, 99) }) { batch -> send(batch) }
             }
         }.getOrElse { error ->
+            if (hashes.isNotEmpty()) runCatching { cache.writeHashes(playlist.id, CatalogDb.LIVE, hashes) }
             report("Live channels did not load from the provider: ${error.message ?: error.javaClass.simpleName}", error)
             return false
         }
@@ -165,7 +196,8 @@ object CatalogIngest {
         }
         progress.live = 100
         db.insertMissing(playlist.id, CatalogDb.LIVE, loaded.liveCategories, emptyList())
-        store(app, db, playlist.id, CatalogDb.LIVE, loaded.liveChannels, true, known)
+        store(db, playlist.id, CatalogDb.LIVE, loaded.liveChannels, true, known, hashes)
+        cache.writeHashes(playlist.id, CatalogDb.LIVE, hashes)
         return true
     }
 
@@ -175,13 +207,16 @@ object CatalogIngest {
             return true
         }
         val known = db.knownChannelIds(playlist.id, CatalogDb.SERIES)
+        val cache = CatalogCache(app)
+        val hashes = cache.readHashes(playlist.id, CatalogDb.SERIES).toMutableMap()
         val loaded = runCatching {
             pipeBatches(
-                write = { batch -> store(app, db, playlist.id, CatalogDb.SERIES, batch, false, known) }
+                write = { batch -> store(db, playlist.id, CatalogDb.SERIES, batch, false, known, hashes) }
             ) { send ->
                 loader.loadShows(playlist, onPercent = { progress.shows = it.coerceIn(0, 99) }) { batch -> send(batch) }
             }
         }.getOrElse { error ->
+            if (hashes.isNotEmpty()) runCatching { cache.writeHashes(playlist.id, CatalogDb.SERIES, hashes) }
             report("Shows did not load: ${error.message ?: error.javaClass.simpleName}", error)
             return false
         }
@@ -191,7 +226,8 @@ object CatalogIngest {
             return false
         }
         db.insertMissing(playlist.id, CatalogDb.SERIES, loaded.seriesCategories.orEmpty(), emptyList())
-        store(app, db, playlist.id, CatalogDb.SERIES, loaded.seriesChannels.orEmpty(), false, known)
+        store(db, playlist.id, CatalogDb.SERIES, loaded.seriesChannels.orEmpty(), false, known, hashes)
+        cache.writeHashes(playlist.id, CatalogDb.SERIES, hashes)
         return true
     }
 
@@ -201,9 +237,11 @@ object CatalogIngest {
             return true
         }
         val known = db.knownChannelIds(playlist.id, CatalogDb.VOD)
+        val cache = CatalogCache(app)
+        val hashes = cache.readHashes(playlist.id, CatalogDb.VOD).toMutableMap()
         var loaded = runCatching {
             pipeBatches(
-                write = { batch -> store(app, db, playlist.id, CatalogDb.VOD, batch, true, known) }
+                write = { batch -> store(db, playlist.id, CatalogDb.VOD, batch, true, known, hashes) }
             ) { send ->
                 CountryIndex.annotate(
                     loader.loadMovies(playlist, onPercent = { progress.movies = it.coerceIn(0, 99) }) { batch ->
@@ -215,7 +253,7 @@ object CatalogIngest {
         if (loaded != null && loaded.vodLoadFailed && loaded.vodChannels.isEmpty()) {
             loaded = runCatching {
                 pipeBatches(
-                    write = { batch -> store(app, db, playlist.id, CatalogDb.VOD, batch, true, known) }
+                    write = { batch -> store(db, playlist.id, CatalogDb.VOD, batch, true, known, hashes) }
                 ) { send ->
                     CountryIndex.annotate(
                         loader.loadMovies(playlist, onPercent = { progress.movies = it.coerceIn(0, 99) }) { batch ->
@@ -226,6 +264,7 @@ object CatalogIngest {
             }.getOrNull()
         }
         if (loaded == null) {
+            if (hashes.isNotEmpty()) runCatching { cache.writeHashes(playlist.id, CatalogDb.VOD, hashes) }
             report("Movies did not load from the provider")
             return false
         }
@@ -235,31 +274,28 @@ object CatalogIngest {
         }
         progress.movies = 100
         db.insertMissing(playlist.id, CatalogDb.VOD, loaded.vodCategories, emptyList())
-        store(app, db, playlist.id, CatalogDb.VOD, loaded.vodChannels, true, known)
+        store(db, playlist.id, CatalogDb.VOD, loaded.vodChannels, true, known, hashes)
+        cache.writeHashes(playlist.id, CatalogDb.VOD, hashes)
         return true
     }
 
     private fun store(
-        app: OlympusIptvApp,
         db: CatalogDb,
         playlistId: String,
         bucket: String,
         channels: List<Channel>,
         tag: Boolean,
-        known: MutableSet<String>
+        known: MutableSet<String>,
+        hashes: MutableMap<String, Int>
     ) {
         if (channels.isEmpty()) return
-        val cache = CatalogCache(app)
-        val previous = cache.readHashes(playlistId, bucket)
-        val changed = CatalogDelta.writes(previous, channels, known)
+        val changed = CatalogDelta.writes(hashes, channels, known)
         if (changed.isNotEmpty()) {
             val rows = if (tag) CountryIndex.tagChannels(changed) else changed
             db.insertMissing(playlistId, bucket, emptyList(), rows)
             for (channel in changed) known.add(channel.id)
         }
-        val next = HashMap(previous)
-        for (channel in channels) next[channel.id] = CatalogDelta.rowHash(channel)
-        cache.writeHashes(playlistId, bucket, next)
+        for (channel in channels) hashes[channel.id] = CatalogDelta.rowHash(channel)
     }
 
     private suspend fun <T> pipeBatches(
