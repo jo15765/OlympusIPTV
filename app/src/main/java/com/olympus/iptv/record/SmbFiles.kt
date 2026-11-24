@@ -32,6 +32,7 @@ object SmbFiles {
         private val file: File
     ) : RecordSink {
         private var offset = 0L
+        override val bytesWritten: Long get() = offset
 
         override fun write(bytes: ByteArray, length: Int) {
             file.write(bytes, offset, 0, length)

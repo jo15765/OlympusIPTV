@@ -25,6 +25,9 @@ val portalCloudUrl = localProperty("portal.cloudUrl").ifBlank {
     "https://stream-me-service-api.getjohnathan.com"
 }
 
+val googleDriveClientId = localProperty("googleDrive.clientId")
+val oneDriveClientId = localProperty("oneDrive.clientId")
+
 fun signingValue(key: String): String {
     val file = File(System.getProperty("user.home"), "olympus-iptv-signing.txt")
     if (!file.exists()) return ""
@@ -43,8 +46,8 @@ android {
         applicationId = "com.olympus.iptv"
         minSdk = 24
         targetSdk = 35
-        versionCode = 132
-        versionName = "0.2.132"
+        versionCode = 133
+        versionName = "0.2.133"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "WATCHMODE_API_KEY", "\"$watchmodeKey\"")
         buildConfigField("String", "OPENSUBTITLES_API_KEY", "\"$opensubtitlesKey\"")
@@ -53,6 +56,8 @@ android {
         buildConfigField("String", "MAILGUN_FROM_EMAIL", "\"$mailgunFrom\"")
         buildConfigField("String", "TMDB_API_KEY", "\"$tmdbKey\"")
         buildConfigField("String", "PORTAL_CLOUD_URL", "\"$portalCloudUrl\"")
+        buildConfigField("String", "GOOGLE_DRIVE_CLIENT_ID", "\"$googleDriveClientId\"")
+        buildConfigField("String", "ONEDRIVE_CLIENT_ID", "\"$oneDriveClientId\"")
     }
 
     // Release stays a single APK. TV sticks only need ARM. Debug keeps every ABI so the emulator still runs.

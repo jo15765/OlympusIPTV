@@ -48,13 +48,33 @@ object RecordingFiles {
     }
 }
 
-class FileSink(file: File) : RecordSink {
-    private val stream = FileOutputStream(file, false)
+class FileSink(private val file: File) : RecordSink {
+    private val stream = java.io.BufferedOutputStream(FileOutputStream(file, false), 256 * 1024)
+    private var nextSpaceCheck = SPACE_CHECK_INTERVAL_BYTES
+    override var bytesWritten: Long = 0L
+        private set
+
     override fun write(bytes: ByteArray, length: Int) {
         stream.write(bytes, 0, length)
+        bytesWritten += length
+        if (bytesWritten >= nextSpaceCheck) {
+            nextSpaceCheck = bytesWritten + SPACE_CHECK_INTERVAL_BYTES
+            val free = file.parentFile?.usableSpace ?: file.usableSpace
+            if (free in 1L until HARD_STOP_FREE_BYTES) {
+                throw java.io.IOException("Low device storage")
+            }
+        }
     }
+
     override fun close() {
+        runCatching { stream.flush() }
         stream.close()
+    }
+
+    companion object {
+        const val MIN_START_FREE_BYTES = 250L * 1024L * 1024L
+        const val HARD_STOP_FREE_BYTES = 100L * 1024L * 1024L
+        private const val SPACE_CHECK_INTERVAL_BYTES = 16L * 1024L * 1024L
     }
 }
 

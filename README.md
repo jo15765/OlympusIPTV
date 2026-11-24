@@ -100,7 +100,9 @@ Olympus-IPTV is one APK for Android TV / set-top boxes and for phones and tablet
   - Disabled `BackdropGlow` motion, capped Coil/HTTP disk caches (`20 MB`), lowered Web-UI logo worker priority/count (`2` threads), trimmed EPG block cache (`36` entries), and tuned live start/back buffers (`1.5s` start, `4s` back-buffer) on low-RAM sticks.
 - **Web Dashboard, DVR & Reminders Overhaul**:
   - Redesigned the Web-UI with warm obsidian + amber styling, `DocumentFragment` batch rendering, shimmer skeletons, color-coded toasts, context-aware sticky Save & Sync, group prefetching, redesigned Web-UI & Active Streams (with cached Public WAN IP + VPN status), and fixed local TV Wi-Fi connection status.
-  - Hardened DVR (`RecordingService` auto-stop when idle, shared HTTP pool, 500-entry HLS dedup cap, immediate start on dashboard schedule save) and Reminders (`ReminderClock` alarm deduplication + cloud-sync arming), backed by unit tests.
+  - Added **Google Drive & OneDrive DVR Cloud Upload** (`CloudDriveUploader` pure-OkHttp resumable chunked uploads + OAuth Device-Code sign-in from the Web-UI **Storage & Cloud** tab, 3-option storage overview cards, dynamic destination picker with live free-space/cloud/SMB labels in both Web-UI and TV/mobile `RecordPrompt`, optional BYO or `BuildConfig` Client ID, per-recording **Upload to Cloud** / cloud links, and an **"Auto-delete local copy after upload"** toggle for Fire TV Sticks).
+  - Kept set-top TV guide scroll alignment (`scheduleGuideAlign` / `alignGuide`) scoped independently from mobile touch scroll locking so both TV and mobile stay perfectly aligned.
+  - Hardened DVR (`RecordingService` auto-stop when idle, shared HTTP pool, pre-flight `< 250 MB` storage guard with automatic SMB fallback, mid-recording `100 MB` low-space safety cutoff + 256 KB buffered writes, auto-reconnect on transient direct-stream drops, accurate SMB byte sizes, 500-entry HLS dedup cap, immediate start on dashboard schedule save) and Reminders (`ReminderClock` alarm deduplication + cloud-sync arming), backed by unit tests.
   - Migrated build config to AGP 9.5 native DSL & built-in Kotlin with **0 compiler warnings**.
 
 ---

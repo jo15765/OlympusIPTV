@@ -543,9 +543,10 @@ class ChannelAdapter(
 
         override fun bindEpg(item: Channel) {
             val context = binding.root.context
-            // In side-by-side EPG guide mode, the right-hand program timeline shows airing shows;
+            val touch = DeviceForm.isTouchPrimary(context)
+            // On mobile side-by-side EPG guide mode, the right-hand program timeline shows airing shows;
             // keeping the left channel cell clean locks its height 1:1 with the program row.
-            if (guideRowHeight > 0 || item.kind != ContentKind.LIVE || !item.seriesId.isNullOrBlank()) {
+            if ((touch && guideRowHeight > 0) || item.kind != ContentKind.LIVE || !item.seriesId.isNullOrBlank()) {
                 binding.epgNow.visibility = View.GONE
                 binding.epgProgress.visibility = View.GONE
                 binding.epgNext.visibility = View.GONE

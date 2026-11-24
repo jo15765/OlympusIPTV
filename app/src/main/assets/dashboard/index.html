@@ -2902,13 +2902,13 @@
         <div class="panel-head">
           <div>
             <h2>Recordings &amp; DVR</h2>
-            <p class="panel-subhead">Schedule recordings from the guide, manage saved shows, or configure network storage.</p>
+            <p class="panel-subhead">Schedule recordings from the guide, manage saved shows, or save to Device, SMB, Google Drive, or OneDrive.</p>
           </div>
         </div>
         <div class="seg-tabs" role="tablist" aria-label="Recordings sections">
           <button class="seg-tab" type="button" data-rec-sub="schedule" aria-selected="true">Schedule</button>
           <button class="seg-tab" type="button" data-rec-sub="list" aria-selected="false">My Recordings</button>
-          <button class="seg-tab" type="button" data-rec-sub="storage" aria-selected="false">Storage (SMB)</button>
+          <button class="seg-tab" type="button" data-rec-sub="storage" aria-selected="false">Storage &amp; Cloud</button>
         </div>
         <div id="recPaneSchedule">
           <div class="record-split">
@@ -2920,9 +2920,18 @@
               <div class="list" id="recordPrograms"></div>
             </article>
             <article class="clean-card">
-              <h3>2. Manual Timer</h3>
+              <h3>2. Destination &amp; Manual Timer</h3>
               <p class="hint">Starts 1 minute early and stops 1 minute late. Keep the TV app open to record.</p>
-              <label for="recordTitle">Program</label>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px">
+                <label for="recordWhere" style="margin:0">Save recordings to</label>
+                <button id="openRecStorageBtn" class="secondary" type="button" style="padding:4px 10px;font-size:12px">Storage &amp; Cloud →</button>
+              </div>
+              <select id="recordWhere" style="margin-top:6px">
+                <option value="local">This Device (Local storage)</option>
+                <option value="smb">Network Share (SMB)</option>
+              </select>
+              <p id="recordDestHint" class="hint" style="margin-top:6px"></p>
+              <label for="recordTitle" style="margin-top:10px">Program</label>
               <input id="recordTitle" type="text" autocomplete="off" />
               <div class="fields" style="margin-top:8px">
                 <div>
@@ -2934,11 +2943,6 @@
                   <input id="recordEnd" type="datetime-local" />
                 </div>
               </div>
-              <label for="recordWhere" style="margin-top:8px">Save to</label>
-              <select id="recordWhere">
-                <option value="local">This TV</option>
-                <option value="smb">Network share</option>
-              </select>
               <div class="actions" style="margin-top:14px">
                 <button id="recordManual" class="primary" type="button">Record these times</button>
               </div>
@@ -2952,33 +2956,118 @@
           </article>
         </div>
         <div id="recPaneStorage" hidden>
-          <article class="clean-card" style="max-width:620px">
-            <h3>Network Share (SMB)</h3>
-            <p class="hint">Optional NAS or PC shared folder for storing recordings off the TV.</p>
-            <div class="fields" style="margin-top:10px">
-              <div>
-                <label for="smbHost">Server</label>
-                <input id="smbHost" type="text" placeholder="192.168.1.20" autocomplete="off" />
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:16px">
+            <div class="clean-card" style="padding:14px">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+                <strong style="font-size:14px">1. This Device</strong>
+                <span class="pill" style="font-size:11px;border-color:rgba(115,181,110,0.55);color:#8fd48a">Ready</span>
               </div>
-              <div>
-                <label for="smbShare">Share</label>
-                <input id="smbShare" type="text" placeholder="Media" autocomplete="off" />
-              </div>
-              <div>
-                <label for="smbFolder">Folder</label>
-                <input id="smbFolder" type="text" placeholder="Olympus-IPTV" autocomplete="off" />
-              </div>
-              <div>
-                <label for="smbUser">Username</label>
-                <input id="smbUser" type="text" autocomplete="off" />
-              </div>
+              <p class="hint" style="margin:6px 0 0">Saves directly to internal storage. Automatically redirects to SMB if free space drops under 250 MB.</p>
             </div>
-            <label for="smbPass" style="margin-top:8px">Password</label>
-            <input id="smbPass" type="password" autocomplete="new-password" />
-            <div class="actions" style="margin-top:14px">
-              <button class="primary" id="saveShare" type="button">Save Storage Settings</button>
+            <div class="clean-card" style="padding:14px">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+                <strong style="font-size:14px">2. Network Share (SMB)</strong>
+                <span class="pill" id="smbSummaryPill" style="font-size:11px">Not set up</span>
+              </div>
+              <p class="hint" style="margin:6px 0 0">Streams directly to your NAS or PC shared folder—ideal for 8 GB Fire TV Sticks.</p>
             </div>
-          </article>
+            <div class="clean-card" style="padding:14px">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+                <strong style="font-size:14px">3. Cloud Drive</strong>
+                <span class="pill" id="cloudSummaryPill" style="font-size:11px">Not connected</span>
+              </div>
+              <p class="hint" style="margin:6px 0 0">Auto-uploads finished recordings to Google Drive or OneDrive with optional local cleanup.</p>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;align-items:start">
+            <article class="clean-card">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+                <div>
+                  <h3 style="margin:0">Network Share (SMB)</h3>
+                  <p class="hint" style="margin-top:4px">NAS or PC shared folder on your home Wi-Fi.</p>
+                </div>
+                <span class="pill" id="smbDriveStatus" style="font-size:12px">Not set up</span>
+              </div>
+              <div class="fields" style="margin-top:12px">
+                <div>
+                  <label for="smbHost">Server</label>
+                  <input id="smbHost" type="text" placeholder="192.168.1.20" autocomplete="off" />
+                </div>
+                <div>
+                  <label for="smbShare">Share</label>
+                  <input id="smbShare" type="text" placeholder="Media" autocomplete="off" />
+                </div>
+                <div>
+                  <label for="smbFolder">Folder</label>
+                  <input id="smbFolder" type="text" placeholder="Olympus-IPTV" autocomplete="off" />
+                </div>
+                <div>
+                  <label for="smbUser">Username</label>
+                  <input id="smbUser" type="text" autocomplete="off" />
+                </div>
+              </div>
+              <label for="smbPass" style="margin-top:8px">Password</label>
+              <input id="smbPass" type="password" autocomplete="new-password" />
+              <div class="actions" style="margin-top:14px">
+                <button class="primary" id="saveShare" type="button">Save SMB Settings</button>
+              </div>
+            </article>
+
+            <article class="clean-card">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+                <div>
+                  <h3 style="margin:0">Cloud Storage</h3>
+                  <p class="hint" style="margin-top:4px">Google Drive or Microsoft OneDrive auto-upload.</p>
+                </div>
+                <span class="pill" id="cloudDriveStatus" style="font-size:12px">Not connected</span>
+              </div>
+              <div class="fields" style="margin-top:12px">
+                <div>
+                  <label for="cloudProvider">Provider</label>
+                  <select id="cloudProvider">
+                    <option value="">Off (Local / SMB only)</option>
+                    <option value="gdrive">Google Drive</option>
+                    <option value="onedrive">Microsoft OneDrive</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="cloudFolder">Folder</label>
+                  <input id="cloudFolder" type="text" placeholder="Olympus-IPTV" autocomplete="off" />
+                </div>
+              </div>
+              <label style="display:flex;align-items:center;gap:8px;margin-top:10px;cursor:pointer">
+                <input id="cloudDeleteLocal" type="checkbox" style="width:auto;margin:0" />
+                <span>Auto-delete local copy on device after cloud upload</span>
+              </label>
+              <details style="margin-top:10px">
+                <summary class="hint" style="cursor:pointer;margin:0">Advanced: Custom OAuth Client ID (optional)</summary>
+                <div class="fields" style="margin-top:8px">
+                  <div>
+                    <label for="cloudClientId">OAuth Client ID</label>
+                    <input id="cloudClientId" type="text" placeholder="Google Cloud or Azure App Client ID" autocomplete="off" />
+                  </div>
+                  <div>
+                    <label for="cloudClientSecret">Client Secret (Google TV/Device)</label>
+                    <input id="cloudClientSecret" type="password" placeholder="Optional" autocomplete="new-password" />
+                  </div>
+                </div>
+              </details>
+              <div id="cloudAuthBox" hidden style="margin-top:12px;padding:12px;border-radius:10px;background:rgba(230,166,92,0.1);border:1px solid rgba(230,166,92,0.35)">
+                <div style="font-size:13px;color:var(--muted)">1. Open the sign-in page and enter this code to link your account:</div>
+                <div style="display:flex;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap">
+                  <strong id="cloudUserCode" style="font-size:20px;letter-spacing:2px;font-family:monospace;color:var(--accent)"></strong>
+                  <a id="cloudVerifyLink" class="secondary" href="#" target="_blank" rel="noopener" style="text-decoration:none;padding:6px 12px;border-radius:8px;border:1px solid var(--stroke)">Open Sign-In Page ↗</a>
+                  <span id="cloudAuthHint" class="hint" style="margin:0">Waiting for approval…</span>
+                </div>
+              </div>
+              <div class="actions" style="margin-top:14px">
+                <button class="primary" id="connectCloudDrive" type="button">Connect Account</button>
+                <button class="secondary" id="saveCloudDrive" type="button">Save Settings</button>
+                <button class="secondary" id="disconnectCloudDrive" type="button" hidden>Disconnect</button>
+              </div>
+            </article>
+          </div>
         </div>
       </section>
 
@@ -4669,6 +4758,48 @@
       document.querySelector("#smbUser").value = smb.username || "";
       document.querySelector("#smbPass").value = "";
       document.querySelector("#smbPass").placeholder = smb.password ? "Saved" : "Password";
+      const cd = recordings().cloudDrive || {};
+      document.querySelector("#cloudProvider").value = cd.provider || "";
+      document.querySelector("#cloudFolder").value = cd.folder || "Olympus-IPTV";
+      document.querySelector("#cloudClientId").value = cd.clientId || "";
+      document.querySelector("#cloudClientSecret").value = "";
+      document.querySelector("#cloudClientSecret").placeholder = cd.clientSecret ? "Saved" : "Optional";
+      document.querySelector("#cloudDeleteLocal").checked = Boolean(cd.deleteLocalAfterUpload);
+      const connected = Boolean((cd.provider === "gdrive" || cd.provider === "onedrive") && cd.refreshToken);
+      const pname = cd.provider === "gdrive" ? "Google Drive" : "OneDrive";
+      const smbReady = Boolean((smb.host || "").trim() && (smb.share || "").trim());
+      const setPill = (el, ok, text) => {
+        if (!el) return;
+        el.textContent = text;
+        el.style.borderColor = ok ? "rgba(115,181,110,0.6)" : "";
+        el.style.color = ok ? "#8fd48a" : "";
+      };
+      setPill(document.querySelector("#smbDriveStatus"), smbReady, smbReady ? "✓ Configured" : "Not set up");
+      setPill(document.querySelector("#smbSummaryPill"), smbReady, smbReady ? "✓ Ready" : "Not set up");
+      setPill(document.querySelector("#cloudDriveStatus"), connected, connected ? ("✓ Connected · " + (cd.accountLabel || pname)) : "Not connected");
+      setPill(document.querySelector("#cloudSummaryPill"), connected, connected ? ("✓ " + pname) : "Not connected");
+      document.querySelector("#disconnectCloudDrive").hidden = !connected;
+      const whereSel = document.querySelector("#recordWhere");
+      if (whereSel && whereSel.options.length >= 2) {
+        whereSel.options[0].textContent = connected
+          ? ("This Device → auto-upload to " + pname)
+          : "This Device (Local storage)";
+        whereSel.options[1].textContent = smbReady
+          ? ("Network Share (SMB · " + smb.host + "/" + smb.share + ")")
+          : "Network Share (SMB — not set up yet)";
+      }
+      const destHint = document.querySelector("#recordDestHint");
+      if (destHint) {
+        if (whereSel && whereSel.value === "smb") {
+          destHint.textContent = smbReady
+            ? ("Saves directly to \\\\" + smb.host + "\\" + smb.share + "\\" + (smb.folder || "Olympus-IPTV") + ".")
+            : "Configure your SMB server & share under Storage & Cloud first.";
+        } else if (connected) {
+          destHint.textContent = "Records locally, then uploads to " + pname + " (" + (cd.folder || "Olympus-IPTV") + ")" + (cd.deleteLocalAfterUpload ? " and removes the local copy." : ".");
+        } else {
+          destHint.textContent = "Saves to device storage. Connect Google Drive, OneDrive, or SMB under Storage & Cloud anytime.";
+        }
+      }
       renderRecordChannels();
       renderRecordPrograms();
       renderRecordList();
@@ -4864,6 +4995,127 @@
       document.querySelector("#recordProgramNote").textContent = "Network share saved.";
       showToast("✓ Storage (SMB) settings saved", "ok");
     }
+    let cloudPollTimer = null;
+    async function saveCloudDrive() {
+      const book = recordings();
+      const prev = book.cloudDrive || {};
+      const typedSecret = document.querySelector("#cloudClientSecret").value.trim();
+      book.cloudDrive = {
+        provider: document.querySelector("#cloudProvider").value,
+        folder: document.querySelector("#cloudFolder").value.trim() || "Olympus-IPTV",
+        clientId: document.querySelector("#cloudClientId").value.trim(),
+        clientSecret: typedSecret || prev.clientSecret || "",
+        refreshToken: prev.refreshToken || "",
+        accountLabel: prev.accountLabel || "",
+        deleteLocalAfterUpload: document.querySelector("#cloudDeleteLocal").checked
+      };
+      book.revision = Date.now();
+      session.recordings = book;
+      await postRecordings();
+      renderRecordings();
+      showToast("✓ Cloud storage settings saved", "ok");
+    }
+    async function connectCloudDrive() {
+      const provider = document.querySelector("#cloudProvider").value;
+      if (!provider) {
+        showToast("Select Google Drive or OneDrive first", "warn");
+        return;
+      }
+      if (cloudPollTimer) { clearInterval(cloudPollTimer); cloudPollTimer = null; }
+      const payload = {
+        email: session.email,
+        deviceId: session.deviceId,
+        provider,
+        clientId: document.querySelector("#cloudClientId").value.trim(),
+        clientSecret: document.querySelector("#cloudClientSecret").value.trim(),
+        folder: document.querySelector("#cloudFolder").value.trim() || "Olympus-IPTV",
+        deleteLocalAfterUpload: document.querySelector("#cloudDeleteLocal").checked
+      };
+      const resp = await fetch("/api/recordings/cloud/auth/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const body = await resp.json().catch(() => ({}));
+      if (!resp.ok || !body.ok) {
+        showToast(body.error || "Could not start cloud sign-in", "err");
+        return;
+      }
+      document.querySelector("#cloudUserCode").textContent = body.userCode || "";
+      document.querySelector("#cloudVerifyLink").href = body.verificationUrl || "#";
+      document.querySelector("#cloudAuthHint").textContent = "Waiting for approval…";
+      document.querySelector("#cloudAuthBox").hidden = false;
+      const everyMs = Math.max(4000, (body.interval || 5) * 1000);
+      const startedAt = Date.now();
+      const maxMs = Math.min(600000, (body.expiresIn || 600) * 1000);
+      cloudPollTimer = setInterval(async () => {
+        if (Date.now() - startedAt > maxMs) {
+          clearInterval(cloudPollTimer);
+          cloudPollTimer = null;
+          document.querySelector("#cloudAuthHint").textContent = "Code expired — click Connect Account again.";
+          return;
+        }
+        const pollResp = await fetch("/api/recordings/cloud/auth/poll", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: session.email,
+            deviceId: session.deviceId,
+            provider,
+            clientId: payload.clientId,
+            clientSecret: payload.clientSecret,
+            deviceCode: body.deviceCode
+          })
+        });
+        const poll = await pollResp.json().catch(() => ({}));
+        if (poll.status === "connected") {
+          clearInterval(cloudPollTimer);
+          cloudPollTimer = null;
+          document.querySelector("#cloudAuthBox").hidden = true;
+          if (poll.recordings) session.recordings = poll.recordings;
+          renderRecordings();
+          showToast("✓ Connected to " + (poll.accountLabel || provider), "ok");
+        } else if (poll.status === "error") {
+          clearInterval(cloudPollTimer);
+          cloudPollTimer = null;
+          document.querySelector("#cloudAuthHint").textContent = poll.error || "Authorization failed.";
+          showToast(poll.error || "Cloud authorization failed", "err");
+        }
+      }, everyMs);
+    }
+    async function disconnectCloudDrive() {
+      if (cloudPollTimer) { clearInterval(cloudPollTimer); cloudPollTimer = null; }
+      const resp = await fetch("/api/recordings/cloud/disconnect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: session.email, deviceId: session.deviceId })
+      });
+      const body = await resp.json().catch(() => ({}));
+      if (resp.ok && body.recordings) session.recordings = body.recordings;
+      document.querySelector("#cloudAuthBox").hidden = true;
+      renderRecordings();
+      showToast("Disconnected cloud storage", "ok");
+    }
+    async function uploadRecordingToCloud(id, btn) {
+      if (btn) { btn.disabled = true; btn.textContent = "Uploading…"; }
+      try {
+        const resp = await fetch("/api/recordings/cloud/upload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: session.email, deviceId: session.deviceId, id })
+        });
+        const body = await resp.json().catch(() => ({}));
+        if (!resp.ok || !body.ok) {
+          showToast(body.error || "Cloud upload failed", "err");
+          return;
+        }
+        if (body.recordings) session.recordings = body.recordings;
+        renderRecordList();
+        showToast("✓ Uploaded recording to cloud", "ok");
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = "Upload to Cloud"; }
+      }
+    }
     async function postRecordings() {
       const response = await fetch("/api/recordings", {
         method: "POST",
@@ -4897,6 +5149,21 @@
           download.textContent = "Download";
           download.href = "/api/recordings/file?email=" + encodeURIComponent(session.email) + "&deviceId=" + encodeURIComponent(session.deviceId) + "&id=" + encodeURIComponent(item.id);
           row.appendChild(download);
+          if (item.cloudUrl) {
+            const cloudLink = document.createElement("a");
+            cloudLink.textContent = item.cloudProvider === "onedrive" ? "OneDrive ↗" : "Google Drive ↗";
+            cloudLink.href = item.cloudUrl;
+            cloudLink.target = "_blank";
+            cloudLink.rel = "noopener";
+            row.appendChild(cloudLink);
+          } else if (item.status === "done" && (recordings().cloudDrive || {}).refreshToken) {
+            const up = document.createElement("button");
+            up.type = "button";
+            up.className = "secondary";
+            up.textContent = "Upload to Cloud";
+            up.addEventListener("click", () => uploadRecordingToCloud(item.id, up));
+            row.appendChild(up);
+          }
         }
         if (item.status === "scheduled" || item.status === "recording") {
           const stop = document.createElement("button");
@@ -6131,6 +6398,13 @@
     });
     document.querySelector("#recordSearch").addEventListener("input", debounce(renderRecordChannels, 120));
     document.querySelector("#saveShare").addEventListener("click", saveShare);
+    document.querySelector("#saveCloudDrive").addEventListener("click", saveCloudDrive);
+    document.querySelector("#connectCloudDrive").addEventListener("click", connectCloudDrive);
+    document.querySelector("#disconnectCloudDrive").addEventListener("click", disconnectCloudDrive);
+    document.querySelector("#recordWhere").addEventListener("change", renderRecordings);
+    document.querySelector("#openRecStorageBtn").addEventListener("click", () => {
+      document.querySelector('[data-rec-sub="storage"]')?.click();
+    });
     document.querySelector("#recordManual").addEventListener("click", recordManual);
     const quickSports = [
       ["nfl", "NFL Football"],
@@ -6635,7 +6909,7 @@
     });
 
     document.querySelectorAll(".section-save").forEach((button) => {
-      if (button.id === "saveShare") return;
+      if (button.id === "saveShare" || button.id === "saveCloudDrive" || button.id === "connectCloudDrive" || button.id === "disconnectCloudDrive" || button.id === "openRecStorageBtn") return;
       button.addEventListener("click", () => saveLineup(false));
     });
     const stripPrefixes = document.querySelector("#stripPrefixes");

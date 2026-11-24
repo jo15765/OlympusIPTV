@@ -6,6 +6,7 @@ import com.olympus.iptv.data.RecordingBook
 import com.olympus.iptv.data.SmbSettings
 import com.olympus.iptv.remind.ShowReminder
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -62,5 +63,30 @@ class RecordAndReminderSmokeTest {
         assertEquals(15, decoded.leadMinutes)
         assertEquals(start - 900_000L, decoded.fireAt)
         assertTrue((decoded.fireAt ?: 0L) < (decoded.startMillis ?: 0L))
+    }
+
+    @Test
+    fun cloudDriveSettingsValidateProvidersAndRoundTrip() {
+        val gdrive = com.olympus.iptv.data.CloudDriveSettings(
+            provider = "GDRIVE",
+            clientId = "test-client-id",
+            refreshToken = "refresh-123",
+            folder = "  ",
+            accountLabel = "user@gmail.com",
+            deleteLocalAfterUpload = true
+        )
+        assertTrue(gdrive.ready())
+        assertEquals("gdrive", gdrive.normalizedProvider())
+        assertEquals("Olympus-IPTV", gdrive.folderName())
+        assertEquals("test-client-id", com.olympus.iptv.record.CloudDriveUploader.effectiveClientId("gdrive", gdrive.clientId))
+
+        val disconnected = gdrive.copy(refreshToken = "")
+        assertFalse(disconnected.ready())
+
+        val book = RecordingBook(cloudDrive = gdrive, revision = 42L)
+        val roundTripped = gson.fromJson(gson.toJson(book), RecordingBook::class.java)
+        assertTrue(roundTripped.cloudDriveOrEmpty().ready())
+        assertEquals("user@gmail.com", roundTripped.cloudDriveOrEmpty().accountLabel)
+        assertEquals(true, roundTripped.cloudDriveOrEmpty().deleteLocalAfterUpload)
     }
 }

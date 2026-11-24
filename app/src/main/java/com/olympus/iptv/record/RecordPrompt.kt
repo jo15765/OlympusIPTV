@@ -53,16 +53,47 @@ object RecordPrompt {
         program: EpgProgram,
         series: Boolean = false
     ) {
-        val dialog = AlertDialog.Builder(activity)
-            .setTitle(R.string.record_where)
-            .setItems(arrayOf(activity.getString(R.string.record_local), activity.getString(R.string.record_smb))) { _, which ->
-                val destination = if (which == 0) Recording.LOCAL else Recording.SMB
-                askEndPad(activity, playlistId, channel, program, series, destination)
+        activity.lifecycleScope.launch {
+            val app = activity.application as OlympusIptvApp
+            val (localLabel, smbLabel) = withContext(Dispatchers.IO) {
+                val book = app.playlistStore.recordingBook(playlistId)
+                val cloud = book.cloudDriveOrEmpty()
+                val smb = book.smbOrEmpty()
+                val freeBytes = RecordingFiles.directory(activity).usableSpace
+                val freeText = if (freeBytes > 0L) {
+                    android.text.format.Formatter.formatShortFileSize(activity, freeBytes) + " free"
+                } else {
+                    ""
+                }
+                val baseLocal = activity.getString(R.string.record_local)
+                val localText = when {
+                    cloud.ready() -> {
+                        val cloudName = if (cloud.normalizedProvider() == Recording.ONEDRIVE) "OneDrive" else "Google Drive"
+                        if (freeText.isNotEmpty()) "$baseLocal + $cloudName ($freeText)" else "$baseLocal + $cloudName"
+                    }
+                    freeText.isNotEmpty() -> "$baseLocal ($freeText)"
+                    else -> baseLocal
+                }
+                val baseSmb = activity.getString(R.string.record_smb)
+                val smbText = if (smb.ready()) {
+                    "$baseSmb (${smb.host}/${smb.share})"
+                } else {
+                    "$baseSmb (Set up…)"
+                }
+                localText to smbText
             }
-            .setNegativeButton(android.R.string.cancel, null)
-            .create()
-        com.olympus.iptv.ui.DialogChrome.dress(dialog)
-        dialog.show()
+            if (activity.isDestroyed) return@launch
+            val dialog = AlertDialog.Builder(activity)
+                .setTitle(R.string.record_where)
+                .setItems(arrayOf(localLabel, smbLabel)) { _, which ->
+                    val destination = if (which == 0) Recording.LOCAL else Recording.SMB
+                    askEndPad(activity, playlistId, channel, program, series, destination)
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .create()
+            com.olympus.iptv.ui.DialogChrome.dress(dialog)
+            dialog.show()
+        }
     }
 
     private fun askEndPad(

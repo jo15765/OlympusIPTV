@@ -18,6 +18,24 @@ data class SmbSettings(
     fun folderName(): String = folder?.trim().orEmpty().ifBlank { "Olympus-IPTV" }
 }
 
+data class CloudDriveSettings(
+    val provider: String? = null,
+    val clientId: String? = null,
+    val clientSecret: String? = null,
+    val refreshToken: String? = null,
+    val folder: String? = null,
+    val accountLabel: String? = null,
+    val deleteLocalAfterUpload: Boolean? = false
+) {
+    fun normalizedProvider(): String = provider?.trim()?.lowercase().orEmpty()
+
+    fun ready(): Boolean =
+        (normalizedProvider() == Recording.GDRIVE || normalizedProvider() == Recording.ONEDRIVE) &&
+            !refreshToken.isNullOrBlank()
+
+    fun folderName(): String = folder?.trim().orEmpty().ifBlank { "Olympus-IPTV" }
+}
+
 data class Recording(
     val id: String? = null,
     val channelId: String? = null,
@@ -31,6 +49,8 @@ data class Recording(
     val bytes: Long? = null,
     val error: String? = null,
     val copied: Boolean? = null,
+    val cloudProvider: String? = null,
+    val cloudUrl: String? = null,
     val startPadMillis: Long? = null,
     val endPadMillis: Long? = null
 ) {
@@ -42,6 +62,8 @@ data class Recording(
     companion object {
         const val LOCAL = "local"
         const val SMB = "smb"
+        const val GDRIVE = "gdrive"
+        const val ONEDRIVE = "onedrive"
         const val SCHEDULED = "scheduled"
         const val RECORDING = "recording"
         const val DONE = "done"
@@ -62,6 +84,7 @@ data class SeriesWatch(
 data class RecordingBook(
     val items: List<Recording>? = emptyList(),
     val smb: SmbSettings? = SmbSettings(),
+    val cloudDrive: CloudDriveSettings? = CloudDriveSettings(),
     val guide: Map<String, List<GuideSlot>>? = emptyMap(),
     val guideRequests: List<String>? = emptyList(),
     val series: List<SeriesWatch>? = null,
@@ -75,4 +98,5 @@ data class RecordingBook(
     }
     fun revisionOrZero(): Long = revision ?: 0L
     fun smbOrEmpty(): SmbSettings = smb ?: SmbSettings()
+    fun cloudDriveOrEmpty(): CloudDriveSettings = cloudDrive ?: CloudDriveSettings()
 }

@@ -6,6 +6,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 
 interface RecordSink : Closeable {
+    val bytesWritten: Long
     fun write(bytes: ByteArray, length: Int)
 }
 
@@ -19,22 +20,40 @@ class StreamCapture(private val http: OkHttpClient) {
     }
 
     private fun captureDirect(url: String, sink: RecordSink, untilMillis: Long, shouldStop: () -> Boolean) {
-        val request = Request.Builder().url(url).build()
-        http.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) error("Stream refused")
-            val input = response.body?.byteStream() ?: error("Empty stream")
-            val buffer = ByteArray(64 * 1024)
-            while (System.currentTimeMillis() < untilMillis && !shouldStop()) {
-                val read = input.read(buffer)
-                if (read < 0) break
-                if (read > 0) sink.write(buffer, read)
+        val buffer = ByteArray(64 * 1024)
+        var consecutiveFailures = 0
+        while (System.currentTimeMillis() < untilMillis && !shouldStop()) {
+            val before = sink.bytesWritten
+            val ok = runCatching {
+                val request = Request.Builder().url(url).build()
+                http.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) error("Stream refused (${response.code})")
+                    val input = response.body?.byteStream() ?: error("Empty stream")
+                    while (System.currentTimeMillis() < untilMillis && !shouldStop()) {
+                        val read = input.read(buffer)
+                        if (read < 0) break
+                        if (read > 0) sink.write(buffer, read)
+                    }
+                }
             }
+            if (shouldStop() || System.currentTimeMillis() >= untilMillis) return
+            if (sink.bytesWritten > before) {
+                consecutiveFailures = 0
+            } else {
+                consecutiveFailures += 1
+                if (consecutiveFailures >= 5) {
+                    ok.exceptionOrNull()?.let { throw it }
+                    return
+                }
+            }
+            runCatching { Thread.sleep((consecutiveFailures.coerceAtLeast(1) * 2_000L).coerceAtMost(8_000L)) }
         }
     }
 
     private fun captureHls(url: String, sink: RecordSink, untilMillis: Long, shouldStop: () -> Boolean) {
         var playlist = url
         val seen = LinkedHashSet<String>()
+        val buffer = ByteArray(64 * 1024)
         while (System.currentTimeMillis() < untilMillis && !shouldStop()) {
             val text = httpText(playlist)
             if (text.contains("#EXT-X-STREAM-INF")) {
@@ -44,7 +63,7 @@ class StreamCapture(private val http: OkHttpClient) {
             for (segment in segments(playlist, text)) {
                 if (!seen.add(segment)) continue
                 if (seen.size > 500) seen.iterator().let { if (it.hasNext()) { it.next(); it.remove() } }
-                append(segment, sink)
+                append(segment, sink, buffer)
                 if (System.currentTimeMillis() >= untilMillis || shouldStop()) return
             }
             if (text.contains("#EXT-X-ENDLIST")) return
@@ -52,12 +71,11 @@ class StreamCapture(private val http: OkHttpClient) {
         }
     }
 
-    private fun append(url: String, sink: RecordSink) {
+    private fun append(url: String, sink: RecordSink, buffer: ByteArray) {
         val request = Request.Builder().url(url).build()
         http.newCall(request).execute().use { response ->
             if (!response.isSuccessful) return
             val input = response.body?.byteStream() ?: return
-            val buffer = ByteArray(64 * 1024)
             while (true) {
                 val read = input.read(buffer)
                 if (read < 0) break

@@ -342,7 +342,10 @@ internal fun BrowseActivity.hostOnCreate(savedInstanceState: Bundle?) {
             }
 
             override fun onScrolled(recyclerView: androidx.recyclerview.widget.RecyclerView, dx: Int, dy: Int) {
-                if (dy != 0) alignGuide(recyclerView, binding.programList)
+                if (dy != 0) {
+                    if (touchPrimary) alignGuide(recyclerView, binding.programList)
+                    else scheduleGuideAlign(recyclerView, binding.programList)
+                }
                 if (dy <= 0 || selectedCategoryId == null || selectedCategoryId == PlaylistLoader.FAVORITES_ID) return
                 maybePrefetchGroupPage(recyclerView)
             }
@@ -359,7 +362,10 @@ internal fun BrowseActivity.hostOnCreate(savedInstanceState: Bundle?) {
             }
 
             override fun onScrolled(recyclerView: androidx.recyclerview.widget.RecyclerView, dx: Int, dy: Int) {
-                if (dy != 0) alignGuide(recyclerView, binding.channelList)
+                if (dy != 0) {
+                    if (touchPrimary) alignGuide(recyclerView, binding.channelList)
+                    else scheduleGuideAlign(recyclerView, binding.channelList)
+                }
             }
         })
         focusHandler.postDelayed(object : Runnable {
@@ -1772,12 +1778,14 @@ internal fun BrowseActivity.applyGuideColumns() {
         binding.contentDivider.visibility = if (showGroups && showChannels) View.VISIBLE else View.GONE
         binding.contentColumn.visibility = if (showChannels) View.VISIBLE else View.GONE
         binding.programPane.visibility = if (showPrograms) View.VISIBLE else View.GONE
-        if (showPrograms) {
-            syncProgramRowHeight()
-        } else if (channelAdapter.guideRowHeight != 0) {
-            channelAdapter.guideRowHeight = 0
-            if (channelAdapter.itemCount > 0) {
-                channelAdapter.notifyItemRangeChanged(0, channelAdapter.itemCount)
+        if (touchPrimary) {
+            if (showPrograms) {
+                syncProgramRowHeight()
+            } else if (channelAdapter.guideRowHeight != 0) {
+                channelAdapter.guideRowHeight = 0
+                if (channelAdapter.itemCount > 0) {
+                    channelAdapter.notifyItemRangeChanged(0, channelAdapter.itemCount)
+                }
             }
         }
         if (phoneChrome) {
@@ -2187,20 +2195,34 @@ internal fun BrowseActivity.alignGuide(
         val index = from.findFirstVisibleItemPosition()
         if (index == androidx.recyclerview.widget.RecyclerView.NO_POSITION) return
         val child = from.findViewByPosition(index) ?: return
-        val offset = child.top - source.paddingTop
-        val shown = to.findViewByPosition(index)
-        if (shown != null && (shown.top - target.paddingTop) == offset) {
+        if (touchPrimary) {
+            val offset = child.top - source.paddingTop
+            val shown = to.findViewByPosition(index)
+            if (shown != null && (shown.top - target.paddingTop) == offset) {
+                lastAlignIndex = index
+                lastAlignTop = offset
+                return
+            }
+            guideScrollSync = true
+            try {
+                lastAlignIndex = index
+                lastAlignTop = offset
+                to.scrollToPositionWithOffset(index, offset)
+            } finally {
+                guideScrollSync = false
+            }
+        } else {
+            val shown = to.findViewByPosition(index)
+            if (shown != null && shown.top == child.top) {
+                lastAlignIndex = index
+                lastAlignTop = child.top
+                return
+            }
+            guideScrollSync = true
             lastAlignIndex = index
-            lastAlignTop = offset
-            return
-        }
-        guideScrollSync = true
-        try {
-            lastAlignIndex = index
-            lastAlignTop = offset
-            to.scrollToPositionWithOffset(index, offset)
-        } finally {
-            guideScrollSync = false
+            lastAlignTop = child.top
+            to.scrollToPositionWithOffset(index, child.top)
+            target.post { guideScrollSync = false }
         }
     }
 

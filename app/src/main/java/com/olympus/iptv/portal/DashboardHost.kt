@@ -452,6 +452,10 @@ object DashboardHost {
             method == "POST" && path == "/api/recordings" -> saveRecordings(app, socket, json(body))
             method == "GET" && path == "/api/recordings/file" -> readRecording(app, socket, query)
             method == "POST" && path == "/api/recordings/delete-file" -> deleteRecording(app, socket, json(body))
+            method == "POST" && path == "/api/recordings/cloud/auth/start" -> cloudAuthStart(app, socket, json(body))
+            method == "POST" && path == "/api/recordings/cloud/auth/poll" -> cloudAuthPoll(app, socket, json(body))
+            method == "POST" && path == "/api/recordings/cloud/disconnect" -> cloudDisconnect(app, socket, json(body))
+            method == "POST" && path == "/api/recordings/cloud/upload" -> cloudUploadExisting(app, socket, json(body))
             method == "GET" && path == "/api/reminders" -> reminders(app, socket, query["email"], query["deviceId"])
             method == "POST" && path == "/api/reminders/update" -> reminderUpdate(app, socket, json(body))
             method == "POST" && path == "/api/reminders/delete" -> reminderDelete(app, socket, json(body))
@@ -1265,8 +1269,19 @@ object DashboardHost {
         val incoming = body.get("recordings")?.let { gson.fromJson(it, RecordingBook::class.java) } ?: RecordingBook()
         val smb = incoming.smb ?: previous.smb
         val password = if (smb?.password.isNullOrBlank()) previous.smb?.password else smb?.password
+        val prevCloud = previous.cloudDriveOrEmpty()
+        val inCloud = incoming.cloudDrive ?: prevCloud
+        val providerChanged = !inCloud.provider.isNullOrBlank() &&
+            !prevCloud.provider.isNullOrBlank() &&
+            inCloud.normalizedProvider() != prevCloud.normalizedProvider()
+        val mergedCloud = inCloud.copy(
+            clientSecret = if (inCloud.clientSecret.isNullOrBlank() && !providerChanged) prevCloud.clientSecret else inCloud.clientSecret,
+            refreshToken = if (inCloud.refreshToken.isNullOrBlank() && !providerChanged) prevCloud.refreshToken else inCloud.refreshToken,
+            accountLabel = if (inCloud.accountLabel.isNullOrBlank() && !providerChanged) prevCloud.accountLabel else inCloud.accountLabel
+        )
         val next = incoming.copy(
             smb = (smb ?: SmbSettings()).copy(password = password),
+            cloudDrive = mergedCloud,
             revision = incoming.revision ?: System.currentTimeMillis()
         )
         if ((next.revision ?: 0L) >= previous.revisionOrZero()) {
@@ -1281,6 +1296,159 @@ object DashboardHost {
         }
         val saved = runBlocking { app.playlistStore.recordingBook(gate.playlist.id) }
         writeJson(socket, 200, mapOf("ok" to true, "recordings" to saved))
+    }
+
+    private fun cloudAuthStart(app: OlympusIptvApp, socket: Socket, body: JsonObject) {
+        val gate = gate(app, text(body, "email"), text(body, "deviceId")) ?: run {
+            writeJson(socket, 401, mapOf("error" to "Device not registered"))
+            return
+        }
+        val provider = text(body, "provider").trim().lowercase()
+        val clientId = text(body, "clientId").trim()
+        val clientSecret = text(body, "clientSecret").trim()
+        val folder = text(body, "folder").trim().ifBlank { "Olympus-IPTV" }
+        val deleteLocal = body.get("deleteLocalAfterUpload")?.takeIf { !it.isJsonNull }?.asBoolean ?: false
+        val started = runCatching {
+            com.olympus.iptv.record.CloudDriveUploader.startDeviceAuth(provider, clientId)
+        }
+        val auth = started.getOrElse { err ->
+            writeJson(socket, 400, mapOf("error" to (err.message ?: "Could not start cloud sign-in")))
+            return
+        }
+        val previous = runBlocking { app.playlistStore.recordingBook(gate.playlist.id) }
+        val updated = previous.copy(
+            cloudDrive = previous.cloudDriveOrEmpty().copy(
+                provider = auth.provider,
+                clientId = clientId.ifBlank { previous.cloudDriveOrEmpty().clientId },
+                clientSecret = clientSecret.ifBlank { previous.cloudDriveOrEmpty().clientSecret },
+                folder = folder,
+                deleteLocalAfterUpload = deleteLocal
+            ),
+            revision = System.currentTimeMillis()
+        )
+        runBlocking { app.playlistStore.saveRecordingBook(gate.playlist.id, updated) }
+        writeJson(
+            socket,
+            200,
+            mapOf(
+                "ok" to true,
+                "provider" to auth.provider,
+                "deviceCode" to auth.deviceCode,
+                "userCode" to auth.userCode,
+                "verificationUrl" to auth.verificationUrl,
+                "expiresIn" to auth.expiresIn,
+                "interval" to auth.interval
+            )
+        )
+    }
+
+    private fun cloudAuthPoll(app: OlympusIptvApp, socket: Socket, body: JsonObject) {
+        val gate = gate(app, text(body, "email"), text(body, "deviceId")) ?: run {
+            writeJson(socket, 401, mapOf("error" to "Device not registered"))
+            return
+        }
+        val book = runBlocking { app.playlistStore.recordingBook(gate.playlist.id) }
+        val cloud = book.cloudDriveOrEmpty()
+        val provider = text(body, "provider").ifBlank { cloud.normalizedProvider() }
+        val clientId = text(body, "clientId").ifBlank { cloud.clientId.orEmpty() }
+        val clientSecret = text(body, "clientSecret").ifBlank { cloud.clientSecret.orEmpty() }
+        val deviceCode = text(body, "deviceCode")
+        when (val poll = com.olympus.iptv.record.CloudDriveUploader.pollDeviceAuth(provider, clientId, clientSecret, deviceCode)) {
+            is com.olympus.iptv.record.CloudDriveUploader.DeviceAuthPoll.Pending -> {
+                writeJson(socket, 200, mapOf("status" to "pending"))
+            }
+            is com.olympus.iptv.record.CloudDriveUploader.DeviceAuthPoll.Failed -> {
+                writeJson(socket, 400, mapOf("status" to "error", "error" to poll.message))
+            }
+            is com.olympus.iptv.record.CloudDriveUploader.DeviceAuthPoll.Connected -> {
+                val next = book.copy(
+                    cloudDrive = cloud.copy(
+                        provider = provider,
+                        clientId = clientId.ifBlank { cloud.clientId },
+                        clientSecret = clientSecret.ifBlank { cloud.clientSecret },
+                        refreshToken = poll.refreshToken,
+                        accountLabel = poll.accountLabel
+                    ),
+                    revision = System.currentTimeMillis()
+                )
+                runBlocking { app.playlistStore.saveRecordingBook(gate.playlist.id, next) }
+                writeJson(
+                    socket,
+                    200,
+                    mapOf(
+                        "status" to "connected",
+                        "accountLabel" to poll.accountLabel,
+                        "recordings" to next
+                    )
+                )
+            }
+        }
+    }
+
+    private fun cloudDisconnect(app: OlympusIptvApp, socket: Socket, body: JsonObject) {
+        val gate = gate(app, text(body, "email"), text(body, "deviceId")) ?: run {
+            writeJson(socket, 401, mapOf("error" to "Device not registered"))
+            return
+        }
+        val book = runBlocking { app.playlistStore.recordingBook(gate.playlist.id) }
+        val next = book.copy(
+            cloudDrive = book.cloudDriveOrEmpty().copy(
+                refreshToken = "",
+                accountLabel = ""
+            ),
+            revision = System.currentTimeMillis()
+        )
+        runBlocking { app.playlistStore.saveRecordingBook(gate.playlist.id, next) }
+        writeJson(socket, 200, mapOf("ok" to true, "recordings" to next))
+    }
+
+    private fun cloudUploadExisting(app: OlympusIptvApp, socket: Socket, body: JsonObject) {
+        val gate = gate(app, text(body, "email"), text(body, "deviceId")) ?: run {
+            writeJson(socket, 401, mapOf("error" to "Device not registered"))
+            return
+        }
+        val id = safePart(text(body, "id")) ?: run {
+            writeJson(socket, 400, mapOf("error" to "Missing recording ID"))
+            return
+        }
+        val book = runBlocking { app.playlistStore.recordingBook(gate.playlist.id) }
+        val cloud = book.cloudDriveOrEmpty()
+        if (!cloud.ready()) {
+            writeJson(socket, 400, mapOf("error" to "Connect Google Drive or OneDrive first"))
+            return
+        }
+        val item = book.itemsOrEmpty().firstOrNull { it.id == id } ?: run {
+            writeJson(socket, 404, mapOf("error" to "Recording not found"))
+            return
+        }
+        val fileName = item.fileName ?: run {
+            writeJson(socket, 404, mapOf("error" to "Recording file missing"))
+            return
+        }
+        val localFile = com.olympus.iptv.record.RecordingFiles.file(app, fileName)
+        if (!localFile.exists() || localFile.length() <= 0L) {
+            writeJson(socket, 404, mapOf("error" to "Local file not found on device"))
+            return
+        }
+        val uploaded = runCatching {
+            com.olympus.iptv.record.CloudDriveUploader.upload(cloud, localFile, fileName)
+        }.getOrElse { err ->
+            writeJson(socket, 500, mapOf("error" to (err.message ?: "Upload failed")))
+            return
+        }
+        if (cloud.deleteLocalAfterUpload == true) {
+            runCatching { localFile.delete() }
+            com.olympus.iptv.record.RecordingFiles.invalidateSize()
+        }
+        val next = book.copy(
+            items = book.itemsOrEmpty().map {
+                if (it.id == id) it.copy(copied = true, cloudProvider = uploaded.provider, cloudUrl = uploaded.webUrl)
+                else it
+            },
+            revision = System.currentTimeMillis()
+        )
+        runBlocking { app.playlistStore.saveRecordingBook(gate.playlist.id, next) }
+        writeJson(socket, 200, mapOf("ok" to true, "cloudUrl" to uploaded.webUrl, "recordings" to next))
     }
 
     private fun readRecording(app: OlympusIptvApp, socket: Socket, query: Map<String, String>) {

@@ -190,7 +190,19 @@ class RecordingService : Service() {
                 if (url.isBlank()) error("No stream")
                 val name = item.fileName ?: error("No file")
                 val book = app.playlistStore.recordingBook(playlistId)
-                val sink = if (item.destination == Recording.SMB) {
+                var destination = item.destination ?: Recording.LOCAL
+                if (destination != Recording.SMB) {
+                    val free = RecordingFiles.directory(this@RecordingService).usableSpace
+                    if (free in 1L until FileSink.MIN_START_FREE_BYTES) {
+                        if (book.smbOrEmpty().ready()) {
+                            destination = Recording.SMB
+                            update(app, playlistId, email, id) { it.copy(destination = Recording.SMB) }
+                        } else {
+                            error("Low device storage (< 250 MB free)")
+                        }
+                    }
+                }
+                val sink = if (destination == Recording.SMB) {
                     SmbFiles.sink(book.smbOrEmpty(), name)
                 } else {
                     FileSink(RecordingFiles.file(this@RecordingService, name))
@@ -199,22 +211,54 @@ class RecordingService : Service() {
                     StreamCapture(http).capture(url, sink, item.windowEnd()) { stopCapture.get() }
                 } finally {
                     runCatching { sink.close() }
-                    if (item.destination != Recording.SMB) RecordingFiles.invalidateSize()
+                    if (destination != Recording.SMB) RecordingFiles.invalidateSize()
                 }
                 val latest = app.playlistStore.recordingBook(playlistId).itemsOrEmpty().firstOrNull { it.id == id }
                 if (latest?.status == Recording.STOPPED) return@launch
-                val bytes = if (item.destination == Recording.SMB) 0L else RecordingFiles.file(this@RecordingService, name).length()
+                val bytes = if (destination == Recording.SMB) {
+                    sink.bytesWritten
+                } else {
+                    RecordingFiles.file(this@RecordingService, name).length().coerceAtLeast(sink.bytesWritten)
+                }
                 var copied = false
-                if (item.destination != Recording.SMB && email.isNotBlank() && bytes > 0L) {
-                    copied = LineupClient(app).uploadRecording(
-                        email,
-                        app.playlistStore.deviceId(),
-                        id,
-                        RecordingFiles.file(this@RecordingService, name)
-                    )
+                var cloudProvider: String? = null
+                var cloudUrl: String? = null
+                if (destination != Recording.SMB && bytes > 0L) {
+                    val localFile = RecordingFiles.file(this@RecordingService, name)
+                    val cloudDrive = app.playlistStore.recordingBook(playlistId).cloudDriveOrEmpty()
+                    if (cloudDrive.ready() && localFile.exists()) {
+                        val uploaded = runCatching {
+                            CloudDriveUploader.upload(cloudDrive, localFile, name)
+                        }.getOrNull()
+                        if (uploaded != null) {
+                            copied = true
+                            cloudProvider = uploaded.provider
+                            cloudUrl = uploaded.webUrl
+                            if (cloudDrive.deleteLocalAfterUpload == true) {
+                                runCatching { localFile.delete() }
+                                RecordingFiles.invalidateSize()
+                            }
+                        }
+                    }
+                    if (!copied && email.isNotBlank() && localFile.exists()) {
+                        copied = LineupClient(app).uploadRecording(
+                            email,
+                            app.playlistStore.deviceId(),
+                            id,
+                            localFile
+                        )
+                    }
                 }
                 update(app, playlistId, email, id) {
-                    it.copy(status = Recording.DONE, bytes = bytes, copied = copied, error = null)
+                    it.copy(
+                        status = Recording.DONE,
+                        destination = destination,
+                        bytes = bytes,
+                        copied = copied,
+                        cloudProvider = cloudProvider ?: it.cloudProvider,
+                        cloudUrl = cloudUrl ?: it.cloudUrl,
+                        error = null
+                    )
                 }
             } catch (error: Exception) {
                 update(app, playlistId, email, id) {
