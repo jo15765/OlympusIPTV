@@ -49,6 +49,11 @@ object NameStrip {
     private val statusCache = java.util.concurrent.ConcurrentHashMap<String, StreamStatus>()
     private var cachedPlan: Plan? = null
 
+    fun clearCaches() {
+        shown.clear()
+        statusCache.clear()
+    }
+
     private data class Plan(
         val prefixes: List<String>,
         val suffixes: List<String>,

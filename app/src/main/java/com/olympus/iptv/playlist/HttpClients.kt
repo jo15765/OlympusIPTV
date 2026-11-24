@@ -4,12 +4,15 @@ import android.content.Context
 import okhttp3.Cache
 import okhttp3.ConnectionPool
 import okhttp3.Dispatcher
+import okhttp3.Dns
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
 import okhttp3.Request
 import java.io.File
 import java.io.IOException
+import java.net.Inet4Address
 import java.net.InetAddress
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 
 /**
@@ -19,11 +22,41 @@ import java.util.concurrent.TimeUnit
  */
 object HttpClients {
     private const val CACHE_BYTES = 50L * 1024L * 1024L
+    private const val CACHE_BYTES_LOW_RAM = 20L * 1024L * 1024L
+    private const val DNS_TTL_MS = 60_000L
+
+    private data class DnsEntry(val addresses: List<InetAddress>, val expiresAt: Long)
+
+    private val dnsCache = ConcurrentHashMap<String, DnsEntry>()
+
+    /**
+     * 60-second in-memory DNS cache preferring IPv4 addresses first so flaky ISP IPv6 routing
+     * never adds Happy-Eyeballs connection stalls on IPTV stream zaps or EPG fetches.
+     */
+    private val fastDns = object : Dns {
+        override fun lookup(hostname: String): List<InetAddress> {
+            val now = System.currentTimeMillis()
+            val hit = dnsCache[hostname]
+            if (hit != null && hit.expiresAt > now) return hit.addresses
+            val resolved = Dns.SYSTEM.lookup(hostname)
+            val ordered = if (resolved.size > 1) {
+                resolved.sortedBy { if (it is Inet4Address) 0 else 1 }
+            } else {
+                resolved
+            }
+            if (dnsCache.size > 128) dnsCache.clear()
+            dnsCache[hostname] = DnsEntry(ordered, now + DNS_TTL_MS)
+            return ordered
+        }
+    }
 
     @Volatile private var cacheDir: File? = null
+    @Volatile private var lowRamDevice = false
 
     fun install(context: Context) {
-        cacheDir = File(context.applicationContext.cacheDir, "http-shared")
+        val app = context.applicationContext
+        cacheDir = File(app.cacheDir, "http-shared")
+        lowRamDevice = com.olympus.iptv.ui.DeviceForm.isLowRam(app)
     }
 
     /** Resolve DNS and open a keep-alive socket for a few stream hosts before the first tune. */
@@ -33,13 +66,16 @@ object HttpClients {
         Thread {
             val client = shared
             for (host in unique) {
-                runCatching { InetAddress.getAllByName(host) }
+                runCatching { fastDns.lookup(host) }
                 runCatching {
                     client.newCall(
                         Request.Builder().url("https://$host/").head().build()
                     ).execute().close()
                 }
             }
+        }.apply {
+            isDaemon = true
+            priority = Thread.MIN_PRIORITY + 1
         }.start()
     }
 
@@ -51,8 +87,9 @@ object HttpClients {
         warm(hosts)
     }
 
-    /** Drops keep-alive sockets and in-flight calls so a network change does not wait out a read timeout. */
+    /** Drops keep-alive sockets, DNS cache, and in-flight calls so a network change does not wait out a read timeout. */
     fun evictConnections() {
+        dnsCache.clear()
         runCatching { shared.dispatcher.cancelAll() }
         runCatching { xtream.dispatcher.cancelAll() }
         runCatching { shared.connectionPool.evictAll() }
@@ -90,14 +127,17 @@ object HttpClients {
 
     private fun buildShared(): OkHttpClient {
         val dir = cacheDir ?: File(System.getProperty("java.io.tmpdir"), "olympus-http")
+        val maxCache = if (lowRamDevice) CACHE_BYTES_LOW_RAM else CACHE_BYTES
+        val poolSize = if (lowRamDevice) 8 else 16
         return OkHttpClient.Builder()
+            .dns(fastDns)
             .connectTimeout(8, TimeUnit.SECONDS)
             .readTimeout(15, TimeUnit.SECONDS)
             .writeTimeout(15, TimeUnit.SECONDS)
             .callTimeout(20, TimeUnit.SECONDS)
-            .connectionPool(ConnectionPool(16, 5, TimeUnit.MINUTES))
+            .connectionPool(ConnectionPool(poolSize, 5, TimeUnit.MINUTES))
             .protocols(listOf(Protocol.HTTP_2, Protocol.HTTP_1_1))
-            .cache(Cache(dir, CACHE_BYTES))
+            .cache(Cache(dir, maxCache))
             .retryOnConnectionFailure(true)
             .addInterceptor { chain ->
                 val host = chain.request().url.host

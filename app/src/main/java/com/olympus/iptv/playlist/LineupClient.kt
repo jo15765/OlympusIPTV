@@ -5,6 +5,8 @@ import com.google.gson.Gson
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
+import com.google.gson.stream.JsonReader
+import com.google.gson.stream.JsonToken
 import com.olympus.iptv.BuildConfig
 import com.olympus.iptv.data.Category
 import com.olympus.iptv.data.Channel
@@ -43,7 +45,7 @@ class LineupClient(
     private val context: Context,
     private val http: OkHttpClient = defaultHttp
 ) {
-    private val gson = Gson()
+    private val gson: Gson get() = sharedGson
     private val jsonType = "application/json; charset=utf-8".toMediaType()
     private val prefs by lazy {
         context.applicationContext.getSharedPreferences("olympus_cloud_auth", Context.MODE_PRIVATE)
@@ -353,37 +355,148 @@ class LineupClient(
     fun fetchCloudCatalog(email: String, deviceId: String, kind: String): CloudCatalogResponse? {
         val token = ensureDeviceToken(email, deviceId)
         val url = "${baseUrl()}/api/catalog/sync?email=${enc(email)}&deviceId=${enc(deviceId)}&kind=$kind"
-        val json = getJson(url, token, deviceId, catalogHttp) ?: return null
+        val req = Request.Builder()
+            .url(url)
+            .header("X-Device-Id", deviceId)
+            .apply { if (!token.isNullOrBlank()) header("X-Device-Token", token) }
+            .get()
+            .build()
         return runCatching {
-            val categories = json.getAsJsonArray("categories").orEmpty().map { el ->
-                val row = el.asJsonObject
-                Category(
-                    id = row.text("id"),
-                    name = row.text("name"),
-                    kind = contentKind(row.text("kind"))
-                )
+            catalogHttp.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return@use null
+                val body = resp.body ?: return@use null
+                // Stream-parse directly with JsonReader to avoid allocating a giant JSON String + DOM tree.
+                JsonReader(body.charStream()).use { reader ->
+                    parseCloudCatalog(reader)
+                }
             }
-            val channels = json.getAsJsonArray("channels").orEmpty().map { el ->
-                val row = el.asJsonObject
-                Channel(
-                    id = row.text("id"),
-                    name = row.text("name"),
-                    streamUrl = row.text("streamUrl"),
-                    logoUrl = row.textOrNull("logoUrl"),
-                    groupTitle = row.textOrNull("groupTitle"),
-                    categoryId = row.textOrNull("categoryId"),
-                    kind = contentKind(row.text("kind")),
-                    seriesId = row.textOrNull("seriesId"),
-                    season = row.get("season")?.takeIf { !it.isJsonNull }?.asInt
-                )
-            }
-            CloudCatalogResponse(
-                categories = categories,
-                channels = channels,
-                stamp = json.get("stamp")?.takeIf { !it.isJsonNull }?.asLong ?: 0L
-            )
         }.getOrNull()
     }
+
+    private fun parseCloudCatalog(reader: JsonReader): CloudCatalogResponse? {
+        if (reader.peek() != JsonToken.BEGIN_OBJECT) return null
+        val categories = ArrayList<Category>()
+        val channels = ArrayList<Channel>(512)
+        var stamp = 0L
+        reader.beginObject()
+        while (reader.hasNext()) {
+            when (reader.nextName()) {
+                "categories" -> {
+                    if (reader.peek() == JsonToken.BEGIN_ARRAY) {
+                        reader.beginArray()
+                        while (reader.hasNext()) {
+                            parseCategory(reader)?.let { categories.add(it) }
+                        }
+                        reader.endArray()
+                    } else {
+                        reader.skipValue()
+                    }
+                }
+                "channels" -> {
+                    if (reader.peek() == JsonToken.BEGIN_ARRAY) {
+                        reader.beginArray()
+                        while (reader.hasNext()) {
+                            parseChannel(reader)?.let { channels.add(it) }
+                        }
+                        reader.endArray()
+                    } else {
+                        reader.skipValue()
+                    }
+                }
+                "stamp" -> {
+                    if (reader.peek() == JsonToken.NULL) {
+                        reader.nextNull()
+                    } else {
+                        stamp = runCatching { reader.nextLong() }.getOrDefault(0L)
+                    }
+                }
+                else -> reader.skipValue()
+            }
+        }
+        reader.endObject()
+        return CloudCatalogResponse(categories = categories, channels = channels, stamp = stamp)
+    }
+
+    private fun parseCategory(reader: JsonReader): Category? {
+        if (reader.peek() != JsonToken.BEGIN_OBJECT) {
+            reader.skipValue()
+            return null
+        }
+        var id = ""
+        var name = ""
+        var kind = ""
+        reader.beginObject()
+        while (reader.hasNext()) {
+            when (reader.nextName()) {
+                "id" -> id = reader.nextStringOrEmpty()
+                "name" -> name = reader.nextStringOrEmpty()
+                "kind" -> kind = reader.nextStringOrEmpty()
+                else -> reader.skipValue()
+            }
+        }
+        reader.endObject()
+        return Category(id = id, name = name, kind = contentKind(kind))
+    }
+
+    private fun parseChannel(reader: JsonReader): Channel? {
+        if (reader.peek() != JsonToken.BEGIN_OBJECT) {
+            reader.skipValue()
+            return null
+        }
+        var id = ""
+        var name = ""
+        var streamUrl = ""
+        var logoUrl: String? = null
+        var groupTitle: String? = null
+        var categoryId: String? = null
+        var kind = ""
+        var seriesId: String? = null
+        var season: Int? = null
+        reader.beginObject()
+        while (reader.hasNext()) {
+            when (reader.nextName()) {
+                "id" -> id = reader.nextStringOrEmpty()
+                "name" -> name = reader.nextStringOrEmpty()
+                "streamUrl" -> streamUrl = reader.nextStringOrEmpty()
+                "logoUrl" -> logoUrl = reader.nextStringOrNull()
+                "groupTitle" -> groupTitle = reader.nextStringOrNull()
+                "categoryId" -> categoryId = reader.nextStringOrNull()
+                "kind" -> kind = reader.nextStringOrEmpty()
+                "seriesId" -> seriesId = reader.nextStringOrNull()
+                "season" -> {
+                    if (reader.peek() == JsonToken.NULL) {
+                        reader.nextNull()
+                    } else {
+                        season = runCatching { reader.nextInt() }.getOrNull()
+                    }
+                }
+                else -> reader.skipValue()
+            }
+        }
+        reader.endObject()
+        return Channel(
+            id = id,
+            name = name,
+            streamUrl = streamUrl,
+            logoUrl = logoUrl,
+            groupTitle = groupTitle,
+            categoryId = categoryId,
+            kind = contentKind(kind),
+            seriesId = seriesId,
+            season = season
+        )
+    }
+
+    private fun JsonReader.nextStringOrEmpty(): String =
+        if (peek() == JsonToken.NULL) {
+            nextNull()
+            ""
+        } else {
+            nextString()
+        }
+
+    private fun JsonReader.nextStringOrNull(): String? =
+        nextStringOrEmpty().takeIf { it.isNotBlank() }
 
     fun uploadErrorLog(
         email: String?,
@@ -493,21 +606,32 @@ class LineupClient(
     private fun enc(value: String): String = URLEncoder.encode(value, "UTF-8")
 
     companion object {
-        private val defaultHttp = OkHttpClient.Builder()
-            .connectTimeout(6, TimeUnit.SECONDS)
-            .readTimeout(10, TimeUnit.SECONDS)
-            .build()
+        private val sharedGson = Gson()
 
-        private val catalogHttp = OkHttpClient.Builder()
-            .connectTimeout(20, TimeUnit.SECONDS)
-            .readTimeout(90, TimeUnit.SECONDS)
-            .build()
+        private val defaultHttp by lazy {
+            HttpClients.shared.newBuilder()
+                .connectTimeout(6, TimeUnit.SECONDS)
+                .readTimeout(10, TimeUnit.SECONDS)
+                .callTimeout(15, TimeUnit.SECONDS)
+                .build()
+        }
 
-        private val sseHttp = OkHttpClient.Builder()
-            .connectTimeout(8, TimeUnit.SECONDS)
-            .readTimeout(0, TimeUnit.SECONDS)
-            .retryOnConnectionFailure(true)
-            .build()
+        private val catalogHttp by lazy {
+            HttpClients.shared.newBuilder()
+                .connectTimeout(20, TimeUnit.SECONDS)
+                .readTimeout(90, TimeUnit.SECONDS)
+                .callTimeout(0, TimeUnit.SECONDS)
+                .build()
+        }
+
+        private val sseHttp by lazy {
+            HttpClients.shared.newBuilder()
+                .connectTimeout(8, TimeUnit.SECONDS)
+                .readTimeout(0, TimeUnit.SECONDS)
+                .callTimeout(0, TimeUnit.SECONDS)
+                .retryOnConnectionFailure(true)
+                .build()
+        }
 
         fun peekDashboardUrl(): String? {
             return DashboardHost.url()

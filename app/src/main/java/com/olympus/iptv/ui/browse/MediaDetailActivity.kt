@@ -85,8 +85,18 @@ class MediaDetailActivity : AppCompatActivity() {
         }
         binding.heroBackdrop.load(posterUrl)
 
-        binding.episodeCarousel.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
-        binding.castCarousel.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
+        binding.episodeCarousel.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false).apply {
+            initialPrefetchItemCount = 6
+        }
+        binding.episodeCarousel.setHasFixedSize(true)
+        binding.episodeCarousel.itemAnimator = null
+        binding.episodeCarousel.setItemViewCacheSize(6)
+        binding.castCarousel.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false).apply {
+            initialPrefetchItemCount = 6
+        }
+        binding.castCarousel.setHasFixedSize(true)
+        binding.castCarousel.itemAnimator = null
+        binding.castCarousel.setItemViewCacheSize(6)
 
         binding.btnDetailBack.setOnClickListener { finish() }
         binding.btnDetailCast.setOnClickListener { CastBridge.showChooser(this, channel) }

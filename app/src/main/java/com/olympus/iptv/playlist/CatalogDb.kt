@@ -15,7 +15,9 @@ import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
 class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext, "olympus-iptv.db", null, 17) {
-    private val filesDir = context.applicationContext.filesDir
+    private val appContext = context.applicationContext
+    private val filesDir = appContext.filesDir
+    private val lowRamDevice = com.olympus.iptv.ui.DeviceForm.isLowRam(appContext)
     private val writer = ReentrantLock()
     private val dashLock = Any()
     @Volatile private var dashHold: DashHold? = null
@@ -44,8 +46,8 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         applyPragma(db, "PRAGMA synchronous=NORMAL")
         applyPragma(db, "PRAGMA temp_store=MEMORY")
         applyPragma(db, "PRAGMA busy_timeout=3000")
-        applyPragma(db, "PRAGMA cache_size=-16384")
-        applyPragma(db, "PRAGMA mmap_size=33554432")
+        applyPragma(db, if (lowRamDevice) "PRAGMA cache_size=-6144" else "PRAGMA cache_size=-16384")
+        applyPragma(db, if (lowRamDevice) "PRAGMA mmap_size=16777216" else "PRAGMA mmap_size=33554432")
         db.enableWriteAheadLogging()
         db.setMaxSqlCacheSize(64)
         db.execSQL(
@@ -68,6 +70,12 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         )
     }
 
+    @Volatile private var deadHold: Pair<String, Set<String>>? = null
+
+    fun invalidateDeadCache() {
+        deadHold = null
+    }
+
     fun recordStreamFailure(playlistId: String, channelId: String): Int = write {
         val db = writableDatabase
         val current = db.rawQuery(
@@ -86,18 +94,25 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
                 arrayOf(next.toString(), playlistId, channelId)
             )
         }
+        deadHold = null
         next
     }
 
-    fun deadChannelIds(playlistId: String, minimum: Int = 2): Set<String> = read {
-        val ids = HashSet<String>()
-        readableDatabase.rawQuery(
-            "SELECT channel_id FROM stream_health WHERE playlist_id=? AND failures>=?",
-            arrayOf(playlistId, minimum.toString())
-        ).use { cursor ->
-            while (cursor.moveToNext()) ids.add(cursor.getString(0))
+    fun deadChannelIds(playlistId: String, minimum: Int = 2): Set<String> {
+        if (minimum == 2) {
+            deadHold?.takeIf { it.first == playlistId }?.let { return it.second }
         }
-        ids
+        return read {
+            val ids = HashSet<String>()
+            readableDatabase.rawQuery(
+                "SELECT channel_id FROM stream_health WHERE playlist_id=? AND failures>=?",
+                arrayOf(playlistId, minimum.toString())
+            ).use { cursor ->
+                while (cursor.moveToNext()) ids.add(cursor.getString(0))
+            }
+            if (minimum == 2) deadHold = playlistId to ids
+            ids
+        }
     }
 
     /** Returns all currently airing or T-30m sports/event feeds across every provider for the Live Games Hub. */
@@ -634,7 +649,7 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
                     ).use { cursor -> collectList(cursor).forEach(::add) }
                 }.isSuccess
             }
-            if (found.size >= limit) return found
+            if (found.size >= limit || (indexed && found.isNotEmpty())) return found
             fun take(where: String, args: Array<String>) {
                 if (found.size >= limit) return
                 db.query(
@@ -903,6 +918,15 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
 
     fun releaseSearchExport() {
         searchExportHold = null
+    }
+
+    /** Reclaims in-memory snapshots and asks SQLite to drop unused native page-cache memory. */
+    fun releaseMemory() {
+        searchExportHold = null
+        dashHold = null
+        liveCountryHold = null
+        fastCountryHold = null
+        runCatching { readableDatabase.rawQuery("PRAGMA shrink_memory", null).use { } }
     }
 
     fun exportSearchCatalog(playlistId: String): Pair<List<Map<String, String>>, List<Map<String, String>>> {
@@ -2187,10 +2211,17 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
     }
 
     fun countInGroup(playlistId: String, groupId: String, needle: String, groupName: String = ""): Int = read {
-        val (where, args) = groupMatch(playlistId, groupId, needle, groupName)
-        readableDatabase.rawQuery("SELECT COUNT(*) FROM channels WHERE $where", args).use { cursor ->
-            if (cursor.moveToFirst()) cursor.getInt(0) else 0
+        if (groupId == PlaylistLoader.ALL_ID) {
+            val (where, args) = bucketNeedleWhere(playlistId, LIVE, needle)
+            return@read readableDatabase.rawQuery("SELECT COUNT(*) FROM channels WHERE $where", args).use { c ->
+                if (c.moveToFirst()) c.getInt(0) else 0
+            }
         }
+        val catCount = countByCategoryIndexed(playlistId, groupId, needle)
+        if (catCount > 0) return@read catCount
+        val titleCount = countByGroupTitleIndexed(playlistId, groupId, groupName, needle)
+        if (titleCount > 0) return@read titleCount
+        0
     }
 
     fun slimInGroup(
@@ -2201,7 +2232,122 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         byName: Boolean = false,
         groupName: String = ""
     ): List<SlimChannel> = read {
-        val (where, args) = groupMatch(playlistId, groupId, needle, groupName)
+        val capped = limit.coerceAtLeast(1)
+        if (groupId == PlaylistLoader.ALL_ID) {
+            val (where, args) = bucketNeedleWhere(playlistId, LIVE, needle)
+            return@read querySlim(where, args, byName, capped)
+        }
+        // Fast path: uses covering index idx_channels_bucket_cat_cover (O(log N), zero table scan).
+        val byCategory = queryByCategoryIndexed(playlistId, groupId, needle, byName, capped)
+        if (byCategory.isNotEmpty()) return@read byCategory
+        // Fallback for M3U groups keyed only by group_title (uses idx_channels_group).
+        queryByGroupTitleIndexed(playlistId, groupId, groupName, needle, byName, capped)
+    }
+
+    private fun bucketNeedleWhere(playlistId: String, bucket: String, needle: String): Pair<String, Array<String>> {
+        val where = StringBuilder("playlist_id=? AND bucket=?")
+        val args = arrayListOf(playlistId, bucket)
+        if (needle.isNotBlank()) {
+            where.append(" AND name LIKE ? ESCAPE '\\'")
+            args.add("%${likeEscape(needle)}%")
+        }
+        return where.toString() to args.toTypedArray()
+    }
+
+    private fun queryByCategoryIndexed(
+        playlistId: String,
+        categoryId: String,
+        needle: String,
+        byName: Boolean,
+        limit: Int
+    ): List<SlimChannel> {
+        val out = ArrayList<SlimChannel>()
+        val buckets = arrayOf(LIVE, VOD, SERIES)
+        for (bucket in buckets) {
+            val remaining = limit - out.size
+            if (remaining <= 0) break
+            val where = StringBuilder("playlist_id=? AND bucket=? AND category_id=?")
+            val args = arrayListOf(playlistId, bucket, categoryId)
+            if (needle.isNotBlank()) {
+                where.append(" AND name LIKE ? ESCAPE '\\'")
+                args.add("%${likeEscape(needle)}%")
+            }
+            out.addAll(querySlim(where.toString(), args.toTypedArray(), byName, remaining))
+        }
+        if (byName && out.size > 1) out.sortWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
+        return out
+    }
+
+    private fun countByCategoryIndexed(playlistId: String, categoryId: String, needle: String): Int {
+        var total = 0
+        for (bucket in arrayOf(LIVE, VOD, SERIES)) {
+            val where = StringBuilder("playlist_id=? AND bucket=? AND category_id=?")
+            val args = arrayListOf(playlistId, bucket, categoryId)
+            if (needle.isNotBlank()) {
+                where.append(" AND name LIKE ? ESCAPE '\\'")
+                args.add("%${likeEscape(needle)}%")
+            }
+            total += readableDatabase.rawQuery("SELECT COUNT(*) FROM channels WHERE $where", args.toTypedArray()).use { c ->
+                if (c.moveToFirst()) c.getInt(0) else 0
+            }
+        }
+        return total
+    }
+
+    private fun queryByGroupTitleIndexed(
+        playlistId: String,
+        groupId: String,
+        groupName: String,
+        needle: String,
+        byName: Boolean,
+        limit: Int
+    ): List<SlimChannel> {
+        val titles = linkedSetOf<String>()
+        if (groupId.isNotBlank()) titles.add(groupId)
+        if (groupName.isNotBlank()) titles.add(groupName)
+        val out = ArrayList<SlimChannel>()
+        val seen = HashSet<String>()
+        for (bucket in arrayOf(LIVE, VOD, SERIES)) {
+            for (title in titles) {
+                val remaining = limit - out.size
+                if (remaining <= 0) break
+                val where = StringBuilder("playlist_id=? AND bucket=? AND group_title=?")
+                val args = arrayListOf(playlistId, bucket, title)
+                if (needle.isNotBlank()) {
+                    where.append(" AND name LIKE ? ESCAPE '\\'")
+                    args.add("%${likeEscape(needle)}%")
+                }
+                for (row in querySlim(where.toString(), args.toTypedArray(), byName, remaining)) {
+                    if (seen.add(row.id)) out.add(row)
+                }
+            }
+        }
+        if (byName && out.size > 1) out.sortWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
+        return out
+    }
+
+    private fun countByGroupTitleIndexed(playlistId: String, groupId: String, groupName: String, needle: String): Int {
+        val titles = linkedSetOf<String>()
+        if (groupId.isNotBlank()) titles.add(groupId)
+        if (groupName.isNotBlank()) titles.add(groupName)
+        var total = 0
+        for (bucket in arrayOf(LIVE, VOD, SERIES)) {
+            for (title in titles) {
+                val where = StringBuilder("playlist_id=? AND bucket=? AND group_title=?")
+                val args = arrayListOf(playlistId, bucket, title)
+                if (needle.isNotBlank()) {
+                    where.append(" AND name LIKE ? ESCAPE '\\'")
+                    args.add("%${likeEscape(needle)}%")
+                }
+                total += readableDatabase.rawQuery("SELECT COUNT(*) FROM channels WHERE $where", args.toTypedArray()).use { c ->
+                    if (c.moveToFirst()) c.getInt(0) else 0
+                }
+            }
+        }
+        return total
+    }
+
+    private fun querySlim(where: String, args: Array<String>, byName: Boolean, limit: Int): List<SlimChannel> {
         val rows = ArrayList<SlimChannel>()
         readableDatabase.query(
             "channels",
@@ -2211,7 +2357,7 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
             null,
             null,
             if (byName) "name COLLATE NOCASE" else null,
-            limit.coerceAtLeast(1).toString()
+            limit.toString()
         ).use { cursor ->
             while (cursor.moveToNext()) {
                 val category = cursor.text(3)?.takeIf { it.isNotBlank() } ?: cursor.text(4).orEmpty()
@@ -2226,30 +2372,7 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
                 )
             }
         }
-        rows
-    }
-
-    private fun groupMatch(playlistId: String, groupId: String, needle: String, groupName: String = ""): Pair<String, Array<String>> {
-        val where = StringBuilder("playlist_id=?")
-        val args = arrayListOf(playlistId)
-        if (groupId == PlaylistLoader.ALL_ID) {
-            where.append(" AND bucket=?")
-            args.add(LIVE)
-        } else if (groupName.isNotBlank() && groupName != groupId) {
-            where.append(" AND (category_id=? OR group_title=? OR group_title=?)")
-            args.add(groupId)
-            args.add(groupId)
-            args.add(groupName)
-        } else {
-            where.append(" AND (category_id=? OR group_title=?)")
-            args.add(groupId)
-            args.add(groupId)
-        }
-        if (needle.isNotBlank()) {
-            where.append(" AND name LIKE ? ESCAPE '\\'")
-            args.add("%${likeEscape(needle)}%")
-        }
-        return where.toString() to args.toTypedArray()
+        return rows
     }
 
     fun hasLogo(playlistId: String, url: String): Boolean = read {

@@ -364,13 +364,22 @@ class LoginActivity : AppCompatActivity() {
         }.getOrNull()
     }
 
+    private fun suppressTransition() {
+        if (android.os.Build.VERSION.SDK_INT >= 34) {
+            overrideActivityTransition(OVERRIDE_TRANSITION_CLOSE, 0, 0)
+        } else {
+            @Suppress("DEPRECATION")
+            overridePendingTransition(0, 0)
+        }
+    }
+
     private fun openBrowse(playlistId: String) {
         startActivity(
             Intent(this, BrowseActivity::class.java)
                 .putExtra(BrowseActivity.EXTRA_PLAYLIST_ID, playlistId)
         )
         finish()
-        overridePendingTransition(0, 0)
+        suppressTransition()
     }
 
     private suspend fun openGuide(playlistId: String) {
@@ -394,7 +403,7 @@ class LoginActivity : AppCompatActivity() {
         }
         startActivity(next)
         finish()
-        overridePendingTransition(0, 0)
+        suppressTransition()
     }
 
     private fun togglePassword() {

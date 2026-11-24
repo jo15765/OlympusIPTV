@@ -47,7 +47,7 @@
             android:id="@+id/freshHoverOverlay"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:background="#550E1116"
+            android:background="#6611100E"
             android:visibility="gone">
 
             <ImageView

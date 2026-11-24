@@ -38,12 +38,16 @@ class RecordingService : Service() {
     @Volatile private var captureId: String? = null
     @Volatile private var lastSyncRevision = 0L
     @Volatile private var lastSyncAt = 0L
+    private var idleTicks = 0
     private var wake: PowerManager.WakeLock? = null
-    private val http = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(45, TimeUnit.SECONDS)
-        .followRedirects(true)
-        .build()
+    private val http by lazy {
+        com.olympus.iptv.playlist.HttpClients.shared.newBuilder()
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(45, TimeUnit.SECONDS)
+            .callTimeout(0, TimeUnit.SECONDS)
+            .followRedirects(true)
+            .build()
+    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -85,10 +89,12 @@ class RecordingService : Service() {
         val busy = book.itemsOrEmpty().any {
             it.status == Recording.SCHEDULED || it.status == Recording.RECORDING
         } || book.seriesOrEmpty().isNotEmpty() || book.requestsOrEmpty().isNotEmpty() || capture?.isActive == true
+        val hasRequests = book.requestsOrEmpty().isNotEmpty()
+        val syncInterval = if (busy) 30_000L else 120_000L
         val shouldSync = email.isNotBlank() && (
-            busy ||
+            hasRequests ||
                 book.revisionOrZero() != lastSyncRevision ||
-                now - lastSyncAt > 120_000L
+                now - lastSyncAt > syncInterval
             )
         if (shouldSync) {
             val synced = LineupClient(app).syncRecordings(email, app.playlistStore.deviceId(), book)
@@ -100,7 +106,17 @@ class RecordingService : Service() {
                 app.playlistStore.saveRecordingBook(playlist.id, book)
             }
         }
-        if (!busy && book.requestsOrEmpty().isEmpty()) return
+        val stillBusy = book.itemsOrEmpty().any {
+            it.status == Recording.SCHEDULED || it.status == Recording.RECORDING
+        } || book.seriesOrEmpty().isNotEmpty() || book.requestsOrEmpty().isNotEmpty() || capture?.isActive == true
+        if (!stillBusy) {
+            idleTicks += 1
+            if (idleTicks >= 6) {
+                stopSelf()
+            }
+            return
+        }
+        idleTicks = 0
 
         val active = book.itemsOrEmpty().firstOrNull { it.id == captureId }
         if (capture?.isActive == true && active?.status != Recording.RECORDING) stopCapture.set(true)

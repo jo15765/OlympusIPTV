@@ -14,7 +14,7 @@ object SoftKeyboard {
             field.requestFocus()
             field.post {
                 val imm = activity.getSystemService(InputMethodManager::class.java)
-                imm?.showSoftInput(field, InputMethodManager.SHOW_IMPLICIT)
+                imm?.showSoftInput(field, 0)
             }
             return
         }
@@ -30,7 +30,7 @@ object SoftKeyboard {
             view.post {
                 val imm = activity.getSystemService(InputMethodManager::class.java)
                 val flag = if (touch) {
-                    InputMethodManager.SHOW_IMPLICIT
+                    0
                 } else {
                     @Suppress("DEPRECATION")
                     InputMethodManager.SHOW_FORCED

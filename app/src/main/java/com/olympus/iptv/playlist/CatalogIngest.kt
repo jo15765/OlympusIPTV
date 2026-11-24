@@ -164,11 +164,20 @@ object CatalogIngest {
         }
         val db = app.catalogDb
         val known = db.knownChannelIds(playlist.id, bucket)
+        val stampPrefs = app.getSharedPreferences("olympus_cloud_stamps", android.content.Context.MODE_PRIVATE)
+        val stampKey = "${playlist.id}:$bucket"
+        val lastStamp = stampPrefs.getLong(stampKey, 0L)
+        if (cloud.stamp > 0L && cloud.stamp == lastStamp && known.isNotEmpty()) {
+            return true
+        }
         val cache = CatalogCache(app)
         val hashes = cache.readHashes(playlist.id, bucket).toMutableMap()
         db.insertMissing(playlist.id, bucket, cloud.categories, emptyList())
         store(db, playlist.id, bucket, cloud.channels, bucket != CatalogDb.SERIES, known, hashes)
         cache.writeHashes(playlist.id, bucket, hashes)
+        if (cloud.stamp > 0L) {
+            stampPrefs.edit().putLong(stampKey, cloud.stamp).apply()
+        }
         return true
     }
 

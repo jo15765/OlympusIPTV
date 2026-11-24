@@ -4,7 +4,6 @@ import java.util.zip.GZIPOutputStream
 
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
 }
 
 fun localProperty(name: String): String = Properties().apply {
@@ -44,8 +43,8 @@ android {
         applicationId = "com.olympus.iptv"
         minSdk = 24
         targetSdk = 35
-        versionCode = 127
-        versionName = "0.2.127"
+        versionCode = 132
+        versionName = "0.2.132"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "WATCHMODE_API_KEY", "\"$watchmodeKey\"")
         buildConfigField("String", "OPENSUBTITLES_API_KEY", "\"$opensubtitlesKey\"")
@@ -121,8 +120,8 @@ android {
         ignoreAssetsPattern = "!.svn:!.git:.*:!CVS:!thumbs.db:!picasa.ini:!*.scc:*~:!store.json"
     }
 
-    sourceSets.getByName("main").assets.srcDir(
-        project.layout.buildDirectory.get().asFile.resolve("generated/dashboardAssets")
+    sourceSets.getByName("main").assets.directories.add(
+        project.layout.buildDirectory.get().asFile.resolve("generated/dashboardAssets").path
     )
 }
 

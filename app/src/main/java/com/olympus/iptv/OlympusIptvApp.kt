@@ -155,17 +155,19 @@ class OlympusIptvApp : Application() {
         }
     }
 
+    private val freshGson by lazy { Gson() }
+
     private fun readFreshFile(playlistId: String, week: String): FreshHold? {
         val file = File(filesDir, "fresh-cards.json")
         if (!file.exists()) return null
         val type = object : TypeToken<FreshHold>() {}.type
-        val hold = runCatching { Gson().fromJson<FreshHold>(file.readText(), type) }.getOrNull() ?: return null
+        val hold = runCatching { freshGson.fromJson<FreshHold>(file.readText(), type) }.getOrNull() ?: return null
         if (hold.playlistId != playlistId || hold.week != week) return null
         return hold
     }
 
     private fun writeFreshFile(hold: FreshHold) {
-        runCatching { File(filesDir, "fresh-cards.json").writeText(Gson().toJson(hold)) }
+        runCatching { File(filesDir, "fresh-cards.json").writeText(freshGson.toJson(hold)) }
     }
     @Volatile var warmPlayer: androidx.media3.exoplayer.ExoPlayer? = null
     @Volatile var warmChannelId: String? = null
@@ -202,6 +204,7 @@ class OlympusIptvApp : Application() {
 
 
     @Volatile private var cloudSyncJob: Job? = null
+    @Volatile private var cloudSseActive = false
 
     fun startCloudRealtimeSync() {
         cloudSyncJob?.cancel()
@@ -215,10 +218,15 @@ class OlympusIptvApp : Application() {
                     val deviceId = runCatching { playlistStore.deviceId() }.getOrDefault("")
                     if (deviceId.isNotBlank()) {
                         val client = com.olympus.iptv.playlist.LineupClient(this@OlympusIptvApp)
-                        val sseJob = client.subscribeSyncEvents(this, email, deviceId) { _ ->
-                            pullCloudChanges()
+                        cloudSseActive = true
+                        try {
+                            val sseJob = client.subscribeSyncEvents(this, email, deviceId) { _ ->
+                                pullCloudChanges()
+                            }
+                            sseJob.join()
+                        } finally {
+                            cloudSseActive = false
                         }
-                        sseJob.join()
                     }
                 }
                 delay(if (activeEmail.isBlank()) 4_000L else 2_000L)
@@ -230,12 +238,12 @@ class OlympusIptvApp : Application() {
     private val cloudPull = Mutex()
     private val cloudStamps = HashMap<String, Long>()
 
-    /** Reads cloud revision numbers every 10 seconds and applies a section only when it changed. */
+    /** Reads cloud revision numbers as a fallback (30s while SSE is connected, 10s when offline). */
     private fun watchCloudLogin() {
         appScope.launch {
             while (isActive) {
                 runCatching { pullCloudChanges() }
-                delay(10_000L)
+                delay(if (cloudSseActive) 30_000L else 10_000L)
             }
         }
     }
@@ -419,8 +427,13 @@ class OlympusIptvApp : Application() {
         com.olympus.iptv.vpn.AppTunnel.restore(this)
         val touch = com.olympus.iptv.ui.DeviceForm.isTouchPrimary(this)
         val lowRam = com.olympus.iptv.ui.DeviceForm.isLowRam(this)
-        com.olympus.iptv.ui.BackdropGlow.motion = true
+        com.olympus.iptv.ui.BackdropGlow.motion = !lowRam
         val imageBytes = if (lowRam) 16L * 1024 * 1024 else 64L * 1024 * 1024
+        val diskBytes = when {
+            lowRam -> 20L * 1024 * 1024
+            touch -> 24L * 1024 * 1024
+            else -> 48L * 1024 * 1024
+        }
         Coil.setImageLoader(
             ImageLoader.Builder(this)
                 .okHttpClient { com.olympus.iptv.playlist.HttpClients.shared }
@@ -438,7 +451,7 @@ class OlympusIptvApp : Application() {
                 .diskCache {
                     DiskCache.Builder()
                         .directory(cacheDir.resolve("logos"))
-                        .maxSizeBytes(if (touch) 24L * 1024 * 1024 else 48L * 1024 * 1024)
+                        .maxSizeBytes(diskBytes)
                         .build()
                 }
                 .build()

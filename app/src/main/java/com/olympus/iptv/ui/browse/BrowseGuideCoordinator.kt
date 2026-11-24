@@ -292,15 +292,22 @@ internal fun BrowseActivity.hostOnCreate(savedInstanceState: Bundle?) {
         binding.channelList.adapter = channelAdapter
         binding.programList.layoutManager = LinearLayoutManager(this)
         binding.programList.adapter = programAdapter
+        val lowRam = com.olympus.iptv.ui.DeviceForm.isLowRam(this)
         binding.programList.setHasFixedSize(true)
-        binding.programList.recycledViewPool.setMaxRecycledViews(ProgramGuideAdapter.VIEW_PROGRAM, if (touchPrimary) 12 else 24)
+        binding.programList.setItemViewCacheSize(if (lowRam) 6 else 12)
+        binding.programList.recycledViewPool.setMaxRecycledViews(
+            ProgramGuideAdapter.VIEW_PROGRAM,
+            if (lowRam) 10 else if (touchPrimary) 12 else 24
+        )
+        (binding.programList.layoutManager as LinearLayoutManager).initialPrefetchItemCount =
+            if (lowRam) 4 else 8
         binding.programList.itemAnimator = null
         binding.categoryList.itemAnimator = null
         binding.channelList.itemAnimator = null
         binding.categoryList.setHasFixedSize(true)
         binding.channelList.setHasFixedSize(true)
-        binding.categoryList.setItemViewCacheSize(if (touchPrimary) 8 else 12)
-        binding.channelList.setItemViewCacheSize(if (touchPrimary) 12 else 24)
+        binding.categoryList.setItemViewCacheSize(if (lowRam) 6 else if (touchPrimary) 8 else 12)
+        binding.channelList.setItemViewCacheSize(if (lowRam) 8 else if (touchPrimary) 12 else 20)
         (binding.categoryList.layoutManager as androidx.recyclerview.widget.GridLayoutManager)
             .initialPrefetchItemCount = categorySpan * 2
         (binding.channelList.layoutManager as LinearLayoutManager).initialPrefetchItemCount =
@@ -316,6 +323,9 @@ internal fun BrowseActivity.hostOnCreate(savedInstanceState: Bundle?) {
         }
         binding.channelList.addOnScrollListener(object : androidx.recyclerview.widget.RecyclerView.OnScrollListener() {
             override fun onScrollStateChanged(recyclerView: androidx.recyclerview.widget.RecyclerView, newState: Int) {
+                if (newState == androidx.recyclerview.widget.RecyclerView.SCROLL_STATE_DRAGGING) {
+                    binding.programList.stopScroll()
+                }
                 val idle = newState == androidx.recyclerview.widget.RecyclerView.SCROLL_STATE_IDLE
                 channelAdapter.setScrolling(!idle)
                 if (idle) {
@@ -332,13 +342,16 @@ internal fun BrowseActivity.hostOnCreate(savedInstanceState: Bundle?) {
             }
 
             override fun onScrolled(recyclerView: androidx.recyclerview.widget.RecyclerView, dx: Int, dy: Int) {
-                if (dy != 0) scheduleGuideAlign(recyclerView, binding.programList)
+                if (dy != 0) alignGuide(recyclerView, binding.programList)
                 if (dy <= 0 || selectedCategoryId == null || selectedCategoryId == PlaylistLoader.FAVORITES_ID) return
                 maybePrefetchGroupPage(recyclerView)
             }
         })
         binding.programList.addOnScrollListener(object : androidx.recyclerview.widget.RecyclerView.OnScrollListener() {
             override fun onScrollStateChanged(recyclerView: androidx.recyclerview.widget.RecyclerView, newState: Int) {
+                if (newState == androidx.recyclerview.widget.RecyclerView.SCROLL_STATE_DRAGGING) {
+                    binding.channelList.stopScroll()
+                }
                 if (newState == androidx.recyclerview.widget.RecyclerView.SCROLL_STATE_IDLE) {
                     alignGuide(recyclerView, binding.channelList)
                     loadVisibleGuidePrograms()
@@ -346,7 +359,7 @@ internal fun BrowseActivity.hostOnCreate(savedInstanceState: Bundle?) {
             }
 
             override fun onScrolled(recyclerView: androidx.recyclerview.widget.RecyclerView, dx: Int, dy: Int) {
-                if (dy != 0) scheduleGuideAlign(recyclerView, binding.channelList)
+                if (dy != 0) alignGuide(recyclerView, binding.channelList)
             }
         })
         focusHandler.postDelayed(object : Runnable {
@@ -375,11 +388,15 @@ internal fun BrowseActivity.hostOnCreate(savedInstanceState: Bundle?) {
                             for (idx in first..last) {
                                 val ch = visibleChannels[idx]
                                 val list = programAdapter.programsFor(ch.id)
-                                val hasEndedOrStarting = list == null ||
-                                    list.any { it.endMillis <= now || (it.startMillis <= now && it.endMillis - now <= 60_000L) }
-                                if (hasEndedOrStarting) {
+                                if (list == null || list.none { it.endMillis > now }) {
                                     epgCache.remove(ch.id)
                                     staleChannels.add(ch)
+                                } else {
+                                    val cachedNow = epgCache[ch.id]?.now
+                                    if (cachedNow != null && cachedNow.endMillis <= now) {
+                                        rememberEpg(ch.id, com.olympus.iptv.playlist.EpgUtils.nowNext(list, now))
+                                        channelAdapter.notifyEpgChanged(ch.id)
+                                    }
                                 }
                             }
                             if (staleChannels.isNotEmpty()) {
@@ -1755,6 +1772,14 @@ internal fun BrowseActivity.applyGuideColumns() {
         binding.contentDivider.visibility = if (showGroups && showChannels) View.VISIBLE else View.GONE
         binding.contentColumn.visibility = if (showChannels) View.VISIBLE else View.GONE
         binding.programPane.visibility = if (showPrograms) View.VISIBLE else View.GONE
+        if (showPrograms) {
+            syncProgramRowHeight()
+        } else if (channelAdapter.guideRowHeight != 0) {
+            channelAdapter.guideRowHeight = 0
+            if (channelAdapter.itemCount > 0) {
+                channelAdapter.notifyItemRangeChanged(0, channelAdapter.itemCount)
+            }
+        }
         if (phoneChrome) {
             val pinOpen = binding.groupPin.visibility == View.VISIBLE ||
                 binding.groupPinWrong.visibility == View.VISIBLE
@@ -2162,17 +2187,21 @@ internal fun BrowseActivity.alignGuide(
         val index = from.findFirstVisibleItemPosition()
         if (index == androidx.recyclerview.widget.RecyclerView.NO_POSITION) return
         val child = from.findViewByPosition(index) ?: return
+        val offset = child.top - source.paddingTop
         val shown = to.findViewByPosition(index)
-        if (shown != null && shown.top == child.top) {
+        if (shown != null && (shown.top - target.paddingTop) == offset) {
             lastAlignIndex = index
-            lastAlignTop = child.top
+            lastAlignTop = offset
             return
         }
         guideScrollSync = true
-        lastAlignIndex = index
-        lastAlignTop = child.top
-        to.scrollToPositionWithOffset(index, child.top)
-        target.post { guideScrollSync = false }
+        try {
+            lastAlignIndex = index
+            lastAlignTop = offset
+            to.scrollToPositionWithOffset(index, offset)
+        } finally {
+            guideScrollSync = false
+        }
     }
 
 internal fun BrowseActivity.currentProgramColumn(row: Int): Int {

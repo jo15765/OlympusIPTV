@@ -189,6 +189,7 @@ class CategoryAdapter(
     }
 
     fun setSelected(id: String?) {
+        if (selectedId == id) return
         val old = items.indexOfFirst { it.id == selectedId }
         selectedId = id
         val next = items.indexOfFirst { it.id == id }

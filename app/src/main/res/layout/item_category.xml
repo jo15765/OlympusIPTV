@@ -84,14 +84,11 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:ellipsize="end"
+                    android:fontFamily="sans-serif-medium"
                     android:maxLines="2"
                     android:textColor="@color/text_primary"
                     android:textSize="15sp"
-                    android:textStyle="bold"
-                    app:autoSizeMaxTextSize="15sp"
-                    app:autoSizeMinTextSize="11sp"
-                    app:autoSizeStepGranularity="1sp"
-                    app:autoSizeTextType="uniform" />
+                    android:textStyle="bold" />
 
                 <TextView
                     android:id="@+id/liveBadge"
@@ -117,11 +114,7 @@
                 android:ellipsize="end"
                 android:maxLines="2"
                 android:textColor="@color/text_secondary"
-                android:textSize="12sp"
-                app:autoSizeMaxTextSize="12sp"
-                app:autoSizeMinTextSize="10sp"
-                app:autoSizeStepGranularity="1sp"
-                app:autoSizeTextType="uniform" />
+                android:textSize="12sp" />
         </LinearLayout>
     </LinearLayout>
 

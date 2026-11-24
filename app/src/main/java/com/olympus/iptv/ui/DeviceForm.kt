@@ -15,8 +15,12 @@ object DeviceForm {
 
     @Volatile private var cachedTelevision: Boolean? = null
     @Volatile private var cachedTouchPrimary: Boolean? = null
+    @Volatile private var cachedLowRam: Boolean? = null
     @Volatile private var cachedPowerSave = false
     @Volatile private var powerSaveCheckedAt = 0L
+    @Volatile private var cachedWidthKey = 0L
+    @Volatile private var cachedWidthAt = 0L
+    @Volatile private var cachedWidthDp = 0
 
     fun isTelevision(context: Context): Boolean {
         cachedTelevision?.let { return it }
@@ -47,14 +51,31 @@ object DeviceForm {
      * cover width, which left the cards at the small size.
      */
     fun windowWidthDp(context: Context): Int {
-        val density = context.resources.displayMetrics.density
-        if (context is Activity && Build.VERSION.SDK_INT >= 30 && density > 0f) {
-            val px = context.windowManager.currentWindowMetrics.bounds.width()
-            if (px > 0) return (px / density).toInt()
+        val res = context.resources
+        val dm = res.displayMetrics
+        val density = dm.density
+        val cfgWidth = res.configuration.screenWidthDp
+        val key = (dm.widthPixels.toLong() shl 32) xor
+            (cfgWidth.toLong() shl 16) xor
+            java.lang.Float.floatToRawIntBits(density).toLong().and(0xFFFFL)
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (cachedWidthKey == key && cachedWidthDp > 0 && now - cachedWidthAt < 500L) {
+            return cachedWidthDp
         }
-        val px = context.resources.displayMetrics.widthPixels
-        if (px > 0 && density > 0f) return (px / density).toInt()
-        return context.resources.configuration.screenWidthDp
+        val result = if (context is Activity && Build.VERSION.SDK_INT >= 30 && density > 0f) {
+            val px = context.windowManager.currentWindowMetrics.bounds.width()
+            if (px > 0) (px / density).toInt()
+            else if (dm.widthPixels > 0) (dm.widthPixels / density).toInt()
+            else cfgWidth
+        } else if (dm.widthPixels > 0 && density > 0f) {
+            (dm.widthPixels / density).toInt()
+        } else {
+            cfgWidth
+        }
+        cachedWidthKey = key
+        cachedWidthAt = now
+        cachedWidthDp = result
+        return result
     }
 
     /** A Galaxy Fold inner screen stays in the phone card layout so the cards use the full display. */
@@ -104,9 +125,10 @@ object DeviceForm {
         else -> 2
     }
 
-    /** Fire Stick / Onn-class sticks versus Shield / Streamer-class boxes. */
+    /** Fire Stick / Onn-class sticks versus Shield / Streamer-class boxes. Cached for process lifetime. */
     fun isLowRam(context: Context): Boolean {
-        val manager = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+        cachedLowRam?.let { return it }
+        val manager = context.applicationContext.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
         @Suppress("DEPRECATION")
         val low = manager?.isLowRamDevice == true
         val smallTotalRam = if (manager != null) {
@@ -116,7 +138,9 @@ object DeviceForm {
         } else {
             false
         }
-        return smallTotalRam || isLowRam(low, Runtime.getRuntime().maxMemory())
+        val result = smallTotalRam || isLowRam(low, Runtime.getRuntime().maxMemory())
+        cachedLowRam = result
+        return result
     }
 
     fun isLowRam(lowRamDevice: Boolean, maxMemoryBytes: Long): Boolean =

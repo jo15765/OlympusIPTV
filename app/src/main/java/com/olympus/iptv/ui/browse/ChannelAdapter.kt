@@ -49,9 +49,15 @@ class ChannelAdapter(
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     private val items = mutableListOf<Channel>()
+    private val indexById = HashMap<String, Int>()
     private val submitGeneration = AtomicInteger()
     private var accentTint: android.content.res.ColorStateList? = null
     private var mutedTint: android.content.res.ColorStateList? = null
+
+    private fun rebuildIndex() {
+        indexById.clear()
+        for (i in items.indices) indexById.putIfAbsent(items[i].id, i)
+    }
 
     init {
         setHasStableIds(true)
@@ -94,12 +100,10 @@ class ChannelAdapter(
         playingId = id
         if (items.isEmpty() || posterMode) return
         if (prev != null) {
-            val oldIdx = items.indexOfFirst { it.id == prev }
-            if (oldIdx >= 0) notifyItemChanged(oldIdx, PAYLOAD_PLAYING)
+            indexById[prev]?.let { notifyItemChanged(it, PAYLOAD_PLAYING) }
         }
         if (id != null) {
-            val newIdx = items.indexOfFirst { it.id == id }
-            if (newIdx >= 0) notifyItemChanged(newIdx, PAYLOAD_PLAYING)
+            indexById[id]?.let { notifyItemChanged(it, PAYLOAD_PLAYING) }
         }
     }
 
@@ -109,12 +113,10 @@ class ChannelAdapter(
         focusedId = id
         if (posterMode || items.isEmpty()) return
         if (prev != null) {
-            val oldIdx = items.indexOfFirst { it.id == prev }
-            if (oldIdx >= 0) notifyItemChanged(oldIdx, PAYLOAD_GUIDE_FOCUS)
+            indexById[prev]?.let { notifyItemChanged(it, PAYLOAD_GUIDE_FOCUS) }
         }
         if (id != null) {
-            val newIdx = items.indexOfFirst { it.id == id }
-            if (newIdx >= 0) notifyItemChanged(newIdx, PAYLOAD_GUIDE_FOCUS)
+            indexById[id]?.let { notifyItemChanged(it, PAYLOAD_GUIDE_FOCUS) }
         }
     }
 
@@ -128,6 +130,7 @@ class ChannelAdapter(
         if (replaceAll) {
             items.clear()
             items.addAll(list)
+            rebuildIndex()
             notifyDataSetChanged()
             return
         }
@@ -154,6 +157,7 @@ class ChannelAdapter(
         ) { diff, rows ->
             items.clear()
             items.addAll(rows)
+            rebuildIndex()
             diff.dispatchUpdatesTo(this)
         }
     }
@@ -162,6 +166,7 @@ class ChannelAdapter(
         if (more.isEmpty()) return
         val start = items.size
         items.addAll(more)
+        for (i in start until items.size) indexById.putIfAbsent(items[i].id, i)
         notifyItemRangeInserted(start, more.size)
     }
 
@@ -176,19 +181,17 @@ class ChannelAdapter(
     private fun detailOf(id: String): String? = details[id]
 
     fun notifyEpgChanged(channelId: String) {
-        val index = items.indexOfFirst { it.id == channelId }
-        if (index >= 0) notifyItemChanged(index, PAYLOAD_EPG)
+        indexById[channelId]?.let { notifyItemChanged(it, PAYLOAD_EPG) }
     }
 
     fun notifyFavoriteChanged(channelId: String) {
-        val index = items.indexOfFirst { it.id == channelId }
-        if (index >= 0) notifyItemChanged(index, PAYLOAD_FAVORITE)
+        indexById[channelId]?.let { notifyItemChanged(it, PAYLOAD_FAVORITE) }
     }
 
     fun remove(channelId: String) {
-        val index = items.indexOfFirst { it.id == channelId }
-        if (index < 0) return
+        val index = indexById[channelId] ?: return
         items.removeAt(index)
+        rebuildIndex()
         notifyItemRemoved(index)
         if (index < items.size) notifyItemRangeChanged(index, items.size - index)
     }
@@ -395,14 +398,15 @@ class ChannelAdapter(
         override fun bind(item: Channel, position: Int, full: Boolean) {
             if (full) {
                 val ctx = binding.root.context
-                val phoneCard = DeviceForm.isTouchPrimary(ctx) && DeviceForm.isCompact(ctx)
+                val inSideBySideGuide = guideRowHeight > 0
+                val phoneCard = DeviceForm.isTouchPrimary(ctx) && DeviceForm.isCompact(ctx) && !inSideBySideGuide
                 val portraitCard = phoneCard && DeviceForm.isPortrait(ctx)
                 val params = binding.root.layoutParams
                 if (params != null) {
-                    val targetHeight = if (phoneCard || guideRowHeight <= 0) {
-                        ViewGroup.LayoutParams.WRAP_CONTENT
-                    } else {
+                    val targetHeight = if (inSideBySideGuide) {
                         guideRowHeight
+                    } else {
+                        ViewGroup.LayoutParams.WRAP_CONTENT
                     }
                     if (params.width != ViewGroup.LayoutParams.MATCH_PARENT || params.height != targetHeight) {
                         params.width = ViewGroup.LayoutParams.MATCH_PARENT
@@ -410,13 +414,14 @@ class ChannelAdapter(
                         binding.root.layoutParams = params
                     }
                 }
+                binding.root.minimumHeight = if (inSideBySideGuide) guideRowHeight else 0
                 binding.number.visibility = View.VISIBLE
                 binding.number.text = (position + 1).toString()
                 binding.logo.background = null
                 binding.logo.setPadding(0, 0, 0, 0)
                 binding.name.text = com.olympus.iptv.data.NameStrip.shown(item.name, item.groupTitle)
-                binding.name.maxLines = if (phoneCard || guideRowHeight > 0) 2 else 1
-                binding.name.textSize = if (phoneCard) 16f else if (guideRowHeight > 0) 13f else 15f
+                binding.name.maxLines = if (phoneCard || inSideBySideGuide) 2 else 1
+                binding.name.textSize = if (phoneCard) 16f else if (inSideBySideGuide) 13f else 15f
                 val badge = qualityBadgeFor(item.name)
                 if (badge == null) {
                     binding.qualityBadge.visibility = View.GONE
@@ -441,7 +446,7 @@ class ChannelAdapter(
                 if (binding.root.paddingLeft != rootPadH || binding.root.paddingTop != rootPadV) {
                     binding.root.setPadding(rootPadH, rootPadV, rootPadH, rootPadV)
                 }
-                val logo = ((if (phoneCard) 40 else if (guideRowHeight > 0) 18 else 24) * density).toInt()
+                val logo = ((if (phoneCard) 40 else if (inSideBySideGuide) (if (touch) 20 else 18) else 24) * density).toInt()
                 val logoLp = binding.logo.layoutParams
                 if (logoLp != null && (logoLp.width != logo || logoLp.height != logo)) {
                     logoLp.width = logo
@@ -450,8 +455,8 @@ class ChannelAdapter(
                 }
                 bindLogo(item)
                 bindEpg(item)
-                bindGuideHighlight(item)
-                if (touch && (phoneCard || guideRowHeight <= 0)) {
+                bindGuideHighlight(item, position)
+                if (touch && !inSideBySideGuide) {
                     binding.favorite.visibility = View.VISIBLE
                     binding.favorite.isFocusable = false
                     binding.favorite.isFocusableInTouchMode = false
@@ -483,8 +488,9 @@ class ChannelAdapter(
             com.olympus.iptv.ui.LiveBars.show(binding.liveBars, item.id == playingId)
         }
 
-        fun bindGuideHighlight(item: Channel) {
+        fun bindGuideHighlight(item: Channel, position: Int = bindingAdapterPosition) {
             val ctx = binding.root.context
+            val inSideBySideGuide = guideRowHeight > 0
             val active = !guideRowsFocusable && item.id == focusedId
             binding.number.setTextColor(
                 ctx.getColor(if (active) R.color.accent else R.color.text_secondary)
@@ -492,12 +498,18 @@ class ChannelAdapter(
             binding.name.setTextColor(
                 ctx.getColor(if (active) R.color.accent else R.color.text_primary)
             )
-            val phoneCard = DeviceForm.isTouchPrimary(ctx) && DeviceForm.isCompact(ctx)
+            val phoneCard = DeviceForm.isTouchPrimary(ctx) && DeviceForm.isCompact(ctx) && !inSideBySideGuide
             if (phoneCard) {
+                binding.root.background = null
                 binding.playTarget.setBackgroundResource(R.drawable.bg_focusable)
             } else {
-                // Never draw a focus rectangle around the channel name row in the live EPG grid.
-                binding.root.background = null
+                // Match ProgramGuideAdapter's subtle alternating row band so eyes track straight across.
+                val band = if (inSideBySideGuide && position >= 0 && position % 2 == 1) {
+                    0x0FFFFFFF
+                } else {
+                    android.graphics.Color.TRANSPARENT
+                }
+                binding.root.setBackgroundColor(band)
                 binding.playTarget.background = null
             }
         }
@@ -531,7 +543,9 @@ class ChannelAdapter(
 
         override fun bindEpg(item: Channel) {
             val context = binding.root.context
-            if (item.kind != ContentKind.LIVE || !item.seriesId.isNullOrBlank()) {
+            // In side-by-side EPG guide mode, the right-hand program timeline shows airing shows;
+            // keeping the left channel cell clean locks its height 1:1 with the program row.
+            if (guideRowHeight > 0 || item.kind != ContentKind.LIVE || !item.seriesId.isNullOrBlank()) {
                 binding.epgNow.visibility = View.GONE
                 binding.epgProgress.visibility = View.GONE
                 binding.epgNext.visibility = View.GONE

@@ -26,6 +26,7 @@ fun applyCloudReminders(
         }
     }
     ReminderStore.replaceAll(context, items)
+    ReminderClock.arm(context)
 }
 
 internal object ReminderStore {

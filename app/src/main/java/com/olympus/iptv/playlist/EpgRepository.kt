@@ -192,12 +192,12 @@ class EpgRepository(
     fun evictExpired(now: Long = System.currentTimeMillis()) {
         windows.evictAll()
         cache.entries.removeIf { (_, list) ->
-            list.isEmpty() || list.any { it.endMillis <= now }
+            list.isEmpty() || list.none { it.endMillis > now }
         }
     }
 
     private companion object {
-        private const val STALE_MS = 5L * 60L * 1000L
+        private const val STALE_MS = 30L * 60L * 1000L
         private const val CACHE_CAP = 256
         private const val PARSED_NAMES_CAP = 2_000
     }

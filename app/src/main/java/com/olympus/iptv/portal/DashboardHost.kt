@@ -93,12 +93,18 @@ object DashboardHost {
     private val workers = Executors.newFixedThreadPool(10) { runnable ->
         Thread(runnable, "dashboard-http").apply { isDaemon = true }
     }
-    private val logoWorkers = Executors.newFixedThreadPool(2) { runnable ->
-        Thread(runnable, "dashboard-logo").apply { isDaemon = true }
+    private val logoWorkers by lazy {
+        val lowRam = appContext?.let { com.olympus.iptv.ui.DeviceForm.isLowRam(it) } == true
+        Executors.newFixedThreadPool(if (lowRam) 2 else 4) { runnable ->
+            Thread(runnable, "dashboard-logo").apply {
+                isDaemon = true
+                priority = Thread.MIN_PRIORITY + 1
+            }
+        }
     }
     private val logoFetchLimiter = java.util.concurrent.Semaphore(3)
     private val logos by lazy {
-        OkHttpClient.Builder()
+        com.olympus.iptv.playlist.HttpClients.shared.newBuilder()
             .connectTimeout(4, TimeUnit.SECONDS)
             .readTimeout(6, TimeUnit.SECONDS)
             .followRedirects(true)
@@ -110,6 +116,9 @@ object DashboardHost {
         val app = context.applicationContext
         appContext = app
         watchNetwork(app)
+        thread(name = "dashboard-wan-warm", isDaemon = true) {
+            runCatching { Thread.sleep(12_000L); wanAddress() }
+        }
         thread(name = "dashboard-accept", isDaemon = true) {
             try {
                 while (started.get()) {
@@ -128,6 +137,7 @@ object DashboardHost {
                         } catch (_: Exception) {
                             break
                         }
+                        runCatching { client.tcpNoDelay = true }
                         com.olympus.iptv.vpn.AppTunnel.protect(client)
                         workers.execute {
                             var handed = false
@@ -293,6 +303,7 @@ object DashboardHost {
     private fun linkAddress(): String? {
         val context = appContext ?: return null
         val manager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return null
+        @Suppress("DEPRECATION")
         val networks = buildList {
             manager.activeNetwork?.let { add(it) }
             addAll(manager.allNetworks)
@@ -519,6 +530,7 @@ object DashboardHost {
         if (playlist != null) {
             runCatching {
                 app.catalogDb.writableDatabase.delete("stream_health", "playlist_id=?", arrayOf(playlist.id))
+                app.catalogDb.invalidateDeadCache()
             }
         }
         writeJson(socket, 200, mapOf("ok" to true))
@@ -558,20 +570,57 @@ object DashboardHost {
         writeJson(socket, 200, mapOf("ok" to ok, "status" to code, "latencyMs" to latencyMs))
     }
 
+    @Volatile private var cachedWanIp: String = ""
+    @Volatile private var cachedWanIpAt: Long = 0L
+
+    private fun wanAddress(): String {
+        val now = System.currentTimeMillis()
+        if (cachedWanIp.isNotBlank() && now - cachedWanIpAt < 5L * 60L * 1000L) return cachedWanIp
+        val endpoints = arrayOf("https://api.ipify.org", "https://icanhazip.com")
+        val client = HttpClients.shared.newBuilder()
+            .connectTimeout(3, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(3, java.util.concurrent.TimeUnit.SECONDS)
+            .callTimeout(4, java.util.concurrent.TimeUnit.SECONDS)
+            .build()
+        for (url in endpoints) {
+            val found = runCatching {
+                val req = okhttp3.Request.Builder().url(url).get().build()
+                client.newCall(req).execute().use { res ->
+                    if (!res.isSuccessful) "" else res.body.string().trim()
+                }
+            }.getOrDefault("")
+            if (found.isNotBlank() && found.length <= 45 && !found.contains('<')) {
+                cachedWanIp = found
+                cachedWanIpAt = now
+                return found
+            }
+        }
+        return cachedWanIp
+    }
+
     private fun activeStreams(app: OlympusIptvApp, socket: Socket) {
         val playlist = runBlocking { app.playlistStore.playlists.first().firstOrNull() }
         val status = playlist?.let { saved ->
             runCatching { runBlocking { XtreamClient().accountStatus(saved) } }.getOrNull()
         }
-        val ip = linkAddress().orEmpty()
+        val lanIp = linkAddress().orEmpty()
+        val wanIp = wanAddress()
+        val displayIp = wanIp.ifBlank { lanIp }
+        val vpn = runCatching { com.olympus.iptv.vpn.VpnDesk.status(app) }.getOrDefault(emptyMap())
         val local = StreamSessions.list().map { row ->
-            mapOf("ip" to ip, "name" to row.name, "role" to row.role, "source" to "This TV")
+            mapOf("ip" to displayIp, "name" to row.name, "role" to row.role, "source" to "This TV")
         }
         val remote = status?.connections.orEmpty().map { (address, name) ->
             mapOf("ip" to address, "name" to name, "role" to "", "source" to "Provider")
         }
         writeJson(socket, 200, mapOf(
-            "deviceIp" to ip,
+            "deviceIp" to displayIp,
+            "wanIp" to wanIp,
+            "lanIp" to lanIp,
+            "vpnConnected" to (vpn["connected"] == true),
+            "vpnCity" to (vpn["city"]?.toString().orEmpty()),
+            "providerStatus" to (status?.status ?: "—"),
+            "providerExpires" to (status?.expires ?: "—"),
             "providerActive" to (status?.activeConnections ?: "—"),
             "providerMax" to (status?.maxConnections ?: "—"),
             "streams" to (remote.ifEmpty { local }),
@@ -596,6 +645,8 @@ object DashboardHost {
             )
         }
         result.onSuccess {
+            cachedWanIp = ""
+            cachedWanIpAt = 0L
             val payload = com.olympus.iptv.vpn.VpnDesk.status(app).toMutableMap()
             payload["ok"] = true
             writeJson(socket, 200, payload)
@@ -981,6 +1032,11 @@ object DashboardHost {
         writeJson(socket, 200, mapOf("channels" to rows))
     }
 
+    private val groupPageCacheLock = Any()
+    private val groupPageCache = object : LinkedHashMap<String, Map<String, Any>>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Map<String, Any>>?) = size > 20
+    }
+
     private fun group(app: OlympusIptvApp, socket: Socket, query: Map<String, String>) {
         val gate = gate(app, query["email"], query["deviceId"]) ?: run {
             writeJson(socket, 401, mapOf("error" to "Device not registered"))
@@ -998,6 +1054,11 @@ object DashboardHost {
                 writeJson(socket, 403, mapOf("error" to "Incorrect password"))
                 return
             }
+        }
+        val cacheKey = "${gate.playlist.id}|$groupId|$needle|$limit|${lineup.revision ?: 0L}"
+        synchronized(groupPageCacheLock) { groupPageCache[cacheKey] }?.let { cached ->
+            writeJson(socket, 200, cached)
+            return
         }
         val order = lineup.channelOrder.orEmpty()[groupId].orEmpty()
         val page: List<CatalogDb.SlimChannel>
@@ -1029,7 +1090,9 @@ object DashboardHost {
                 "logo" to channel.logo
             )
         }
-        writeJson(socket, 200, mapOf("channels" to pageRows, "total" to total))
+        val payload = mapOf("channels" to pageRows, "total" to total)
+        synchronized(groupPageCacheLock) { groupPageCache[cacheKey] = payload }
+        writeJson(socket, 200, payload)
     }
 
     private fun profile(app: OlympusIptvApp, socket: Socket, email: String?, deviceId: String?) {
@@ -1208,6 +1271,13 @@ object DashboardHost {
         )
         if ((next.revision ?: 0L) >= previous.revisionOrZero()) {
             runBlocking { app.playlistStore.saveRecordingBook(gate.playlist.id, next) }
+            val needsService = next.itemsOrEmpty().any {
+                it.status == com.olympus.iptv.data.Recording.SCHEDULED ||
+                    it.status == com.olympus.iptv.data.Recording.RECORDING
+            } || next.seriesOrEmpty().isNotEmpty() || next.requestsOrEmpty().isNotEmpty()
+            if (needsService) {
+                runCatching { com.olympus.iptv.record.RecordingService.start(app) }
+            }
         }
         val saved = runBlocking { app.playlistStore.recordingBook(gate.playlist.id) }
         writeJson(socket, 200, mapOf("ok" to true, "recordings" to saved))
@@ -1364,7 +1434,15 @@ object DashboardHost {
             writeJson(socket, 404, mapOf("error" to "Logo unavailable"))
             return
         }
-        val hash = MessageDigest.getInstance("SHA-1").digest(target.toByteArray()).joinToString("") { "%02x".format(it) }
+        val digest = MessageDigest.getInstance("SHA-1").digest(target.toByteArray())
+        val hexChars = "0123456789abcdef"
+        val hashBuf = CharArray(digest.size * 2)
+        for (i in digest.indices) {
+            val v = digest[i].toInt() and 0xFF
+            hashBuf[i * 2] = hexChars[v ushr 4]
+            hashBuf[i * 2 + 1] = hexChars[v and 0x0F]
+        }
+        val hash = String(hashBuf)
         logoMemCache.get(hash)?.let { (cachedType, cachedBytes) ->
             writeBytes(socket, 200, cachedType, cachedBytes, "public, max-age=86400, immutable", allowGzip = false)
             return
@@ -1377,16 +1455,17 @@ object DashboardHost {
                 writeJson(socket, 503, mapOf("error" to "Logo fetch busy"))
                 return
             }
+            var fresh: Pair<String, ByteArray>? = null
             try {
                 val request = Request.Builder().url(target).header("User-Agent", "Olympus-IPTV").build()
-                val fetched = runCatching {
+                fresh = runCatching {
                     logos.newCall(request).execute().use { response ->
-                        if (!response.isSuccessful) return@use false
+                        if (!response.isSuccessful) return@use null
                         val type = response.header("Content-Type").orEmpty().substringBefore(";").ifBlank { "image/jpeg" }
-                        if (!type.startsWith("image/")) return@use false
-                        val declared = response.body?.contentLength() ?: -1L
-                        if (declared > MAX_LOGO_BYTES) return@use false
-                        val source = response.body?.source() ?: return@use false
+                        if (!type.startsWith("image/")) return@use null
+                        val declared = response.body.contentLength()
+                        if (declared > MAX_LOGO_BYTES) return@use null
+                        val source = response.body.source()
                         val buffer = okio.Buffer()
                         var read = 0L
                         while (!source.exhausted()) {
@@ -1395,23 +1474,28 @@ object DashboardHost {
                             read += chunk
                             if (read > MAX_LOGO_BYTES) {
                                 buffer.clear()
-                                return@use false
+                                return@use null
                             }
                         }
                         val bytes = buffer.readByteArray()
                         file.parentFile?.mkdirs()
                         file.writeBytes(bytes)
                         typeFile.writeText(type)
-                        logoMemCache.put(hash, type to bytes)
-                        true
+                        val entry = type to bytes
+                        logoMemCache.put(hash, entry)
+                        entry
                     }
-                }.getOrDefault(false)
-                if (!fetched || !file.isFile) {
-                    writeJson(socket, 404, mapOf("error" to "Logo unavailable"))
-                    return
-                }
+                }.getOrNull()
             } finally {
                 logoFetchLimiter.release()
+            }
+            if (fresh != null) {
+                writeBytes(socket, 200, fresh.first, fresh.second, "public, max-age=86400, immutable", allowGzip = false)
+                return
+            }
+            if (!file.isFile) {
+                writeJson(socket, 404, mapOf("error" to "Logo unavailable"))
+                return
             }
         }
         val type = if (typeFile.isFile) typeFile.readText() else "image/jpeg"
@@ -1436,6 +1520,7 @@ object DashboardHost {
     fun clearGuideCache() {
         guideHold = null
         catalogHold = null
+        synchronized(groupPageCacheLock) { groupPageCache.clear() }
     }
 
     private fun publicLogo(value: String): Boolean {

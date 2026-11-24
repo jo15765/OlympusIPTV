@@ -1011,8 +1011,8 @@ internal fun BrowseActivity.paintNowPlayingBar() {
         val app = application as OlympusIptvApp
         val channel = app.lastPlayed
         val match = channel != null && !channel.streamUrl.isBlank() && app.lastPlayedPlaylistId == playlist?.id
-        channelAdapter.setPlaying(if (match && channel?.kind == ContentKind.LIVE) channel.id else null)
-        if (!touchPrimary || !match || channel == null || binding.groupColumn.visibility != View.VISIBLE) {
+        channelAdapter.setPlaying(if (match && channel.kind == ContentKind.LIVE) channel.id else null)
+        if (!touchPrimary || !match || binding.groupColumn.visibility != View.VISIBLE) {
             binding.nowPlayingBar.visibility = View.GONE
             return
         }
@@ -1207,11 +1207,16 @@ internal fun BrowseActivity.applyChannelLayout() {
         // Phones: one poster column scrolls smoother than a 2-up grid on mid-range devices.
         val posterSpan = com.olympus.iptv.ui.DeviceForm.contentColumns(this)
         if (posters && manager !is androidx.recyclerview.widget.GridLayoutManager) {
-            binding.channelList.layoutManager = androidx.recyclerview.widget.GridLayoutManager(this, posterSpan)
+            binding.channelList.layoutManager = androidx.recyclerview.widget.GridLayoutManager(this, posterSpan).apply {
+                initialPrefetchItemCount = posterSpan * 2
+            }
         } else if (posters && manager is androidx.recyclerview.widget.GridLayoutManager && manager.spanCount != posterSpan) {
             manager.spanCount = posterSpan
+            manager.initialPrefetchItemCount = posterSpan * 2
         } else if (!posters && manager is androidx.recyclerview.widget.GridLayoutManager) {
-            binding.channelList.layoutManager = LinearLayoutManager(this)
+            binding.channelList.layoutManager = LinearLayoutManager(this).apply {
+                initialPrefetchItemCount = if (touchPrimary) 4 else 8
+            }
         }
     }
 

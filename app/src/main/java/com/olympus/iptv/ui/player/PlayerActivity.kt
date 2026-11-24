@@ -241,6 +241,9 @@ class PlayerActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         try {
+        if (DeviceForm.isLowRam(this)) {
+            com.olympus.iptv.MemoryTrim.trimForPlayback(application as OlympusIptvApp)
+        }
         touchPrimary = DeviceForm.isTouchPrimary(this)
         requestedOrientation = if (touchPrimary) {
             rememberedPhoneOrientation()

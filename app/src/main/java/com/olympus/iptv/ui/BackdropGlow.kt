@@ -53,7 +53,8 @@ object BackdropGlow {
             GradientDrawable.Orientation.TOP_BOTTOM,
             intArrayOf(accent, dark)
         )
-        val previous = target.background
+        val rawPrevious = target.background
+        val previous = (rawPrevious as? TransitionDrawable)?.getDrawable(1) ?: rawPrevious
         val animate = motion &&
             !DeviceForm.powerSave(target.context) &&
             SystemClock.uptimeMillis() >= quietUntil &&
@@ -65,7 +66,7 @@ object BackdropGlow {
         val cross = TransitionDrawable(arrayOf(previous, next))
         cross.isCrossFadeEnabled = true
         target.background = cross
-        cross.startTransition(280)
+        cross.startTransition(240)
     }
 
     private fun sample(bitmap: Bitmap): Int? {

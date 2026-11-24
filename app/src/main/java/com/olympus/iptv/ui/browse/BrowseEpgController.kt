@@ -167,6 +167,7 @@ class BrowseEpgController(
         if (snap.channelScroll > 0) {
             binding.channelList.post {
                 binding.channelList.scrollToPosition(snap.channelScroll)
+                (activity as? BrowseActivity)?.alignGuide(binding.channelList, binding.programList)
             }
         }
         if (snap.programScrollX > 0) {

@@ -20,7 +20,6 @@ fun prefetchLogos(context: Context, urls: List<String>, sizePx: Int) {
     if (urls.isEmpty() || sizePx <= 0) return
     val loader = context.imageLoader
     val memory = loader.memoryCache
-    val disk = loader.diskCache
     val seen = HashSet<String>(urls.size)
     for (url in urls) {
         if (url.isBlank() || !seen.add(url)) continue
@@ -30,14 +29,7 @@ fun prefetchLogos(context: Context, urls: List<String>, sizePx: Int) {
             .build()
         val memoryKey = request.memoryCacheKey
         if (memoryKey != null && memory?.get(memoryKey) != null) continue
-        val diskKey = request.diskCacheKey
-        if (diskKey != null) {
-            val hit = runCatching { disk?.openSnapshot(diskKey) }.getOrNull()
-            if (hit != null) {
-                runCatching { hit.close() }
-                continue
-            }
-        }
+        // Coil checks disk cache asynchronously on its IO dispatcher; avoid blocking the main thread.
         loader.enqueue(request)
     }
 }

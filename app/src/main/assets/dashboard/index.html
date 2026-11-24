@@ -24,7 +24,8 @@
     body {
       margin: 0;
       min-height: 100vh;
-      font-family: "Segoe UI", sans-serif;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      -webkit-font-smoothing: antialiased;
       background: var(--bg);
       color: var(--text);
     }
@@ -1530,6 +1531,549 @@
       .toast-host { left: 14px; right: 14px; bottom: 14px; }
     }
 
+    /* --- Revamped Web-UI Aesthetics & Decluttered Flow --- */
+    .stage { gap: 14px; }
+    .kpi-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 0;
+      padding: 0;
+    }
+    .kpi-card {
+      flex: 1 1 150px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px 14px;
+      border-radius: 12px;
+      background: linear-gradient(180deg, rgba(255,244,230,0.045), rgba(255,244,230,0.015));
+      border: 1px solid rgba(226,161,90,0.14);
+      box-shadow: inset 0 1px 0 rgba(255,244,230,0.06);
+      text-align: left;
+      transition: border-color .16s ease, transform .16s ease, background .16s ease;
+    }
+    .kpi-card:hover {
+      border-color: rgba(226, 161, 90, 0.5);
+      background: rgba(226, 161, 90, 0.08);
+      transform: translateY(-1px);
+    }
+    .kpi-card .kpi-label { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+    .kpi-card .kpi-val { font-size: 18px; font-weight: 700; color: var(--text); line-height: 1.1; font-variant-numeric: tabular-nums; }
+    .kpi-card .kpi-sub { display: none; }
+    .stage-bar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      background: rgba(24, 21, 17, 0.9);
+      border: 1px solid rgba(226, 161, 90, 0.16);
+      border-radius: 12px;
+      padding: 10px 14px;
+      box-shadow: inset 0 1px 0 rgba(255,244,230,0.06), 0 8px 24px rgba(0,0,0,0.32);
+    }
+    /* Unified warm obsidian cards, dirty save glow, and setup flow */
+    .clean-card, .epg-card, .quick-card {
+      background: linear-gradient(180deg, rgba(255,244,230,0.038), rgba(255,244,230,0.014));
+      border: 1px solid rgba(226,161,90,0.14);
+      box-shadow: inset 0 1px 0 rgba(255,244,230,0.05);
+      border-radius: 14px;
+      transition: border-color .16s ease, transform .16s ease, background .16s ease, box-shadow .16s ease;
+    }
+    .epg-card:hover, .quick-card:hover {
+      border-color: rgba(226, 161, 90, 0.48);
+      background: rgba(226, 161, 90, 0.07);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.24);
+    }
+    .country-card {
+      border-radius: 11px;
+      transition: border-color .14s ease, background .14s ease, transform .1s ease;
+    }
+    .country-card:hover { border-color: rgba(226, 161, 90, 0.45); transform: translateY(-1px); }
+    .country-card.on {
+      border-color: rgba(226, 161, 90, 0.55);
+      background: linear-gradient(180deg, rgba(226,161,90,0.16), rgba(226,161,90,0.07));
+    }
+    .stage-mode-note {
+      font-size: 12px;
+      color: var(--muted);
+      padding: 5px 11px;
+      border-radius: 999px;
+      background: rgba(255,244,230,0.04);
+      border: 1px solid rgba(255,244,230,0.08);
+    }
+    .stage-mode-note[hidden] { display: none; }
+    #globalSaveBtn.needs-save {
+      box-shadow: 0 0 0 3px rgba(226, 161, 90, 0.34), 0 4px 14px rgba(226, 161, 90, 0.25);
+    }
+    .flow-next-btn {
+      margin-left: auto;
+      border: 1px solid rgba(226, 161, 90, 0.35);
+      background: rgba(226, 161, 90, 0.1);
+      color: var(--accent);
+      border-radius: 999px;
+      padding: 6px 13px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .flow-next-btn:hover {
+      background: rgba(226, 161, 90, 0.2);
+      border-color: var(--accent);
+    }
+    .card.panel {
+      border-radius: 16px;
+      border: 1px solid rgba(226, 161, 90, 0.14);
+      background: linear-gradient(180deg, rgba(30, 26, 21, 0.96), rgba(22, 19, 15, 0.98));
+      box-shadow: inset 0 1px 0 rgba(255,244,230,0.05), 0 12px 32px rgba(0,0,0,0.3);
+      padding: 20px 22px;
+      animation: panelFade 0.14s ease-out;
+    }
+    .subpanel:not([hidden]) { animation: panelFade 0.12s ease-out; }
+    @keyframes panelFade {
+      from { opacity: 0; transform: translateY(3px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .card.panel, .subpanel:not([hidden]), .skel-row::after { animation: none !important; }
+    }
+    /* Tactile press feedback & tabular numerals */
+    .primary, .secondary, .group-step, .fav-step, .remote-btn, .kpi-card {
+      transition: transform .1s ease, border-color .15s ease, background .15s ease, box-shadow .15s ease;
+    }
+    .primary:active:not(:disabled), .secondary:active:not(:disabled),
+    .group-step:active:not(:disabled), .fav-step:active:not(:disabled),
+    .remote-btn:active:not(:disabled) {
+      transform: scale(0.96);
+    }
+    .country-count, .group-count, .fav-num, #channelNote, #favManageCountFoot {
+      font-variant-numeric: tabular-nums;
+    }
+    /* Live connection status pill */
+    .live-conn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      color: var(--muted);
+      background: rgba(255,244,230,0.04);
+      border: 1px solid rgba(255,244,230,0.08);
+      flex-shrink: 0;
+    }
+    .live-conn-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #73b56e;
+      box-shadow: 0 0 0 2px rgba(115, 181, 110, 0.24);
+    }
+    .live-conn.syncing .live-conn-dot {
+      background: var(--accent);
+      box-shadow: 0 0 0 3px rgba(226, 161, 90, 0.28);
+      animation: connPulse 1s ease-in-out infinite;
+    }
+    .live-conn.offline .live-conn-dot {
+      background: var(--danger);
+      box-shadow: 0 0 0 2px rgba(224, 122, 114, 0.24);
+    }
+    .live-conn.offline { color: #f0a19a; border-color: rgba(224, 122, 114, 0.3); }
+    @keyframes connPulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.85); }
+    }
+    /* Custom dark amber scrollbars */
+    .list::-webkit-scrollbar, #countries::-webkit-scrollbar, .panel::-webkit-scrollbar, .stage::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    .list::-webkit-scrollbar-track, #countries::-webkit-scrollbar-track, .panel::-webkit-scrollbar-track, .stage::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.18);
+      border-radius: 8px;
+    }
+    .list::-webkit-scrollbar-thumb, #countries::-webkit-scrollbar-thumb, .panel::-webkit-scrollbar-thumb, .stage::-webkit-scrollbar-thumb {
+      background: rgba(226, 161, 90, 0.25);
+      border-radius: 8px;
+    }
+    .list::-webkit-scrollbar-thumb:hover, #countries::-webkit-scrollbar-thumb:hover, .panel::-webkit-scrollbar-thumb:hover, .stage::-webkit-scrollbar-thumb:hover {
+      background: rgba(226, 161, 90, 0.5);
+    }
+    /* Shimmer skeletons */
+    .skel-list { display: flex; flex-direction: column; gap: 8px; padding: 4px 0; }
+    .skel-row {
+      position: relative;
+      overflow: hidden;
+      height: 48px;
+      border-radius: 10px;
+      background: rgba(255, 244, 230, 0.04);
+      border: 1px solid rgba(255, 244, 230, 0.05);
+    }
+    .skel-row::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      transform: translateX(-100%);
+      background: linear-gradient(90deg, transparent, rgba(226, 161, 90, 0.09), transparent);
+      animation: skelShimmer 1.15s ease-in-out infinite;
+    }
+    @keyframes skelShimmer {
+      100% { transform: translateX(100%); }
+    }
+    /* Rich empty state */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 28px 16px;
+      text-align: center;
+      color: var(--muted);
+      border: 1px dashed rgba(226, 161, 90, 0.2);
+      border-radius: 12px;
+      background: rgba(255, 244, 230, 0.02);
+    }
+    .empty-state-icon { font-size: 24px; line-height: 1; opacity: 0.85; }
+    .empty-state-title { font-size: 14px; font-weight: 700; color: var(--text); }
+    .empty-state-hint { font-size: 12px; color: var(--muted); max-width: 380px; }
+    /* Toast variants */
+    .toast-pill { display: inline-flex; align-items: center; gap: 8px; }
+    .toast-pill.toast-ok { border-color: rgba(115, 181, 110, 0.55); }
+    .toast-pill.toast-warn { border-color: rgba(226, 161, 90, 0.65); }
+    .toast-pill.toast-err { border-color: rgba(224, 122, 114, 0.65); color: #ffd4d0; }
+    /* Mobile quick-switch bar */
+    .mobile-quick-tabs {
+      display: none;
+      gap: 6px;
+      overflow-x: auto;
+      padding: 2px 0 4px;
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
+    }
+    .mobile-quick-tabs::-webkit-scrollbar { display: none; }
+    .mobile-quick-tabs button {
+      flex: 0 0 auto;
+      border: 1px solid rgba(226, 161, 90, 0.2);
+      background: rgba(30, 26, 21, 0.92);
+      color: var(--muted);
+      border-radius: 999px;
+      padding: 7px 14px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .mobile-quick-tabs button[aria-selected="true"] {
+      background: var(--accent);
+      color: var(--accent-ink);
+      border-color: var(--accent);
+    }
+    @media (max-width: 860px) {
+      .mobile-quick-tabs { display: flex; }
+    }
+    /* Settings → Web-UI & Active Streams visual polish */
+    .web-url-box {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin: 12px 0;
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: rgba(14, 12, 10, 0.72);
+      border: 1px solid rgba(226, 161, 90, 0.36);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--accent);
+      word-break: break-all;
+    }
+    .web-status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      background: rgba(115, 181, 110, 0.14);
+      color: #8fd18a;
+      border: 1px solid rgba(115, 181, 110, 0.35);
+      margin-bottom: 10px;
+    }
+    .web-status-pill::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #73b56e;
+    }
+    .web-meta-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 9px 0;
+      border-bottom: 1px solid rgba(255, 244, 230, 0.06);
+      font-size: 13px;
+    }
+    .web-meta-row:last-of-type { border-bottom: 0; }
+    .web-meta-key { color: var(--muted); }
+    .web-meta-val { font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+    .web-tips {
+      margin: 12px 0 0;
+      padding-left: 18px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.65;
+    }
+    .stream-summary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 12px;
+      margin: 12px 0 16px;
+    }
+    .stream-meter-track {
+      height: 8px;
+      border-radius: 999px;
+      background: rgba(255, 244, 230, 0.08);
+      overflow: hidden;
+      margin: 10px 0 8px;
+    }
+    .stream-meter-fill {
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #73b56e, var(--accent));
+      transition: width 0.25s ease;
+    }
+    .stream-meter-fill.warn { background: linear-gradient(90deg, var(--accent), #e07a72); }
+    .stream-big-val {
+      font-size: 26px;
+      font-weight: 800;
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.02em;
+      margin-top: 4px;
+    }
+    .stream-wan-val {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--accent);
+      margin-top: 6px;
+      word-break: break-all;
+    }
+    .stream-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .stream-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 9px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      background: rgba(255, 244, 230, 0.06);
+      border: 1px solid rgba(255, 244, 230, 0.1);
+      color: var(--muted);
+    }
+    .stream-pill.ok { color: #8fd18a; border-color: rgba(115, 181, 110, 0.35); background: rgba(115, 181, 110, 0.12); }
+    .stream-pill.vpn { color: var(--accent); border-color: rgba(226, 161, 90, 0.4); background: rgba(226, 161, 90, 0.12); }
+    .stream-card-list { display: flex; flex-direction: column; gap: 8px; }
+    .stream-card {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: rgba(255, 244, 230, 0.03);
+      border: 1px solid rgba(226, 161, 90, 0.16);
+      flex-wrap: wrap;
+    }
+    .stream-card-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .stream-live-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #73b56e;
+      box-shadow: 0 0 0 3px rgba(115, 181, 110, 0.22);
+      flex-shrink: 0;
+    }
+    .stream-card-name { font-size: 14px; font-weight: 700; color: var(--text); }
+    .stream-card-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .stream-ip-badge {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 5px 10px;
+      border-radius: 8px;
+      background: rgba(14, 12, 10, 0.65);
+      border: 1px solid rgba(226, 161, 90, 0.3);
+      color: var(--accent);
+    }
+    .stream-callout {
+      margin-top: 10px;
+      padding: 11px 14px;
+      border-radius: 11px;
+      background: rgba(226, 161, 90, 0.08);
+      border: 1px solid rgba(226, 161, 90, 0.28);
+      color: var(--text);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .panel-head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px 12px;
+      margin-bottom: 14px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .panel-head h2 {
+      font-size: 20px;
+      letter-spacing: -0.01em;
+      margin: 0;
+    }
+    .panel-subhead {
+      font-size: 12px;
+      color: var(--muted);
+      margin: 2px 0 0;
+    }
+    .seg-tabs {
+      display: inline-flex;
+      gap: 4px;
+      padding: 4px;
+      border-radius: 12px;
+      background: rgba(0,0,0,0.28);
+      border: 1px solid rgba(255,255,255,0.07);
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .seg-tab {
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      padding: 8px 15px;
+      border-radius: 9px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .15s ease, color .15s ease;
+    }
+    .seg-tab[aria-selected="true"] {
+      background: var(--accent);
+      color: var(--accent-ink);
+      box-shadow: 0 2px 10px rgba(212, 168, 83, 0.3);
+    }
+    .seg-tab:not([aria-selected="true"]):hover {
+      color: var(--ink);
+      background: rgba(255,255,255,0.06);
+    }
+    .settings-section-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .09em;
+      color: var(--accent);
+      margin: 18px 0 10px;
+    }
+    .settings-section-title:first-of-type { margin-top: 4px; }
+    .admin-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 12px;
+    }
+    .admin-card {
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.025);
+      padding: 16px;
+      text-align: left;
+      transition: border-color .16s ease, transform .16s ease, background .16s ease;
+    }
+    .admin-card:hover {
+      border-color: rgba(212, 168, 83, 0.45);
+      background: rgba(212, 168, 83, 0.06);
+      transform: translateY(-2px);
+    }
+    .admin-card .admin-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      background: rgba(212, 168, 83, 0.12);
+      border: 1px solid rgba(212, 168, 83, 0.25);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 10px;
+    }
+    .group-tools, .channel-tools {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px 12px;
+      padding: 10px 12px;
+      border-radius: 11px;
+      background: rgba(0,0,0,0.22);
+      border: 1px solid rgba(255,255,255,0.06);
+      margin-bottom: 12px;
+    }
+    .group-bulk {
+      border-radius: 11px;
+      padding: 8px 12px;
+      background: rgba(212, 168, 83, 0.06);
+      border: 1px solid rgba(212, 168, 83, 0.18);
+    }
+    .remote-dpad {
+      max-width: 248px;
+      margin: 14px auto 18px;
+      gap: 10px;
+    }
+    .remote-btn {
+      border-radius: 14px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02));
+      border: 1px solid rgba(255,255,255,0.12);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+      transition: transform .1s ease, border-color .15s ease, background .15s ease;
+    }
+    .remote-btn:hover { border-color: rgba(212, 168, 83, 0.55); }
+    .remote-btn:active { transform: scale(0.95); }
+    .remote-btn.ok {
+      border-radius: 50%;
+      background: linear-gradient(180deg, var(--accent), #b68a38);
+      color: var(--accent-ink);
+      border-color: rgba(255,255,255,0.22);
+      box-shadow: 0 6px 18px rgba(212, 168, 83, 0.35);
+    }
+    .clean-card {
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.025);
+      padding: 18px;
+    }
+    .record-split {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 16px;
+    }
+    .group-row, .channel-row, .fav-row, .remote-fav-item {
+      content-visibility: auto;
+      contain-intrinsic-size: auto 56px;
+    }
+    @media (max-width: 720px) {
+      .card.panel { padding: 14px; }
+      .kpi-card { flex: 1 1 45%; padding: 8px 10px; }
+      .stage-bar { padding: 8px 10px; }
+    }
   </style>
 </head>
 <body>
@@ -1676,7 +2220,7 @@
           <div class="nav-label">System</div>
           <button id="tabRemote" type="button" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="7" y="2" width="10" height="20" rx="3"/><circle cx="12" cy="8" r="2"/><path d="M10 14h4M10 17h4"/></svg>TV Remote</button>
           <button id="tabBackup" type="button" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 4v10"/><path d="M8 10l4 4 4-4"/><path d="M5 18h14"/></svg>Backup &amp; Restore</button>
-          <button id="tabAdmin" type="button" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4"/></svg>Admin</button>
+          <button id="tabAdmin" type="button" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4"/></svg>Settings</button>
         </div>
         <div class="side-foot">
           <button id="backDevices" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8"/></svg>Devices</button>
@@ -1706,20 +2250,36 @@
           <span class="kpi-sub">Launch D-pad &amp; cast</span>
         </button>
       </div>
+      <nav class="mobile-quick-tabs" id="mobileQuickTabs" aria-label="Quick sections">
+        <button type="button" data-quick-tab="groups" aria-selected="false">Groups</button>
+        <button type="button" data-quick-tab="channels" aria-selected="false">Channels</button>
+        <button type="button" data-quick-tab="favorites" aria-selected="false">Favorites</button>
+        <button type="button" data-quick-tab="remote" aria-selected="false">TV Remote</button>
+        <button type="button" data-quick-tab="record" aria-selected="false">DVR</button>
+        <button type="button" data-quick-tab="admin" aria-selected="false">Settings</button>
+      </nav>
       <div class="stage-bar">
         <div class="stage-bar-left">
+          <span class="live-conn" id="liveConnPill" title="Live connection to TV"><i class="live-conn-dot" aria-hidden="true"></i><span id="liveConnText">Connected</span></span>
           <span class="dirty-pill" id="dirtyPill" hidden>Unsaved changes</span>
           <p class="ok" id="saveStatus"></p>
         </div>
         <div class="stage-bar-right">
+          <span class="stage-mode-note" id="stageAutoNote" hidden>Changes here sync automatically</span>
           <button class="secondary" id="undoBtn" type="button" title="Undo last lineup edit (Ctrl+Z)" disabled>↩ Undo</button>
-          <button class="primary" id="globalSaveBtn" type="button" title="Push lineup changes to the TV">Save &amp; Sync</button>
+          <button class="primary" id="globalSaveBtn" type="button" title="Push lineup changes to the TV (Ctrl+S)">Save &amp; Sync</button>
         </div>
       </div>
       <section class="card panel" id="panelCountries">
         <div class="panel-head">
-          <h2>Countries</h2>
-          <span class="search-wrap">
+          <div>
+            <h2>Countries</h2>
+            <p class="panel-subhead">Click any region to show or hide it, or drag cards to set your preferred order.</p>
+          </div>
+          <button class="flow-next-btn" type="button" data-flow-tab="groups">Next: Groups →</button>
+        </div>
+        <div class="group-tools">
+          <span class="search-wrap" style="flex:1;min-width:180px">
             <input id="countrySearch" type="search" placeholder="Find a country... (/)" />
             <button class="search-clear" type="button" data-clear="#countrySearch" hidden aria-label="Clear search">×</button>
           </span>
@@ -1729,7 +2289,6 @@
             <button class="secondary" id="countriesVisible" type="button" aria-pressed="false">Visible</button>
             <button class="secondary" id="countriesHidden" type="button" aria-pressed="false">Hidden</button>
             <button class="secondary" id="countriesBoth" type="button" aria-pressed="true">Both</button>
-            <button class="section-save" type="button">Save</button>
           </div>
         </div>
         <div class="chips" id="countries"></div>
@@ -1737,8 +2296,14 @@
 
       <section class="card panel" id="panelGroups" hidden>
         <div class="panel-head">
-          <h2>Groups</h2>
-          <span class="search-wrap">
+          <div>
+            <h2>Groups</h2>
+            <p class="panel-subhead">Toggle categories on or off, drag to reorder, or rename groups — then click Save &amp; Sync.</p>
+          </div>
+          <button class="flow-next-btn" type="button" data-flow-tab="channels">Next: Channels →</button>
+        </div>
+        <div class="group-tools">
+          <span class="search-wrap" style="flex:1;min-width:180px">
             <input id="groupSearch" type="search" placeholder="Find a group or wildcard... (/)" />
             <button class="search-clear" type="button" data-clear="#groupSearch" hidden aria-label="Clear search">×</button>
           </span>
@@ -1750,7 +2315,6 @@
             <button class="secondary" id="groupsBoth" type="button" aria-pressed="true">Both</button>
             <button class="secondary" id="groupsHideMatching" type="button" title="Hide all groups matching the current search or wildcard (e.g. PPV *, 24/7 *)">Hide Matching</button>
             <button class="primary" id="smartLineupBtn" type="button" title="Enable Smart Auto-Clean Names and hide duplicate backup channels">✨ 1-Click Smart Lineup</button>
-            <button class="section-save" type="button">Save</button>
           </div>
         </div>
         <div class="group-tools">
@@ -1768,13 +2332,18 @@
 
       <section class="card panel" id="panelChannels" hidden>
         <div class="panel-head">
-          <h2>Channels</h2>
-          <select id="channelGroup"></select>
-          <span class="search-wrap">
+          <div>
+            <h2>Channels</h2>
+            <p class="panel-subhead">Fine-tune channels inside a group, test stream latency, or tap ▶ to play directly on your TV.</p>
+          </div>
+          <button class="flow-next-btn" type="button" data-flow-tab="favorites">Next: Favorites →</button>
+        </div>
+        <div class="group-tools">
+          <select id="channelGroup" style="flex:0 1 260px"></select>
+          <span class="search-wrap" style="flex:1;min-width:180px">
             <input id="channelSearch" type="search" placeholder="Find a channel in this group... (/)" />
             <button class="search-clear" type="button" data-clear="#channelSearch" hidden aria-label="Clear search">×</button>
           </span>
-          <button class="section-save" type="button">Save</button>
         </div>
         <div class="channel-tools">
           <span id="channelNote"></span>
@@ -1801,38 +2370,36 @@
           <div class="panel-head">
             <div>
               <button class="admin-back" id="adminHomeBack" type="button">← Back</button>
-              <h2>Admin</h2>
-              <p class="admin-lead">Configure and manage your Olympus-IPTV server and dashboard options.</p>
+              <h2>Settings</h2>
+              <p class="admin-lead">Manage catalog sync, EPG cleanup, network tools, and device diagnostics.</p>
             </div>
           </div>
+          <div class="settings-section-title">Guide &amp; Lineup</div>
           <div class="admin-cards">
             <button class="admin-card" id="adminRefresh" type="button">
               <span class="admin-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v6h-6"/></svg></span>
-              <strong>Refresh Options</strong>
+              <strong>Refresh &amp; Sync</strong>
               <span>Sync guide, playlists, and channels</span>
               <em id="adminRefreshAge">Last refresh</em>
             </button>
+            <button class="admin-card" id="adminEpg" type="button">
+              <span class="admin-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M8 10h4M8 14h8"/></svg></span>
+              <strong>EPG &amp; Cleanup</strong>
+              <span>Manage guide visibility &amp; name rules</span>
+              <em id="adminEpgBadge">Auto-clean active</em>
+            </button>
+          </div>
+          <div class="settings-section-title">Device &amp; Network</div>
+          <div class="admin-cards">
             <button class="admin-card" id="adminWeb" type="button">
               <span class="admin-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="5" width="12" height="10" rx="2"/><rect x="10" y="9" width="11" height="8" rx="2"/><path d="M8 19h8"/></svg></span>
-              <strong>Web-UI</strong>
+              <strong>Web-UI Access</strong>
               <span>Access the dashboard on Wi-Fi</span>
               <em>Online &amp; Ready</em>
             </button>
-            <button class="admin-card" id="adminLogs" type="button">
-              <span class="admin-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v5h5"/><path d="M9 13h6M9 17h4"/><path d="M5 8v11"/></svg></span>
-              <strong>Error log</strong>
-              <span>Review system events and issues</span>
-              <em id="adminLogAge">0 errors</em>
-            </button>
-            <button class="admin-card" id="adminEpg" type="button">
-              <span class="admin-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M8 10h4M8 14h8"/></svg></span>
-              <strong>EPG edits</strong>
-              <span>Manage guide visibility</span>
-              <em id="adminEpgBadge">Auto-clean active</em>
-            </button>
             <button class="admin-card" id="adminVpn" type="button">
               <span class="admin-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 3l8 3v6c0 5-3.4 8.4-8 9-4.6-.6-8-4-8-9V6l8-3z"/></svg></span>
-              <strong>VPN</strong>
+              <strong>VPN Tunnel</strong>
               <em id="adminVpnCard">Not Connected • Secure your traffic</em>
               <span>The dashboard stays on your Wi-Fi.</span>
             </button>
@@ -1841,6 +2408,12 @@
               <strong>Active Streams</strong>
               <span>See which address is using each open stream.</span>
               <em id="adminStreamsBadge">Monitor connections</em>
+            </button>
+            <button class="admin-card" id="adminLogs" type="button">
+              <span class="admin-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v5h5"/><path d="M9 13h6M9 17h4"/><path d="M5 8v11"/></svg></span>
+              <strong>Error Log</strong>
+              <span>Review system events and issues</span>
+              <em id="adminLogAge">0 errors</em>
             </button>
           </div>
         </div>
@@ -1870,10 +2443,46 @@
         </div>
         <div id="adminWebPage" hidden>
           <div class="panel-head">
-            <button class="secondary" id="adminWebBack" type="button">Back</button>
-            <h2>Web-UI</h2>
+            <button class="secondary" id="adminWebBack" type="button">← Settings</button>
+            <div>
+              <h2>Web-UI Access</h2>
+              <p class="panel-subhead">Manage your TV lineup, favorites, DVR, and remote from any browser on the same Wi-Fi.</p>
+            </div>
           </div>
-          <p class="hint" id="adminWebCopy">Open this address on a phone or computer on the same Wi-Fi.</p>
+          <div class="clean-grid" style="margin-top:12px">
+            <article class="clean-card">
+              <span class="web-status-pill">Online · Local Wi-Fi</span>
+              <h3>Dashboard Address</h3>
+              <p class="hint" id="adminWebCopy">Open this address on a phone, tablet, or computer on the same Wi-Fi network.</p>
+              <div class="web-url-box">
+                <span id="adminWebUrl">Loading address…</span>
+              </div>
+              <div class="clean-actions" style="justify-content:flex-start;gap:8px">
+                <button class="primary" id="adminWebCopyBtn" type="button">📋 Copy Address</button>
+                <a class="secondary" id="adminWebOpenBtn" href="#" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center">↗ Open in New Tab</a>
+              </div>
+            </article>
+            <article class="clean-card">
+              <h3>Device &amp; Connection Details</h3>
+              <div class="web-meta-row">
+                <span class="web-meta-key">Device ID</span>
+                <span class="web-meta-val" id="adminWebDeviceId">—</span>
+              </div>
+              <div class="web-meta-row">
+                <span class="web-meta-key">Account</span>
+                <span class="web-meta-val" id="adminWebEmail">—</span>
+              </div>
+              <div class="web-meta-row">
+                <span class="web-meta-key">Sync Mode</span>
+                <span class="web-meta-val">Instant Live Wi-Fi + Cloud</span>
+              </div>
+              <ul class="web-tips">
+                <li>Keep your phone or computer on the same Wi-Fi as this TV.</li>
+                <li>This page stays private on your home network and is not exposed to the internet.</li>
+                <li>Changes saved here update the TV guide immediately.</li>
+              </ul>
+            </article>
+          </div>
         </div>
         <div id="adminLogPage" hidden>
           <div class="panel-head">
@@ -1891,10 +2500,13 @@
         </div>
         <div id="adminStreamsPage" hidden>
           <div class="panel-head">
-            <button class="secondary" id="adminStreamsBack" type="button">Back</button>
-            <h2>Active Streams</h2>
+            <button class="secondary" id="adminStreamsBack" type="button">← Settings</button>
+            <div>
+              <h2>Active Streams</h2>
+              <p class="panel-subhead" id="adminStreamsLead">Checking provider connections and public WAN IP…</p>
+            </div>
+            <button class="secondary" id="adminStreamsRefreshBtn" type="button" style="margin-left:auto">↻ Refresh</button>
           </div>
-          <p class="hint" id="adminStreamsLead">Checking the provider…</p>
           <div id="adminStreamsList"></div>
         </div>
         <div id="adminVpnPage" hidden>
@@ -1947,9 +2559,11 @@
       <section class="card panel" id="panelClean" hidden>
         <div class="panel-head" id="epgHomeHead">
           <div class="epg-title">
-            <button class="secondary" id="epgBack" type="button">Admin</button>
-            <h2>EPG edits</h2>
-            <button class="section-save" type="button">Save</button>
+            <button class="secondary" id="epgBack" type="button">← Settings</button>
+            <div>
+              <h2>EPG &amp; Cleanup</h2>
+              <p class="panel-subhead">Strip messy tags, bulk-rename groups, or reset visibility — then click Save &amp; Sync above.</p>
+            </div>
           </div>
         </div>
         <div class="epg-grid" id="epgCards">
@@ -1996,9 +2610,9 @@
         </div>
         <div id="epgTools" hidden>
           <div class="panel-head">
-            <button class="secondary" id="epgToolsBack" type="button">Back</button>
-            <h2 id="epgToolTitle">EPG edits</h2>
-            <button id="epgToolSave" type="button">Save</button>
+            <button class="secondary" id="epgToolsBack" type="button">← Back</button>
+            <h2 id="epgToolTitle">EPG &amp; Cleanup</h2>
+            <button id="epgToolSave" type="button" hidden>Save</button>
           </div>
           <p class="note" id="epgPageStatus"></p>
           <div class="clean-grid">
@@ -2102,9 +2716,9 @@
         <div class="fav-top-head">
           <div>
             <h2>Favorites</h2>
-            <p class="hint">Build, search, and manage your favorite channels, movies, and shows.</p>
+            <p class="hint">Build, search, and manage your favorite channels, movies, and shows — every change syncs automatically.</p>
           </div>
-          <button class="section-save" type="button">Save</button>
+          <button class="flow-next-btn" type="button" data-flow-tab="remote">Open TV Remote →</button>
         </div>
         <div class="fav-subtabs" role="tablist" aria-label="Favorites sections">
           <button class="fav-subtab" id="favSubTabAuto" type="button" role="tab" aria-selected="true" data-fav-sub="auto">Auto Build</button>
@@ -2286,13 +2900,62 @@
 
       <section class="card panel" id="panelRecord" hidden>
         <div class="panel-head">
-          <h2>Record</h2>
-          <button class="section-save" id="saveShare" type="button">Save</button>
-        </div>
-        <div class="record-grid">
           <div>
-            <h3>Network share</h3>
-            <div class="fields">
+            <h2>Recordings &amp; DVR</h2>
+            <p class="panel-subhead">Schedule recordings from the guide, manage saved shows, or configure network storage.</p>
+          </div>
+        </div>
+        <div class="seg-tabs" role="tablist" aria-label="Recordings sections">
+          <button class="seg-tab" type="button" data-rec-sub="schedule" aria-selected="true">Schedule</button>
+          <button class="seg-tab" type="button" data-rec-sub="list" aria-selected="false">My Recordings</button>
+          <button class="seg-tab" type="button" data-rec-sub="storage" aria-selected="false">Storage (SMB)</button>
+        </div>
+        <div id="recPaneSchedule">
+          <div class="record-split">
+            <article class="clean-card">
+              <h3>1. Pick a Channel &amp; Program</h3>
+              <input id="recordSearch" type="search" placeholder="Find a channel..." />
+              <div class="list" id="recordChannels" style="margin-top:8px"></div>
+              <p class="note" id="recordProgramNote"></p>
+              <div class="list" id="recordPrograms"></div>
+            </article>
+            <article class="clean-card">
+              <h3>2. Manual Timer</h3>
+              <p class="hint">Starts 1 minute early and stops 1 minute late. Keep the TV app open to record.</p>
+              <label for="recordTitle">Program</label>
+              <input id="recordTitle" type="text" autocomplete="off" />
+              <div class="fields" style="margin-top:8px">
+                <div>
+                  <label for="recordStart">Starts</label>
+                  <input id="recordStart" type="datetime-local" />
+                </div>
+                <div>
+                  <label for="recordEnd">Ends</label>
+                  <input id="recordEnd" type="datetime-local" />
+                </div>
+              </div>
+              <label for="recordWhere" style="margin-top:8px">Save to</label>
+              <select id="recordWhere">
+                <option value="local">This TV</option>
+                <option value="smb">Network share</option>
+              </select>
+              <div class="actions" style="margin-top:14px">
+                <button id="recordManual" class="primary" type="button">Record these times</button>
+              </div>
+            </article>
+          </div>
+        </div>
+        <div id="recPaneList" hidden>
+          <article class="clean-card">
+            <h3>Scheduled &amp; Saved Recordings</h3>
+            <div class="list" id="recordList" style="margin-top:10px"></div>
+          </article>
+        </div>
+        <div id="recPaneStorage" hidden>
+          <article class="clean-card" style="max-width:620px">
+            <h3>Network Share (SMB)</h3>
+            <p class="hint">Optional NAS or PC shared folder for storing recordings off the TV.</p>
+            <div class="fields" style="margin-top:10px">
               <div>
                 <label for="smbHost">Server</label>
                 <input id="smbHost" type="text" placeholder="192.168.1.20" autocomplete="off" />
@@ -2310,40 +2973,12 @@
                 <input id="smbUser" type="text" autocomplete="off" />
               </div>
             </div>
-            <label for="smbPass">Password</label>
+            <label for="smbPass" style="margin-top:8px">Password</label>
             <input id="smbPass" type="password" autocomplete="new-password" />
-            <p class="hint">Starts one minute early and stops one minute late. The TV app has to be open to record. Save stores the network share.</p>
-            <h3>Set the times</h3>
-            <label for="recordTitle">Program</label>
-            <input id="recordTitle" type="text" autocomplete="off" />
-            <div class="fields">
-              <div>
-                <label for="recordStart">Starts</label>
-                <input id="recordStart" type="datetime-local" />
-              </div>
-              <div>
-                <label for="recordEnd">Ends</label>
-                <input id="recordEnd" type="datetime-local" />
-              </div>
+            <div class="actions" style="margin-top:14px">
+              <button class="primary" id="saveShare" type="button">Save Storage Settings</button>
             </div>
-            <label for="recordWhere">Save to</label>
-            <select id="recordWhere">
-              <option value="local">This TV</option>
-              <option value="smb">Network share</option>
-            </select>
-            <div class="actions">
-              <button id="recordManual" class="primary" type="button">Record these times</button>
-            </div>
-          </div>
-          <div>
-            <h3>Channel</h3>
-            <input id="recordSearch" type="search" placeholder="Find a channel" />
-            <div class="list" id="recordChannels"></div>
-            <p class="note" id="recordProgramNote"></p>
-            <div class="list" id="recordPrograms"></div>
-            <h3>Recordings</h3>
-            <div class="list" id="recordList"></div>
-          </div>
+          </article>
         </div>
       </section>
 
@@ -2383,36 +3018,48 @@
 
       <section class="card panel" id="panelBackup" hidden>
         <div class="panel-head">
-          <h2>Backup &amp; Restore</h2>
-          <p class="clean-lead">Export downloads a file. Import saves that lineup onto this TV.</p>
+          <div>
+            <h2>Backup &amp; Restore</h2>
+            <p class="panel-subhead">Export or import a portable backup file, roll back cloud snapshots, or sync across TVs.</p>
+          </div>
         </div>
-        <div class="clean-grid">
-          <article class="clean-card">
-            <h3>Export Lineup &amp; Settings</h3>
-            <p class="hint">Download this device's favorites, hidden groups/channels, renames, parental PINs, and audio offsets as a portable JSON file.</p>
-            <button class="clean-apply" id="exportSettings" type="button" style="margin-top:14px">Export backup (.json)</button>
-          </article>
-          <article class="clean-card">
-            <h3>Import Backup</h3>
-            <p class="hint">Replace this device's lineup with a previously exported settings file.</p>
-            <button class="clean-apply" id="importSettings" type="button" style="margin-top:14px">Import backup (.json)</button>
-            <input id="importFile" type="file" accept="application/json,.json" hidden />
-          </article>
-          <article class="clean-card">
-            <h3>Cloud Revision History (1-Click Rollback)</h3>
-            <p class="hint">Restore any of the last 5 automatic PostgreSQL snapshots saved before your recent edits.</p>
-            <button class="secondary" id="loadCloudHistoryBtn" type="button" style="margin-top:14px">⏱ View Last 5 Cloud Snapshots</button>
-            <div id="cloudHistoryList" style="margin-top:10px;display:flex;flex-direction:column;gap:6px"></div>
-          </article>
-          <article class="clean-card">
-            <h3>Multi-TV Profile Sync &amp; Clone</h3>
-            <p class="hint">Share one household lineup across all TVs, or copy another TV's setup onto this device.</p>
-            <label class="intl-switch" style="margin-top:10px"><input id="sharedHouseholdToggle" type="checkbox" /><span class="switch" aria-hidden="true"></span> Share Household Lineup Across All TVs</label>
-            <div style="display:flex;gap:8px;margin-top:12px">
-              <select id="cloneSourceSelect"></select>
-              <button class="secondary" id="cloneProfileBtn" type="button" style="flex-shrink:0">Clone Here</button>
-            </div>
-          </article>
+        <div class="seg-tabs" role="tablist" aria-label="Backup sections">
+          <button class="seg-tab" type="button" data-backup-sub="local" aria-selected="true">Local File</button>
+          <button class="seg-tab" type="button" data-backup-sub="cloud" aria-selected="false">Cloud &amp; Multi-TV</button>
+        </div>
+        <div id="backupPaneLocal">
+          <div class="clean-grid">
+            <article class="clean-card">
+              <h3>Export Lineup &amp; Settings</h3>
+              <p class="hint">Download this device's favorites, hidden groups/channels, renames, parental PINs, and audio offsets as a portable JSON file.</p>
+              <button class="clean-apply" id="exportSettings" type="button" style="margin-top:14px">Export backup (.json)</button>
+            </article>
+            <article class="clean-card">
+              <h3>Import Backup</h3>
+              <p class="hint">Replace this device's lineup with a previously exported settings file.</p>
+              <button class="clean-apply" id="importSettings" type="button" style="margin-top:14px">Import backup (.json)</button>
+              <input id="importFile" type="file" accept="application/json,.json" hidden />
+            </article>
+          </div>
+        </div>
+        <div id="backupPaneCloud" hidden>
+          <div class="clean-grid">
+            <article class="clean-card">
+              <h3>Cloud Revision History (1-Click Rollback)</h3>
+              <p class="hint">Restore any of the last 5 automatic PostgreSQL snapshots saved before your recent edits.</p>
+              <button class="secondary" id="loadCloudHistoryBtn" type="button" style="margin-top:14px">⏱ View Last 5 Cloud Snapshots</button>
+              <div id="cloudHistoryList" style="margin-top:10px;display:flex;flex-direction:column;gap:6px"></div>
+            </article>
+            <article class="clean-card">
+              <h3>Multi-TV Profile Sync &amp; Clone</h3>
+              <p class="hint">Share one household lineup across all TVs, or copy another TV's setup onto this device.</p>
+              <label class="intl-switch" style="margin-top:10px"><input id="sharedHouseholdToggle" type="checkbox" /><span class="switch" aria-hidden="true"></span> Share Household Lineup Across All TVs</label>
+              <div style="display:flex;gap:8px;margin-top:12px">
+                <select id="cloneSourceSelect"></select>
+                <button class="secondary" id="cloneProfileBtn" type="button" style="flex-shrink:0">Clone Here</button>
+              </div>
+            </article>
+          </div>
         </div>
       </section>
       </div>
@@ -2535,11 +3182,32 @@
       if (kpiD) kpiD.textContent = session.deviceId || "Connected";
       updateAdminBadges();
     }
+    function isLineupTab(name) {
+      return name === "countries" || name === "groups" || name === "channels" || name === "clean";
+    }
     function syncDirtyChrome() {
       const pill = document.querySelector("#dirtyPill");
       if (pill) pill.hidden = !pageDirty;
       const undoBtn = document.querySelector("#undoBtn");
-      if (undoBtn) undoBtn.disabled = undoStack.length === 0;
+      const saveBtn = document.querySelector("#globalSaveBtn");
+      const autoNote = document.querySelector("#stageAutoNote");
+      const showSave = isLineupTab(tab) || pageDirty;
+      if (undoBtn) {
+        undoBtn.hidden = !showSave;
+        undoBtn.disabled = undoStack.length === 0;
+      }
+      if (saveBtn) {
+        saveBtn.hidden = !showSave;
+        saveBtn.classList.toggle("needs-save", !!pageDirty);
+      }
+      if (autoNote) {
+        autoNote.hidden = showSave;
+        autoNote.textContent = tab === "remote"
+          ? "Live TV remote — commands send immediately"
+          : tab === "record"
+            ? "Schedule & storage save directly inside each tab"
+            : "Changes here sync automatically";
+      }
       updateDashboardKpis();
     }
     function scheduleLineupSync() {
@@ -3109,6 +3777,51 @@
     function forgetTabPaint() {
       Object.keys(tabPaint).forEach((key) => { delete tabPaint[key]; });
     }
+    function renderSkeleton(box, count) {
+      if (!box) return;
+      const wrap = document.createElement("div");
+      wrap.className = "skel-list";
+      wrap.setAttribute("aria-busy", "true");
+      const rows = Math.max(2, Math.min(count || 5, 10));
+      for (let i = 0; i < rows; i += 1) {
+        const bar = document.createElement("div");
+        bar.className = "skel-row";
+        wrap.append(bar);
+      }
+      box.replaceChildren(wrap);
+    }
+
+    function renderEmpty(box, icon, title, hint) {
+      if (!box) return;
+      const el = document.createElement("div");
+      el.className = "empty-state";
+      const ic = document.createElement("div");
+      ic.className = "empty-state-icon";
+      ic.setAttribute("aria-hidden", "true");
+      ic.textContent = icon || "✦";
+      const tt = document.createElement("div");
+      tt.className = "empty-state-title";
+      tt.textContent = title || "Nothing here";
+      el.append(ic, tt);
+      if (hint) {
+        const ht = document.createElement("div");
+        ht.className = "empty-state-hint";
+        ht.textContent = hint;
+        el.append(ht);
+      }
+      box.replaceChildren(el);
+    }
+
+    function setConnState(mode, label) {
+      const pill = document.querySelector("#liveConnPill");
+      const text = document.querySelector("#liveConnText");
+      if (!pill || !text) return;
+      pill.classList.remove("syncing", "offline");
+      if (mode === "syncing") pill.classList.add("syncing");
+      else if (mode === "offline") pill.classList.add("offline");
+      text.textContent = label || (mode === "offline" ? "Offline" : mode === "syncing" ? "Syncing…" : "Connected");
+    }
+
     function openTab(next) {
       tab = next;
       document.querySelector("#tabCountries").setAttribute("aria-selected", String(next === "countries"));
@@ -3120,6 +3833,10 @@
       document.querySelector("#tabRemote").setAttribute("aria-selected", String(next === "remote"));
       document.querySelector("#tabBackup").setAttribute("aria-selected", String(next === "backup"));
       document.querySelector("#tabAdmin").setAttribute("aria-selected", String(next === "admin" || next === "clean"));
+      document.querySelectorAll("#mobileQuickTabs button[data-quick-tab]").forEach((btn) => {
+        const target = btn.getAttribute("data-quick-tab");
+        btn.setAttribute("aria-selected", String(target === next || (target === "admin" && next === "clean")));
+      });
       document.querySelector("#panelCountries").hidden = next !== "countries";
       document.querySelector("#panelGroups").hidden = next !== "groups";
       document.querySelector("#panelChannels").hidden = next !== "channels";
@@ -3130,7 +3847,7 @@
       document.querySelector("#panelReminders").hidden = next !== "reminders";
       document.querySelector("#panelRemote").hidden = next !== "remote";
       document.querySelector("#panelBackup").hidden = next !== "backup";
-      updateDashboardKpis();
+      syncDirtyChrome();
       const paintKey = tabPaintKey(next);
       const fresh = tabPaint[next] !== paintKey;
       if (next === "countries" && fresh) renderCountries();
@@ -3162,14 +3879,17 @@
       const query = document.querySelector("#countrySearch").value.trim().toLowerCase();
       const hidden = new Set(lineup().hiddenCountries || []);
       const box = document.querySelector("#countries");
-      box.innerHTML = "";
-      countryChoices()
-        .filter((country) => {
-          const isHidden = hidden.has(country.id);
-          const matchesFilter = countryFilter === "both" || (countryFilter === "hidden" ? isHidden : !isHidden);
-          return matchesFilter && (!query || country.label.toLowerCase().includes(query));
-        })
-        .forEach((country) => {
+      const list = countryChoices().filter((country) => {
+        const isHidden = hidden.has(country.id);
+        const matchesFilter = countryFilter === "both" || (countryFilter === "hidden" ? isHidden : !isHidden);
+        return matchesFilter && (!query || country.label.toLowerCase().includes(query));
+      });
+      if (!list.length) {
+        renderEmpty(box, "🌐", "No countries match", query ? "Try clearing your search or switching the visibility filter." : "No regions available for this lineup.");
+        return;
+      }
+      const frag = document.createDocumentFragment();
+      list.forEach((country) => {
           const chip = document.createElement("button");
           chip.type = "button";
           chip.className = "country-card" + (hidden.has(country.id) ? "" : " on");
@@ -3227,8 +3947,9 @@
             }
             chip.className = "country-card" + (wasHidden ? " on" : "");
           });
-          box.append(chip);
+          frag.append(chip);
         });
+      box.replaceChildren(frag);
     }
 
     const selectedGroups = new Set();
@@ -3371,21 +4092,19 @@
       selectAll.checked = groups.length > 0 && groups.every((group) => selectedGroups.has(group.id));
       selectAll.indeterminate = !selectAll.checked && groups.some((group) => selectedGroups.has(group.id));
       if (!groups.length) {
-        const empty = document.createElement("div");
-        empty.className = "group-empty";
-        empty.textContent = "No groups match.";
-        box.append(empty);
+        renderEmpty(box, "📂", "No groups match", "Try clearing the search box or switching to Both.");
         requestAnimationFrame(() => { box.scrollTop = scroll; });
         return;
       }
       const sliced = windowSlice(groups, groupWindowStart);
       groupWindowStart = sliced.from;
+      const frag = document.createDocumentFragment();
       if (sliced.from > 0) {
         const pad = document.createElement("div");
         pad.className = "group-empty";
         pad.style.height = (sliced.from * 56) + "px";
         pad.textContent = "";
-        box.append(pad);
+        frag.append(pad);
       }
       sliced.rows.forEach((group) => {
         const index = orderIndex.get(group.id) ?? -1;
@@ -3550,7 +4269,7 @@
         down.textContent = "▼";
         down.addEventListener("click", () => reorderGroups(index, 1));
         row.append(grip, pick, toggleShown, nameBox, display, count, lock, topBtn, up, down);
-        box.append(row);
+        frag.append(row);
       });
       const remaining = groups.length - (groupWindowStart + sliced.rows.length);
       if (remaining > 0) {
@@ -3558,8 +4277,9 @@
         pad.className = "group-empty";
         pad.style.height = (remaining * 56) + "px";
         pad.textContent = "";
-        box.append(pad);
+        frag.append(pad);
       }
+      box.replaceChildren(frag);
       requestAnimationFrame(() => { box.scrollTop = scroll; });
     }
 
@@ -3634,6 +4354,7 @@
       const query = document.querySelector("#channelSearch").value.trim().toLowerCase();
       const queryKey = query.length >= 2 ? query : "";
       note.textContent = "Loading channels…";
+      if (!groupCache.has(group.id + "\n" + queryKey)) renderSkeleton(box, 6);
       let all = [];
       try {
         all = await channelsFor(group.id, queryKey);
@@ -3682,12 +4403,13 @@
       const hidden = new Set(lineup().hiddenChannels || []);
       const sliced = windowSlice(matches, channelWindowStart);
       channelWindowStart = sliced.from;
+      const frag = document.createDocumentFragment();
       if (sliced.from > 0) {
         const pad = document.createElement("div");
         pad.className = "group-empty";
         pad.style.height = (sliced.from * (channelView === "grid" ? 84 : 64)) + "px";
         pad.textContent = "";
-        box.append(pad);
+        frag.append(pad);
       }
       sliced.rows.forEach((channel) => {
         const editing = channelEditors.has(channel.id);
@@ -3851,7 +4573,7 @@
           if (ok) showToast("Playing " + (channelName(channel) || channel.name || "channel") + " on TV");
         });
         row.append(grip, pick, logo, copy, probe, up, down, shown, play);
-        box.append(row);
+        frag.append(row);
       });
       const remaining = matches.length - (channelWindowStart + sliced.rows.length);
       if (remaining > 0) {
@@ -3859,9 +4581,25 @@
         pad.className = "group-empty";
         pad.style.height = (remaining * (channelView === "grid" ? 84 : 64)) + "px";
         pad.textContent = "";
-        box.append(pad);
+        frag.append(pad);
       }
+      box.replaceChildren(frag);
       requestAnimationFrame(() => { box.scrollTop = scroll; });
+      if (!queryKey) prefetchAdjacentGroups(group.id);
+    }
+
+    function prefetchAdjacentGroups(currentId) {
+      const sel = document.querySelector("#channelGroup");
+      if (!sel || !sel.options || !sel.options.length) return;
+      const idx = sel.selectedIndex;
+      const neighbors = [idx + 1, idx + 2, idx - 1].filter((i) => i >= 0 && i < sel.options.length);
+      const hiddenPins = (lineup() && lineup().groupPins) || {};
+      neighbors.slice(0, 2).forEach((i) => {
+        const opt = sel.options[i];
+        const gid = opt && opt.value;
+        if (!gid || gid === currentId || hiddenPins[gid] || groupCache.has(gid + "\n")) return;
+        channelsFor(gid, "").catch(() => {});
+      });
     }
 
     function reorderGroups(index, direction) {
@@ -3940,8 +4678,11 @@
       const token = ++recordSearchToken;
       const query = document.querySelector("#recordSearch").value.trim().toLowerCase();
       const box = document.querySelector("#recordChannels");
-      box.replaceChildren();
-      if (query.length < 2) return;
+      if (query.length < 2) {
+        box.replaceChildren();
+        return;
+      }
+      renderSkeleton(box, 4);
       const params = new URLSearchParams({
         email: session.email,
         deviceId: session.deviceId,
@@ -3953,6 +4694,11 @@
       const body = await response.json().catch(() => ({}));
       if (token !== recordSearchToken) return;
       const hits = (body.channels || []).filter((channel) => channelFromAllowedCountry(channel));
+      if (!hits.length) {
+        renderEmpty(box, "📺", "No live channels found", "Try another channel name or check your country filters.");
+        return;
+      }
+      const frag = document.createDocumentFragment();
       for (const channel of hits) {
         const row = document.createElement("div");
         row.className = "row";
@@ -3965,8 +4711,9 @@
         button.addEventListener("click", () => chooseRecordChannel(channel));
         row.appendChild(name);
         row.appendChild(button);
-        box.appendChild(row);
+        frag.appendChild(row);
       }
+      box.replaceChildren(frag);
     }
     async function chooseRecordChannel(channel) {
       recordChannel = channel;
@@ -4115,6 +4862,7 @@
       await postRecordings();
       document.querySelector("#smbPass").value = "";
       document.querySelector("#recordProgramNote").textContent = "Network share saved.";
+      showToast("✓ Storage (SMB) settings saved", "ok");
     }
     async function postRecordings() {
       const response = await fetch("/api/recordings", {
@@ -4296,16 +5044,19 @@
         ? "Drag to reorder. Use the arrows or Remove to manage your list. Changes sync to the device."
         : "Add packages in Auto Build or find channels in Search — favorites sync to the device as you go.";
       if (!ids.length) {
-        const empty = document.createElement("p");
-        empty.className = "fav-empty";
-        empty.textContent = !allIds.length
-          ? (catalogIsReady()
-              ? "No favorites yet. Use Auto Build or Search to add channels, movies, or shows."
-              : "Waiting for the catalog… auto-add and search unlock when groups arrive.")
-          : "No favorites match the current filter.";
-        box.append(empty);
+        renderEmpty(
+          box,
+          "★",
+          !allIds.length ? "No favorites yet" : "No favorites match",
+          !allIds.length
+            ? (catalogIsReady()
+                ? "Use Auto Build or Search to add channels, movies, or shows."
+                : "Waiting for the catalog… auto-add and search unlock when groups arrive.")
+            : "Try clearing the filter or switching the category pill."
+        );
         return;
       }
+      const frag = document.createDocumentFragment();
       ids.forEach((id, visibleIndex) => {
         const fullIndex = allIds.indexOf(id);
         const label = labels[id] || id;
@@ -4358,8 +5109,9 @@
         actions.className = "fav-actions";
         actions.append(hoverActions, favRemove(() => toggleWebFavorite(id, false)));
         row.append(grip, num, favoriteRowLogo(favoriteParts(label).title, logos[id] || ""), favoriteCopy(label, kindLabel), actions);
-        box.append(row);
+        frag.append(row);
       });
+      box.replaceChildren(frag);
       requestAnimationFrame(() => { box.scrollTop = scroll; });
     }
     async function commitFavoriteOrder(ids) {
@@ -4407,6 +5159,7 @@
       }
       box.hidden = false;
       note.textContent = "Searching…";
+      renderSkeleton(box, 5);
       const token = ++favoriteToken;
       const params = new URLSearchParams({
         email: session.email,
@@ -4429,6 +5182,7 @@
         return channelFromAllowedCountry(channel);
       });
       let shown = 0;
+      const frag = document.createDocumentFragment();
       for (const [kind, label, prefix] of sections) {
         if (favSearchKind !== "all" && favSearchKind !== prefix) continue;
         const hits = channels.filter((channel) => String(channel.kind || "LIVE").toUpperCase() === kind);
@@ -4463,9 +5217,14 @@
           actions.className = "fav-actions";
           actions.append(playHit, button, chev);
           row.append(favoriteRowLogo(title, channel.logo || channel.logoUrl || ""), favoriteCopy(title, groupLabel), actions);
-          box.appendChild(row);
+          frag.appendChild(row);
           shown += 1;
         }
+      }
+      if (shown) {
+        box.replaceChildren(frag);
+      } else {
+        renderEmpty(box, "🔎", "Nothing matched", "Try another keyword or switch the region filter to All Regions.");
       }
       note.textContent = shown ? "Results (" + shown + ")" : "Nothing matched. Movies and shows show up after the TV opens once.";
     }
@@ -4481,7 +5240,7 @@
       text.textContent = "Removed. ";
       const undo = document.createElement("button");
       undo.type = "button";
-      undo.className = "section-save";
+      undo.className = "secondary";
       undo.textContent = "Undo";
       undo.addEventListener("click", () => {
         clearTimeout(favoriteUndoTimer);
@@ -4723,20 +5482,53 @@
       else stopVpnPoll();
       if (which === "streams") refreshStreams();
       else stopStreamsPoll();
+      if (which === "web") paintAdminWebPage();
     }
+    function paintAdminWebPage() {
+      const urlEl = document.querySelector("#adminWebUrl");
+      const openBtn = document.querySelector("#adminWebOpenBtn");
+      const devEl = document.querySelector("#adminWebDeviceId");
+      const emailEl = document.querySelector("#adminWebEmail");
+      const shownUrl = tvUrl || window.location.origin;
+      if (urlEl) urlEl.textContent = shownUrl;
+      if (openBtn) openBtn.href = shownUrl;
+      if (devEl) devEl.textContent = (session && session.deviceId) || "—";
+      if (emailEl) emailEl.textContent = (session && session.email) || accountEmail || "—";
+    }
+    document.querySelector("#adminWebCopyBtn")?.addEventListener("click", () => {
+      const plain = tvUrl || window.location.origin;
+      navigator.clipboard.writeText(plain).then(() => {
+        showToast("✓ Dashboard URL copied", "ok");
+      }).catch(() => {
+        showToast("Could not copy URL", "err");
+      });
+    });
     document.querySelector("#adminStreams").addEventListener("click", () => showAdminPage("streams"));
     document.querySelector("#adminStreamsBack").addEventListener("click", () => showAdminPage("home"));
+    document.querySelector("#adminStreamsRefreshBtn")?.addEventListener("click", () => {
+      refreshStreams();
+      showToast("Refreshing active streams…", "ok");
+    });
     let streamsPoll = 0;
     function stopStreamsPoll() {
       if (streamsPoll) clearInterval(streamsPoll);
       streamsPoll = 0;
     }
-    function streamLine(row) {
-      const ip = row.ip || "No IP reported";
-      const name = row.name || "Unnamed stream";
-      const role = row.role ? " · " + row.role : "";
-      const source = row.source ? " · " + row.source : "";
-      return "<p><strong>" + ip + "</strong> · " + name + role + source + "</p>";
+    function escapeHtml(text) {
+      return String(text || "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[ch]));
+    }
+    function streamCardHtml(row) {
+      const ip = escapeHtml(row.ip || "Unknown WAN IP");
+      const name = escapeHtml(row.name || "Active Stream");
+      const meta = [row.role, row.source].filter(Boolean).map(escapeHtml).join(" · ");
+      return "<div class=\"stream-card\">"
+        + "<div class=\"stream-card-left\">"
+        + "<span class=\"stream-live-dot\" aria-hidden=\"true\"></span>"
+        + "<div><div class=\"stream-card-name\">" + name + "</div>"
+        + (meta ? "<div class=\"stream-card-sub\">" + meta + "</div>" : "")
+        + "</div></div>"
+        + "<span class=\"stream-ip-badge\" title=\"Public WAN IP\">WAN · " + ip + "</span>"
+        + "</div>";
     }
     async function refreshStreams() {
       const lead = document.querySelector("#adminStreamsLead");
@@ -4744,26 +5536,71 @@
       if (!lead || !list) return;
       try {
         const data = await fetch("/api/streams").then((res) => res.json());
-        const active = data.providerActive || "—";
-        const max = data.providerMax || "—";
+        const activeStr = String(data.providerActive ?? "—");
+        const maxStr = String(data.providerMax ?? "—");
+        const activeNum = parseInt(activeStr, 10);
+        const maxNum = parseInt(maxStr, 10);
+        const pct = (!isNaN(activeNum) && !isNaN(maxNum) && maxNum > 0)
+          ? Math.min(100, Math.round((activeNum / maxNum) * 100))
+          : 0;
+        const nearCap = !isNaN(activeNum) && !isNaN(maxNum) && maxNum > 0 && activeNum >= maxNum;
+        const wanIp = data.wanIp || data.deviceIp || "Unavailable";
+        const lanIp = data.lanIp || "";
+        const vpnConnected = !!data.vpnConnected;
+        const vpnCity = data.vpnCity || "";
+        const statusText = data.providerStatus || "Active";
+        const expiresText = data.providerExpires || "—";
         const remote = !!data.providerListedIps;
-        lead.textContent = "Provider reports " + active + " of " + max + " connections in use.";
         const rows = Array.isArray(data.streams) ? data.streams : [];
         const local = Array.isArray(data.local) ? data.local : [];
+
+        lead.textContent = "Provider reports " + activeStr + " of " + maxStr + " connections in use · Public WAN IP " + wanIp;
+
         const parts = [];
+        parts.push("<div class=\"stream-summary\">");
+        parts.push("<article class=\"clean-card\">"
+          + "<h3>Provider Connections</h3>"
+          + "<div class=\"stream-big-val\">" + escapeHtml(activeStr) + " <span style=\"font-size:15px;font-weight:600;color:var(--muted)\">/ " + escapeHtml(maxStr) + " in use</span></div>"
+          + "<div class=\"stream-meter-track\"><div class=\"stream-meter-fill" + (nearCap ? " warn" : "") + "\" style=\"width:" + pct + "%\"></div></div>"
+          + "<div class=\"stream-pills\">"
+          + "<span class=\"stream-pill ok\">● " + escapeHtml(statusText) + "</span>"
+          + (expiresText && expiresText !== "—" ? "<span class=\"stream-pill\">Expires " + escapeHtml(expiresText) + "</span>" : "")
+          + "</div>"
+          + "</article>");
+        parts.push("<article class=\"clean-card\">"
+          + "<h3>Public WAN IP</h3>"
+          + "<div class=\"stream-wan-val\">" + escapeHtml(wanIp) + "</div>"
+          + "<div class=\"stream-pills\">"
+          + (vpnConnected
+              ? "<span class=\"stream-pill vpn\">🛡 VPN Active" + (vpnCity ? " · " + escapeHtml(vpnCity) : "") + "</span>"
+              : "<span class=\"stream-pill\">Direct ISP Connection</span>")
+          + (lanIp ? "<span class=\"stream-pill\">Local TV: " + escapeHtml(lanIp) + "</span>" : "")
+          + "</div>"
+          + "</article>");
+        parts.push("</div>");
+
         if (remote) {
-          parts.push("<p class=\"hint\">Addresses returned by the provider.</p>");
-          rows.forEach((row) => parts.push(streamLine(row)));
+          parts.push("<h3 style=\"margin:6px 0 10px\">Provider-Reported Connections (" + rows.length + ")</h3>");
+          parts.push("<div class=\"stream-card-list\">" + rows.map(streamCardHtml).join("") + "</div>");
         } else {
-          parts.push("<p class=\"hint\">This provider login does not include the IP of each connection. The addresses below are streams this TV still has open.</p>");
-          if (!local.length) parts.push("<p>None. Leaving the app closes the streams on this TV.</p>");
-          local.forEach((row) => parts.push(streamLine(row)));
+          parts.push("<h3 style=\"margin:6px 0 10px\">Streams Open on This TV (" + local.length + ")</h3>");
+          if (!local.length) {
+            parts.push("<div class=\"empty-state\"><div class=\"empty-state-icon\">📺</div><div class=\"empty-state-title\">No active streams on this TV</div><div class=\"empty-state-hint\">Start playing a live channel or movie on the TV to see it listed here with your public WAN IP.</div></div>");
+          } else {
+            parts.push("<div class=\"stream-card-list\">" + local.map(streamCardHtml).join("") + "</div>");
+          }
+          if (!isNaN(activeNum) && activeNum > local.length) {
+            const extra = activeNum - local.length;
+            parts.push("<div class=\"stream-callout\"><strong>Why does the provider show " + activeNum + " connection" + (activeNum === 1 ? "" : "s") + "?</strong><br/>"
+              + extra + " additional connection" + (extra === 1 ? " is" : "s are")
+              + " currently counted by your IPTV provider — usually from another TV/phone on this account, or a recently closed stream that takes 30–60 seconds to expire on the provider's server. Most Xtream logins do not expose per-stream IPs of other devices.</div>");
+          }
         }
         list.innerHTML = parts.join("");
       } catch (err) {
         lead.textContent = "Could not read active streams.";
       }
-      if (!streamsPoll) streamsPoll = setInterval(refreshStreams, 4000);
+      if (!streamsPoll) streamsPoll = setInterval(refreshStreams, 5000);
     }
     document.querySelector("#adminRefresh").addEventListener("click", () => showAdminPage("refresh"));
     document.querySelector("#adminWeb").addEventListener("click", () => showAdminPage("web"));
@@ -4954,12 +5791,12 @@
       const body = await response.json();
       const rows = body.reminders || [];
       empty.hidden = rows.length > 0;
-      box.innerHTML = "";
+      const frag = document.createDocumentFragment();
       rows.forEach((item) => {
         const card = document.createElement("div");
-        card.className = "card";
-        card.style.margin = "12px 0";
-        card.style.padding = "16px";
+        card.className = "clean-card";
+        card.style.margin = "10px 0";
+        card.style.padding = "14px 16px";
         const title = document.createElement("strong");
         title.textContent = item.title || item.channelName || "Reminder";
         const line = document.createElement("p");
@@ -4982,6 +5819,7 @@
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ email: session.email, deviceId: session.deviceId, id: item.id, minutes: Number(edit.value) })
           });
+          showToast("✓ Reminder updated", "ok");
           renderReminders();
         });
         const remove = document.createElement("button");
@@ -4995,11 +5833,13 @@
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ email: session.email, deviceId: session.deviceId, id: item.id })
           });
+          showToast("Reminder deleted", "warn");
           renderReminders();
         });
         card.append(title, line, lead, edit, remove);
-        box.appendChild(card);
+        frag.append(card);
       });
+      box.replaceChildren(frag);
     }
     document.querySelector("#vpnBackup").addEventListener("click", () => {
       if (vpnCities.length < 2) return;
@@ -5107,7 +5947,7 @@
       document.querySelector("#epgResetTool").hidden = which !== "reset";
       document.querySelector("#epgSanitizeTool").hidden = which !== "sanitize";
       document.querySelector("#epgParseTool").hidden = which !== "parse";
-      document.querySelector("#epgToolSave").hidden = which === "sanitize";
+      document.querySelector("#epgToolSave").hidden = true;
       if (which === "sanitize") resetSanitize();
       const titles = {
         strip: "Bulk Channel Stripper",
@@ -5746,6 +6586,7 @@
       const status = document.querySelector("#saveStatus");
       clearTimeout(lineupTimer);
       if (status && !quiet) status.textContent = "Saving…";
+      setConnState("syncing", "Syncing…");
       lineupHold = true;
       try {
         captureStrip();
@@ -5762,14 +6603,21 @@
         const body = await response.json();
         if (!response.ok) {
           if (status) status.textContent = body.error || "Save failed";
+          setConnState("offline", "Sync failed");
+          if (!quiet) showToast(body.error || "Save failed", "err");
           return false;
         }
         session.lineup = body.lineup;
         paintStrip();
-        if (status) status.textContent = "Saved & synced to the device."; if (!quiet) showToast("✓ Saved & synced to TV");
+        if (status) status.textContent = "Saved & synced to the device."; if (!quiet) showToast("✓ Saved & synced to TV", "ok");
         pageDirty = false;
         syncDirtyChrome();
+        setConnState("online", "Connected");
         return true;
+      } catch (err) {
+        setConnState("offline", "Offline");
+        if (!quiet) showToast("Could not reach TV", "err");
+        return false;
       } finally {
         lineupHold = false;
       }
@@ -5833,6 +6681,32 @@
       });
     }
     let favKindFilter = "all";
+    document.querySelectorAll("[data-rec-sub]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const target = btn.getAttribute("data-rec-sub") || "schedule";
+        document.querySelectorAll("[data-rec-sub]").forEach((b) => {
+          b.setAttribute("aria-selected", String(b.getAttribute("data-rec-sub") === target));
+        });
+        const pSched = document.querySelector("#recPaneSchedule");
+        const pList = document.querySelector("#recPaneList");
+        const pStore = document.querySelector("#recPaneStorage");
+        if (pSched) pSched.hidden = target !== "schedule";
+        if (pList) pList.hidden = target !== "list";
+        if (pStore) pStore.hidden = target !== "storage";
+      });
+    });
+    document.querySelectorAll("[data-backup-sub]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const target = btn.getAttribute("data-backup-sub") || "local";
+        document.querySelectorAll("[data-backup-sub]").forEach((b) => {
+          b.setAttribute("aria-selected", String(b.getAttribute("data-backup-sub") === target));
+        });
+        const pLocal = document.querySelector("#backupPaneLocal");
+        const pCloud = document.querySelector("#backupPaneCloud");
+        if (pLocal) pLocal.hidden = target !== "local";
+        if (pCloud) pCloud.hidden = target !== "cloud";
+      });
+    });
     function showFavSubTab(which) {
       const target = which === "search" || which === "manage" ? which : "auto";
       document.querySelectorAll(".fav-subtab").forEach((btn) => {
@@ -5982,11 +6856,17 @@
     }
 
 
-    function showToast(message) {
+    function showToast(message, tone) {
       const host = document.querySelector("#toastHost");
       if (!host || !message) return;
+      const lower = String(message).toLowerCase();
+      const resolved = tone || (
+        /fail|error|could not|unable|offline/.test(lower) ? "err"
+          : /warn|undo|wait|still/.test(lower) ? "warn"
+          : "ok"
+      );
       const pill = document.createElement("div");
-      pill.className = "toast-pill";
+      pill.className = "toast-pill toast-" + resolved;
       pill.textContent = message;
       host.appendChild(pill);
       setTimeout(() => {
@@ -5995,6 +6875,19 @@
         setTimeout(() => pill.remove(), 220);
       }, 2600);
     }
+
+    document.querySelectorAll("#mobileQuickTabs button[data-quick-tab]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const target = btn.getAttribute("data-quick-tab");
+        if (target) openTab(target);
+      });
+    });
+    document.querySelectorAll("button[data-flow-tab]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const target = btn.getAttribute("data-flow-tab");
+        if (target) openTab(target);
+      });
+    });
 
     const mobileNavToggle = document.querySelector("#mobileNavToggle");
     if (mobileNavToggle) {
@@ -6042,7 +6935,7 @@
         span.textContent = "Cleared " + backupIds.length + " favorites. ";
         const undo = document.createElement("button");
         undo.type = "button";
-        undo.className = "section-save";
+        undo.className = "secondary";
         undo.textContent = "Restore All";
         undo.addEventListener("click", async () => {
           bar.hidden = true;
@@ -6531,6 +7424,7 @@
       document.querySelector("#address").textContent = line;
       const webCopy = document.querySelector("#adminWebCopy");
       if (webCopy) webCopy.textContent = line;
+      paintAdminWebPage();
     }).catch(() => {
       document.querySelector("#address").textContent = "Stay on this Wi-Fi. This page is not published on the internet.";
     });
@@ -6538,6 +7432,23 @@
     document.addEventListener("keydown", (event) => {
       const tag = (event.target && event.target.tagName) || "";
       const typing = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+      if (event.key === "Escape") {
+        const pinMask = document.querySelector("#groupPin");
+        if (pinMask && !pinMask.hidden) {
+          document.querySelector("#groupPinCancel")?.click();
+          return;
+        }
+        const leave = document.querySelector("#leaveGuard");
+        if (leave && !leave.hidden) {
+          leave.hidden = true;
+          return;
+        }
+        if (typing && event.target.type === "search" && event.target.value) {
+          event.target.value = "";
+          event.target.dispatchEvent(new Event("input", { bubbles: true }));
+          return;
+        }
+      }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
         event.preventDefault();
         if (session) saveLineup(false);
@@ -6572,18 +7483,46 @@
     function connectSyncStream() {
       if (syncEventSource) { try { syncEventSource.close(); } catch (_) {} syncEventSource = null; }
       if (!session || !session.email || !window.EventSource) return;
+      // On the TV's embedded local Wi-Fi dashboard, edits already talk directly to the TV over LAN;
+      // /api/events SSE is only hosted by the external cloud portal.
+      if (tvUrl && window.location.origin === new URL(tvUrl).origin) {
+        setConnState("online", "Connected · TV");
+        return;
+      }
       const params = new URLSearchParams({ email: session.email, deviceId: session.deviceId || "__shared__" });
       try {
         const es = new EventSource("/api/events?" + params);
+        let everOpened = false;
+        es.onopen = () => {
+          everOpened = true;
+          setConnState("online", "Connected");
+        };
+        es.onerror = () => {
+          if (!everOpened) {
+            // Endpoint not present (e.g. embedded TV host) — stop retrying and stay green.
+            try { es.close(); } catch (_) {}
+            syncEventSource = null;
+            setConnState(navigator.onLine ? "online" : "offline", navigator.onLine ? "Connected · TV" : "Offline");
+            return;
+          }
+          setConnState(navigator.onLine ? "syncing" : "offline", navigator.onLine ? "Reconnecting…" : "Offline");
+        };
         es.addEventListener("sync", async (ev) => {
           const data = JSON.parse(ev.data || "{}");
           if (!session || data.account_id == null) return;
+          setConnState("syncing", "Syncing…");
           showToast("☁ Cloud update received (" + (data.table || "lineup") + ")");
-          await refreshSessionCatalog();
+          try {
+            await refreshSessionCatalog();
+          } finally {
+            setConnState("online", "Connected");
+          }
         });
         syncEventSource = es;
       } catch (_) {}
     }
+    window.addEventListener("online", () => setConnState("online", "Connected"));
+    window.addEventListener("offline", () => setConnState("offline", "Offline"));
 
     document.querySelector("#pairCodeBtn")?.addEventListener("click", async () => {
       const code = (document.querySelector("#pairCodeInput")?.value || "").replace(/\D/g, "");

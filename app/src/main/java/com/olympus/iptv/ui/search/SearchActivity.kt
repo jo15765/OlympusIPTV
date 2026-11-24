@@ -141,7 +141,10 @@ class SearchActivity : AppCompatActivity() {
         layout.spanSizeLookup = object : GridLayoutManager.SpanSizeLookup() {
             override fun getSpanSize(position: Int): Int =
                 if (adapter.isHeader(position)) span else 1
+        }.apply {
+            isSpanIndexCacheEnabled = true
         }
+        layout.initialPrefetchItemCount = span * 2
         binding.resultGrid.layoutManager = layout
         binding.resultGrid.adapter = adapter
         binding.resultGrid.setHasFixedSize(true)
@@ -269,7 +272,7 @@ class SearchActivity : AppCompatActivity() {
         val channel = app.lastPlayed
         val match = channel != null && !channel.streamUrl.isBlank() &&
             (app.lastPlayedPlaylistId == null || app.lastPlayedPlaylistId == app.guidePlaylistId)
-        if (!match || channel == null) {
+        if (!match) {
             binding.nowPlayingBar.visibility = View.GONE
             return
         }

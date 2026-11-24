@@ -83,10 +83,14 @@ internal object ReminderClock {
         }
     }
 
+    private var lastAlarmAt = -1L
+
     private fun scheduleAlarm(context: Context, at: Long) {
+        val trigger = at.coerceAtLeast(System.currentTimeMillis() + 500)
+        if (lastAlarmAt == trigger) return
+        lastAlarmAt = trigger
         val alarm = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val pending = pending(context)
-        val trigger = at.coerceAtLeast(System.currentTimeMillis() + 500)
         val exact = Build.VERSION.SDK_INT < 31 || alarm.canScheduleExactAlarms()
         runCatching {
             if (exact) alarm.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, trigger, pending)
@@ -97,6 +101,8 @@ internal object ReminderClock {
     }
 
     private fun cancelAlarm(context: Context) {
+        if (lastAlarmAt == -1L) return
+        lastAlarmAt = -1L
         val alarm = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         alarm.cancel(pending(context))
     }

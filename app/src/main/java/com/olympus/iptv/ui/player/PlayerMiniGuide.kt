@@ -30,9 +30,12 @@ class PlayerMiniGuide(
     private val adapter = Adapter()
 
     init {
-        list.layoutManager = LinearLayoutManager(list.context)
+        val lm = LinearLayoutManager(list.context).apply { initialPrefetchItemCount = 6 }
+        list.layoutManager = lm
         list.adapter = adapter
         list.itemAnimator = null
+        list.setHasFixedSize(true)
+        list.setItemViewCacheSize(8)
     }
 
     fun isOpen(): Boolean = panel.visibility == View.VISIBLE
@@ -57,8 +60,12 @@ class PlayerMiniGuide(
 
     fun move(delta: Int) {
         if (rows.isEmpty()) return
+        val prev = selected
         selected = (selected + delta).floorMod(rows.size)
-        adapter.notifyDataSetChanged()
+        if (prev != selected) {
+            adapter.notifyItemChanged(prev, PAYLOAD_ACTIVE)
+            adapter.notifyItemChanged(selected, PAYLOAD_ACTIVE)
+        }
         list.scrollToPosition(selected)
         list.post {
             list.findViewHolderForAdapterPosition(selected)?.itemView?.requestFocus()
@@ -79,6 +86,13 @@ class PlayerMiniGuide(
     private fun Int.floorMod(size: Int): Int = ((this % size) + size) % size
 
     private inner class Adapter : RecyclerView.Adapter<Adapter.Holder>() {
+        init {
+            setHasStableIds(true)
+        }
+
+        override fun getItemId(position: Int): Long =
+            rows.getOrNull(position)?.id?.hashCode()?.toLong() ?: RecyclerView.NO_ID
+
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder {
             val view = LayoutInflater.from(parent.context)
                 .inflate(R.layout.item_mini_guide, parent, false)
@@ -87,6 +101,14 @@ class PlayerMiniGuide(
 
         override fun onBindViewHolder(holder: Holder, position: Int) {
             holder.bind(rows[position], position == selected)
+        }
+
+        override fun onBindViewHolder(holder: Holder, position: Int, payloads: MutableList<Any>) {
+            if (payloads.contains(PAYLOAD_ACTIVE)) {
+                holder.itemView.isSelected = (position == selected)
+            } else {
+                super.onBindViewHolder(holder, position, payloads)
+            }
         }
 
         override fun getItemCount(): Int = rows.size
@@ -98,6 +120,17 @@ class PlayerMiniGuide(
             private val bar: ProgressBar = view.findViewById(R.id.miniGuideProgress)
             private val badge: TextView = view.findViewById(R.id.miniGuideBadge)
             private val bars: android.widget.LinearLayout = view.findViewById(R.id.miniLiveBars)
+            private val logoPx = (48 * logo.resources.displayMetrics.density).toInt().coerceAtLeast(1)
+
+            init {
+                itemView.setOnClickListener {
+                    val index = bindingAdapterPosition
+                    if (index == RecyclerView.NO_POSITION) return@setOnClickListener
+                    selected = index
+                    tune()
+                }
+            }
+
             fun bind(channel: Channel, active: Boolean) {
                 label.text = com.olympus.iptv.data.NameStrip.shown(channel.name, channel.groupTitle)
                 val title = nowTitle(channel)
@@ -115,21 +148,22 @@ class PlayerMiniGuide(
                 badge.text = mark.orEmpty()
                 badge.visibility = if (mark.isNullOrBlank()) View.GONE else View.VISIBLE
                 com.olympus.iptv.ui.LiveBars.show(bars, channel.id == playingId)
-                val px = (48 * logo.resources.displayMetrics.density).toInt().coerceAtLeast(1)
-                logo.load(channel.logoUrl) {
-                    channelLogo(px)
-                    scale(coil.size.Scale.FIT)
-                    placeholder(R.drawable.ic_channel_placeholder)
-                    error(R.drawable.ic_channel_placeholder)
+                val url = channel.logoUrl.orEmpty()
+                if (logo.getTag(R.id.miniGuideLogo) != url || logo.drawable == null) {
+                    logo.setTag(R.id.miniGuideLogo, url)
+                    logo.load(channel.logoUrl) {
+                        channelLogo(logoPx)
+                        scale(coil.size.Scale.FIT)
+                        placeholder(R.drawable.ic_channel_placeholder)
+                        error(R.drawable.ic_channel_placeholder)
+                    }
                 }
                 itemView.isSelected = active
-                itemView.setOnClickListener {
-                    val index = bindingAdapterPosition
-                    if (index == RecyclerView.NO_POSITION) return@setOnClickListener
-                    selected = index
-                    tune()
-                }
             }
         }
+    }
+
+    private companion object {
+        private const val PAYLOAD_ACTIVE = "active"
     }
 }

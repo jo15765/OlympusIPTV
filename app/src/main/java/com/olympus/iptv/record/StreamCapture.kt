@@ -43,6 +43,7 @@ class StreamCapture(private val http: OkHttpClient) {
             }
             for (segment in segments(playlist, text)) {
                 if (!seen.add(segment)) continue
+                if (seen.size > 500) seen.iterator().let { if (it.hasNext()) { it.next(); it.remove() } }
                 append(segment, sink)
                 if (System.currentTimeMillis() >= untilMillis || shouldStop()) return
             }

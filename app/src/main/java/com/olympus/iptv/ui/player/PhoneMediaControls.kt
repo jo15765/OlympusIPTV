@@ -126,19 +126,27 @@ internal class PhoneMediaControls(private val activity: PlayerActivity) {
         val subtitle = activity.binding.channelMeta.text?.toString()
             ?.takeIf { it.isNotBlank() && it != "No EPG" && it != "Loading EPG…" }
             ?: channel?.groupTitle.orEmpty()
+        fun noteAction(iconRes: Int, label: String, intent: PendingIntent): Notification.Action =
+            Notification.Action.Builder(
+                android.graphics.drawable.Icon.createWithResource(activity, iconRes),
+                label,
+                intent
+            ).build()
         note.setSmallIcon(android.R.drawable.ic_media_play)
             .setContentTitle(com.olympus.iptv.data.NameStrip.shown(title, channel?.groupTitle))
             .setContentText(subtitle)
             .setContentIntent(openIntent)
             .setOngoing(playing)
-            .addAction(android.R.drawable.ic_media_previous, activity.getString(R.string.channel_down), pending(ACTION_DOWN))
+            .addAction(noteAction(android.R.drawable.ic_media_previous, activity.getString(R.string.channel_down), pending(ACTION_DOWN)))
             .addAction(
-                if (playing) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play,
-                activity.getString(if (playing) R.string.player_pause else R.string.play),
-                pending(if (playing) ACTION_PAUSE else ACTION_PLAY)
+                noteAction(
+                    if (playing) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play,
+                    activity.getString(if (playing) R.string.player_pause else R.string.play),
+                    pending(if (playing) ACTION_PAUSE else ACTION_PLAY)
+                )
             )
-            .addAction(android.R.drawable.ic_media_next, activity.getString(R.string.channel_up), pending(ACTION_UP))
-            .addAction(android.R.drawable.ic_lock_idle_alarm, activity.getString(R.string.sleep_30), pending(ACTION_SLEEP))
+            .addAction(noteAction(android.R.drawable.ic_media_next, activity.getString(R.string.channel_up), pending(ACTION_UP)))
+            .addAction(noteAction(android.R.drawable.ic_lock_idle_alarm, activity.getString(R.string.sleep_30), pending(ACTION_SLEEP)))
             .setStyle(
                 Notification.MediaStyle()
                     .setMediaSession(active.sessionToken)

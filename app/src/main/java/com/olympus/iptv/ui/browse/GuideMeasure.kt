@@ -34,10 +34,10 @@ internal fun BrowseActivity.sameNames(previous: List<Channel>, channels: List<Ch
 }
 
 internal fun BrowseActivity.baseGuideRowDp(): Int =
-    GuideMetrics.rowDp(guideDensity == PlaylistStore.GUIDE_COMPACT, tall = false)
+    if (touchPrimary) 56 else GuideMetrics.rowDp(guideDensity == PlaylistStore.GUIDE_COMPACT, tall = false)
 
 internal fun BrowseActivity.tallGuideRowDp(): Int =
-    GuideMetrics.rowDp(guideDensity == PlaylistStore.GUIDE_COMPACT, tall = true)
+    if (touchPrimary) 64 else GuideMetrics.rowDp(guideDensity == PlaylistStore.GUIDE_COMPACT, tall = true)
 
 internal fun BrowseActivity.syncProgramRowHeight() {
     applyGuideRowHeight(guideRowsTall)

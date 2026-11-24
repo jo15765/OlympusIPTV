@@ -77,9 +77,16 @@ object EpgUtils {
     }
 
     fun nowNext(programs: List<EpgProgram>, now: Long = System.currentTimeMillis()): EpgNowNext {
-        val sorted = programs.sortedBy { it.startMillis }
-        val current = sorted.firstOrNull { it.contains(now) }
-        val upcoming = sorted.firstOrNull { it.startMillis > now }
+        if (programs.isEmpty()) return EpgNowNext(now = null, next = null)
+        var current: EpgProgram? = null
+        var upcoming: EpgProgram? = null
+        for (p in programs) {
+            if (p.contains(now)) {
+                if (current == null || p.startMillis < current.startMillis) current = p
+            } else if (p.startMillis > now) {
+                if (upcoming == null || p.startMillis < upcoming.startMillis) upcoming = p
+            }
+        }
         return EpgNowNext(now = current, next = upcoming)
     }
 }

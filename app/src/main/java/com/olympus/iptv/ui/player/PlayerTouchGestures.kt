@@ -1,24 +1,29 @@
 package com.olympus.iptv.ui.player
 
 import android.media.AudioManager
+import android.provider.Settings
 import android.view.GestureDetector
 import android.view.Gravity
 import android.view.MotionEvent
+import android.view.ScaleGestureDetector
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import com.olympus.iptv.data.ContentKind
+import com.olympus.iptv.data.PlaylistStore
 import com.olympus.iptv.ui.DeviceForm
 import com.olympus.iptv.ui.Haptics
 import kotlin.math.abs
 
 /**
  * Full mobile touch gesture controller:
- * - Left edge vertical swipe: screen brightness
+ * - Left edge vertical swipe: screen brightness (starts from actual system brightness)
  * - Right edge vertical swipe: media volume
  * - Center vertical fling: Live TV channel zap up/down
  * - Center horizontal fling: VOD/Series quick scrub (-30s / +30s)
  * - Double-tap left/right: -15s / +15s seek
+ * - Long-press (VOD/Series): temporary 2x playback speed while held
+ * - Pinch out / in: Zoom (fill phone screen) / Fit aspect ratio
  * - Single tap: toggle transport chrome
  */
 internal object PlayerTouchGestures {
@@ -36,12 +41,58 @@ internal object PlayerTouchGestures {
         var startBrightness = 0.5f
         var startVolume = 0
         var lastStep = -1
+        var speedBoosted = false
+        var speedBeforeBoost = 1f
+        var pinchHandled = false
+
+        val scaleDetector = ScaleGestureDetector(
+            activity,
+            object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+                override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
+                    pinchHandled = false
+                    return true
+                }
+
+                override fun onScale(detector: ScaleGestureDetector): Boolean {
+                    if (pinchHandled) return true
+                    val factor = detector.scaleFactor
+                    if (factor > 1.12f && activity.pictureMode != PlaylistStore.PICTURE_FILL) {
+                        pinchHandled = true
+                        activity.pictureMode = PlaylistStore.PICTURE_FILL
+                        activity.applyPicture(PlaylistStore.PICTURE_FILL)
+                        Haptics.confirm(surface)
+                        hud.showSeek("Zoom")
+                    } else if (factor < 0.88f && activity.pictureMode != PlaylistStore.PICTURE_FIT) {
+                        pinchHandled = true
+                        activity.pictureMode = PlaylistStore.PICTURE_FIT
+                        activity.applyPicture(PlaylistStore.PICTURE_FIT)
+                        Haptics.confirm(surface)
+                        hud.showSeek("Fit")
+                    }
+                    return true
+                }
+            }
+        )
+
         val detector = GestureDetector(activity, object : GestureDetector.SimpleOnGestureListener() {
             override fun onDown(e: MotionEvent): Boolean = true
 
             override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
                 activity.togglePlaybackChrome()
                 return true
+            }
+
+            override fun onLongPress(e: MotionEvent) {
+                val ch = activity.current ?: return
+                val isLive = ch.kind == ContentKind.LIVE && ch.seriesId.isNullOrBlank()
+                if (isLive) return
+                val exo = activity.player ?: return
+                if (!exo.isPlaying) return
+                speedBeforeBoost = exo.playbackParameters.speed.coerceIn(0.5f, 2f)
+                speedBoosted = true
+                exo.setPlaybackSpeed(2.0f)
+                Haptics.confirm(surface)
+                hud.showSeek("2×")
             }
 
             override fun onDoubleTap(e: MotionEvent): Boolean {
@@ -77,7 +128,13 @@ internal object PlayerTouchGestures {
                     // Vertical fling in center zaps Live TV channels
                     if (isLive && abs(dy) > height * 0.14f && abs(dy) > abs(dx) * 1.4f && abs(velocityY) > 600f) {
                         Haptics.confirm(surface)
-                        if (dy < 0f) activity.step(1) else activity.step(-1)
+                        if (dy < 0f) {
+                            hud.showSeek("CH ▲")
+                            activity.step(1)
+                        } else {
+                            hud.showSeek("CH ▼")
+                            activity.step(-1)
+                        }
                         return true
                     }
                     // Horizontal fling in center scrubs VOD / Series by +/- 30s
@@ -103,6 +160,7 @@ internal object PlayerTouchGestures {
                 distanceX: Float,
                 distanceY: Float
             ): Boolean {
+                if (speedBoosted || scaleDetector.isInProgress) return true
                 val start = e1 ?: return false
                 val width = surface.width
                 val height = surface.height
@@ -114,7 +172,13 @@ internal object PlayerTouchGestures {
                     originY = start.y
                     side = if (start.x <= edge) -1 else 1
                     val current = activity.window.attributes.screenBrightness
-                    startBrightness = if (current < 0f) 0.5f else current
+                    startBrightness = if (current >= 0f) {
+                        current
+                    } else {
+                        runCatching {
+                            Settings.System.getInt(activity.contentResolver, Settings.System.SCREEN_BRIGHTNESS) / 255f
+                        }.getOrDefault(0.5f).coerceIn(0.05f, 1f)
+                    }
                     startVolume = audio?.getStreamVolume(AudioManager.STREAM_MUSIC) ?: 0
                     lastStep = -1
                 }
@@ -143,14 +207,20 @@ internal object PlayerTouchGestures {
             }
         })
         surface.setOnTouchListener { _, event ->
-            val handled = detector.onTouchEvent(event)
+            scaleDetector.onTouchEvent(event)
+            val handled = if (scaleDetector.isInProgress) true else detector.onTouchEvent(event)
             if (event.actionMasked == MotionEvent.ACTION_UP ||
                 event.actionMasked == MotionEvent.ACTION_CANCEL
             ) {
+                if (speedBoosted) {
+                    speedBoosted = false
+                    activity.player?.setPlaybackSpeed(speedBeforeBoost)
+                }
                 if (originY >= 0f || hud.visibility == View.VISIBLE) hud.fadeOut()
                 originY = -1f
                 side = 0
                 lastStep = -1
+                pinchHandled = false
             }
             handled
         }

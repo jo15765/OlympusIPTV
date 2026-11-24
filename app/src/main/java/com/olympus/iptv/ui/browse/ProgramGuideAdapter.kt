@@ -37,9 +37,21 @@ class ProgramGuideAdapter(
     private val primary = context.getColor(R.color.text_primary)
     private val secondary = context.getColor(R.color.text_secondary)
     private val channels = mutableListOf<Channel>()
+    private val indexById = HashMap<String, Int>()
     private val programs = HashMap<String, List<EpgProgram>>()
     private val slotMs = 30L * 60L * 1000L
     private val hourMs = 60L * 60L * 1000L
+
+    init {
+        setHasStableIds(true)
+    }
+
+    private fun rebuildIndex() {
+        indexById.clear()
+        for (i in channels.indices) indexById.putIfAbsent(channels[i].id, i)
+    }
+
+    override fun getItemId(position: Int): Long = stableRowId(channels.getOrNull(position)?.id)
 
     var slotPx = dp(240)
         private set
@@ -76,11 +88,13 @@ class ProgramGuideAdapter(
         if (list.isEmpty()) {
             val old = channels.size
             channels.clear()
+            indexById.clear()
             if (old > 0) notifyItemRangeRemoved(0, old)
             return
         }
         if (channels.isEmpty()) {
             channels.addAll(list)
+            rebuildIndex()
             notifyItemRangeInserted(0, list.size)
             return
         }
@@ -101,6 +115,7 @@ class ProgramGuideAdapter(
         if (shared == channels.size && list.size > channels.size) {
             val added = list.subList(shared, list.size)
             channels.addAll(added)
+            for (i in shared until channels.size) indexById.putIfAbsent(channels[i].id, i)
             notifyItemRangeInserted(shared, added.size)
             return
         }
@@ -108,6 +123,7 @@ class ProgramGuideAdapter(
             val removed = channels.size - list.size
             for (index in 0 until shared) channels[index] = list[index]
             channels.subList(shared, channels.size).clear()
+            rebuildIndex()
             notifyItemRangeRemoved(shared, removed)
             if (shared > 0) notifyItemRangeChanged(0, shared)
             return
@@ -127,6 +143,7 @@ class ProgramGuideAdapter(
         ) { diff, rows ->
             channels.clear()
             channels.addAll(rows)
+            rebuildIndex()
             diff.dispatchUpdatesTo(this)
         }
     }
@@ -136,7 +153,7 @@ class ProgramGuideAdapter(
     fun programsFor(id: String): List<EpgProgram>? = if (id in programs) programs[id] else null
 
     fun programAt(channelId: String, column: Int): EpgProgram? {
-        val channel = channels.firstOrNull { it.id == channelId } ?: return null
+        val channel = indexById[channelId]?.let { channels.getOrNull(it) } ?: return null
         val shown = cachedBlocks(channel, programs[channelId]).getOrNull(column)?.program ?: return null
         return programs[channelId].orEmpty().firstOrNull { program ->
             program.title == shown.title &&
@@ -147,8 +164,7 @@ class ProgramGuideAdapter(
 
     fun put(id: String, list: List<EpgProgram>) {
         programs[id] = list
-        val index = channels.indexOfFirst { it.id == id }
-        if (index >= 0) notifyItemChanged(index)
+        indexById[id]?.let { notifyItemChanged(it) }
     }
 
     fun columnAt(channel: Channel, time: Long): Int {
@@ -192,8 +208,9 @@ class ProgramGuideAdapter(
 
     private fun dp(value: Int): Int = (value * density).toInt()
 
+    private val blockCacheCap = if (com.olympus.iptv.ui.DeviceForm.isLowRam(context)) 36 else 80
     private val blockCache = object : LinkedHashMap<String, List<Block>>(64, 0.75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<Block>>?) = size > 80
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<Block>>?) = size > blockCacheCap
     }
 
     private fun cachedBlocks(channel: Channel, loaded: List<EpgProgram>?): List<Block> {
@@ -296,6 +313,9 @@ class ProgramGuideAdapter(
                 params.height = rowHeight
                 itemView.layoutParams = params
             }
+            itemView.setBackgroundColor(
+                if (position % 2 == 1) 0x0FFFFFFF else android.graphics.Color.TRANSPARENT
+            )
             val width = timelineWidth()
             val trackParams = track.layoutParams
             if (trackParams == null || trackParams.width != width) {
