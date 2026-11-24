@@ -89,4 +89,53 @@ class RecordAndReminderSmokeTest {
         assertEquals("user@gmail.com", roundTripped.cloudDriveOrEmpty().accountLabel)
         assertEquals(true, roundTripped.cloudDriveOrEmpty().deleteLocalAfterUpload)
     }
+
+    @Test
+    fun proStateRoundTripsProfilesPlaybackAndDownloads() {
+        val state = com.olympus.iptv.data.ProState(
+            activeProfileId = "kids",
+            profiles = listOf(
+                com.olympus.iptv.data.HouseholdProfile(id = "default", name = "Main", avatar = "🎬"),
+                com.olympus.iptv.data.HouseholdProfile(id = "kids", name = "Kids", avatar = "🧸", kidsMode = true)
+            ),
+            playback = com.olympus.iptv.data.PlaybackDefaults(
+                preferredAudioLang = "eng",
+                preferredSubtitleLang = "spa",
+                subtitleScale = 1.25f,
+                subtitleBgOpacity = 70,
+                defaultVodSpeed = 1.5f,
+                timeshiftMinutes = 10,
+                statsOverlayEnabled = true,
+                quadMultiViewEnabled = true,
+                externalPlayerEnabled = true,
+                externalPlayerPackage = "org.videolan.vlc",
+                epgOffsetMinutes = -60,
+                customXmltvUrl = "https://example.com/epg.xml",
+                backupFailoverEnabled = true,
+                spoilerFreeSports = true
+            ),
+            downloads = listOf(
+                com.olympus.iptv.data.OfflineDownload(
+                    id = "dl-1",
+                    title = "Pilot Episode",
+                    channelId = "ep-101",
+                    streamUrl = "https://example.com/pilot.mp4",
+                    fileName = "pilot.mp4",
+                    bytes = 120_000_000L,
+                    status = com.olympus.iptv.data.OfflineDownload.STATUS_DONE
+                )
+            )
+        )
+        val decoded = gson.fromJson(gson.toJson(state), com.olympus.iptv.data.ProState::class.java)
+        val active = decoded.profiles.first { it.id == decoded.activeProfileId }
+        assertEquals("kids", decoded.activeProfileId)
+        assertEquals("Kids", active.name)
+        assertTrue(active.kidsMode)
+        assertEquals("eng", decoded.playback.preferredAudioLang)
+        assertEquals(1.25f, decoded.playback.subtitleScale, 0.001f)
+        assertEquals(10, decoded.playback.timeshiftMinutes)
+        assertTrue(decoded.playback.spoilerFreeSports)
+        assertEquals(1, decoded.downloads.size)
+        assertEquals("pilot.mp4", decoded.downloads.first().fileName)
+    }
 }

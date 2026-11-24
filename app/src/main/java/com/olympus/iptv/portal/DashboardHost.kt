@@ -456,6 +456,13 @@ object DashboardHost {
             method == "POST" && path == "/api/recordings/cloud/auth/poll" -> cloudAuthPoll(app, socket, json(body))
             method == "POST" && path == "/api/recordings/cloud/disconnect" -> cloudDisconnect(app, socket, json(body))
             method == "POST" && path == "/api/recordings/cloud/upload" -> cloudUploadExisting(app, socket, json(body))
+            method == "GET" && path == "/api/pro" -> proState(app, socket, query["email"], query["deviceId"])
+            method == "POST" && path == "/api/pro" -> saveProState(app, socket, json(body))
+            method == "GET" && path == "/api/downloads" -> listDownloads(app, socket, query["email"], query["deviceId"])
+            method == "POST" && path == "/api/downloads/start" -> startDownload(app, socket, json(body))
+            method == "POST" && path == "/api/downloads/delete" -> deleteDownload(app, socket, json(body))
+            method == "GET" && path == "/api/backup/export" -> exportBackup(app, socket, query["email"], query["deviceId"])
+            method == "POST" && path == "/api/backup/import" -> importBackup(app, socket, json(body))
             method == "GET" && path == "/api/reminders" -> reminders(app, socket, query["email"], query["deviceId"])
             method == "POST" && path == "/api/reminders/update" -> reminderUpdate(app, socket, json(body))
             method == "POST" && path == "/api/reminders/delete" -> reminderDelete(app, socket, json(body))
@@ -576,6 +583,8 @@ object DashboardHost {
 
     @Volatile private var cachedWanIp: String = ""
     @Volatile private var cachedWanIpAt: Long = 0L
+
+    fun cachedWanIp(): String = cachedWanIp
 
     private fun wanAddress(): String {
         val now = System.currentTimeMillis()
@@ -1449,6 +1458,167 @@ object DashboardHost {
         )
         runBlocking { app.playlistStore.saveRecordingBook(gate.playlist.id, next) }
         writeJson(socket, 200, mapOf("ok" to true, "cloudUrl" to uploaded.webUrl, "recordings" to next))
+    }
+
+    private fun proState(app: OlympusIptvApp, socket: Socket, email: String?, deviceId: String?) {
+        if (gate(app, email, deviceId) == null) {
+            writeJson(socket, 401, mapOf("error" to "Device not registered"))
+            return
+        }
+        val state = com.olympus.iptv.data.ProFeatureStore.load(app)
+        writeJson(
+            socket,
+            200,
+            mapOf(
+                "ok" to true,
+                "pro" to state,
+                "quadSupported" to !com.olympus.iptv.ui.DeviceForm.isLowRam(app),
+                "downloadsBytes" to com.olympus.iptv.record.OfflineDownloadManager.usedBytes(app)
+            )
+        )
+    }
+
+    private fun saveProState(app: OlympusIptvApp, socket: Socket, body: JsonObject) {
+        if (gate(app, text(body, "email"), text(body, "deviceId")) == null) {
+            writeJson(socket, 401, mapOf("error" to "Device not registered"))
+            return
+        }
+        val incoming = body.get("pro")?.let {
+            runCatching { gson.fromJson(it, com.olympus.iptv.data.ProState::class.java) }.getOrNull()
+        } ?: com.olympus.iptv.data.ProFeatureStore.load(app)
+        val existing = com.olympus.iptv.data.ProFeatureStore.load(app)
+        val saved = com.olympus.iptv.data.ProFeatureStore.save(
+            app,
+            incoming.copy(downloads = existing.downloads)
+        )
+        writeJson(
+            socket,
+            200,
+            mapOf(
+                "ok" to true,
+                "pro" to saved,
+                "quadSupported" to !com.olympus.iptv.ui.DeviceForm.isLowRam(app)
+            )
+        )
+    }
+
+    private fun listDownloads(app: OlympusIptvApp, socket: Socket, email: String?, deviceId: String?) {
+        if (gate(app, email, deviceId) == null) {
+            writeJson(socket, 401, mapOf("error" to "Device not registered"))
+            return
+        }
+        val state = com.olympus.iptv.data.ProFeatureStore.load(app)
+        writeJson(
+            socket,
+            200,
+            mapOf(
+                "ok" to true,
+                "downloads" to state.downloads,
+                "usedBytes" to com.olympus.iptv.record.OfflineDownloadManager.usedBytes(app)
+            )
+        )
+    }
+
+    private fun startDownload(app: OlympusIptvApp, socket: Socket, body: JsonObject) {
+        if (gate(app, text(body, "email"), text(body, "deviceId")) == null) {
+            writeJson(socket, 401, mapOf("error" to "Device not registered"))
+            return
+        }
+        val title = text(body, "title").trim()
+        val channelId = text(body, "channelId").trim()
+        val streamUrl = text(body, "streamUrl").trim()
+        if (streamUrl.isBlank()) {
+            writeJson(socket, 400, mapOf("error" to "Missing stream URL"))
+            return
+        }
+        val item = com.olympus.iptv.record.OfflineDownloadManager.enqueue(app, title, channelId, streamUrl)
+        writeJson(socket, 200, mapOf("ok" to true, "download" to item, "downloads" to com.olympus.iptv.data.ProFeatureStore.load(app).downloads))
+    }
+
+    private fun deleteDownload(app: OlympusIptvApp, socket: Socket, body: JsonObject) {
+        if (gate(app, text(body, "email"), text(body, "deviceId")) == null) {
+            writeJson(socket, 401, mapOf("error" to "Device not registered"))
+            return
+        }
+        val id = text(body, "id").trim()
+        if (id.isNotBlank()) com.olympus.iptv.record.OfflineDownloadManager.delete(app, id)
+        writeJson(
+            socket,
+            200,
+            mapOf(
+                "ok" to true,
+                "downloads" to com.olympus.iptv.data.ProFeatureStore.load(app).downloads,
+                "usedBytes" to com.olympus.iptv.record.OfflineDownloadManager.usedBytes(app)
+            )
+        )
+    }
+
+    private fun exportBackup(app: OlympusIptvApp, socket: Socket, email: String?, deviceId: String?) {
+        val gate = gate(app, email, deviceId) ?: run {
+            writeJson(socket, 401, mapOf("error" to "Device not registered"))
+            return
+        }
+        val lineup = runBlocking { app.playlistStore.lineup(gate.playlist.id) }
+        val favorites = runBlocking { app.playlistStore.favoriteIds(gate.playlist.id) }
+        val recordings = runBlocking { app.playlistStore.recordingBook(gate.playlist.id) }
+        val reminders = com.olympus.iptv.remind.ReminderStore.listed(app)
+        val pro = com.olympus.iptv.data.ProFeatureStore.load(app)
+        writeJson(
+            socket,
+            200,
+            mapOf(
+                "version" to com.olympus.iptv.BuildConfig.VERSION_NAME,
+                "exportedAt" to System.currentTimeMillis(),
+                "playlistName" to gate.playlist.name,
+                "lineup" to lineup,
+                "favorites" to favorites,
+                "recordings" to recordings,
+                "reminders" to reminders,
+                "pro" to pro
+            )
+        )
+    }
+
+    private fun importBackup(app: OlympusIptvApp, socket: Socket, body: JsonObject) {
+        val gate = gate(app, text(body, "email"), text(body, "deviceId")) ?: run {
+            writeJson(socket, 401, mapOf("error" to "Device not registered"))
+            return
+        }
+        val backup = body.getAsJsonObject("backup") ?: run {
+            writeJson(socket, 400, mapOf("error" to "Invalid backup JSON"))
+            return
+        }
+        var restored = 0
+        backup.get("lineup")?.takeIf { it.isJsonObject }?.let { el ->
+            runCatching {
+                val cfg = gson.fromJson(el, LineupConfig::class.java)
+                    .copy(revision = System.currentTimeMillis())
+                runBlocking { app.playlistStore.saveLineup(gate.playlist.id, cfg) }
+                restored += 1
+            }
+        }
+        backup.getAsJsonArray("favorites")?.let { arr ->
+            val ids = arr.mapNotNull { it.takeIf { !it.isJsonNull }?.asString }.filter { it.isNotBlank() }
+            runBlocking { app.playlistStore.saveFavorites(gate.playlist.id, ids, System.currentTimeMillis()) }
+            restored += 1
+        }
+        backup.get("recordings")?.takeIf { it.isJsonObject }?.let { el ->
+            runCatching {
+                val book = gson.fromJson(el, RecordingBook::class.java)
+                    .copy(revision = System.currentTimeMillis())
+                runBlocking { app.playlistStore.saveRecordingBook(gate.playlist.id, book) }
+                restored += 1
+            }
+        }
+        backup.get("pro")?.takeIf { it.isJsonObject }?.let { el ->
+            runCatching {
+                val st = gson.fromJson(el, com.olympus.iptv.data.ProState::class.java)
+                com.olympus.iptv.data.ProFeatureStore.save(app, st)
+                restored += 1
+            }
+        }
+        clearGuideCache()
+        writeJson(socket, 200, mapOf("ok" to true, "restoredSections" to restored))
     }
 
     private fun readRecording(app: OlympusIptvApp, socket: Socket, query: Map<String, String>) {

@@ -92,6 +92,7 @@ class PlayerActivity : AppCompatActivity() {
     internal lateinit var binding: ActivityPlayerBinding
     internal fun tracksReady(): Boolean = ::binding.isInitialized
     private lateinit var miniGuide: PlayerMiniGuide
+    internal var statsHud: StreamStatsHud? = null
     internal var player: ExoPlayer? = null
 
     internal var queue: List<Channel> = emptyList()
@@ -252,6 +253,11 @@ class PlayerActivity : AppCompatActivity() {
         }
         binding = ActivityPlayerBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        statsHud = StreamStatsHud(this, { player }, { playersDecoder }).also { hud ->
+            (binding.root as? android.view.ViewGroup)?.let { hud.attachTo(it) }
+            hud.setVisible(com.olympus.iptv.data.ProFeatureStore.playback(this).statsOverlayEnabled)
+        }
+        applySubtitleAppearance()
         binding.root.post {
             com.olympus.iptv.ui.RemoteTip.show(this, getString(R.string.remote_tip_player), binding.root as? android.view.ViewGroup)
         }
@@ -770,6 +776,19 @@ class PlayerActivity : AppCompatActivity() {
             finish()
             return
         }
+        val proPlayback = com.olympus.iptv.data.ProFeatureStore.playback(this)
+        val isVod = seed.kind != ContentKind.LIVE || !seed.seriesId.isNullOrBlank()
+        if (isVod && proPlayback.externalPlayerEnabled && !failover) {
+            if (ExternalPlayerBridge.launch(this, seed, proPlayback.externalPlayerPackage)) {
+                finish()
+                return
+            }
+        }
+        if (isVod && proPlayback.defaultVodSpeed != 1.0f) {
+            player?.setPlaybackSpeed(proPlayback.defaultVodSpeed.coerceIn(0.5f, 2.0f))
+        } else if (!isVod) {
+            player?.setPlaybackSpeed(1.0f)
+        }
         val upcomingUrls = listOfNotNull(
             queue.getOrNull(index + 1)?.streamUrl,
             queue.getOrNull(index - 1)?.streamUrl,
@@ -980,7 +999,8 @@ class PlayerActivity : AppCompatActivity() {
         decoderDirty = false
         val control = PlayerBuffers.live(
             lowRam = DeviceForm.isLowRam(this),
-            highEndTv = DeviceForm.isHighEndTv(this)
+            highEndTv = DeviceForm.isHighEndTv(this),
+            timeshiftMinutes = com.olympus.iptv.data.ProFeatureStore.playback(this).timeshiftMinutes
         )
         val http = StreamHeaders.httpFactory(this, { playlistId }, { current })
         val loadPolicy = object : androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy(3) {
@@ -998,14 +1018,20 @@ class PlayerActivity : AppCompatActivity() {
             15_000,
             0.65f
         )
+        val proPlayback = com.olympus.iptv.data.ProFeatureStore.playback(this)
         val trackSelector = androidx.media3.exoplayer.trackselection.DefaultTrackSelector(this, adaptiveFactory).apply {
-            setParameters(
-                buildUponParameters()
-                    .setAllowVideoMixedMimeTypeAdaptiveness(true)
-                    .setAllowAudioMixedMimeTypeAdaptiveness(true)
-                    .setAllowVideoNonSeamlessAdaptiveness(true)
-                    .setExceedRendererCapabilitiesIfNecessary(true)
-            )
+            val builder = buildUponParameters()
+                .setAllowVideoMixedMimeTypeAdaptiveness(true)
+                .setAllowAudioMixedMimeTypeAdaptiveness(true)
+                .setAllowVideoNonSeamlessAdaptiveness(true)
+                .setExceedRendererCapabilitiesIfNecessary(true)
+            if (proPlayback.preferredAudioLang.isNotBlank()) {
+                builder.setPreferredAudioLanguage(proPlayback.preferredAudioLang)
+            }
+            if (proPlayback.preferredSubtitleLang.isNotBlank()) {
+                builder.setPreferredTextLanguage(proPlayback.preferredSubtitleLang)
+            }
+            setParameters(builder)
         }
         val liveSpeedControl = androidx.media3.exoplayer.DefaultLivePlaybackSpeedControl.Builder()
             .setFallbackMinPlaybackSpeed(0.98f)
@@ -1034,6 +1060,25 @@ class PlayerActivity : AppCompatActivity() {
         leveler = null
         if (!nightMode) return
         leveler = AudioLeveler.attach(exo.audioSessionId)
+    }
+
+    internal fun applySubtitleAppearance() {
+        val pb = com.olympus.iptv.data.ProFeatureStore.playback(this)
+        val sub = binding.playerView.subtitleView ?: return
+        val alpha = ((pb.subtitleBgOpacity.coerceIn(0, 100) * 255) / 100)
+        val bg = android.graphics.Color.argb(alpha, 14, 12, 10)
+        val style = androidx.media3.ui.CaptionStyleCompat(
+            0xFFF8F4EC.toInt(),
+            bg,
+            android.graphics.Color.TRANSPARENT,
+            androidx.media3.ui.CaptionStyleCompat.EDGE_TYPE_DROP_SHADOW,
+            android.graphics.Color.BLACK,
+            null
+        )
+        sub.setStyle(style)
+        sub.setFractionalTextSize(
+            androidx.media3.ui.SubtitleView.DEFAULT_TEXT_SIZE_FRACTION * pb.subtitleScale.coerceIn(0.7f, 1.8f)
+        )
     }
 
     internal fun chooseNightMode(enabled: Boolean) {
@@ -3126,6 +3171,8 @@ class PlayerActivity : AppCompatActivity() {
     override fun onDestroy() {
         phoneControls?.release()
         phoneControls = null
+        statsHud?.release()
+        statsHud = null
         leveler?.let { runCatching { it.release() } }
         leveler = null
         unhookReconnect()
