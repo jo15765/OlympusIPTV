@@ -606,7 +606,7 @@ class LineupClient(
     private fun enc(value: String): String = URLEncoder.encode(value, "UTF-8")
 
     companion object {
-        private val sharedGson = Gson()
+        private val sharedGson get() = com.olympus.iptv.data.AppJson.gson
 
         private val defaultHttp by lazy {
             HttpClients.shared.newBuilder()

@@ -43,7 +43,7 @@ data class TitleRatingsBundle(
  * Aggregates TMDB + Watchmode ratings/reviews with LRU+TTL memory cache and disk persistence.
  */
 object TitleRatings {
-    private val gson = Gson()
+    private val gson get() = com.olympus.iptv.data.AppJson.gson
     private val http get() = HttpClients.shared
     private const val CACHE_CAP = 80
     private val TTL_MS = TimeUnit.HOURS.toMillis(24)

@@ -69,7 +69,7 @@ object DashboardHost {
     @Volatile private var server: ServerSocket? = null
     private val urlListeners = CopyOnWriteArrayList<(String) -> Unit>()
     private val started = AtomicBoolean(false)
-    private val gson = Gson()
+    private val gson get() = com.olympus.iptv.data.AppJson.gson
     private val requestGzip = ThreadLocal.withInitial { false }
     private val requestValidator = ThreadLocal<String?>()
     private val removed = ConcurrentHashMap<String, MutableList<String>>()
@@ -2095,14 +2095,15 @@ object DashboardHost {
     }
 
     private fun writePortalPage(socket: Socket, context: Context) {
-        if (requestGzip.get() == true) {
-            val packed = pageGzipBytes(context)
-            if (packed != null) {
-                writePrepared(socket, 200, "text/html; charset=utf-8", packed, "no-store", gzip = true)
-                return
-            }
+        val useGzip = requestGzip.get() == true
+        val packed = if (useGzip) pageGzipBytes(context) else null
+        val payload = packed ?: pageBytes(context)
+        val etag = "ui-${com.olympus.iptv.BuildConfig.VERSION_CODE}-${payload.size}-${if (packed != null) "gz" else "raw"}"
+        if (notModified(etag)) {
+            writeNotModified(socket, etag)
+            return
         }
-        writeBytes(socket, 200, "text/html; charset=utf-8", pageBytes(context), "no-store")
+        writePrepared(socket, 200, "text/html; charset=utf-8", payload, "private, no-cache", gzip = packed != null, etag = etag)
     }
 
     private fun writePrepared(
@@ -2111,11 +2112,13 @@ object DashboardHost {
         type: String,
         body: ByteArray,
         cache: String,
-        gzip: Boolean
+        gzip: Boolean,
+        etag: String? = null
     ) {
         val encoding = if (gzip) "Content-Encoding: gzip\r\nVary: Accept-Encoding\r\n" else ""
+        val etagHead = if (etag != null) "ETag: \"$etag\"\r\n" else ""
         val output = BufferedOutputStream(socket.getOutputStream())
-        val head = "HTTP/1.1 $code ${reason(code)}\r\nContent-Type: $type\r\nContent-Length: ${body.size}\r\n$encoding" +
+        val head = "HTTP/1.1 $code ${reason(code)}\r\nContent-Type: $type\r\nContent-Length: ${body.size}\r\n$encoding$etagHead" +
             "Cache-Control: $cache\r\nConnection: close\r\n\r\n"
         output.write(head.toByteArray(Charsets.UTF_8))
         output.write(body)

@@ -23,6 +23,8 @@ object DeviceCompat {
     private const val REQ_POST_NOTIFICATIONS = 9413
 
     @Volatile private var cachedCodecs: Map<String, Boolean>? = null
+    @Volatile private var cachedDiag: Map<String, Any?>? = null
+    @Volatile private var cachedDiagAt: Long = 0L
 
     /**
      * Applies Android 15+ edge-to-edge safe insets (status bar, gesture bar, display cutout)
@@ -110,6 +112,8 @@ object DeviceCompat {
     }
 
     fun diagnostics(context: Context): Map<String, Any?> {
+        val now = System.currentTimeMillis()
+        cachedDiag?.takeIf { now - cachedDiagAt < 5_000L }?.let { return it }
         val app = context.applicationContext
         val am = app.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
         val mem = ActivityManager.MemoryInfo()
@@ -123,7 +127,7 @@ object DeviceCompat {
             DeviceForm.isCompact(app) -> "Phone"
             else -> "Tablet / Foldable"
         }
-        return mapOf(
+        val out = mapOf(
             "manufacturer" to Build.MANUFACTURER,
             "model" to Build.MODEL,
             "androidVersion" to Build.VERSION.RELEASE,
@@ -138,6 +142,9 @@ object DeviceCompat {
             "totalStorageMb" to (totalBytes / (1024L * 1024L)),
             "codecs" to hardwareCodecs()
         )
+        cachedDiag = out
+        cachedDiagAt = now
+        return out
     }
 
     fun safeExternalFile(context: Context, name: String): File {

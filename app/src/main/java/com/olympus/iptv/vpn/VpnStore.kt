@@ -103,7 +103,7 @@ class SavedVpn {
 internal object VpnStore {
     private const val FILE = "vpn-session.bin"
     private const val ALIAS = "olympus-iptv-vpn"
-    private val gson = Gson()
+    private val gson get() = com.olympus.iptv.data.AppJson.gson
 
     fun load(context: Context): SavedVpn? {
         val file = File(context.filesDir, FILE)

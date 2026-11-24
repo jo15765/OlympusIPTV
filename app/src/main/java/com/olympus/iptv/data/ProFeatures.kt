@@ -67,7 +67,7 @@ data class ProState(
 object ProFeatureStore {
     private const val PREFS = "olympus_pro_features"
     private const val KEY_STATE = "state_json"
-    private val gson = Gson()
+    private val gson get() = AppJson.gson
     @Volatile private var cached: ProState? = null
 
     fun load(context: Context): ProState {

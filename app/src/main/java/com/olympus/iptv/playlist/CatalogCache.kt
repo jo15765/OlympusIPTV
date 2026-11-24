@@ -10,7 +10,7 @@ import java.util.zip.GZIPOutputStream
 
 class CatalogCache(context: Context) {
     private val dir = File(context.filesDir, "catalogs").apply { mkdirs() }
-    private val gson = Gson()
+    private val gson get() = com.olympus.iptv.data.AppJson.gson
 
     fun read(playlistId: String, includeVod: Boolean): LoadedPlaylist? {
         val file = file(playlistId, includeVod)

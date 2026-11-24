@@ -32,7 +32,7 @@ class SavedPage(
 class PlaylistStore(private val context: Context) {
     var onLineupSaved: ((String, LineupConfig) -> Unit)? = null
     var onFavoritesSaved: ((String) -> Unit)? = null
-    private val gson = Gson()
+    private val gson get() = AppJson.gson
     private val key = stringPreferencesKey("playlists_json")
     private val sessionKey = stringPreferencesKey("session_json")
     private val favoritesKey = stringPreferencesKey("favorites_json")

@@ -30,7 +30,7 @@ fun applyCloudReminders(
 }
 
 internal object ReminderStore {
-    private val gson = Gson()
+    private val gson get() = com.olympus.iptv.data.AppJson.gson
     private val type = object : TypeToken<List<ShowReminder>>() {}.type
     private val lock = Any()
     @Volatile

@@ -2074,6 +2074,358 @@
       .kpi-card { flex: 1 1 45%; padding: 8px 10px; }
       .stage-bar { padding: 8px 10px; }
     }
+    /* ── Command Bar, Home Hub, Pill Switches, Floating Remote, Light Theme & Mobile Bottom Nav ── */
+    .list .row {
+      content-visibility: auto;
+      contain-intrinsic-size: auto 56px;
+    }
+    .cmd-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+    .cmd-search-btn {
+      flex: 1 1 240px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px 14px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.03);
+      color: var(--muted);
+      font-size: 13.5px;
+      cursor: pointer;
+      text-align: left;
+      transition: border-color .16s ease, background .16s ease;
+    }
+    .cmd-search-btn:hover { border-color: var(--accent); background: rgba(230, 166, 92, 0.08); color: var(--text); }
+    .cmd-kbd {
+      font-size: 11px;
+      padding: 2px 7px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--muted);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .cmd-tool-btn {
+      padding: 9px 13px;
+      border-radius: 11px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: border-color .15s ease, background .15s ease, transform .12s ease;
+    }
+    .cmd-tool-btn:hover { border-color: var(--accent); background: rgba(230, 166, 92, 0.12); transform: translateY(-1px); }
+    .nav-badge {
+      margin-left: auto;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 1px 7px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--muted);
+    }
+    .nav-dot-rec {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #ef5350;
+      box-shadow: 0 0 0 0 rgba(239, 83, 80, 0.7);
+      animation: recPulse 1.6s infinite;
+      margin-left: 6px;
+      display: inline-block;
+    }
+    @keyframes recPulse {
+      0% { box-shadow: 0 0 0 0 rgba(239, 83, 80, 0.7); }
+      70% { box-shadow: 0 0 0 7px rgba(239, 83, 80, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(239, 83, 80, 0); }
+    }
+    .home-hero {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px;
+      margin-top: 14px;
+    }
+    .home-tile {
+      text-align: left;
+      padding: 16px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.015));
+      color: var(--text);
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease;
+    }
+    .home-tile:hover {
+      transform: translateY(-2px);
+      border-color: var(--accent);
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+    }
+    .home-tile .tile-icon { font-size: 22px; line-height: 1; }
+    .home-tile strong { font-size: 15px; }
+    .home-tile span { font-size: 12.5px; color: var(--muted); line-height: 1.4; }
+    .setup-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 14px;
+    }
+    .setup-pill {
+      padding: 7px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.03);
+      color: var(--muted);
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .setup-pill.done {
+      border-color: rgba(143, 212, 138, 0.45);
+      background: rgba(143, 212, 138, 0.12);
+      color: #8fd48a;
+    }
+    /* Smooth amber pill toggle switches inside Pro & Settings */
+    #panelPro input[type="checkbox"],
+    #panelAdmin input[type="checkbox"],
+    #panelRecord input[type="checkbox"] {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 38px;
+      height: 22px;
+      min-width: 38px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.14);
+      border: 1px solid var(--border);
+      position: relative;
+      cursor: pointer;
+      transition: background .18s ease, border-color .18s ease;
+      vertical-align: middle;
+    }
+    #panelPro input[type="checkbox"]::after,
+    #panelAdmin input[type="checkbox"]::after,
+    #panelRecord input[type="checkbox"]::after {
+      content: "";
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #f5efe6;
+      transition: transform .18s ease;
+    }
+    #panelPro input[type="checkbox"]:checked,
+    #panelAdmin input[type="checkbox"]:checked,
+    #panelRecord input[type="checkbox"]:checked {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+    #panelPro input[type="checkbox"]:checked::after,
+    #panelAdmin input[type="checkbox"]:checked::after,
+    #panelRecord input[type="checkbox"]:checked::after {
+      transform: translateX(16px);
+      background: #1a1510;
+    }
+    .btn-dirty {
+      box-shadow: 0 0 0 2px rgba(230, 166, 92, 0.55), 0 0 18px rgba(230, 166, 92, 0.32) !important;
+    }
+    /* Floating Mini TV Remote Drawer */
+    .mini-remote {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      width: 248px;
+      padding: 14px;
+      border-radius: 18px;
+      border: 1px solid rgba(230, 166, 92, 0.35);
+      background: rgba(21, 18, 15, 0.96);
+      backdrop-filter: blur(14px);
+      box-shadow: 0 18px 44px rgba(0, 0, 0, 0.55);
+      z-index: 950;
+    }
+    .mini-remote-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .mini-dpad {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+    }
+    .mini-dpad button, .mini-remote-row button {
+      padding: 10px 6px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text);
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .mini-dpad button:hover, .mini-remote-row button:hover {
+      border-color: var(--accent);
+      background: rgba(230, 166, 92, 0.16);
+    }
+    .mini-dpad button.ok-btn {
+      background: var(--accent);
+      color: #1a140e;
+      border-color: var(--accent);
+    }
+    .mini-remote-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      margin-top: 8px;
+    }
+    /* Command Palette & Shortcuts Modal */
+    .cmd-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(8, 7, 6, 0.72);
+      backdrop-filter: blur(6px);
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 9vh 16px 24px;
+      z-index: 1000;
+    }
+    .cmd-overlay[hidden] { display: none !important; }
+    .cmd-box {
+      width: min(560px, 100%);
+      border-radius: 16px;
+      border: 1px solid rgba(230, 166, 92, 0.35);
+      background: var(--card, #181411);
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+      overflow: hidden;
+    }
+    .cmd-box input {
+      width: 100%;
+      border: 0;
+      border-bottom: 1px solid var(--border);
+      border-radius: 0;
+      padding: 14px 16px;
+      font-size: 15px;
+      background: transparent;
+      color: var(--text);
+      outline: none;
+    }
+    .cmd-results {
+      max-height: 360px;
+      overflow-y: auto;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .cmd-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text);
+      text-align: left;
+      cursor: pointer;
+      font-size: 13.5px;
+    }
+    .cmd-item:hover, .cmd-item.active {
+      background: rgba(230, 166, 92, 0.14);
+      border-color: rgba(230, 166, 92, 0.35);
+    }
+    .cmd-item small { color: var(--muted); font-size: 11.5px; }
+    /* Mobile Sticky Bottom Nav Bar */
+    .mobile-bottom-nav { display: none; }
+    @media (max-width: 780px) {
+      body { padding-bottom: 74px; }
+      .mini-remote { bottom: 76px; right: 12px; }
+      .mobile-bottom-nav {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        background: rgba(18, 15, 12, 0.96);
+        backdrop-filter: blur(12px);
+        border-top: 1px solid var(--border);
+        padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px));
+        z-index: 900;
+      }
+      .mobile-bottom-nav button {
+        background: transparent;
+        border: 0;
+        color: var(--muted);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+        min-height: 46px;
+        font-size: 11px;
+        font-weight: 600;
+        border-radius: 10px;
+        cursor: pointer;
+      }
+      .mobile-bottom-nav button[aria-selected="true"] {
+        color: var(--accent);
+        background: rgba(230, 166, 92, 0.12);
+      }
+      .mobile-bottom-nav .mbn-ic { font-size: 17px; line-height: 1; }
+    }
+    /* Crisp Daylight Theme (optional toggle) */
+    body.theme-light {
+      --bg: #f5f2ec;
+      --surface: #ffffff;
+      --card: #ffffff;
+      --panel: #ffffff;
+      --text: #1c1814;
+      --muted: #665c52;
+      --border: rgba(28, 24, 20, 0.14);
+      --accent: #c57824;
+      background: #f5f2ec !important;
+      color: #1c1814 !important;
+    }
+    body.theme-light .side,
+    body.theme-light .card,
+    body.theme-light .clean-card,
+    body.theme-light .kpi-card,
+    body.theme-light .home-tile,
+    body.theme-light .mini-remote,
+    body.theme-light .mobile-bottom-nav {
+      background: #ffffff !important;
+      color: #1c1814 !important;
+      border-color: rgba(28, 24, 20, 0.14) !important;
+    }
+    body.theme-light .cmd-search-btn,
+    body.theme-light .cmd-tool-btn,
+    body.theme-light input,
+    body.theme-light select {
+      background: #faf8f4 !important;
+      color: #1c1814 !important;
+      border-color: rgba(28, 24, 20, 0.18) !important;
+    }
   </style>
 </head>
 <body>
@@ -2210,15 +2562,16 @@
         <button class="mobile-nav-btn" id="mobileNavToggle" type="button">☰ Menu &amp; Sections</button>
         <div class="tabs" role="tablist">
           <div class="nav-label" style="margin-top:4px">Lineup</div>
-          <button id="tabCountries" type="button" aria-selected="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.8 2.5 15.2 0 18M12 3c-2.5 2.8-2.5 15.2 0 18"/></svg>Countries</button>
-          <button id="tabGroups" type="button" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 7h12M8 12h12M8 17h12"/><path d="M4 7h.01M4 12h.01M4 17h.01"/></svg>Groups</button>
+          <button id="tabHome" type="button" aria-selected="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V20h14V9.5"/></svg>Home</button>
+          <button id="tabFavorites" type="button" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 19s-7-4.4-7-9a4 4 0 0 1 7-2 4 4 0 0 1 7 2c0 4.6-7 9-7 9z"/></svg>Favorites<span class="nav-badge" id="badgeFavs" hidden>0</span></button>
           <button id="tabChannels" type="button" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 6v12l10-6z"/></svg>Channels</button>
-          <button id="tabFavorites" type="button" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 19s-7-4.4-7-9a4 4 0 0 1 7-2 4 4 0 0 1 7 2c0 4.6-7 9-7 9z"/></svg>Favorites</button>
-          <div class="nav-label">DVR &amp; Schedule</div>
-          <button id="tabRecord" type="button" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3" fill="currentColor" stroke="none"/></svg>Recordings</button>
-          <button id="tabReminders" type="button" aria-selected="false"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 22a2 2 0 0 0 2-2h-4a2 2 0 0 0 2 2zm6-6v-5a6 6 0 0 0-5-5.91V4a1 1 0 1 0-2 0v1.09A6 6 0 0 0 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>Reminders</button>
-          <div class="nav-label">System</div>
+          <button id="tabGroups" type="button" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 7h12M8 12h12M8 17h12"/><path d="M4 7h.01M4 12h.01M4 17h.01"/></svg>Groups</button>
+          <button id="tabCountries" type="button" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.8 2.5 15.2 0 18M12 3c-2.5 2.8-2.5 15.2 0 18"/></svg>Countries</button>
+          <div class="nav-label">Watch &amp; DVR</div>
           <button id="tabRemote" type="button" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="7" y="2" width="10" height="20" rx="3"/><circle cx="12" cy="8" r="2"/><path d="M10 14h4M10 17h4"/></svg>TV Remote</button>
+          <button id="tabRecord" type="button" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3" fill="currentColor" stroke="none"/></svg>Recordings<span class="nav-dot-rec" id="dotRecLive" hidden title="Recording active"></span><span class="nav-badge" id="badgeRecs" hidden>0</span></button>
+          <button id="tabReminders" type="button" aria-selected="false"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 22a2 2 0 0 0 2-2h-4a2 2 0 0 0 2 2zm6-6v-5a6 6 0 0 0-5-5.91V4a1 1 0 1 0-2 0v1.09A6 6 0 0 0 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>Reminders<span class="nav-badge" id="badgeRems" hidden>0</span></button>
+          <div class="nav-label">System</div>
           <button id="tabPro" type="button" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3.5"/><path d="M3 19c0-3 2.7-5 6-5s6 2 6 5"/><path d="M17 11l1.5 1.5L21 10"/></svg>Pro &amp; Profiles</button>
           <button id="tabBackup" type="button" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 4v10"/><path d="M8 10l4 4 4-4"/><path d="M5 18h14"/></svg>Backup &amp; Restore</button>
           <button id="tabAdmin" type="button" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4"/></svg>Settings</button>
@@ -2229,6 +2582,15 @@
         </div>
       </aside>
       <div class="stage">
+      <div class="cmd-bar">
+        <button class="cmd-search-btn" id="cmdOpenBtn" type="button">
+          <span>🔍 Quick jump to any setting, feature, or channel…</span>
+          <span class="cmd-kbd">Ctrl K</span>
+        </button>
+        <button class="cmd-tool-btn" id="miniRemoteToggle" type="button" title="Floating TV Remote">🎮 Remote</button>
+        <button class="cmd-tool-btn" id="themeToggleBtn" type="button" title="Switch Dark / Daylight theme">☀ Light</button>
+        <button class="cmd-tool-btn" id="keysHelpBtn" type="button" title="Keyboard shortcuts">?</button>
+      </div>
       <div class="kpi-strip" id="kpiStrip">
         <button class="kpi-card" type="button" data-kpi-tab="countries">
           <span class="kpi-label">Active Countries</span>
@@ -2272,7 +2634,49 @@
           <button class="primary" id="globalSaveBtn" type="button" title="Push lineup changes to the TV (Ctrl+S)">Save &amp; Sync</button>
         </div>
       </div>
-      <section class="card panel" id="panelCountries">
+      <section class="card panel" id="panelHome">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+          <div>
+            <h2 style="margin:0">Command Center</h2>
+            <p class="hint" style="margin-top:4px">Everything for your TV, lineup, DVR, and household profiles in one place.</p>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+            <button class="pill" id="homeProfileChip" type="button" style="cursor:pointer;font-size:12px">🎬 Profile: Main</button>
+            <span class="pill" id="homeDeviceChip" style="font-size:12px">📺 Connected</span>
+            <span class="pill" id="homeDvrChip" style="font-size:12px">⏺ DVR Ready</span>
+          </div>
+        </div>
+        <div class="home-hero">
+          <button class="home-tile" type="button" id="homeTileRemote">
+            <span class="tile-icon">🎮</span>
+            <strong>TV Remote &amp; Quick Zap</strong>
+            <span>Open the floating D-pad remote or jump straight to your favorite channels.</span>
+          </button>
+          <button class="home-tile" type="button" id="homeTileFavs">
+            <span class="tile-icon">♥</span>
+            <strong>Favorites &amp; Lineup</strong>
+            <span id="homeTileFavsSub">Organize groups, filter countries, and curate your favorites.</span>
+          </button>
+          <button class="home-tile" type="button" id="homeTileDvr">
+            <span class="tile-icon">⏺</span>
+            <strong>DVR &amp; Cloud Storage</strong>
+            <span id="homeTileDvrSub">Schedule recordings to Local storage, SMB NAS, Google Drive, or OneDrive.</span>
+          </button>
+          <button class="home-tile" type="button" id="homeTilePro">
+            <span class="tile-icon">✨</span>
+            <strong>Pro, Profiles &amp; Health</strong>
+            <span id="homeTileProSub">Profiles, subtitles, timeshift, Stats HUD, and hardware codec health.</span>
+          </button>
+        </div>
+        <div class="setup-strip" id="homeSetupStrip">
+          <button class="setup-pill done" type="button" data-jump-tab="countries">✓ Playlist Connected</button>
+          <button class="setup-pill" id="setupFavPill" type="button" data-jump-tab="favorites">○ Add Favorites</button>
+          <button class="setup-pill" id="setupDvrPill" type="button" data-jump-tab="record">○ Configure DVR / Cloud</button>
+          <button class="setup-pill" id="setupBackupPill" type="button" data-jump-tab="pro">○ Download Full Backup</button>
+        </div>
+      </section>
+
+      <section class="card panel" id="panelCountries" hidden>
         <div class="panel-head">
           <div>
             <h2>Countries</h2>
@@ -4132,6 +4536,7 @@
 
     function openTab(next) {
       tab = next;
+      document.querySelector("#tabHome").setAttribute("aria-selected", String(next === "home"));
       document.querySelector("#tabCountries").setAttribute("aria-selected", String(next === "countries"));
       document.querySelector("#tabGroups").setAttribute("aria-selected", String(next === "groups"));
       document.querySelector("#tabChannels").setAttribute("aria-selected", String(next === "channels"));
@@ -4142,10 +4547,11 @@
       document.querySelector("#tabPro").setAttribute("aria-selected", String(next === "pro"));
       document.querySelector("#tabBackup").setAttribute("aria-selected", String(next === "backup"));
       document.querySelector("#tabAdmin").setAttribute("aria-selected", String(next === "admin" || next === "clean"));
-      document.querySelectorAll("#mobileQuickTabs button[data-quick-tab]").forEach((btn) => {
-        const target = btn.getAttribute("data-quick-tab");
+      document.querySelectorAll("#mobileQuickTabs button[data-quick-tab], #mobileBottomNav button[data-mbn-tab]").forEach((btn) => {
+        const target = btn.getAttribute("data-quick-tab") || btn.getAttribute("data-mbn-tab");
         btn.setAttribute("aria-selected", String(target === next || (target === "admin" && next === "clean")));
       });
+      document.querySelector("#panelHome").hidden = next !== "home";
       document.querySelector("#panelCountries").hidden = next !== "countries";
       document.querySelector("#panelGroups").hidden = next !== "groups";
       document.querySelector("#panelChannels").hidden = next !== "channels";
@@ -4160,6 +4566,7 @@
       syncDirtyChrome();
       const paintKey = tabPaintKey(next);
       const fresh = tabPaint[next] !== paintKey;
+      if (next === "home") renderHomeOverview();
       if (next === "countries" && fresh) renderCountries();
       if (next === "groups" && fresh) renderGroups();
       if (next === "channels" && fresh) renderChannelPanel();
@@ -6153,12 +6560,197 @@
       const body = await resp.json().catch(() => ({}));
       if (resp.ok && body.pro) {
         proCache = body.pro;
+        document.querySelector("#saveProBtn").classList.remove("btn-dirty");
         renderProState();
+        renderHomeOverview();
         showToast("✓ Pro & Profile settings saved", "ok");
       } else {
         showToast(body.error || "Could not save Pro settings", "err");
       }
     }
+    document.querySelector("#tabHome").addEventListener("click", () => showTab("home"));
+    document.querySelectorAll("#mobileBottomNav button[data-mbn-tab]").forEach((btn) => {
+      btn.addEventListener("click", () => showTab(btn.getAttribute("data-mbn-tab")));
+    });
+    document.querySelectorAll("#panelPro input, #panelPro select").forEach((el) => {
+      el.addEventListener("change", () => document.querySelector("#saveProBtn").classList.add("btn-dirty"));
+    });
+    function updateSidebarBadges() {
+      const favCount = (typeof favorites !== "undefined" && favorites && favorites.size) ? favorites.size : 0;
+      const favEl = document.querySelector("#badgeFavs");
+      if (favEl) { favEl.textContent = String(favCount); favEl.hidden = favCount <= 0; }
+      const recItems = (typeof recordingBook !== "undefined" && recordingBook && Array.isArray(recordingBook.items)) ? recordingBook.items : [];
+      const recEl = document.querySelector("#badgeRecs");
+      const recDot = document.querySelector("#dotRecLive");
+      const activeRec = recItems.some((r) => r && r.status === "recording");
+      if (recEl) { recEl.textContent = String(recItems.length); recEl.hidden = recItems.length <= 0; }
+      if (recDot) recDot.hidden = !activeRec;
+      const remCount = (typeof reminders !== "undefined" && Array.isArray(reminders)) ? reminders.length : 0;
+      const remEl = document.querySelector("#badgeRems");
+      if (remEl) { remEl.textContent = String(remCount); remEl.hidden = remCount <= 0; }
+    }
+    function renderHomeOverview() {
+      updateSidebarBadges();
+      const favCount = (typeof favorites !== "undefined" && favorites && favorites.size) ? favorites.size : 0;
+      const devLabel = document.querySelector("#kpiDevice") ? document.querySelector("#kpiDevice").textContent : "Connected";
+      const devChip = document.querySelector("#homeDeviceChip");
+      if (devChip && devLabel && devLabel !== "—") devChip.textContent = "📺 " + devLabel;
+      const favSub = document.querySelector("#homeTileFavsSub");
+      if (favSub) favSub.textContent = favCount > 0 ? favCount + " favorites synced · Organize groups, countries & channels." : "Organize groups, filter countries, and curate your favorites.";
+      const setupFav = document.querySelector("#setupFavPill");
+      if (setupFav) {
+        setupFav.classList.toggle("done", favCount > 0);
+        setupFav.textContent = favCount > 0 ? "✓ " + favCount + " Favorites Saved" : "○ Add Favorites";
+      }
+      const dvrChip = document.querySelector("#homeDvrChip");
+      const setupDvr = document.querySelector("#setupDvrPill");
+      const hasCloudOrSmb = typeof recordingBook !== "undefined" && recordingBook && ((recordingBook.cloudDrive && recordingBook.cloudDrive.refreshToken) || (recordingBook.smb && recordingBook.smb.host));
+      if (setupDvr) {
+        setupDvr.classList.toggle("done", Boolean(hasCloudOrSmb));
+        setupDvr.textContent = hasCloudOrSmb ? "✓ Cloud / NAS DVR Ready" : "○ Configure DVR / Cloud";
+      }
+      if (dvrChip) dvrChip.textContent = hasCloudOrSmb ? "☁ DVR Cloud/NAS Ready" : "⏺ Local DVR Ready";
+      if (proCache) {
+        const prof = (proCache.profiles || []).find((p) => p.id === proCache.activeProfileId) || { name: "Main", avatar: "🎬" };
+        const pChip = document.querySelector("#homeProfileChip");
+        if (pChip) pChip.textContent = (prof.avatar || "🎬") + " Profile: " + (prof.name || "Main");
+      } else if (session && session.email && session.deviceId) {
+        loadProState().then(() => {
+          if (proCache) {
+            const prof = (proCache.profiles || []).find((p) => p.id === proCache.activeProfileId) || { name: "Main", avatar: "🎬" };
+            const pChip = document.querySelector("#homeProfileChip");
+            if (pChip) pChip.textContent = (prof.avatar || "🎬") + " Profile: " + (prof.name || "Main");
+          }
+        });
+      }
+    }
+    document.querySelector("#homeProfileChip").addEventListener("click", () => { showTab("pro"); showProSub("profiles"); });
+    document.querySelector("#homeTileRemote").addEventListener("click", () => {
+      const dr = document.querySelector("#miniRemoteDrawer");
+      dr.hidden = false;
+    });
+    document.querySelector("#homeTileFavs").addEventListener("click", () => showTab("favorites"));
+    document.querySelector("#homeTileDvr").addEventListener("click", () => showTab("record"));
+    document.querySelector("#homeTilePro").addEventListener("click", () => showTab("pro"));
+    document.querySelectorAll("#homeSetupStrip [data-jump-tab]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const target = btn.getAttribute("data-jump-tab");
+        showTab(target);
+        if (btn.id === "setupBackupPill") showProSub("downloads");
+      });
+    });
+
+    /* Floating Mini TV Remote Drawer */
+    const miniDrawer = document.querySelector("#miniRemoteDrawer");
+    document.querySelector("#miniRemoteToggle").addEventListener("click", () => { miniDrawer.hidden = !miniDrawer.hidden; });
+    document.querySelector("#miniRemoteClose").addEventListener("click", () => { miniDrawer.hidden = true; });
+    document.querySelector("#miniRemoteFullBtn").addEventListener("click", () => { miniDrawer.hidden = true; showTab("remote"); });
+
+    /* Dark / Daylight Theme Toggle */
+    const themeBtn = document.querySelector("#themeToggleBtn");
+    function applyTheme(light) {
+      document.body.classList.toggle("theme-light", light);
+      themeBtn.textContent = light ? "🌙 Dark" : "☀ Light";
+      try { localStorage.setItem("olympusTheme", light ? "light" : "dark"); } catch (_) {}
+    }
+    try { if (localStorage.getItem("olympusTheme") === "light") applyTheme(true); } catch (_) {}
+    themeBtn.addEventListener("click", () => applyTheme(!document.body.classList.contains("theme-light")));
+
+    /* Command Palette (Ctrl+K / /) */
+    const CMD_ENTRIES = [
+      { label: "Home Command Center", sub: "Overview & quick setup", run: () => showTab("home") },
+      { label: "Household Profiles & Kids Mode", sub: "Pro & Profiles → Profiles", run: () => { showTab("pro"); showProSub("profiles"); } },
+      { label: "Preferred Audio & Subtitle Languages", sub: "Pro & Profiles → Playback", run: () => { showTab("pro"); showProSub("playback"); } },
+      { label: "Subtitle Size & Background Opacity", sub: "Live preview", run: () => { showTab("pro"); showProSub("playback"); } },
+      { label: "Live TV Pause / Timeshift Buffer", sub: "RAM back-buffer", run: () => { showTab("pro"); showProSub("playback"); } },
+      { label: "Stats for Nerds HUD", sub: "Codec, FPS, bitrate overlay", run: () => { showTab("pro"); showProSub("playback"); } },
+      { label: "External Player Handoff (VLC / MX / Nova)", sub: "VOD & Series", run: () => { showTab("pro"); showProSub("playback"); } },
+      { label: "EPG Time-Shift Offset & Custom XMLTV", sub: "Pro & Profiles → EPG & Sports", run: () => { showTab("pro"); showProSub("epg"); } },
+      { label: "Spoiler-Free Sports Mode", sub: "Hide live scores in guide", run: () => { showTab("pro"); showProSub("epg"); } },
+      { label: "Backup Stream Auto-Failover", sub: "Switch to backup channel on error", run: () => { showTab("pro"); showProSub("epg"); } },
+      { label: "Offline VOD Downloads", sub: "Manage saved movies & episodes", run: () => { showTab("pro"); showProSub("downloads"); } },
+      { label: "1-Click Full System Backup & Restore", sub: "Export / import JSON", run: () => { showTab("pro"); showProSub("downloads"); } },
+      { label: "Device & Hardware Codec Health", sub: "H.264, HEVC, VP9, AV1, Dolby", run: () => { showTab("pro"); showProSub("downloads"); } },
+      { label: "Google Drive & OneDrive DVR Cloud Upload", sub: "Recordings → Storage & Cloud", run: () => showTab("record") },
+      { label: "Schedule a DVR Recording", sub: "Recordings", run: () => showTab("record") },
+      { label: "Show Reminders", sub: "Reminders", run: () => showTab("reminders") },
+      { label: "Favorites (Auto Build, Search, Manage)", sub: "Favorites", run: () => showTab("favorites") },
+      { label: "Channels", sub: "Browse & play channels", run: () => showTab("channels") },
+      { label: "Groups & Categories", sub: "Show/hide groups", run: () => showTab("groups") },
+      { label: "Countries & Regions", sub: "Filter regions", run: () => showTab("countries") },
+      { label: "Open Floating TV Remote", sub: "D-pad & volume anywhere", run: () => { miniDrawer.hidden = false; } },
+      { label: "Full TV Remote & Quick Zap", sub: "TV Remote tab", run: () => showTab("remote") },
+      { label: "VPN, Active Streams & Settings", sub: "Settings", run: () => showTab("admin") },
+      { label: "Toggle Dark / Daylight Theme", sub: "Appearance", run: () => applyTheme(!document.body.classList.contains("theme-light")) }
+    ];
+    const cmdModal = document.querySelector("#cmdModal");
+    const cmdInput = document.querySelector("#cmdInput");
+    const cmdResults = document.querySelector("#cmdResults");
+    const keysModal = document.querySelector("#keysModal");
+    function renderCmdResults(q) {
+      const term = (q || "").trim().toLowerCase();
+      const hits = CMD_ENTRIES.filter((e) => !term || (e.label + " " + e.sub).toLowerCase().includes(term)).slice(0, 12);
+      cmdResults.replaceChildren();
+      if (!hits.length) {
+        const empty = document.createElement("div");
+        empty.className = "hint";
+        empty.style.padding = "14px";
+        empty.textContent = "No matching settings or actions.";
+        cmdResults.appendChild(empty);
+        return;
+      }
+      const frag = document.createDocumentFragment();
+      hits.forEach((h, i) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "cmd-item" + (i === 0 ? " active" : "");
+        const left = document.createElement("span");
+        left.textContent = h.label;
+        const right = document.createElement("small");
+        right.textContent = h.sub;
+        btn.append(left, right);
+        btn.addEventListener("click", () => { cmdModal.hidden = true; h.run(); });
+        frag.appendChild(btn);
+      });
+      cmdResults.appendChild(frag);
+    }
+    function openCmdPalette() {
+      cmdModal.hidden = false;
+      cmdInput.value = "";
+      renderCmdResults("");
+      setTimeout(() => cmdInput.focus(), 10);
+    }
+    document.querySelector("#cmdOpenBtn").addEventListener("click", openCmdPalette);
+    cmdInput.addEventListener("input", () => renderCmdResults(cmdInput.value));
+    cmdInput.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") {
+        const first = cmdResults.querySelector(".cmd-item");
+        if (first) first.click();
+      }
+    });
+    cmdModal.addEventListener("click", (ev) => { if (ev.target === cmdModal) cmdModal.hidden = true; });
+    document.querySelector("#keysHelpBtn").addEventListener("click", () => { keysModal.hidden = false; });
+    document.querySelector("#keysCloseBtn").addEventListener("click", () => { keysModal.hidden = true; });
+    keysModal.addEventListener("click", (ev) => { if (ev.target === keysModal) keysModal.hidden = true; });
+    document.addEventListener("keydown", (ev) => {
+      if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "k") {
+        ev.preventDefault();
+        openCmdPalette();
+        return;
+      }
+      if (ev.key === "Escape") {
+        cmdModal.hidden = true;
+        keysModal.hidden = true;
+        miniDrawer.hidden = true;
+        return;
+      }
+      const tag = (document.activeElement && document.activeElement.tagName || "").toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select") return;
+      if (ev.key === "/") { ev.preventDefault(); openCmdPalette(); }
+      else if (ev.key === "?") { ev.preventDefault(); keysModal.hidden = !keysModal.hidden; }
+      else if (ev.key.toLowerCase() === "r") { miniDrawer.hidden = !miniDrawer.hidden; }
+      else if (ev.key.toLowerCase() === "t") { applyTheme(!document.body.classList.contains("theme-light")); }
+    });
     document.querySelector("#saveProBtn").addEventListener("click", saveProState);
     document.querySelector("#proSubScale").addEventListener("input", paintSubPreview);
     document.querySelector("#proSubBg").addEventListener("input", paintSubPreview);
@@ -7333,7 +7925,7 @@
       loginForm.hidden = true;
       editor.hidden = false;
       selectedGroupId = null;
-      showTab("countries");
+      showTab("home");
       lineupLive = true;
       const ready = catalogIsReady();
       paintCatalogReady(ready);
@@ -8410,5 +9002,58 @@
     });
 
   </script>
+  <aside class="mini-remote" id="miniRemoteDrawer" hidden aria-label="Floating TV Remote">
+    <div class="mini-remote-head">
+      <span>🎮 Quick TV Remote</span>
+      <button type="button" class="secondary" id="miniRemoteClose" style="padding:2px 8px;font-size:12px">×</button>
+    </div>
+    <div class="mini-dpad">
+      <button type="button" data-remote="back" title="Back">↩</button>
+      <button type="button" data-remote="up" title="Up">▲</button>
+      <button type="button" data-remote="home" title="Home">⌂</button>
+      <button type="button" data-remote="left" title="Left">◀</button>
+      <button type="button" class="ok-btn" data-remote="ok" title="Select / OK">OK</button>
+      <button type="button" data-remote="right" title="Right">▶</button>
+      <button type="button" data-remote="vol_down" title="Volume Down">🔉</button>
+      <button type="button" data-remote="down" title="Down">▼</button>
+      <button type="button" data-remote="vol_up" title="Volume Up">🔊</button>
+    </div>
+    <div class="mini-remote-row">
+      <button type="button" data-remote="play_pause">⏯ Play</button>
+      <button type="button" data-remote="mute">🔇 Mute</button>
+      <button type="button" id="miniRemoteFullBtn">Full ↗</button>
+    </div>
+  </aside>
+
+  <div class="cmd-overlay" id="cmdModal" hidden>
+    <div class="cmd-box" role="dialog" aria-label="Quick Jump">
+      <input id="cmdInput" type="search" placeholder="Type a setting, tab, or channel (e.g. subtitle, drive, kids, espn)…" autocomplete="off" />
+      <div class="cmd-results" id="cmdResults"></div>
+    </div>
+  </div>
+
+  <div class="cmd-overlay" id="keysModal" hidden>
+    <div class="cmd-box" role="dialog" aria-label="Keyboard Shortcuts" style="padding:18px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <strong style="font-size:16px">Keyboard Shortcuts</strong>
+        <button type="button" class="secondary" id="keysCloseBtn" style="padding:3px 9px">×</button>
+      </div>
+      <div class="list">
+        <div class="row"><span>Open Quick Jump / Search</span><span class="cmd-kbd">Ctrl K or /</span></div>
+        <div class="row"><span>Toggle Floating TV Remote</span><span class="cmd-kbd">R</span></div>
+        <div class="row"><span>Toggle Dark / Daylight Theme</span><span class="cmd-kbd">T</span></div>
+        <div class="row"><span>Close Modals / Remote Drawer</span><span class="cmd-kbd">Esc</span></div>
+        <div class="row"><span>Show This Shortcuts Guide</span><span class="cmd-kbd">?</span></div>
+      </div>
+    </div>
+  </div>
+
+  <nav class="mobile-bottom-nav" id="mobileBottomNav" aria-label="Mobile navigation">
+    <button type="button" data-mbn-tab="home" aria-selected="true"><span class="mbn-ic">⌂</span>Home</button>
+    <button type="button" data-mbn-tab="channels" aria-selected="false"><span class="mbn-ic">▶</span>Channels</button>
+    <button type="button" data-mbn-tab="record" aria-selected="false"><span class="mbn-ic">⏺</span>DVR</button>
+    <button type="button" data-mbn-tab="remote" aria-selected="false"><span class="mbn-ic">🎮</span>Remote</button>
+    <button type="button" data-mbn-tab="pro" aria-selected="false"><span class="mbn-ic">✨</span>Pro</button>
+  </nav>
 </body>
 </html>

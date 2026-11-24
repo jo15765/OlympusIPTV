@@ -54,7 +54,7 @@ object EpisodeCache {
         }
     }
 
-    private val gson = Gson()
+    private val gson get() = com.olympus.iptv.data.AppJson.gson
     private val listType = object : TypeToken<List<EpisodeRow>>() {}.type
     private val lock = ReentrantLock()
     private val memory = object : LinkedHashMap<String, List<Channel>>(48, 0.75f, true) {

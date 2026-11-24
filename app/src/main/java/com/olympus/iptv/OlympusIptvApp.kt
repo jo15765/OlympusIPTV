@@ -155,7 +155,7 @@ class OlympusIptvApp : Application() {
         }
     }
 
-    private val freshGson by lazy { Gson() }
+    private val freshGson get() = com.olympus.iptv.data.AppJson.gson
 
     private fun readFreshFile(playlistId: String, week: String): FreshHold? {
         val file = File(filesDir, "fresh-cards.json")
@@ -462,5 +462,15 @@ class OlympusIptvApp : Application() {
                 }
                 .build()
         )
+    }
+
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (level >= TRIM_MEMORY_UI_HIDDEN) {
+            runCatching { catalogDb.releaseMemory() }
+            runCatching { com.olympus.iptv.portal.DashboardHost.clearGuideCache() }
+            freshHold = null
+            runCatching { Coil.imageLoader(this).memoryCache?.clear() }
+        }
     }
 }
