@@ -16,6 +16,7 @@ object DeviceForm {
     @Volatile private var cachedTelevision: Boolean? = null
     @Volatile private var cachedTouchPrimary: Boolean? = null
     @Volatile private var cachedLowRam: Boolean? = null
+    @Volatile private var cachedGoogleTvStreamer: Boolean? = null
     @Volatile private var cachedPowerSave = false
     @Volatile private var powerSaveCheckedAt = 0L
     @Volatile private var cachedWidthKey = 0L
@@ -26,13 +27,16 @@ object DeviceForm {
         cachedTelevision?.let { return it }
         val app = context.applicationContext
         val pm = app.packageManager
-        val uiMode = app.getSystemService(Context.UI_MODE_SERVICE) as? UiModeManager
         val fireTv = pm.hasSystemFeature("amazon.hardware.fire_tv") ||
             (Build.MANUFACTURER.equals("Amazon", ignoreCase = true) &&
                 Build.MODEL.startsWith("AFT", ignoreCase = true))
+        @Suppress("DEPRECATION")
         val tv = fireTv ||
-            uiMode?.currentModeType == Configuration.UI_MODE_TYPE_TELEVISION ||
-            pm.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
+            pm.hasSystemFeature(PackageManager.FEATURE_LEANBACK) ||
+            pm.hasSystemFeature(PackageManager.FEATURE_TELEVISION) ||
+            !pm.hasSystemFeature(PackageManager.FEATURE_TOUCHSCREEN) ||
+            (app.getSystemService(Context.UI_MODE_SERVICE) as? UiModeManager)
+                ?.currentModeType == Configuration.UI_MODE_TYPE_TELEVISION
         cachedTelevision = tv
         return tv
     }
@@ -148,14 +152,14 @@ object DeviceForm {
 
     /** True on Google TV Streamer (4K) hardware (codename Kirkwood / model Google TV Streamer). */
     fun isGoogleTvStreamer(context: Context): Boolean {
-        if (!isTelevision(context)) return false
-        val model = Build.MODEL.orEmpty()
-        val device = Build.DEVICE.orEmpty()
-        val manufacturer = Build.MANUFACTURER.orEmpty()
-        return (manufacturer.equals("Google", ignoreCase = true) &&
-            (model.contains("Streamer", ignoreCase = true) ||
-                device.equals("kirkwood", ignoreCase = true) ||
-                Build.VERSION.SDK_INT >= 34))
+        cachedGoogleTvStreamer?.let { return it }
+        val result = isTelevision(context) &&
+            Build.MANUFACTURER.equals("Google", ignoreCase = true) &&
+            (Build.MODEL.orEmpty().contains("Streamer", ignoreCase = true) ||
+                Build.DEVICE.orEmpty().equals("kirkwood", ignoreCase = true) ||
+                Build.VERSION.SDK_INT >= 34)
+        cachedGoogleTvStreamer = result
+        return result
     }
 
     /** High-RAM Android TV boxes (Google TV Streamer 4K, NVIDIA Shield, etc.) with >= 3 GB RAM. */

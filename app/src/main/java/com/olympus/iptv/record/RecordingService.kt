@@ -325,12 +325,19 @@ class RecordingService : Service() {
         manager.notify(NOTICE, notification(text))
     }
 
+    private var channelCreated = false
+
     private fun notification(text: String): Notification {
-        val manager = getSystemService(NotificationManager::class.java)
-        if (manager.getNotificationChannel(CHANNEL) == null) {
-            manager.createNotificationChannel(
-                NotificationChannel(CHANNEL, getString(R.string.record), NotificationManager.IMPORTANCE_LOW)
-            )
+        if (!channelCreated && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val manager = getSystemService(NotificationManager::class.java)
+            if (manager != null) {
+                if (manager.getNotificationChannel(CHANNEL) == null) {
+                    manager.createNotificationChannel(
+                        NotificationChannel(CHANNEL, getString(R.string.record), NotificationManager.IMPORTANCE_LOW)
+                    )
+                }
+                channelCreated = true
+            }
         }
         return NotificationCompat.Builder(this, CHANNEL)
             .setSmallIcon(android.R.drawable.stat_sys_download)
