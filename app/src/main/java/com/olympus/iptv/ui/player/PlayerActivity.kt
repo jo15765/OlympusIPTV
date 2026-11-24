@@ -978,7 +978,10 @@ class PlayerActivity : AppCompatActivity() {
         val mode = PlayerDecoder.normalize(videoDecoder)
         playersDecoder = mode
         decoderDirty = false
-        val control = PlayerBuffers.live(DeviceForm.isLowRam(this))
+        val control = PlayerBuffers.live(
+            lowRam = DeviceForm.isLowRam(this),
+            highEndTv = DeviceForm.isHighEndTv(this)
+        )
         val http = StreamHeaders.httpFactory(this, { playlistId }, { current })
         val loadPolicy = object : androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy(3) {
             override fun getRetryDelayMsFor(loadErrorInfo: androidx.media3.exoplayer.upstream.LoadErrorHandlingPolicy.LoadErrorInfo): Long {
@@ -2400,7 +2403,17 @@ class PlayerActivity : AppCompatActivity() {
         if (!surface.isValid) return
         lastAppliedFrameRateHz = target
         runCatching {
-            surface.setFrameRate(target, android.view.Surface.FRAME_RATE_COMPATIBILITY_DEFAULT)
+            if (Build.VERSION.SDK_INT >= 31) {
+                // Uses HDMI 2.1a QMS seamless refresh-rate switching on Google TV Streamer / Android TV 12+
+                // so 23.976 / 50 / 59.94 Hz transitions happen with zero black-screen flicker.
+                surface.setFrameRate(
+                    target,
+                    android.view.Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE,
+                    android.view.Surface.CHANGE_FRAME_RATE_ONLY_IF_SEAMLESS
+                )
+            } else {
+                surface.setFrameRate(target, android.view.Surface.FRAME_RATE_COMPATIBILITY_DEFAULT)
+            }
         }
     }
 
@@ -2901,6 +2914,16 @@ class PlayerActivity : AppCompatActivity() {
                 if (binding.subtitlePanel.visibility == View.VISIBLE) return false
                 togglePause()
                 showTransportChrome()
+                true
+            }
+            KeyEvent.KEYCODE_GUIDE, KeyEvent.KEYCODE_TV_CONTENTS_MENU -> {
+                if (binding.subtitlePanel.visibility == View.VISIBLE) return false
+                if (binding.playbackMenu.visibility == View.VISIBLE) hidePlaybackMenu()
+                if (::miniGuide.isInitialized && miniGuide.isOpen()) {
+                    miniGuide.hide()
+                } else {
+                    openMiniGuide()
+                }
                 true
             }
             KeyEvent.KEYCODE_INFO -> {

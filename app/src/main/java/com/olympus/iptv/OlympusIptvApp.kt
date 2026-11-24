@@ -427,11 +427,17 @@ class OlympusIptvApp : Application() {
         com.olympus.iptv.vpn.AppTunnel.restore(this)
         val touch = com.olympus.iptv.ui.DeviceForm.isTouchPrimary(this)
         val lowRam = com.olympus.iptv.ui.DeviceForm.isLowRam(this)
+        val highEndTv = com.olympus.iptv.ui.DeviceForm.isHighEndTv(this)
         com.olympus.iptv.ui.BackdropGlow.motion = !lowRam
-        val imageBytes = if (lowRam) 16L * 1024 * 1024 else 64L * 1024 * 1024
+        val imageBytes = when {
+            lowRam -> 16L * 1024 * 1024
+            highEndTv -> 80L * 1024 * 1024
+            else -> 64L * 1024 * 1024
+        }
         val diskBytes = when {
             lowRam -> 20L * 1024 * 1024
             touch -> 24L * 1024 * 1024
+            highEndTv -> 64L * 1024 * 1024
             else -> 48L * 1024 * 1024
         }
         Coil.setImageLoader(

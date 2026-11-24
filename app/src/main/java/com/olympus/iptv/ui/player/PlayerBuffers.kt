@@ -10,11 +10,19 @@ object PlayerBuffers {
     const val PLAYBACK_MS = 2_000
     const val REBUFFER_MS = 3_500
 
-    fun live(lowRam: Boolean = false): DefaultLoadControl {
+    fun live(lowRam: Boolean = false, highEndTv: Boolean = false): DefaultLoadControl {
         val min = if (lowRam) 8_000 else MIN_MS
-        val max = if (lowRam) 20_000 else MAX_MS
-        val start = if (lowRam) 1_500 else PLAYBACK_MS
-        val back = if (lowRam) 4_000 else 8_000
+        val max = when {
+            lowRam -> 20_000
+            highEndTv -> 45_000
+            else -> MAX_MS
+        }
+        val start = if (lowRam || highEndTv) 1_500 else PLAYBACK_MS
+        val back = when {
+            lowRam -> 4_000
+            highEndTv -> 10_000
+            else -> 8_000
+        }
         val builder = DefaultLoadControl.Builder()
             .setBufferDurationsMs(min, max, start, REBUFFER_MS)
             .setBackBuffer(back, false)

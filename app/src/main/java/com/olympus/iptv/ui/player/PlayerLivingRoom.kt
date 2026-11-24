@@ -21,7 +21,8 @@ internal fun PlayerActivity.stopForSleep() {
 }
 
 internal fun PlayerActivity.canEnterPip(): Boolean {
-    if (!touchPrimary) return false
+    val tvPip = Build.VERSION.SDK_INT >= 33 && com.olympus.iptv.ui.DeviceForm.isHighEndTv(this)
+    if (!touchPrimary && !tvPip) return false
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return false
     return packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)
 }

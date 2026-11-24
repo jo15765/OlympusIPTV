@@ -145,4 +145,19 @@ object DeviceForm {
 
     fun isLowRam(lowRamDevice: Boolean, maxMemoryBytes: Long): Boolean =
         lowRamDevice || maxMemoryBytes <= LOW_HEAP_BYTES
+
+    /** True on Google TV Streamer (4K) hardware (codename Kirkwood / model Google TV Streamer). */
+    fun isGoogleTvStreamer(context: Context): Boolean {
+        if (!isTelevision(context)) return false
+        val model = Build.MODEL.orEmpty()
+        val device = Build.DEVICE.orEmpty()
+        val manufacturer = Build.MANUFACTURER.orEmpty()
+        return (manufacturer.equals("Google", ignoreCase = true) &&
+            (model.contains("Streamer", ignoreCase = true) ||
+                device.equals("kirkwood", ignoreCase = true) ||
+                Build.VERSION.SDK_INT >= 34))
+    }
+
+    /** High-RAM Android TV boxes (Google TV Streamer 4K, NVIDIA Shield, etc.) with >= 3 GB RAM. */
+    fun isHighEndTv(context: Context): Boolean = isTelevision(context) && !isLowRam(context)
 }
