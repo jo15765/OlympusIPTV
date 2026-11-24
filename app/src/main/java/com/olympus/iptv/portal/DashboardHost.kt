@@ -458,6 +458,7 @@ object DashboardHost {
             method == "POST" && path == "/api/recordings/cloud/upload" -> cloudUploadExisting(app, socket, json(body))
             method == "GET" && path == "/api/pro" -> proState(app, socket, query["email"], query["deviceId"])
             method == "POST" && path == "/api/pro" -> saveProState(app, socket, json(body))
+            method == "GET" && path == "/api/diagnostics" -> writeJson(socket, 200, mapOf("ok" to true, "diagnostics" to com.olympus.iptv.ui.DeviceCompat.diagnostics(app)))
             method == "GET" && path == "/api/downloads" -> listDownloads(app, socket, query["email"], query["deviceId"])
             method == "POST" && path == "/api/downloads/start" -> startDownload(app, socket, json(body))
             method == "POST" && path == "/api/downloads/delete" -> deleteDownload(app, socket, json(body))
@@ -1473,7 +1474,8 @@ object DashboardHost {
                 "ok" to true,
                 "pro" to state,
                 "quadSupported" to !com.olympus.iptv.ui.DeviceForm.isLowRam(app),
-                "downloadsBytes" to com.olympus.iptv.record.OfflineDownloadManager.usedBytes(app)
+                "downloadsBytes" to com.olympus.iptv.record.OfflineDownloadManager.usedBytes(app),
+                "diagnostics" to com.olympus.iptv.ui.DeviceCompat.diagnostics(app)
             )
         )
     }

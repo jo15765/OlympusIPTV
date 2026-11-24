@@ -68,6 +68,7 @@ class LoginActivity : AppCompatActivity() {
         }
         binding = ActivityLoginBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        com.olympus.iptv.ui.DeviceCompat.applySafeInsets(binding.root)
 
         binding.btnM3u.setOnClickListener { selectMode(PlaylistType.M3U) }
         binding.btnXtream.setOnClickListener { selectMode(PlaylistType.XTREAM) }

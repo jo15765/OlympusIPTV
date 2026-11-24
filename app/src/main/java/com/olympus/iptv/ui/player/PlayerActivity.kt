@@ -1612,6 +1612,10 @@ class PlayerActivity : AppCompatActivity() {
             onResult?.invoke(false)
             return
         }
+        if (!com.olympus.iptv.data.ProFeatureStore.load(this).playback.backupFailoverEnabled) {
+            onResult?.invoke(false)
+            return
+        }
         val savedId = playlistId ?: run {
             onResult?.invoke(false)
             return

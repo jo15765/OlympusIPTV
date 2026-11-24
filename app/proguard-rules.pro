@@ -25,6 +25,7 @@
     @com.google.gson.annotations.SerializedName <fields>;
 }
 -keep class com.olympus.iptv.data.** { *; }
+-keep class com.olympus.iptv.remind.ShowReminder { *; }
 -keep class com.olympus.iptv.playlist.TitleRatingsBundle { *; }
 -keep class com.olympus.iptv.playlist.SourceRating { *; }
 -keep class com.olympus.iptv.playlist.ReviewSnippet { *; }

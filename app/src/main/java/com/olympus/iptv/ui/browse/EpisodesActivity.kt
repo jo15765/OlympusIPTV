@@ -46,6 +46,7 @@ class EpisodesActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityEpisodesBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        com.olympus.iptv.ui.DeviceCompat.applySafeInsets(binding.root)
         if (playlistId.isBlank() || seriesId.isBlank()) {
             finish()
             return

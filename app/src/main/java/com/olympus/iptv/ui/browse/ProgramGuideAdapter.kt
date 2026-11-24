@@ -208,18 +208,22 @@ class ProgramGuideAdapter(
 
     private fun dp(value: Int): Int = (value * density).toInt()
 
+    private val appContext = context.applicationContext
     private val blockCacheCap = if (com.olympus.iptv.ui.DeviceForm.isLowRam(context)) 36 else 80
     private val blockCache = object : LinkedHashMap<String, List<Block>>(64, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<Block>>?) = size > blockCacheCap
     }
 
     private fun cachedBlocks(channel: Channel, loaded: List<EpgProgram>?): List<Block> {
+        val offsetMin = com.olympus.iptv.data.ProFeatureStore.load(appContext).playback.epgOffsetMinutes
         val key = buildString {
             append(channel.id)
             append(':')
             append(windowStart)
             append(':')
             append(windowEnd)
+            append(':')
+            append(offsetMin)
             append(':')
             append(loaded?.size ?: -1)
             append(':')
@@ -228,20 +232,23 @@ class ProgramGuideAdapter(
             append(loaded?.lastOrNull()?.endMillis ?: 0L)
         }
         blockCache[key]?.let { return it }
-        val built = guideBlocks(channel, loaded)
+        val built = guideBlocks(channel, loaded, offsetMin)
         blockCache[key] = built
         return built
     }
 
-    private fun guideBlocks(channel: Channel, loaded: List<EpgProgram>?): List<Block> {
+    private fun guideBlocks(channel: Channel, loaded: List<EpgProgram>?, proEpgOffsetMinutes: Int = 0): List<Block> {
         if (channel.kind != ContentKind.LIVE || loaded == null || windowEnd <= windowStart) return emptyList()
         val name = com.olympus.iptv.data.NameStrip.shown(channel.name, channel.groupTitle).trim()
         if (name.isEmpty()) return emptyList()
+        val shiftMs = proEpgOffsetMinutes * 60_000L
         val clipped = ArrayList<EpgProgram>(loaded.size)
         for (program in loaded) {
-            if (program.endMillis <= windowStart || program.startMillis >= windowEnd) continue
-            val start = program.startMillis.coerceAtLeast(windowStart)
-            val end = program.endMillis.coerceAtMost(windowEnd)
+            val pStart = if (shiftMs == 0L) program.startMillis else program.startMillis + shiftMs
+            val pEnd = if (shiftMs == 0L) program.endMillis else program.endMillis + shiftMs
+            if (pEnd <= windowStart || pStart >= windowEnd) continue
+            val start = pStart.coerceAtLeast(windowStart)
+            val end = pEnd.coerceAtMost(windowEnd)
             if (end > start) clipped.add(program.copy(startMillis = start, endMillis = end))
         }
         clipped.sortBy { it.startMillis }
@@ -344,12 +351,14 @@ class ProgramGuideAdapter(
                     slot = Slot(position, 0)
                 )
             } else {
+                val maskSports = com.olympus.iptv.data.ProFeatureStore.load(itemView.context).playback.spoilerFreeSports
                 blocks.forEachIndexed { index, block ->
+                    val rawTitle = block.program.guideTitle.ifEmpty { block.program.title }
                     bindBlock(
                         view = track.getChildAt(index) as TextView,
                         channel = channel,
                         program = block.program,
-                        title = block.program.guideTitle.ifEmpty { block.program.title },
+                        title = com.olympus.iptv.data.ProFilters.maskSportsSpoilers(rawTitle, maskSports),
                         time = block.program.guideClock.takeIf { it.isNotEmpty() },
                         left = block.left,
                         width = block.width,

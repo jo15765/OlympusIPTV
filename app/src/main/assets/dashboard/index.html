@@ -3358,6 +3358,16 @@
               </div>
             </article>
           </div>
+          <article class="clean-card" style="margin-top:16px">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+              <div>
+                <h3 style="margin:0">Device &amp; Hardware Codec Health</h3>
+                <p class="hint" id="proDiagSummary" style="margin-top:4px">Checking connected device capabilities…</p>
+              </div>
+              <span class="pill" id="proDiagForm" style="font-size:12px">—</span>
+            </div>
+            <div id="proDiagCodecs" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px"></div>
+          </article>
         </div>
       </section>
       </div>
@@ -6086,6 +6096,35 @@
         qb.style.color = body.quadSupported ? "#8fd48a" : "";
       }
       document.querySelector("#proDlStorage").textContent = ((body.downloadsBytes || 0) / (1024 * 1024)).toFixed(1) + " MB used";
+      const dg = body.diagnostics;
+      if (dg) {
+        const formEl = document.querySelector("#proDiagForm");
+        const sumEl = document.querySelector("#proDiagSummary");
+        const codEl = document.querySelector("#proDiagCodecs");
+        if (formEl) formEl.textContent = dg.formFactor || "Android";
+        if (sumEl) {
+          sumEl.textContent = (dg.manufacturer || "") + " " + (dg.model || "") +
+            " · Android " + (dg.androidVersion || "?") + " (API " + (dg.apiLevel || "?") + ")" +
+            " · RAM " + (dg.availRamMb || 0) + "/" + (dg.totalRamMb || 0) + " MB" +
+            " · Free Storage " + (dg.freeStorageMb || 0) + " MB · ABI " + (dg.abis || "—");
+        }
+        if (codEl && dg.codecs) {
+          codEl.replaceChildren();
+          const labels = [
+            ["h264", "H.264 / AVC"], ["hevc", "HEVC / H.265"], ["vp9", "VP9"],
+            ["av1", "AV1"], ["ac3", "Dolby AC-3"], ["eac3", "Dolby E-AC-3"]
+          ];
+          for (const [k, lbl] of labels) {
+            const ok = Boolean(dg.codecs[k]);
+            const chip = document.createElement("span");
+            chip.className = "pill";
+            chip.style.fontSize = "12px";
+            chip.style.color = ok ? "#8fd48a" : "#b9a794";
+            chip.textContent = (ok ? "✓ HW " : "— ") + lbl;
+            codEl.appendChild(chip);
+          }
+        }
+      }
       renderProState();
     }
     async function saveProState() {

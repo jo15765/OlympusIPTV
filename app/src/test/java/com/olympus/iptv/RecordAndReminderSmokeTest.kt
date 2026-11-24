@@ -137,5 +137,15 @@ class RecordAndReminderSmokeTest {
         assertTrue(decoded.playback.spoilerFreeSports)
         assertEquals(1, decoded.downloads.size)
         assertEquals("pilot.mp4", decoded.downloads.first().fileName)
+
+        assertEquals(
+            "Lakers vs Celtics [Score Hidden] Final",
+            com.olympus.iptv.data.ProFilters.maskSportsSpoilers("Lakers vs Celtics 108-102 Final", true)
+        )
+        assertEquals(
+            "Lakers vs Celtics 108-102 Final",
+            com.olympus.iptv.data.ProFilters.maskSportsSpoilers("Lakers vs Celtics 108-102 Final", false)
+        )
+        assertEquals("espn", com.olympus.iptv.data.ProFilters.normalizeChannelKey("US: ESPN FHD 60fps"))
     }
 }

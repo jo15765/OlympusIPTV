@@ -46,28 +46,28 @@
         <activity
             android:name=".ui.login.LoginActivity"
             android:exported="false"
-            android:screenOrientation="landscape"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden"
             android:windowSoftInputMode="adjustPan" />
 
         <activity
             android:name=".ui.login.FavoritesSetupActivity"
             android:exported="false"
-            android:screenOrientation="landscape" />
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize" />
 
         <activity
             android:name=".ui.login.PairingStepActivity"
             android:exported="false"
-            android:screenOrientation="landscape" />
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize" />
 
         <activity
             android:name=".ui.home.HomeActivity"
             android:exported="false"
-            android:screenOrientation="landscape" />
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize" />
 
         <activity
             android:name=".ui.add.AddPlaylistActivity"
             android:exported="true"
-            android:screenOrientation="landscape">
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden">
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -134,45 +134,45 @@
         <activity
             android:name=".ui.browse.EpisodesActivity"
             android:exported="false"
-            android:screenOrientation="landscape" />
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden" />
 
         <activity
             android:name=".ui.browse.LibraryActivity"
             android:exported="false"
-            android:screenOrientation="landscape" />
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden" />
 
         <activity
             android:name=".ui.lineup.LineupActivity"
             android:exported="false"
-            android:screenOrientation="landscape"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden"
             android:windowSoftInputMode="adjustResize" />
 
         <activity
             android:name=".ui.search.SearchActivity"
             android:exported="false"
-            android:screenOrientation="landscape"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden"
             android:windowSoftInputMode="adjustResize" />
 
         <activity
             android:name=".record.RecordActivity"
             android:exported="false"
-            android:screenOrientation="landscape" />
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize" />
 
         <activity
             android:name=".record.ScheduleActivity"
             android:exported="false"
-            android:screenOrientation="landscape"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden"
             android:windowSoftInputMode="adjustResize" />
 
         <activity
             android:name=".record.RecordingsActivity"
             android:exported="false"
-            android:screenOrientation="landscape" />
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize" />
 
         <activity
             android:name=".record.SmbActivity"
             android:exported="false"
-            android:screenOrientation="landscape"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden"
             android:windowSoftInputMode="adjustResize" />
 
         <service
@@ -198,7 +198,7 @@
             android:excludeFromRecents="true"
             android:exported="false"
             android:launchMode="singleTask"
-            android:screenOrientation="landscape"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize"
             android:theme="@style/Theme.OlympusIptv.Reminder" />
 
         <receiver

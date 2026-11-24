@@ -88,6 +88,7 @@ class SearchActivity : AppCompatActivity() {
         }
         binding = ActivitySearchBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        com.olympus.iptv.ui.DeviceCompat.applySafeInsets(binding.root)
         binding.root.post {
             val seeded = intent.getStringExtra("query")?.trim().orEmpty()
             if (seeded.isNotBlank()) {

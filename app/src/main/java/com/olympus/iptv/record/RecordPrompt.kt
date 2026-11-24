@@ -24,6 +24,7 @@ object RecordPrompt {
     private data class Choice(val program: EpgProgram, val series: Boolean)
 
     fun show(activity: AppCompatActivity, playlistId: String, channel: Channel, now: EpgProgram?, next: EpgProgram?) {
+        com.olympus.iptv.ui.DeviceCompat.requestNotificationPermissionIfNeeded(activity)
         val choices = buildList {
             if (now != null) add(activity.getString(R.string.record_now, now.title) to Choice(now, series = false))
             if (next != null) add(activity.getString(R.string.record_next, next.title) to Choice(next, series = false))

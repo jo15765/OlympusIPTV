@@ -31,15 +31,19 @@ object CastBridge {
     }
 
     private fun openRouteChooser(context: Context, channel: Channel?) {
-        val selector = MediaRouteSelector.Builder()
-            .addControlCategory(MediaControlIntent.CATEGORY_REMOTE_PLAYBACK)
-            .build()
-        val dialog = MediaRouteChooserDialog(context)
-        dialog.routeSelector = selector
-        dialog.setOnDismissListener {
-            if (channel != null) loadOntoSession(context, channel)
+        runCatching {
+            val selector = MediaRouteSelector.Builder()
+                .addControlCategory(MediaControlIntent.CATEGORY_REMOTE_PLAYBACK)
+                .build()
+            val dialog = MediaRouteChooserDialog(context)
+            dialog.routeSelector = selector
+            dialog.setOnDismissListener {
+                if (channel != null) loadOntoSession(context, channel)
+            }
+            dialog.show()
+        }.onFailure {
+            Toast.makeText(context, R.string.cast_no_session, Toast.LENGTH_SHORT).show()
         }
-        dialog.show()
     }
 
     private fun loadOntoSession(context: Context, channel: Channel) {
