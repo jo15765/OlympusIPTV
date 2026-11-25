@@ -376,6 +376,91 @@ object AutoFavorites {
         return best
     }
 
+    private val nonLocalSuffix = Regex("""\b(news|sports?|business|weather|soul|life|kids|create|world|action|movies?|golazo|now|live|deportes|espanol|spanish|plus|extra|24/7)\b""", RegexOption.IGNORE_CASE)
+    private val knownLocalNetworks = setOf("ABC", "CBS", "NBC", "FOX", "CW", "PBS", "ION", "MY")
+    private val networkWordRegex: Map<String, Regex> = knownLocalNetworks.associateWith { net ->
+        Regex("""\b${Regex.escape(net)}\b""")
+    }
+    private val shortAliasRegex = HashMap<String, Regex>()
+    private val wordSplit = Regex("""[^a-z0-9]+""")
+    private val usPrefixRegex = Regex("^US:\\s*", RegexOption.IGNORE_CASE)
+    private val digitsRegex = Regex("(\\d+)")
+    private val cityAliasesMap = mapOf(
+        "new york" to listOf("new york", "nyc", "manhattan"),
+        "los angeles" to listOf("los angeles", "la "),
+        "san francisco" to listOf("san francisco", "sf ", "bay area", "oakland", "san jose"),
+        "dallas" to listOf("dallas", "fort worth", "dfw"),
+        "washington" to listOf("washington", "d.c.", " dc"),
+        "minneapolis" to listOf("minneapolis", "st paul", "st. paul", "saint paul", "twin cities"),
+        "philadelphia" to listOf("philadelphia", "philly"),
+        "st. louis" to listOf("st. louis", "st louis", "saint louis"),
+        "st louis" to listOf("st. louis", "st louis", "saint louis"),
+        "las vegas" to listOf("las vegas", "vegas"),
+        "tampa" to listOf("tampa", "st petersburg", "st. petersburg", "tampa bay"),
+        "miami" to listOf("miami", "fort lauderdale", "ft lauderdale"),
+        "raleigh" to listOf("raleigh", "durham"),
+        "norfolk" to listOf("norfolk", "hampton", "virginia beach"),
+        "greensboro" to listOf("greensboro", "winston", "high point"),
+        "greenville" to listOf("greenville", "spartanburg", "asheville"),
+        "hartford" to listOf("hartford", "new haven"),
+        "orlando" to listOf("orlando", "daytona"),
+        "sacramento" to listOf("sacramento", "stockton"),
+        "salt lake city" to listOf("salt lake", "slc")
+    )
+
+    private fun localNetworkIn(name: String, group: String): String? {
+        val upper = name.uppercase()
+        val tokens = wordSplit.split(name.lowercase())
+        var found: String? = null
+        for (t in tokens) {
+            if (t.length !in 2..3) continue
+            val u = t.uppercase()
+            if (u in knownLocalNetworks) {
+                found = u
+                break
+            }
+        }
+        if (found == null) {
+            val gUpper = group.uppercase()
+            for ((net, _) in localNetworks) {
+                if (networkWordRegex[net]?.containsMatchIn(gUpper) == true) {
+                    found = net
+                    break
+                }
+            }
+        }
+        if (found == null) return null
+        if (nonLocalSuffix.containsMatchIn(name) && !upper.contains("LOCAL")) return null
+        return found
+    }
+
+    private fun aliasesForCity(marketName: String): List<String> {
+        val base = cityKey(marketName)
+        return cityAliasesMap[base] ?: listOf(base)
+    }
+
+    private fun matchesMarketCity(channel: GuideChannel, marketName: String): Boolean {
+        val hay = "${channel.name} ${channel.group}".lowercase()
+        val aliases = aliasesForCity(marketName)
+        for (alias in aliases) {
+            val clean = alias.trim()
+            if (clean.length < 2) continue
+            if (clean.length <= 3) {
+                val rx = synchronized(shortAliasRegex) {
+                    shortAliasRegex.getOrPut(clean) {
+                        Regex("""(^|[^a-z0-9])${Regex.escape(clean)}([^a-z0-9]|$)""")
+                    }
+                }
+                if (rx.containsMatchIn(hay)) return true
+            } else if (hay.contains(clean)) {
+                return true
+            }
+        }
+        val parsed = splitLocal(channel.name)
+        if (parsed != null && sameCity(parsed.first, marketName)) return true
+        return false
+    }
+
     private fun bestLocal(
         channels: List<GuideChannel>,
         lat: Double,
@@ -383,40 +468,101 @@ object AutoFavorites {
         networks: Set<String>?
     ): LocalResult {
         val ordered = markets.sortedBy { haversine(lat, lon, it.lat, it.lon) }
-        var fallback: LocalResult? = null
+        val byNetwork = HashMap<String, MutableList<GuideChannel>>(8)
+        for (channel in channels) {
+            val net = localNetworkIn(channel.name, channel.group) ?: continue
+            if (networks != null && net !in networks) continue
+            byNetwork.getOrPut(net) { ArrayList() }.add(channel)
+        }
+
+        // Tier 1: Closest market(s) within 220 km
+        var fallbackMarket: String? = null
+        var fallbackByNet: LinkedHashMap<String, ChannelPick>? = null
         for (market in ordered) {
             val distance = haversine(lat, lon, market.lat, market.lon)
-            if (fallback != null && distance > 180.0) break
-            val picks = pickLocal(channels, market.name, networks)
-            if (picks.isEmpty()) continue
-            val result = LocalResult(market.name, picks)
-            if (picks.size >= 3) return result
-            if (fallback == null) fallback = result
+            if (fallbackByNet != null && distance > 220.0) break
+            val picksByNet = pickLocalByNetwork(byNetwork, market.name, networks)
+            if (picksByNet.isEmpty()) continue
+            if (picksByNet.size >= 3) return LocalResult(market.name, picksByNet.values.toList())
+            if (fallbackByNet == null || picksByNet.size > fallbackByNet.size) {
+                fallbackMarket = market.name
+                fallbackByNet = picksByNet
+            }
         }
-        return fallback ?: LocalResult(ordered.first().name, emptyList())
+
+        // Tier 2: Supplement missing core networks from nearest same-state markets
+        val primaryMarket = fallbackMarket ?: ordered.first().name
+        val primaryState = primaryMarket.substringAfter(",", "").trim().uppercase()
+        val chosenByNet = fallbackByNet ?: LinkedHashMap()
+        if (chosenByNet.size < 4 && primaryState.length == 2) {
+            for (market in ordered) {
+                val st = market.name.substringAfter(",", "").trim().uppercase()
+                if (st != primaryState) continue
+                for ((net, _) in localNetworks) {
+                    if (networks != null && net !in networks) continue
+                    if (net in chosenByNet) continue
+                    val hit = pickSingleLocal(byNetwork[net].orEmpty(), net, market.name)
+                    if (hit != null) chosenByNet[net] = hit
+                }
+                if (chosenByNet.size >= 4) break
+            }
+        }
+
+        // Tier 3: National US East/West affiliate fallback so a user NEVER gets 0 locals
+        if (chosenByNet.size < 4) {
+            val preferWest = lon < -105.0
+            for ((net, group) in localNetworks) {
+                if (networks != null && net !in networks) continue
+                if (net in chosenByNet) continue
+                val pool = byNetwork[net].orEmpty()
+                if (pool.isEmpty()) continue
+                val best = pool.sortedWith(
+                    compareBy<GuideChannel> {
+                        val l = it.name.lowercase()
+                        when {
+                            preferWest && l.contains("west") -> 0
+                            !preferWest && l.contains("east") -> 0
+                            l.contains("east") || l.contains("west") -> 1
+                            else -> 2
+                        }
+                    }.thenBy { if (it.group.equals(group, ignoreCase = true) || it.group.contains("local", ignoreCase = true)) 0 else 1 }
+                        .thenBy { it.name.length }
+                ).firstOrNull() ?: continue
+                chosenByNet[net] = ChannelPick(best.id, best.name)
+            }
+        }
+        return LocalResult(primaryMarket, chosenByNet.values.toList())
     }
 
-    private fun pickLocal(
-        channels: List<GuideChannel>,
+    private fun pickLocalByNetwork(
+        byNetwork: Map<String, List<GuideChannel>>,
         marketName: String,
         networks: Set<String>? = null
-    ): List<ChannelPick> {
-        val want = marketName.lowercase()
-        val picks = ArrayList<ChannelPick>()
-        for ((network, group) in localNetworks) {
+    ): LinkedHashMap<String, ChannelPick> {
+        val picks = LinkedHashMap<String, ChannelPick>()
+        for ((network, _) in localNetworks) {
             if (networks != null && network !in networks) continue
-            val hits = channels.filter { channel ->
-                val parsed = splitLocal(channel.name) ?: return@filter false
-                parsed.second.equals(network, ignoreCase = true) && sameCity(parsed.first, want)
-            }.sortedWith(
-                compareBy<GuideChannel> { if (it.group.equals(group, ignoreCase = true)) 0 else 1 }
-                    .thenBy { if (it.name == it.name.uppercase()) 1 else 0 }
-                    .thenBy { it.name.length }
-            )
-            val chosen = hits.firstOrNull() ?: continue
-            picks.add(ChannelPick(chosen.id, chosen.name))
+            val chosen = pickSingleLocal(byNetwork[network].orEmpty(), network, marketName) ?: continue
+            picks[network] = chosen
         }
         return picks
+    }
+
+    private fun pickSingleLocal(
+        pool: List<GuideChannel>,
+        network: String,
+        marketName: String
+    ): ChannelPick? {
+        if (pool.isEmpty()) return null
+        val group = localNetworks.firstOrNull { it.first == network }?.second.orEmpty()
+        val hits = pool.filter { matchesMarketCity(it, marketName) }.sortedWith(
+            compareBy<GuideChannel> { if (it.group.equals(group, ignoreCase = true)) 0 else 1 }
+                .thenBy { if (it.group.contains("local", ignoreCase = true) || it.group.contains("affiliate", ignoreCase = true)) 0 else 1 }
+                .thenBy { if (it.name == it.name.uppercase()) 1 else 0 }
+                .thenBy { it.name.length }
+        )
+        val chosen = hits.firstOrNull() ?: return null
+        return ChannelPick(chosen.id, chosen.name)
     }
 
     private fun pickNamed(channels: List<GuideChannel>, specs: List<Pair<String, String>>): List<ChannelPick> {
@@ -426,13 +572,14 @@ object AutoFavorites {
             var exact: GuideChannel? = null
             var fallback: GuideChannel? = null
             for (channel in channels) {
-                if (!channel.group.startsWith("USA |")) continue
+                val g = channel.group.uppercase()
+                if (!g.startsWith("USA") && !g.startsWith("US ") && !g.startsWith("US|") && !g.startsWith("US:") && !g.contains("UNITED STATES")) continue
                 val name = bare(channel.name)
                 if (name == want) {
                     exact = channel
                     break
                 }
-                if (fallback == null && name == "$want hd") fallback = channel
+                if (fallback == null && (name == "$want hd" || name == "$want fhd" || name == "$want east")) fallback = channel
             }
             val chosen = exact ?: fallback ?: continue
             picks.add(ChannelPick(chosen.id, chosen.name, label))
@@ -468,7 +615,7 @@ object AutoFavorites {
         return parts[cityIndex] to network
     }
 
-    private fun bare(name: String): String = name.trim().replace(Regex("^US:\\s*", RegexOption.IGNORE_CASE), "").trim().lowercase()
+    private fun bare(name: String): String = usPrefixRegex.replace(name.trim(), "").trim().lowercase()
 
     private fun teamScore(name: String, team: String): Int {
         val text = name.trim()
@@ -508,7 +655,7 @@ object AutoFavorites {
     }
 
     private fun slotNumber(name: String): Int =
-        Regex("(\\d+)").find(name)?.groupValues?.get(1)?.toIntOrNull() ?: 9999
+        digitsRegex.find(name)?.groupValues?.get(1)?.toIntOrNull() ?: 9999
 
     private fun hasWord(name: String, team: String): Boolean {
         val pattern = "(^|[^A-Za-z0-9])${Regex.escape(team)}([^A-Za-z0-9]|$)"

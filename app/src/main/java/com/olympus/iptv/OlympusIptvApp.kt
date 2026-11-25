@@ -205,6 +205,27 @@ class OlympusIptvApp : Application() {
 
     @Volatile private var cloudSyncJob: Job? = null
     @Volatile private var cloudSseActive = false
+    @Volatile var lastSyncAt: Long = 0L
+        private set
+    @Volatile private var lastNudgeAt: Long = 0L
+    private val activeActivities = java.util.concurrent.atomic.AtomicInteger(0)
+
+    fun isCloudSseActive(): Boolean = cloudSseActive
+
+    fun notifyLineupChanged(playlistId: String) {
+        if (playlistId.isBlank()) return
+        android.os.Handler(mainLooper).post {
+            lineupListeners.forEach { listener -> listener(playlistId) }
+        }
+    }
+
+    /** Triggers an immediate non-blocking cloud sync pull (debounced 500 ms). */
+    fun nudgeCloudSyncNow() {
+        val now = android.os.SystemClock.uptimeMillis()
+        if (now - lastNudgeAt < 500L) return
+        lastNudgeAt = now
+        appScope.launch { runCatching { pullCloudChanges() } }
+    }
 
     fun startCloudRealtimeSync() {
         cloudSyncJob?.cancel()
@@ -238,12 +259,22 @@ class OlympusIptvApp : Application() {
     private val cloudPull = Mutex()
     private val cloudStamps = HashMap<String, Long>()
 
-    /** Reads cloud revision numbers as a fallback (30s while SSE is connected, 10s when offline). */
+    /** Reads cloud revision numbers as a fast foreground safety net (2.5s pre-login, 4s offline, 15s SSE, 60s background). */
     private fun watchCloudLogin() {
         appScope.launch {
             while (isActive) {
-                runCatching { pullCloudChanges() }
-                delay(if (cloudSseActive) 30_000L else 10_000L)
+                val inForeground = activeActivities.get() > 0
+                if (inForeground) {
+                    runCatching { pullCloudChanges() }
+                }
+                val loggedIn = runCatching { !playlistStore.session.first()?.email.isNullOrBlank() }.getOrDefault(false)
+                val waitMs = when {
+                    !inForeground -> 60_000L
+                    !loggedIn -> 2_500L
+                    cloudSseActive -> 15_000L
+                    else -> 4_000L
+                }
+                delay(waitMs)
             }
         }
     }
@@ -254,6 +285,7 @@ class OlympusIptvApp : Application() {
             if (deviceId.isBlank()) return
             val client = com.olympus.iptv.playlist.LineupClient(this)
             val stamp = client.pullSyncStamp(deviceId) ?: return
+            lastSyncAt = System.currentTimeMillis()
             fun number(key: String): Long {
                 val value = stamp.get(key) ?: return 0L
                 if (value.isJsonNull || !value.isJsonPrimitive) return 0L
@@ -404,12 +436,17 @@ class OlympusIptvApp : Application() {
             override fun onActivityResumed(activity: android.app.Activity) {
                 if (activity is com.olympus.iptv.remind.ReminderActivity) return
                 com.olympus.iptv.remind.ReminderClock.arm(activity)
+                nudgeCloudSyncNow()
             }
 
             override fun onActivityCreated(activity: android.app.Activity, savedInstanceState: android.os.Bundle?) = Unit
-            override fun onActivityStarted(activity: android.app.Activity) = Unit
+            override fun onActivityStarted(activity: android.app.Activity) {
+                activeActivities.incrementAndGet()
+            }
             override fun onActivityPaused(activity: android.app.Activity) = Unit
-            override fun onActivityStopped(activity: android.app.Activity) = Unit
+            override fun onActivityStopped(activity: android.app.Activity) {
+                activeActivities.updateAndGet { (it - 1).coerceAtLeast(0) }
+            }
             override fun onActivitySaveInstanceState(activity: android.app.Activity, outState: android.os.Bundle) = Unit
             override fun onActivityDestroyed(activity: android.app.Activity) = Unit
         })

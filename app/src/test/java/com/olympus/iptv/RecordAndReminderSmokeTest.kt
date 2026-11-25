@@ -148,4 +148,31 @@ class RecordAndReminderSmokeTest {
         )
         assertEquals("espn", com.olympus.iptv.data.ProFilters.normalizeChannelKey("US: ESPN FHD 60fps"))
     }
+
+    @Test
+    fun zipLocatorAndAutoFavoritesDiscoverLocalsAcrossAllNamingFormats() {
+        val ny = com.olympus.iptv.data.ZipLocator.fallbackForPrefix("10001")!!
+        assertEquals("NY", ny.state)
+        val dallas = com.olympus.iptv.data.ZipLocator.fallbackForPrefix("75201")!!
+        assertEquals("TX", dallas.state)
+        val la = com.olympus.iptv.data.ZipLocator.fallbackForPrefix("90210")!!
+        assertEquals("CA", la.state)
+
+        val channels = listOf(
+            com.olympus.iptv.data.AutoFavorites.GuideChannel("1", "US: CBS 2 New York (WCBS)", "USA Locals"),
+            com.olympus.iptv.data.AutoFavorites.GuideChannel("2", "US | ABC | New York", "USA | ABC"),
+            com.olympus.iptv.data.AutoFavorites.GuideChannel("3", "NY | New York | NBC WNBC", "USA | NBC"),
+            com.olympus.iptv.data.AutoFavorites.GuideChannel("4", "USA FOX 5 NYC WNYW", "Local Channels"),
+            com.olympus.iptv.data.AutoFavorites.GuideChannel("5", "USA FOX News Channel", "USA News"),
+            com.olympus.iptv.data.AutoFavorites.GuideChannel("6", "US: CBS Sports Network", "USA Sports")
+        )
+        val found = com.olympus.iptv.data.AutoFavorites.localStations(channels, ny.lat, ny.lon)
+        val pickedIds = found.picks.map { it.id }.toSet()
+        assertTrue("1" in pickedIds)
+        assertTrue("2" in pickedIds)
+        assertTrue("3" in pickedIds)
+        assertTrue("4" in pickedIds)
+        assertFalse("5" in pickedIds)
+        assertFalse("6" in pickedIds)
+    }
 }

@@ -843,12 +843,20 @@ class BrowseActivity : AppCompatActivity(), ToolHost {
         hostOnStart()
     }
 
+    private val proWatcher: (com.olympus.iptv.data.ProState) -> Unit = {
+        if (!isDestroyed && guideReady()) {
+            programAdapter.notifyItemRangeChanged(0, programAdapter.itemCount)
+        }
+    }
+
     override fun onResume() {
         super.onResume()
+        com.olympus.iptv.data.ProFeatureStore.watch(proWatcher)
         hostOnResume()
     }
 
     override fun onStop() {
+        com.olympus.iptv.data.ProFeatureStore.unwatch(proWatcher)
         hostOnStop()
         super.onStop()
     }

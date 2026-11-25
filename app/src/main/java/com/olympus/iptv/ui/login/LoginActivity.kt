@@ -349,21 +349,8 @@ class LoginActivity : AppCompatActivity() {
 
     private data class HomeZip(val lat: Double, val lon: Double, val country: String)
 
-    private fun lookupZip(zip: String): HomeZip? {
-        val request = Request.Builder().url("https://api.zippopotam.us/us/$zip").build()
-        return runCatching {
-            http.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return null
-                val json = JSONObject(response.body?.string().orEmpty())
-                val places = json.optJSONArray("places") ?: return null
-                if (places.length() == 0) return null
-                val place = places.getJSONObject(0)
-                val lat = place.optString("latitude").toDoubleOrNull() ?: return null
-                val lon = place.optString("longitude").toDoubleOrNull() ?: return null
-                HomeZip(lat, lon, "us")
-            }
-        }.getOrNull()
-    }
+    private fun lookupZip(zip: String): HomeZip? =
+        com.olympus.iptv.data.ZipLocator.resolve(zip)?.let { HomeZip(it.lat, it.lon, it.country) }
 
     private fun suppressTransition() {
         if (android.os.Build.VERSION.SDK_INT >= 34) {

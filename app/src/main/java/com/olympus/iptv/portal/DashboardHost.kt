@@ -459,6 +459,8 @@ object DashboardHost {
             method == "GET" && path == "/api/pro" -> proState(app, socket, query["email"], query["deviceId"])
             method == "POST" && path == "/api/pro" -> saveProState(app, socket, json(body))
             method == "GET" && path == "/api/diagnostics" -> writeJson(socket, 200, mapOf("ok" to true, "diagnostics" to com.olympus.iptv.ui.DeviceCompat.diagnostics(app)))
+            method == "GET" && path == "/api/live-status" -> liveStatus(app, socket)
+            method == "POST" && path == "/api/sync/now" -> forceSyncNow(app, socket, json(body))
             method == "GET" && path == "/api/downloads" -> listDownloads(app, socket, query["email"], query["deviceId"])
             method == "POST" && path == "/api/downloads/start" -> startDownload(app, socket, json(body))
             method == "POST" && path == "/api/downloads/delete" -> deleteDownload(app, socket, json(body))
@@ -925,7 +927,36 @@ object DashboardHost {
             writeJson(socket, 200, mapOf("ok" to true, "teams" to teams))
             return
         }
-        val place = gate.playlist.homeLat to gate.playlist.homeLon
+        val incomingZip = com.olympus.iptv.data.ZipLocator.normalizeZip(text(body, "zip"))
+        var resolvedLat = gate.playlist.homeLat
+        var resolvedLon = gate.playlist.homeLon
+        var resolvedZip = gate.playlist.homeZip.orEmpty()
+        val zipToResolve = when {
+            incomingZip.length == 5 -> incomingZip
+            (resolvedLat == null || resolvedLon == null) && resolvedZip.length == 5 -> resolvedZip
+            else -> ""
+        }
+        if (zipToResolve.length == 5) {
+            val z = com.olympus.iptv.data.ZipLocator.resolve(zipToResolve)
+            if (z != null) {
+                resolvedLat = z.lat
+                resolvedLon = z.lon
+                resolvedZip = z.zip
+                if (gate.playlist.homeZip != z.zip || gate.playlist.homeLat != z.lat || gate.playlist.homeLon != z.lon) {
+                    runBlocking {
+                        app.playlistStore.saveSession(
+                            gate.playlist.copy(
+                                homeZip = z.zip,
+                                homeLat = z.lat,
+                                homeLon = z.lon,
+                                homeCountry = z.country
+                            )
+                        )
+                    }
+                }
+            }
+        }
+        val place = resolvedLat to resolvedLon
         val picks: List<AutoFavorites.ChannelPick>
         var market = ""
         when (mode) {
@@ -963,6 +994,7 @@ object DashboardHost {
             }
         }
         val counts = applyPicks(app, playlistId, picks)
+        app.notifyLineupChanged(playlistId)
         val favorites = runBlocking { app.playlistStore.favoritePage(playlistId) }
         writeJson(
             socket,
@@ -970,6 +1002,7 @@ object DashboardHost {
             mapOf(
                 "ok" to true,
                 "market" to market,
+                "zip" to resolvedZip,
                 "city" to "",
                 "added" to counts.first,
                 "already" to counts.second,
@@ -1620,7 +1653,42 @@ object DashboardHost {
             }
         }
         clearGuideCache()
+        app.notifyLineupChanged(gate.playlist.id)
         writeJson(socket, 200, mapOf("ok" to true, "restoredSections" to restored))
+    }
+
+    private fun liveStatus(app: OlympusIptvApp, socket: Socket) {
+        val prof = com.olympus.iptv.data.ProFeatureStore.activeProfile(app)
+        val playing = app.lastPlayed
+        writeJson(
+            socket,
+            200,
+            mapOf(
+                "ok" to true,
+                "mode" to "lan",
+                "sseActive" to app.isCloudSseActive(),
+                "lastSyncAt" to app.lastSyncAt,
+                "activeProfile" to mapOf("id" to prof.id, "name" to prof.name, "avatar" to prof.avatar),
+                "nowPlaying" to (playing?.let {
+                    mapOf("id" to it.id, "name" to it.name, "group" to it.groupTitle.orEmpty())
+                })
+            )
+        )
+    }
+
+    private fun forceSyncNow(app: OlympusIptvApp, socket: Socket, body: JsonObject) {
+        val gate = gate(app, text(body, "email"), text(body, "deviceId"))
+        app.nudgeCloudSyncNow()
+        gate?.let { app.notifyLineupChanged(it.playlist.id) }
+        writeJson(
+            socket,
+            200,
+            mapOf(
+                "ok" to true,
+                "syncedAt" to System.currentTimeMillis(),
+                "sseActive" to app.isCloudSseActive()
+            )
+        )
     }
 
     private fun readRecording(app: OlympusIptvApp, socket: Socket, query: Map<String, String>) {
@@ -2033,21 +2101,8 @@ object DashboardHost {
         }
     }
 
-    private fun lookupZip(zip: String): Triple<Double, Double, String>? {
-        val request = Request.Builder().url("https://api.zippopotam.us/us/$zip").build()
-        return runCatching {
-            logos.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return null
-                val json = JsonParser.parseString(response.body?.string().orEmpty()).asJsonObject
-                val places = json.getAsJsonArray("places") ?: return null
-                if (places.size() == 0) return null
-                val place = places[0].asJsonObject
-                val lat = place.get("latitude")?.asString?.toDoubleOrNull() ?: return null
-                val lon = place.get("longitude")?.asString?.toDoubleOrNull() ?: return null
-                Triple(lat, lon, "us")
-            }
-        }.getOrNull()
-    }
+    private fun lookupZip(zip: String): Triple<Double, Double, String>? =
+        com.olympus.iptv.data.ZipLocator.resolve(zip)?.let { Triple(it.lat, it.lon, it.country) }
 
     private fun flag(body: JsonObject, key: String, fallback: Boolean): Boolean {
         if (!body.has(key) || !body.get(key).isJsonPrimitive) return fallback

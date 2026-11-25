@@ -209,7 +209,7 @@ class PlayerActivity : AppCompatActivity() {
     internal var scrobbleChannel: Channel? = null
     internal var scrobbleJob: Job? = null
     internal var scrobbleStarted = false
-    private var inPip = false
+    internal var inPip = false
     internal var pipPending = false
     private var networkWatcher: NetworkWatcher? = null
     private var acceptReconnectAt = 0L
@@ -458,7 +458,15 @@ class PlayerActivity : AppCompatActivity() {
             return
         }
         WindowCompat.setDecorFitsSystemWindows(window, false)
-        binding.btnPhoneBack.setOnClickListener { handlePlayerBack() }
+        binding.btnOverlayBack.visibility = View.VISIBLE
+        binding.btnOverlayBack.setOnClickListener {
+            com.olympus.iptv.ui.Haptics.tick(binding.btnOverlayBack)
+            exitToGuide()
+        }
+        binding.btnPhoneBack.setOnClickListener {
+            com.olympus.iptv.ui.Haptics.tick(binding.btnPhoneBack)
+            exitToGuide()
+        }
         binding.btnPhonePlay.setOnClickListener {
             com.olympus.iptv.ui.Haptics.tick(binding.btnPhonePlay)
             togglePause()
@@ -701,6 +709,26 @@ class PlayerActivity : AppCompatActivity() {
     private fun playbackErrorOpen(): Boolean =
         ::binding.isInitialized && binding.playbackErrorCard.visibility == View.VISIBLE
 
+    private fun exitToGuide() {
+        hideHandler.removeCallbacks(leaveAfterBack)
+        lastBackAt = 0L
+        inPip = false
+        pipPending = false
+        unregisterPipReceiver()
+        dropOpenStreams()
+        armBrowseBack()
+        finish()
+    }
+
+    private fun closeFromPip() {
+        hideHandler.removeCallbacks(leaveAfterBack)
+        inPip = false
+        pipPending = false
+        unregisterPipReceiver()
+        dropOpenStreams()
+        runCatching { finishAndRemoveTask() }.onFailure { finish() }
+    }
+
     private fun handlePlayerBack() {
         if (radioOn) {
             leaveRadioMode()
@@ -716,11 +744,19 @@ class PlayerActivity : AppCompatActivity() {
         }
         if (playbackErrorOpen()) {
             hidePlaybackError()
-            armBrowseBack()
-            finish()
+            exitToGuide()
             return
         }
-        if (binding.playbackMenu.visibility == View.VISIBLE || transportShowing()) {
+        if (binding.playbackMenu.visibility == View.VISIBLE) {
+            hideTransportChrome(animated = false)
+            return
+        }
+        // On mobile/tablet (touchPrimary), Back returns directly to the guide with zero delay.
+        if (touchPrimary) {
+            exitToGuide()
+            return
+        }
+        if (transportShowing()) {
             hideTransportChrome(animated = false)
             return
         }
@@ -3029,12 +3065,61 @@ class PlayerActivity : AppCompatActivity() {
         playCurrent()
     }
 
+    private val proWatcher: (com.olympus.iptv.data.ProState) -> Unit = { state ->
+        if (!isDestroyed) {
+            applySubtitleAppearance()
+            statsHud?.setVisible(state.playback.statsOverlayEnabled)
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        com.olympus.iptv.data.ProFeatureStore.watch(proWatcher)
+        if (Build.VERSION.SDK_INT >= 31 && pipSwipeHome && canEnterPip() && !DeviceForm.isTelevision(this)) {
+            runCatching { setPictureInPictureParams(buildPipParams()) }
+        }
+    }
+
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
         val playing = player?.playWhenReady == true || radioOn
         if (pipSwipeHome && canEnterPip() && playing && !DeviceForm.isTelevision(this)) {
             enterPip(manual = false)
         }
+    }
+
+    private var pipReceiver: android.content.BroadcastReceiver? = null
+
+    private fun registerPipReceiver() {
+        if (pipReceiver != null) return
+        val receiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(context: android.content.Context?, intent: Intent?) {
+                when (intent?.action) {
+                    ACTION_PIP_TOGGLE_PLAY -> {
+                        togglePause()
+                        refreshPipActions()
+                    }
+                    ACTION_PIP_CLOSE -> closeFromPip()
+                }
+            }
+        }
+        val filter = android.content.IntentFilter().apply {
+            addAction(ACTION_PIP_TOGGLE_PLAY)
+            addAction(ACTION_PIP_CLOSE)
+        }
+        androidx.core.content.ContextCompat.registerReceiver(
+            this,
+            receiver,
+            filter,
+            androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED
+        )
+        pipReceiver = receiver
+    }
+
+    private fun unregisterPipReceiver() {
+        val receiver = pipReceiver ?: return
+        pipReceiver = null
+        runCatching { unregisterReceiver(receiver) }
     }
 
     override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean) {
@@ -3046,6 +3131,10 @@ class PlayerActivity : AppCompatActivity() {
             binding.overlay.visibility = View.GONE
             binding.phoneDock.visibility = View.GONE
             player?.playWhenReady = true
+            registerPipReceiver()
+            refreshPipActions()
+        } else {
+            unregisterPipReceiver()
         }
     }
 
@@ -3173,6 +3262,8 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        com.olympus.iptv.data.ProFeatureStore.unwatch(proWatcher)
+        unregisterPipReceiver()
         phoneControls?.release()
         phoneControls = null
         statsHud?.release()

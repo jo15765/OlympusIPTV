@@ -69,6 +69,15 @@ object ProFeatureStore {
     private const val KEY_STATE = "state_json"
     private val gson get() = AppJson.gson
     @Volatile private var cached: ProState? = null
+    private val listeners = java.util.concurrent.CopyOnWriteArrayList<(ProState) -> Unit>()
+
+    fun watch(listener: (ProState) -> Unit) {
+        listeners.add(listener)
+    }
+
+    fun unwatch(listener: (ProState) -> Unit) {
+        listeners.remove(listener)
+    }
 
     fun load(context: Context): ProState {
         cached?.let { return it }
@@ -92,6 +101,11 @@ object ProFeatureStore {
             .edit()
             .putString(KEY_STATE, gson.toJson(clean))
             .apply()
+        if (listeners.isNotEmpty()) {
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                listeners.forEach { runCatching { it(clean) } }
+            }
+        }
         return clean
     }
 
