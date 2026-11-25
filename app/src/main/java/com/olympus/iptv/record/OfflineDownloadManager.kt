@@ -26,7 +26,9 @@ object OfflineDownloadManager {
     private val cancelled = ConcurrentHashMap.newKeySet<String>()
 
     fun directory(context: Context): File {
-        val dir = File(context.applicationContext.getExternalFilesDir(null), "downloads")
+        val app = context.applicationContext
+        val base = app.getExternalFilesDir(null) ?: app.filesDir
+        val dir = File(base, "downloads")
         dir.mkdirs()
         return dir
     }

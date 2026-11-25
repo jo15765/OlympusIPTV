@@ -19,7 +19,9 @@ object RecordingFiles {
     private var usedBytesCache: Long? = null
 
     fun directory(context: Context): File {
-        val dir = File(context.getExternalFilesDir(null), "recordings")
+        val app = context.applicationContext
+        val base = app.getExternalFilesDir(null) ?: app.filesDir
+        val dir = File(base, "recordings")
         dir.mkdirs()
         return dir
     }
