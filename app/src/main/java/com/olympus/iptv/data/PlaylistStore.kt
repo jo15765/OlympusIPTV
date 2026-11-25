@@ -842,7 +842,7 @@ class PlaylistStore(private val context: Context) {
         }
         editPrefs { prefs ->
             prefs[scrobblerProviderKey] = chosen
-            // Mutex: only one scrobbler active.
+
             if (chosen == ScrobblerIds.SIMKL) {
                 prefs.remove(traktTokenKey)
                 prefs.remove(traktClientIdKey)

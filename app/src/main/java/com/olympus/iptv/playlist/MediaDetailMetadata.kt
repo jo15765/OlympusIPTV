@@ -5,13 +5,6 @@ import com.olympus.iptv.BuildConfig
 import okhttp3.Request
 import java.net.URLEncoder
 
-/**
- * Fetches rich Emby-style hero metadata from TMDB:
- * - Full-bleed backdrop_path, poster_path, clearlogo (logos endpoint)
- * - Star rating, years, network/studio, season count, content rating (TV-MA / PG-13), genres, synopsis
- * - Cast & Crew portraits + character names
- * - Per-episode stills, air dates, runtimes & overviews
- */
 object MediaDetailMetadata {
     data class CastMember(
         val id: Int,

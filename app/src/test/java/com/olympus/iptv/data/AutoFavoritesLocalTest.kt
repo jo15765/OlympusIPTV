@@ -38,7 +38,7 @@ class AutoFavoritesLocalTest {
 
     @Test
     fun smallCityWithFewChannelsFallsBackToClosestMajorCityAllFiveNetworks() {
-        // Smaller city (Macon, GA ~ 32.84, -83.63) only has 1 channel; Atlanta (~130km away) has all 5 majors
+
         val channels = listOf(
             AutoFavorites.GuideChannel("m1", "Macon | CBS 13", "USA | Local CBS"),
             AutoFavorites.GuideChannel("a1", "Atlanta | ABC 2", "USA | Local ABC"),

@@ -483,7 +483,7 @@ class SearchActivity : AppCompatActivity() {
         searchWait?.let { searchHandler.removeCallbacks(it) }
         val run = Runnable { showMatches(rawQuery) }
         searchWait = run
-        // FTS path is fast; debounce keystrokes so D-pad typing doesn't flood queries.
+
         if (rawQuery.isBlank()) searchHandler.post(run)
         else searchHandler.postDelayed(run, 150L)
     }

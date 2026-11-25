@@ -1,9 +1,5 @@
 package com.olympus.iptv.data
 
-/**
- * Find-and-replace across group display names. Results stay in [LineupConfig.groupNames],
- * the same map used when a group is renamed on its own.
- */
 object GroupRename {
     data class Sample(val before: String, val after: String)
 
@@ -41,7 +37,6 @@ object GroupRename {
         return Result(next, changed, spread(samples))
     }
 
-    /** Name shown in the guide: a one-off rename, otherwise the saved bulk find-and-replace. */
     fun shown(id: String, original: String, config: LineupConfig): String {
         val override = config.groupNames?.get(id)?.takeIf { it.isNotBlank() }
         if (override != null) return override
@@ -58,10 +53,6 @@ object GroupRename {
         return fold(name).text.contains(foldedNeedle, ignoreCase = true)
     }
 
-    /**
-     * Bars that look like "|" and odd spaces are treated as the same character,
-     * so a typed "USA |" matches the group name on screen.
-     */
     fun replaceAll(name: String, needle: String, replacement: String): String {
         if (needle.isEmpty()) return name
         val foldedNeedle = fold(needle).text

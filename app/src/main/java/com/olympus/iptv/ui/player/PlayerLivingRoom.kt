@@ -22,7 +22,6 @@ internal const val ACTION_PIP_CLOSE = "com.olympus.iptv.action.PIP_CLOSE"
 private const val REQ_PIP_PLAY = 4101
 private const val REQ_PIP_CLOSE = 4102
 
-/** Picture-in-picture, sleep stop, and DVR prompt kept off the player activity body. */
 internal fun PlayerActivity.stopForSleep() {
     if (isDestroyed) return
     player?.playWhenReady = false

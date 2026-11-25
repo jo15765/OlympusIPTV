@@ -10,7 +10,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** Long-press menu. Stateless aside from the activity it is called on. */
 internal fun BrowseActivity.showRowOptions(seed: com.olympus.iptv.data.Channel? = null) {
     val now = android.os.SystemClock.uptimeMillis()
     if (now - rowMenuAt < 400L) return

@@ -6,7 +6,6 @@ import androidx.recyclerview.widget.DiffUtil
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.concurrent.thread
 
-/** Runs [DiffUtil] off the main thread and applies the result only if this generation is still current. */
 internal object ListDiff {
     private val main = Handler(Looper.getMainLooper())
 

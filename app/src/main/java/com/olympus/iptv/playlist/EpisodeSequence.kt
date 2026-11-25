@@ -14,7 +14,7 @@ object EpisodeSequence {
 
     fun ordered(episodes: List<Channel>): List<Channel> {
         if (episodes.size <= 1) return episodes
-        // Identity-keyed soft cache: same list instance reused across skip/next in one session.
+
         val cached = orderedCache
         if (cached != null && cached.first === episodes) return cached.second
         val rows = episodes.sortedWith(compareBy({ it.season ?: 1 }, { it.number ?: Int.MAX_VALUE }, { it.id }))

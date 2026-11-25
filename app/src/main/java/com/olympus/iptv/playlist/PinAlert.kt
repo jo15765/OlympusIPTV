@@ -10,11 +10,6 @@ import okhttp3.Request
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 
-/**
- * Optional parental PIN-fail email via Mailgun.
- * Set `mailgun.apiKey`, `mailgun.domain`, and `mailgun.fromEmail` in local.properties when ready.
- * Safe no-op until all three fields are configured.
- */
 object PinAlert {
     private val http = OkHttpClient.Builder()
         .connectTimeout(12, TimeUnit.SECONDS)

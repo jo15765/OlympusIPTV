@@ -15,17 +15,10 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 
-/**
- * Pure-OkHttp resumable cloud DVR uploader & OAuth Device-Code client for Google Drive and OneDrive.
- * Requires zero Google Play Services or Microsoft SDKs, so it runs identically on Fire TV Sticks,
- * Android TV, and mobile devices.
- */
 object CloudDriveUploader {
     private val jsonType = "application/json; charset=utf-8".toMediaType()
     private val streamType = "video/mp2t".toMediaType()
 
-    // Google Drive requires chunk sizes to be multiples of 256 KiB; OneDrive requires multiples of 320 KiB.
-    // 3,276,800 bytes (3.2 MiB) is an exact multiple of 320 KiB (10 * 320 KiB); 4 MiB is 16 * 256 KiB.
     private const val GDRIVE_CHUNK = 4 * 1024 * 1024
     private const val ONEDRIVE_CHUNK = 10 * 320 * 1024
 

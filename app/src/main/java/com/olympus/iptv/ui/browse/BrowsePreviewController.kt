@@ -17,9 +17,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-/**
- * Owns the guide corner preview / mini-PiP player so BrowseActivity does not.
- */
 class BrowsePreviewController(
     private val activity: AppCompatActivity,
     private val binding: ActivityBrowseBinding,

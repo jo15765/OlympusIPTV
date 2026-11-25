@@ -15,17 +15,6 @@ import com.olympus.iptv.ui.DeviceForm
 import com.olympus.iptv.ui.Haptics
 import kotlin.math.abs
 
-/**
- * Full mobile touch gesture controller:
- * - Left edge vertical swipe: screen brightness (starts from actual system brightness)
- * - Right edge vertical swipe: media volume
- * - Center vertical fling: Live TV channel zap up/down
- * - Center horizontal fling: VOD/Series quick scrub (-30s / +30s)
- * - Double-tap left/right: -15s / +15s seek
- * - Long-press (VOD/Series): temporary 2x playback speed while held
- * - Pinch out / in: Zoom (fill phone screen) / Fit aspect ratio
- * - Single tap: toggle transport chrome
- */
 internal object PlayerTouchGestures {
     fun attach(activity: PlayerActivity, surface: View) {
         if (!DeviceForm.isTouchPrimary(activity) || DeviceForm.isTelevision(activity)) return
@@ -125,7 +114,7 @@ internal object PlayerTouchGestures {
                     val dy = e2.y - start.y
                     val ch = activity.current
                     val isLive = ch != null && ch.kind == ContentKind.LIVE && ch.seriesId.isNullOrBlank()
-                    // Vertical fling in center zaps Live TV channels
+
                     if (isLive && abs(dy) > height * 0.14f && abs(dy) > abs(dx) * 1.4f && abs(velocityY) > 600f) {
                         Haptics.confirm(surface)
                         if (dy < 0f) {
@@ -137,7 +126,7 @@ internal object PlayerTouchGestures {
                         }
                         return true
                     }
-                    // Horizontal fling in center scrubs VOD / Series by +/- 30s
+
                     if (!isLive && abs(dx) > width * 0.16f && abs(dx) > abs(dy) * 1.4f && abs(velocityX) > 600f) {
                         val exo = activity.player ?: return false
                         val duration = exo.duration

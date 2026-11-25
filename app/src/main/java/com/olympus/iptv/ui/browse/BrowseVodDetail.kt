@@ -12,7 +12,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.lifecycle.lifecycleScope
 
-/** VOD title, score, and ratings sheet. Called on demand and keeps no Activity of its own. */
 internal fun BrowseActivity.glowFrom(url: String?) {
     if (url.isNullOrBlank()) return
     val request = coil.request.ImageRequest.Builder(this)

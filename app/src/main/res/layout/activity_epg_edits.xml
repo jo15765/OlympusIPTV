@@ -9,7 +9,6 @@
     android:paddingTop="16dp"
     android:paddingBottom="12dp">
 
-    <!-- Header Bar -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -49,7 +48,6 @@
         android:textColor="@color/text_secondary"
         android:textSize="14sp" />
 
-    <!-- Split-Pane Layout: Category Side-Tabs Left + Category Panel Right -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
@@ -57,7 +55,6 @@
         android:layout_weight="1"
         android:orientation="horizontal">
 
-        <!-- Left Navigation Category Tabs -->
         <LinearLayout
             android:id="@+id/categoryTabs"
             android:layout_width="220dp"
@@ -132,7 +129,6 @@
                 android:textStyle="bold" />
         </LinearLayout>
 
-        <!-- Right Content Cards Container -->
         <ScrollView
             android:layout_width="0dp"
             android:layout_height="match_parent"
@@ -145,7 +141,6 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical">
 
-                <!-- Section 1: Playback Engine -->
                 <LinearLayout
                     android:id="@+id/panelPlayback"
                     android:layout_width="match_parent"
@@ -333,7 +328,6 @@
                     </LinearLayout>
                 </LinearLayout>
 
-                <!-- Section 2: Channel & Guide Curation -->
                 <LinearLayout
                     android:id="@+id/panelCuration"
                     android:layout_width="match_parent"
@@ -675,7 +669,6 @@
                     </LinearLayout>
                 </LinearLayout>
 
-                <!-- Section 3: Security & Parental Controls -->
                 <LinearLayout
                     android:id="@+id/panelSecurity"
                     android:layout_width="match_parent"
@@ -765,7 +758,6 @@
                     </LinearLayout>
                 </LinearLayout>
 
-                <!-- Section 4: Services & Sync -->
                 <LinearLayout
                     android:id="@+id/panelServices"
                     android:layout_width="match_parent"

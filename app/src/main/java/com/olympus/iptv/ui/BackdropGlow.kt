@@ -7,22 +7,16 @@ import android.graphics.drawable.TransitionDrawable
 import android.os.SystemClock
 import android.view.View
 
-/**
- * Samples artwork for a muted accent and paints a soft gradient behind a hero.
- * A handful of pixels keeps this out of the APK as a library.
- */
 object BackdropGlow {
     const val THUMB_W = 64
     const val THUMB_H = 36
     @Volatile var motion: Boolean = true
     @Volatile private var quietUntil = 0L
 
-    /** Gradients live on the views that asked for them. This stops a new sample during a trim. */
     fun release() {
         motion = false
     }
 
-    /** Called while a low-RAM stick is repeating Up/Down so the glow paints in place. */
     fun noteScroll() {
         quietUntil = SystemClock.uptimeMillis() + 450L
     }

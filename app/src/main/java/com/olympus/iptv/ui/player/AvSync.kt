@@ -15,7 +15,6 @@ import com.olympus.iptv.data.AvSyncStore
 import com.olympus.iptv.data.PlayerDecoder
 import java.nio.ByteBuffer
 
-/** Holds a few milliseconds of PCM so one channel's audio can sit earlier or later than the picture. */
 @UnstableApi
 class DelayAudioProcessor : BaseAudioProcessor() {
     @Volatile var delayMs: Int = 0
@@ -27,7 +26,6 @@ class DelayAudioProcessor : BaseAudioProcessor() {
         return inputAudioFormat
     }
 
-    /** A zero delay stays out of the PCM chain so AC-3 and E-AC-3 can pass through to the AVR. */
     override fun isActive(): Boolean = delayMs != 0 && super.isActive()
 
     override fun onFlush() {

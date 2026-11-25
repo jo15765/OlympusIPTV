@@ -189,7 +189,7 @@ internal class TunnelEngine(
         for (dns in config.dns) {
             val literal = dns.substringBefore("%").trim()
             if (LanRoutes.parse(literal) == null) continue
-            // A private DNS host stays off the tunnel so phone-to-TV pairing on :8766 keeps working.
+
             if (LanRoutes.isPrivateV4(literal)) continue
             runCatching { builder.addDnsServer(literal) }
         }

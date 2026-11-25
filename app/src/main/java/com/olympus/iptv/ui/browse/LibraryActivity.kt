@@ -10,10 +10,6 @@ import com.olympus.iptv.databinding.ActivityLibraryBinding
 import com.olympus.iptv.remind.RemindersFragment
 import com.olympus.iptv.ui.FocusMotion
 
-/**
- * Queue, Fresh, and Reminders stay attached and are shown or hidden in place.
- * D-pad Left/Right on the pills switches tabs without starting a new Activity.
- */
 class LibraryActivity : AppCompatActivity(), LibraryHost {
     private lateinit var binding: ActivityLibraryBinding
     private val playlistId by lazy { intent.getStringExtra(EXTRA_PLAYLIST_ID).orEmpty() }

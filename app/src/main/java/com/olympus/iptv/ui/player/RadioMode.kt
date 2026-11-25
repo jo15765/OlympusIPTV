@@ -9,7 +9,6 @@ import androidx.media3.common.C
 import java.text.DateFormat
 import java.util.Date
 
-/** Audio keeps playing. The picture is detached and the panel is black so a music or news channel does not burn in. */
 internal fun PlayerActivity.toggleRadioMode() {
     if (radioOn) leaveRadioMode() else enterRadioMode()
 }

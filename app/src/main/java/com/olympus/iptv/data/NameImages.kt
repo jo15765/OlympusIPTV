@@ -1,6 +1,5 @@
 package com.olympus.iptv.data
 
-/** Removes emoji and other picture characters from a channel or group name. */
 object NameImages {
     fun strip(value: String): String {
         if (value.isEmpty()) return value

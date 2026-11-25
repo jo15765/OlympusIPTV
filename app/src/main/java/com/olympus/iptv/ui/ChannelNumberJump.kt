@@ -2,7 +2,6 @@ package com.olympus.iptv.ui
 
 import android.view.KeyEvent
 
-/** Numeric remote entry shared by the guide and the player. Holds no views. */
 object ChannelNumberJump {
     const val DELAY_MS = 1_200L
     const val MAX_DIGITS = 4
@@ -18,7 +17,6 @@ object ChannelNumberJump {
         return base + digit.coerceIn(0, 9).toString()
     }
 
-    /** Prefer an explicit channel number. Otherwise treat the typed value as a 1-based row. */
     fun indexFor(numbers: List<Int?>, typed: Int, allowRowFallback: Boolean = true): Int {
         if (typed <= 0) return -1
         val byNumber = numbers.indexOfFirst { it == typed }

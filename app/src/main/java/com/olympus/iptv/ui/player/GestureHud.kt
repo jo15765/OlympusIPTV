@@ -8,7 +8,6 @@ import android.util.AttributeSet
 import android.view.View
 import kotlin.math.min
 
-/** Vertical pill shown while a phone user drags brightness or volume. */
 class GestureHud @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null

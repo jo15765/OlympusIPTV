@@ -10,7 +10,6 @@ import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import java.io.File
 
-/** Keeps New/Just Added cards that have a playable stream in this playlist. */
 object FreshPlayable {
     private val gate = Semaphore(4)
 

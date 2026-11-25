@@ -27,7 +27,6 @@ object Haptics {
         view.performHapticFeedback(feedback)
     }
 
-    /** 10% brightness or volume step on a phone. */
     fun clock(view: View?) {
         view ?: return
         if (DeviceForm.isTelevision(view.context)) return
@@ -37,7 +36,6 @@ object Haptics {
         )
     }
 
-    /** Double-tap seek. */
     fun confirm(view: View?) {
         view ?: return
         if (DeviceForm.isTelevision(view.context)) return

@@ -56,10 +56,6 @@ import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
 import okhttp3.Request
 
-/**
- * Serves the dashboard from this device while the app process is running.
- * Phones and computers on the same Wi-Fi open the address returned by [url].
- */
 object DashboardHost {
     const val PORT = 8765
     private const val MAX_JSON_BYTES = 512 * 1024
@@ -147,7 +143,7 @@ object DashboardHost {
                                 handed = handle(app, client)
                             } catch (error: Throwable) {
                                 if (error is java.net.SocketTimeoutException || error.cause is java.net.SocketTimeoutException) {
-                                    // A client connected and never sent a request. Close it and keep the guide moving.
+
                                 } else {
                                     com.olympus.iptv.AppLog.error("Dashboard", "Request failed", error)
                                     runCatching {
@@ -181,7 +177,6 @@ object DashboardHost {
         urlListeners.remove(listener)
     }
 
-    /** Confirms this process is answering, and moves to a free port when it is not. */
     fun ensureReachable(): String {
         val current = server
         if (current != null && (current.isClosed || !current.isBound)) {
@@ -802,7 +797,7 @@ object DashboardHost {
             "hiddenGroups" to lineup.hiddenGroups.orEmpty().size,
             "hiddenChannels" to lineup.hiddenChannels.orEmpty().size
         )
-        // Merge any other devices registered under the same email from the cloud portal (fast 2.5s timeout).
+
         val cloudBase = com.olympus.iptv.BuildConfig.PORTAL_CLOUD_URL.trim().trimEnd('/')
         if (cloudBase.startsWith("http")) {
             runCatching {
@@ -2212,7 +2207,16 @@ object DashboardHost {
             PlaylistType.M3U -> !current.m3uUrl.isNullOrBlank()
             PlaylistType.XTREAM -> !current.xtreamHost.isNullOrBlank()
         }
-        writeJson(socket, 200, mapOf("ready" to ready))
+        val deviceId = runCatching { kotlinx.coroutines.runBlocking { app.playlistStore.deviceId() } }.getOrDefault("")
+        writeJson(
+            socket,
+            200,
+            mapOf(
+                "ready" to ready,
+                "email" to current?.email.orEmpty(),
+                "deviceId" to deviceId
+            )
+        )
     }
 
     private fun setupAccount(app: OlympusIptvApp, socket: Socket, body: JsonObject) {
@@ -2434,7 +2438,7 @@ object DashboardHost {
     private fun readHeader(input: java.io.InputStream): String? {
         val buffer = ByteArray(16384)
         var count = 0
-        var patternState = 0 // 0: none, 1: \r, 2: \r\n, 3: \r\n\r
+        var patternState = 0
         while (count < buffer.size) {
             val next = input.read()
             if (next < 0) return null

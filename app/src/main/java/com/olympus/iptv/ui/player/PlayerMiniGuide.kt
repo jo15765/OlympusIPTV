@@ -14,7 +14,6 @@ import com.olympus.iptv.R
 import com.olympus.iptv.data.Channel
 import com.olympus.iptv.data.StreamQuality
 
-/** Left-hand channel list drawn over the live picture. The stream keeps playing. */
 class PlayerMiniGuide(
     private val panel: View,
     private val list: RecyclerView,

@@ -15,7 +15,6 @@ import android.os.Build
 import com.olympus.iptv.R
 import com.olympus.iptv.ui.DeviceForm
 
-/** Lock-screen and Bluetooth controls for phone playback, including radio mode. */
 internal class PhoneMediaControls(private val activity: PlayerActivity) {
     private var session: MediaSession? = null
 

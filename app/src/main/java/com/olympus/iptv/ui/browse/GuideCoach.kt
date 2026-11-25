@@ -11,7 +11,6 @@ import android.widget.TextView
 import com.olympus.iptv.R
 import com.olympus.iptv.ui.DeviceForm
 
-/** Three first-run tips. Dismissing the last one stores a flag and stays quiet. */
 object GuideCoach {
     private const val PREFS = "olympus_tips"
     private const val KEY = "coach_done"
@@ -32,7 +31,6 @@ object GuideCoach {
         focus(activity)
     }
 
-    /** Keep the remote on Got it until the tip is dismissed. */
     fun onKey(activity: BrowseActivity, event: KeyEvent): Boolean {
         val button = button(activity) ?: return false
         val confirm = event.keyCode == KeyEvent.KEYCODE_DPAD_CENTER ||

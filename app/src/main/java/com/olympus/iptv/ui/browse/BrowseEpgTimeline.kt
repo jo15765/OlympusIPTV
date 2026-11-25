@@ -5,7 +5,6 @@ import com.olympus.iptv.R
 import com.olympus.iptv.ui.browse.BrowseActivity.GuideMenu
 import com.olympus.iptv.ui.browse.BrowseActivity.GuideSection
 
-/** EPG header clock and horizontal timeline scrolling. */
 internal fun BrowseActivity.tickGuideHeader() {
     if (binding.guideDate.visibility != View.VISIBLE) return
     val now = com.olympus.iptv.playlist.EpgUtils.now()

@@ -39,9 +39,6 @@ data class TitleRatingsBundle(
         ratings.take(max).joinToString(" · ") { "${it.source} ${it.scoreLabel}" }
 }
 
-/**
- * Aggregates TMDB + Watchmode ratings/reviews with LRU+TTL memory cache and disk persistence.
- */
 object TitleRatings {
     private val gson get() = com.olympus.iptv.data.AppJson.gson
     private val http get() = HttpClients.shared
@@ -110,7 +107,6 @@ object TitleRatings {
         catalogDb?.putMetaMiss(key)
     }
 
-    // Android ICU requires `}` escaped outside character classes; an unescaped `}` crashed playback.
     private val bracketNoise = Regex("""\[[^\]]*]|\{[^}]*\}""")
     private val qualityParens = Regex(
         """\((?:[^)]*(?:4K|UHD|1080|720|480|HEVC|H\.?26[45]|HDR|DV|WEB-?DL|BluRay)[^)]*)\)""",
@@ -150,7 +146,6 @@ object TitleRatings {
         return null
     }
 
-    /** Cheap path for poster/focus lines — TMDB only, no reviews. */
     fun loadScores(name: String, preferTv: Boolean): TitleRatingsBundle {
         val clean = cleanTitle(name)
         if (clean.isBlank()) return emptyBundle(name)
@@ -175,7 +170,6 @@ object TitleRatings {
         }
     }
 
-    /** Full sheet path — parallel TMDB + Watchmode, reviews on demand. */
     suspend fun loadFull(name: String, preferTv: Boolean, tmdbLimit: Int = 10): TitleRatingsBundle {
         val clean = cleanTitle(name)
         if (clean.isBlank()) return emptyBundle(name)
@@ -265,7 +259,7 @@ object TitleRatings {
     private fun maybePersist() {
         val file = diskFile ?: return
         val now = System.currentTimeMillis()
-        // Debounce full-blob rewrites while browsing (focus-driven score loads).
+
         if (!diskDirty || now - lastPersistAt < PERSIST_DEBOUNCE_MS) return
         val blob = synchronized(lock) {
             if (!diskDirty) return

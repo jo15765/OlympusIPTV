@@ -33,14 +33,6 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 
-/**
- * Real-time, security-hardened Cloud Sync client for Olympus-IPTV:
- * - Subscribes to Server-Sent Events (`/api/events`) backed by PostgreSQL LISTEN/NOTIFY (`olympus_sync`)
- *   so edits in the Web Dashboard push to the TV and mobile apps within < 200 ms
- * - Authenticates every request with a per-device `X-Device-Token` stored locally
- * - Syncs LineupConfig, Shared Favorites, Continue Watching, DVR Recordings, Reminders & Snapshots
- * - Falls back automatically to local LAN `DashboardHost` when offline or unconfigured
- */
 class LineupClient(
     private val context: Context,
     private val http: OkHttpClient = defaultHttp
@@ -79,10 +71,6 @@ class LineupClient(
         return null
     }
 
-    /**
-     * Opens a persistent Server-Sent Events (SSE) stream to `/api/events` so any change saved
-     * in the Web UI or another device triggers [onSyncEvent] immediately (< 200 ms).
-     */
     fun subscribeSyncEvents(
         scope: CoroutineScope,
         email: String,
@@ -132,7 +120,6 @@ class LineupClient(
         }
     }
 
-    /** Playlist login saved on the cloud dashboard for this device. Null when none is waiting. */
     fun pullProviderLogin(deviceId: String): JsonObject? {
         val cloud = BuildConfig.PORTAL_CLOUD_URL.trim()
         if (!cloud.startsWith("http://") && !cloud.startsWith("https://")) return null
@@ -149,7 +136,6 @@ class LineupClient(
         }.getOrNull()
     }
 
-    /** Revision numbers only. The app downloads a section when its number changes. */
     fun pullSyncStamp(deviceId: String): JsonObject? {
         val cloud = BuildConfig.PORTAL_CLOUD_URL.trim()
         if (!cloud.startsWith("http://") && !cloud.startsWith("https://")) return null
@@ -365,7 +351,7 @@ class LineupClient(
             catalogHttp.newCall(req).execute().use { resp ->
                 if (!resp.isSuccessful) return@use null
                 val body = resp.body ?: return@use null
-                // Stream-parse directly with JsonReader to avoid allocating a giant JSON String + DOM tree.
+
                 JsonReader(body.charStream()).use { reader ->
                     parseCloudCatalog(reader)
                 }

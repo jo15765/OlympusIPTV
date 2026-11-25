@@ -41,13 +41,13 @@ data class LineupConfig(
     val namePrefixes: List<String>? = emptyList(),
     val nameSuffixes: List<String>? = emptyList(),
     val nameEpg: Boolean? = false,
-    /** Auto-strip group prefixes, channel numbers, and clutter by default across TV and Web-UI. */
+
     val autoCleanNames: Boolean? = true,
-    /** Bulk group find text. Shared by the TV and the web dashboard. */
+
     val groupFind: String? = null,
-    /** Bulk group replacement. Empty means the found text is removed. */
+
     val groupReplace: String? = null,
-    /** Group id to a 4-digit code. Null when that group is not locked. */
+
     val groupPins: Map<String, String>? = null,
     val revision: Long? = 0
 )
@@ -68,7 +68,7 @@ data class Channel(
     val categoryId: String? = null,
     val kind: ContentKind = ContentKind.LIVE,
     val containerExtension: String? = null,
-    /** XMLTV / tvg-id when different from stream id (mostly M3U). */
+
     val epgChannelId: String? = null,
     val countryId: String? = null,
     val countryLabel: String? = null,
@@ -83,7 +83,7 @@ data class Channel(
     val catchupDays: Int? = null,
     val tvArchive: Boolean? = null,
     val tvArchiveDuration: Int? = null,
-    /** M3U #EXTVLCOPT values. Not stored in the catalog database. */
+
     val userAgent: String? = null,
     val httpReferer: String? = null
 ) {

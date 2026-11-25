@@ -3,7 +3,6 @@ package com.olympus.iptv.playlist
 import com.olympus.iptv.data.Channel
 import com.olympus.iptv.data.NameStrip
 
-/** Picks a sibling feed when the current HD stream fails or stalls, including cross-provider event feeds. */
 object ChannelFailover {
     fun stem(name: String): String =
         name.lowercase()

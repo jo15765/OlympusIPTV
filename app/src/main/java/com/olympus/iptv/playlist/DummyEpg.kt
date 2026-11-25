@@ -6,11 +6,6 @@ import java.util.Calendar
 import java.util.Locale
 import java.util.TimeZone
 
-/**
- * When a live channel has no provider guide, build one from its name.
- * Timed events use the date and clock in the name. Everything else is the
- * cleaned name for the local day.
- */
 object DummyEpg {
     private const val EVENT_MS = 3L * 60 * 60 * 1000
     private const val UPCOMING_MS = 36L * 60 * 60 * 1000
@@ -60,7 +55,6 @@ object DummyEpg {
     fun programs(channelName: String, now: Long = System.currentTimeMillis()): List<EpgProgram> =
         fromParsed(parse(channelName, now), now)
 
-    /** Guide title plus the listings built from one pass over the channel name. */
     fun titled(channelName: String, now: Long = System.currentTimeMillis()): Pair<String, List<EpgProgram>> {
         val parsed = parse(channelName, now)
         return parsed.title to fromParsed(parsed, now)

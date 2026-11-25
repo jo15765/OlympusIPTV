@@ -65,8 +65,7 @@ object FocusMotion {
             .start()
         if (focused) {
             view.elevation = (if (lively) 8f else 4f) * density
-            // Views backed by a StateListDrawable already draw their own radius-matched focus border;
-            // only attach the cached foreground ring when a view has no selector border.
+
             if (view.background !is StateListDrawable) {
                 view.foreground = focusStroke(density)
             } else if (view.foreground != null) {

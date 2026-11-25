@@ -29,7 +29,7 @@ fun prefetchLogos(context: Context, urls: List<String>, sizePx: Int) {
             .build()
         val memoryKey = request.memoryCacheKey
         if (memoryKey != null && memory?.get(memoryKey) != null) continue
-        // Coil checks disk cache asynchronously on its IO dispatcher; avoid blocking the main thread.
+
         loader.enqueue(request)
     }
 }

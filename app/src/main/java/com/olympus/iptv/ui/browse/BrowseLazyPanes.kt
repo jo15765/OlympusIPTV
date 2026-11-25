@@ -9,16 +9,6 @@ import com.olympus.iptv.databinding.BrowsePaneDeviceBinding
 import com.olympus.iptv.databinding.BrowsePaneRefreshBinding
 import com.olympus.iptv.databinding.BrowsePaneVpnBinding
 
-/**
- * Heavy setting panes live behind ViewStubs so they are not inflated during cold start.
- * Each pane is inflated on first use; until then it counts as "not visible".
- *
- * `xRoot` / `xOrNull` return null while the pane is still a stub. The child accessors
- * (cardAdmin*, device*, vpn*, refresh*, ...) inflate on demand, so only use them from
- * paths that are about to show the pane or that already know it is open. Passive paths
- * should go through `xOrNull`. The `onXInflated` hooks run once, right after inflation,
- * for listener wiring and for applying state that arrived while the pane was a stub.
- */
 class BrowseLazyPanes(private val binding: ActivityBrowseBinding) {
     var onAdminInflated: ((BrowsePaneAdminBinding) -> Unit)? = null
     var onAboutInflated: ((BrowsePaneAboutBinding) -> Unit)? = null
@@ -90,11 +80,9 @@ class BrowseLazyPanes(private val binding: ActivityBrowseBinding) {
     fun isVpnVisible(): Boolean = vpnRoot?.visibility == View.VISIBLE
     fun isRefreshVisible(): Boolean = refreshRoot?.visibility == View.VISIBLE
 
-    /** True when any of the five setting panes is on screen. */
     fun isAnyVisible(): Boolean =
         isDeviceVisible() || isAboutVisible() || isAdminVisible() || isRefreshVisible() || isVpnVisible()
 
-    /** Hides every pane that has been inflated; never inflates a stub. */
     fun hideAllSettingPanes() {
         admin?.root?.visibility = View.GONE
         about?.root?.visibility = View.GONE
@@ -103,7 +91,6 @@ class BrowseLazyPanes(private val binding: ActivityBrowseBinding) {
         refresh?.root?.visibility = View.GONE
     }
 
-    // Admin pane children
     val cardAdminRefresh get() = ensureAdmin().cardAdminRefresh
     val cardAdminWeb get() = ensureAdmin().cardAdminWeb
     val cardAdminEpg get() = ensureAdmin().cardAdminEpg
@@ -117,17 +104,14 @@ class BrowseLazyPanes(private val binding: ActivityBrowseBinding) {
     val adminQuietSchedule get() = ensureAdmin().adminQuietSchedule
     val adminBackupLink get() = ensureAdmin().adminBackupLink
 
-    // Device pane children
     val deviceBack get() = ensureDevice().deviceBack
     val deviceEmailValue get() = ensureDevice().deviceEmailValue
     val deviceIdValue get() = ensureDevice().deviceIdValue
     val deviceUrlValue get() = ensureDevice().deviceUrlValue
     val deviceRemovePlaylist get() = ensureDevice().deviceRemovePlaylist
 
-    // VPN pane children (VpnUi owns the rest through BrowsePaneVpnBinding)
     val vpnBack get() = ensureVpn().vpnBack
 
-    // Refresh pane children
     val refreshBack get() = ensureRefresh().refreshBack
     val refreshNowCard get() = ensureRefresh().refreshNowCard
     val refreshIntervalCard get() = ensureRefresh().refreshIntervalCard

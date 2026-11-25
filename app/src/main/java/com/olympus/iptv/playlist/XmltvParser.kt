@@ -5,9 +5,6 @@ import com.olympus.iptv.data.EpgProgram
 import org.xmlpull.v1.XmlPullParser
 import java.io.InputStream
 
-/**
- * Lightweight XMLTV parser. Keeps programmes overlapping [windowStart, windowEnd].
- */
 object XmltvParser {
     const val PAST_MS = 2L * 60L * 60L * 1000L
     const val FUTURE_MS = 48L * 60L * 60L * 1000L

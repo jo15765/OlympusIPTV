@@ -59,7 +59,6 @@ class EpgEditsFragment : Fragment() {
             return
         }
 
-        // Side Tab Category Selection
         val tabs = listOf(
             binding.tabPlayback to binding.panelPlayback,
             binding.tabCuration to binding.panelCuration,

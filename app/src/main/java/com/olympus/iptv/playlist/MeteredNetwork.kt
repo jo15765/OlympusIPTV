@@ -3,7 +3,6 @@ package com.olympus.iptv.playlist
 import android.content.Context
 import android.net.ConnectivityManager
 
-/** True when the active network is cellular or otherwise metered. */
 object MeteredNetwork {
     @Volatile private var cached = false
     @Volatile private var checkedAt = 0L

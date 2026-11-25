@@ -121,7 +121,7 @@ object AppLog {
         val safeStack = redact(
             StringWriter().also { error.printStackTrace(PrintWriter(it)) }.toString()
         )
-        // Write to local log with fsync, without launching an async upload that would be killed.
+
         val current = file
         if (current != null) {
             val stamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
@@ -136,7 +136,7 @@ object AppLog {
                 }
             }
         }
-        // Persist a pending crash payload so even if the process dies before HTTP completes, next launch uploads it.
+
         val pending = File(ctx.filesDir, PENDING_CRASH)
         val payload = com.google.gson.JsonObject().apply {
             addProperty("tag", "Crash")
@@ -149,7 +149,7 @@ object AppLog {
                 out.fd.sync()
             }
         }
-        // Try a bounded synchronous upload before the process terminates.
+
         val app = ctx.applicationContext as? OlympusIptvApp ?: return
         val worker = Thread({
             runCatching {

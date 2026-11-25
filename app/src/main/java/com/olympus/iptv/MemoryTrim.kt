@@ -4,9 +4,8 @@ import android.content.ComponentCallbacks2
 import android.content.res.Configuration
 import coil.Coil
 
-/** Drops picture and guide caches when a low-RAM stick asks the process to shrink. */
 object MemoryTrim {
-    /** Reclaim non-essential browse/search caches before full-screen playback on low-RAM sticks. */
+
     fun trimForPlayback(app: OlympusIptvApp) {
         runCatching { Coil.imageLoader(app).memoryCache?.clear() }
         runCatching { com.olympus.iptv.data.NameStrip.clearCaches() }

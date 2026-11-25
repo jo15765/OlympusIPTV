@@ -15,9 +15,6 @@ import com.google.android.gms.common.images.WebImage
 import com.olympus.iptv.R
 import com.olympus.iptv.data.Channel
 
-/**
- * Cast is initialized only after the user confirms the disclaimer — never on player open.
- */
 object CastBridge {
     fun showChooser(context: Context, channel: Channel?) {
         AlertDialog.Builder(context)
@@ -52,7 +49,7 @@ object CastBridge {
             Toast.makeText(context, R.string.playback_no_url, Toast.LENGTH_SHORT).show()
             return
         }
-        // CastContext is created here on first use only.
+
         runCatching {
             val cast = CastContext.getSharedInstance(context.applicationContext)
             val client = cast.sessionManager.currentCastSession?.remoteMediaClient

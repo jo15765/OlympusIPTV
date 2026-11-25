@@ -1,8 +1,5 @@
 package com.olympus.iptv.ui.browse
 
-/**
- * Pure helpers for guide UX decisions that should stay unit-testable.
- */
 object GuideFeel {
     fun onFocus(view: android.view.View) {
         view.playSoundEffect(android.view.SoundEffectConstants.CLICK)
@@ -14,7 +11,6 @@ object GuideFeel {
     fun chipDownTarget(continueVisible: Boolean): String =
         if (continueVisible) "homeContinue" else "categoryList"
 
-    /** Channel column width: longest name plus the number and logo, capped so the grid keeps the rest. */
     fun columnWidth(textPx: Float, chromePx: Float, parentPx: Int): Int {
         val floor = chromePx.toInt().coerceAtLeast(1)
         val ceiling = (parentPx * 0.40f).toInt().coerceAtLeast(floor)

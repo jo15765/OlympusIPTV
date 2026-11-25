@@ -71,7 +71,7 @@ class ChannelAdapter(
         private set
     var focusedId: String? = null
         private set
-    /** 0..1000 watch progress for poster gold bar; null hides. */
+
     var continueProgress: (Channel) -> Int? = { null }
     var posterRating: (Channel) -> String? = { null }
     var posterMeta: (Channel) -> String? = { null }
@@ -503,7 +503,7 @@ class ChannelAdapter(
                 binding.root.background = null
                 binding.playTarget.setBackgroundResource(R.drawable.bg_focusable)
             } else {
-                // Match ProgramGuideAdapter's subtle alternating row band so eyes track straight across.
+
                 val band = if (inSideBySideGuide && position >= 0 && position % 2 == 1) {
                     0x0FFFFFFF
                 } else {
@@ -544,8 +544,7 @@ class ChannelAdapter(
         override fun bindEpg(item: Channel) {
             val context = binding.root.context
             val touch = DeviceForm.isTouchPrimary(context)
-            // On mobile side-by-side EPG guide mode, the right-hand program timeline shows airing shows;
-            // keeping the left channel cell clean locks its height 1:1 with the program row.
+
             if ((touch && guideRowHeight > 0) || item.kind != ContentKind.LIVE || !item.seriesId.isNullOrBlank()) {
                 binding.epgNow.visibility = View.GONE
                 binding.epgProgress.visibility = View.GONE

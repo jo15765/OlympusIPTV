@@ -100,7 +100,7 @@ object CatalogIngest {
                 return
             }
             if (lowRam) {
-                // Fire Stick / low-RAM devices: ingest one bucket at a time so Live opens fast without OOM.
+
                 val live = pullLive(app, db, scoped)
                 reached = live || reached
                 if (!liveReady.isCompleted) liveReady.complete(live)

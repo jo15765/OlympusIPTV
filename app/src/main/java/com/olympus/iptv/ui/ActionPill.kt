@@ -9,7 +9,6 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import com.olympus.iptv.R
 
-/** Bottom confirmation that stays for a few seconds and can undo the last tap. */
 object ActionPill {
     private const val TAG = "action_pill"
     private const val SHOW_MS = 3_000L

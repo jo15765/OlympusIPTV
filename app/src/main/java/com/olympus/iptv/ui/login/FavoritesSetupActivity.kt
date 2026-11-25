@@ -204,7 +204,7 @@ class FavoritesSetupActivity : AppCompatActivity() {
             counts = withContext(Dispatchers.IO) { db.bucketCounts(saved.id) }
             val percent = CatalogIngest.progress.overall(saved.includeVod)
             publishCounts(counts, percent)
-            // Live rows are enough to leave this screen. Movies and shows keep downloading behind it.
+
             if (counts[0] > 0 && counts[0] == lastLive) {
                 steady += 1
                 if (steady >= 2 || percent >= 100) break
@@ -214,7 +214,7 @@ class FavoritesSetupActivity : AppCompatActivity() {
             if (counts[0] == lastLive && percent == lastPercent) stuck += 1 else stuck = 0
             lastLive = counts[0]
             lastPercent = percent
-            // A provider that never finishes used to leave this spinner up with no error on screen.
+
             if (counts[0] == 0 && stuck >= 45) break
             delay(800)
         }

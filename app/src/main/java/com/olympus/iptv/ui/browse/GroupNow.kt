@@ -1,6 +1,5 @@
 package com.olympus.iptv.ui.browse
 
-/** Picks the two programs to show under a group title. Holds no views. */
 internal object GroupNow {
     fun line(ids: List<String>, titleOf: (String) -> String?): String {
         val titles = ArrayList<String>(2)

@@ -1,6 +1,5 @@
 package com.olympus.iptv.data
 
-/** In-memory quiet-hours snapshot so alarm ticks avoid DataStore when already known. */
 object QuietHoursBridge {
     @Volatile
     private var cached: Triple<Boolean, Int, Int>? = null

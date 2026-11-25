@@ -15,10 +15,6 @@ import androidx.media3.exoplayer.ExoPlayer
 import com.olympus.iptv.portal.DashboardHost
 import java.util.Locale
 
-/**
- * Lightweight "Stats for Nerds" diagnostics HUD.
- * Runs a 1-second ticker ONLY while visible; zero CPU/RAM overhead when disabled.
- */
 internal class StreamStatsHud(
     context: Context,
     private val playerProvider: () -> ExoPlayer?,

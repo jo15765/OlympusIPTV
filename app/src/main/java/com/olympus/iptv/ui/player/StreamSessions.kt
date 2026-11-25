@@ -2,7 +2,6 @@ package com.olympus.iptv.ui.player
 
 import java.util.concurrent.ConcurrentHashMap
 
-/** Streams this TV currently has open. Cleared when playback stops. */
 object StreamSessions {
     data class Row(val id: String, val name: String, val role: String)
 

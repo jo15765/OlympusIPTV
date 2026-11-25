@@ -198,49 +198,6 @@ class BrowseActivity : AppCompatActivity(), ToolHost {
     internal var guideRowsTall = false
     internal var lastLabelShiftScroll = Int.MIN_VALUE
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     override fun showTool(fragment: Fragment) = browseToolHost.showTool(fragment)
 
     override fun hideTool() = browseToolHost.hideTool()
@@ -252,202 +209,12 @@ class BrowseActivity : AppCompatActivity(), ToolHost {
     internal var section = GuideSection.TV
     internal var returnToGuide = true
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     internal enum class GuideMenu { SETTINGS, GROUPS, CHANNELS, PROGRAMS }
 
     internal var guideMenu = GuideMenu.SETTINGS
     internal var previousMenu = GuideMenu.GROUPS
     internal var navExpanded = true
     internal val navLabels = HashMap<Int, CharSequence>()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
     internal val dashboardUrls: (String) -> Unit = { url ->
         runOnUiThread { if (!isDestroyed) showDashboardUrl(url) }
@@ -561,7 +328,6 @@ class BrowseActivity : AppCompatActivity(), ToolHost {
 
     internal var landOnGroups = false
 
-    /** Settings card to restore when Back leaves a Settings &amp; Help submenu. */
     internal var settingsReturnCard: android.view.View? = null
 
     internal var removingPlaylist = false
@@ -706,7 +472,6 @@ class BrowseActivity : AppCompatActivity(), ToolHost {
     internal var lastDisplayWidth = 0
 
     internal var lastDisplayHeight = 0
-
 
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         super.onCreate(savedInstanceState)
@@ -885,6 +650,5 @@ class BrowseActivity : AppCompatActivity(), ToolHost {
         const val FOCUS_SETTLE_MS = 160L
         const val EPG_CACHE_CAP = 120
     }
-
 
 }

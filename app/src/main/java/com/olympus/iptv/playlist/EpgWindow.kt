@@ -2,7 +2,6 @@ package com.olympus.iptv.playlist
 
 import com.olympus.iptv.data.EpgProgram
 
-/** Four-hour slices of a channel's programs, so guide scroll can reuse RAM. */
 object EpgWindow {
     const val BUCKET_MS = 4L * 60L * 60L * 1000L
 

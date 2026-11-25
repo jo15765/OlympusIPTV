@@ -129,7 +129,6 @@
             android:descendantFocusability="afterDescendants" />
     </LinearLayout>
 
-    <!-- Option A: Split-Pane Hub (Pinned Show Overview Left + Seasons & Episodes Right) -->
     <LinearLayout
         android:id="@+id/freshDetail"
         android:layout_width="match_parent"
@@ -162,7 +161,6 @@
             android:layout_weight="1"
             android:orientation="horizontal">
 
-            <!-- Left Column (38%): Pinned Show Card -->
             <LinearLayout
                 android:id="@+id/detailHero"
                 android:layout_width="0dp"
@@ -278,7 +276,6 @@
                 </LinearLayout>
             </LinearLayout>
 
-            <!-- Right Column (62%): Seasons Strip + Scrollable Episode List -->
             <LinearLayout
                 android:id="@+id/detailSeriesPane"
                 android:layout_width="0dp"

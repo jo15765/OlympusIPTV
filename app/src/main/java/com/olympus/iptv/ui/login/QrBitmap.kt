@@ -3,7 +3,6 @@ package com.olympus.iptv.ui.login
 import android.graphics.Bitmap
 import android.graphics.Color
 
-/** Byte-mode QR, version 4, error correction L. Enough for a home dashboard address. */
 object QrBitmap {
     private const val SIZE = 33
     private const val DATA_LEN = 80

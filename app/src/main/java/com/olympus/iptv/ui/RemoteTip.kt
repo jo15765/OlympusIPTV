@@ -10,7 +10,6 @@ import android.widget.FrameLayout
 import android.widget.TextView
 import com.olympus.iptv.R
 
-/** Translucent D-pad quick-tip footer that fades after a few seconds. */
 object RemoteTip {
     private const val SHOW_MS = 4_000L
 

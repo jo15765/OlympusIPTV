@@ -10,7 +10,6 @@ import com.olympus.iptv.R
 import com.olympus.iptv.data.Channel
 import com.olympus.iptv.ui.DialogChrome
 
-/** Gold A–Z / # grid for lists too long to scroll one row at a time. */
 object LetterJump {
     fun show(activity: BrowseActivity, channels: List<Channel>, onJump: (Int) -> Unit) {
         val letters = ('A'..'Z').map { it.toString() } + "#"

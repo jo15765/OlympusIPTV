@@ -1,6 +1,5 @@
 package com.olympus.iptv.data
 
-/** HD / 4K / 60fps marks parsed from a stream name. */
 object StreamQuality {
     fun badge(name: String): String? {
         val hay = name.lowercase()

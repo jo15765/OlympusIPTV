@@ -4,10 +4,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.concurrent.Semaphore
 
-/**
- * Bounds concurrent TMDB / Watchmode / ratings HTTP so Coil logos and live playback
- * keep priority on the shared OkHttp pool (budget STBs).
- */
 object MetaLookupGate {
     private val semaphore = Semaphore(3)
 

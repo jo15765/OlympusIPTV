@@ -116,7 +116,7 @@ class PlayerActivity : AppCompatActivity() {
     internal var nextLookup: Job? = null
     internal var introJob: Job? = null
     internal var subtitleJob: Job? = null
-    /** Cancels in-flight EPG / catch-up / subtitle work when the user zaps away. */
+
     private var channelJob = SupervisorJob()
     private val zapEpgPrefetch = object : LinkedHashMap<String, EpgNowNext>(8, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, EpgNowNext>?): Boolean = size > 8
@@ -229,7 +229,7 @@ class PlayerActivity : AppCompatActivity() {
             if (seekOpen) paintSeekBar()
             if (seekOpen || binding.playbackMenu.visibility == View.VISIBLE) paintGoLive()
             val playing = player?.isPlaying == true
-            // Tick slower while paused; ExoPlayer listener drives updates while playing.
+
             val delay = when {
                 !seekOpen && !liveBehind && binding.playbackMenu.visibility != View.VISIBLE -> return
                 !playing || seekDragging -> 1_500L
@@ -336,7 +336,6 @@ class PlayerActivity : AppCompatActivity() {
         index = intent.getIntExtra(EXTRA_INDEX, 0).coerceIn(0, (queue.size - 1).coerceAtLeast(0))
         current = queue.getOrNull(index)
 
-        // Prefer warm in-memory decoder cache — never block the main thread with runBlocking.
         videoDecoder = (application as OlympusIptvApp).playlistStore.videoDecoderCached()
             ?: PlayerDecoder.HARDWARE
         player = newPlayer().also { exo ->
@@ -435,7 +434,7 @@ class PlayerActivity : AppCompatActivity() {
             player?.let { applyNightMode(it) }
             preferredAudio = withContext(Dispatchers.IO) { store.audioLanguage() }
             preferredSubtitle = withContext(Dispatchers.IO) { store.subtitleLanguage() }
-            // Multi-view needs a second ExoPlayer; skip on phones to keep RAM free.
+
             multiViewEnabled = if (touchPrimary) {
                 false
             } else {
@@ -764,7 +763,7 @@ class PlayerActivity : AppCompatActivity() {
             hideTransportChrome(animated = false)
             return
         }
-        // On mobile/tablet (touchPrimary), Back returns directly to the guide with zero delay.
+
         if (touchPrimary) {
             exitToGuide()
             return
@@ -894,7 +893,7 @@ class PlayerActivity : AppCompatActivity() {
             hadPlaybackReady = false
             bufferStartedAt = 0L
             bufferWatchToken += 1
-            // Do not pin Connecting here — wait for real buffering / clear on first frame.
+
             showConnectingBadge(false)
             hidePlaybackError()
             PlaybackTrace.start(channel)
@@ -1030,8 +1029,7 @@ class PlayerActivity : AppCompatActivity() {
             )
         sidecar?.let { builder.setSubtitleConfigurations(listOf(it)) }
         if (channel.kind == ContentKind.LIVE) {
-            // Never speed up past 1.00x (which eats the live buffer cushion),
-            // and allow gentle 0.98x drift recovery to absorb jitter without spooling.
+
             builder.setLiveConfiguration(
                 MediaItem.LiveConfiguration.Builder()
                     .setMinPlaybackSpeed(0.98f)
@@ -1275,8 +1273,7 @@ class PlayerActivity : AppCompatActivity() {
         val token = ++bufferWatchToken
         val started = bufferStartedAt
         val live = current?.kind == ContentKind.LIVE && current?.seriesId.isNullOrBlank()
-        // After first paint, live rebuffers briefly on jitter — never tear down a working stream.
-        // Initial connect also waits briefly so READY/first-frame can clear without a flash.
+
         val pictureUp = hadPlaybackReady && live && player?.videoFormat != null
         if (pictureUp) showConnectingBadge(false)
         val delayShow = when {
@@ -1421,7 +1418,7 @@ class PlayerActivity : AppCompatActivity() {
         val catchUp = behind || http == 404
         recoverAttempt += 1
         if (catchUp) PlaybackTrace.liveCatchUp(channel, recoverAttempt, behind) else PlaybackTrace.recover(channel, recoverAttempt, behind)
-        // 403/401 are provider denials — retrying forever freezes the session and spams the log.
+
         val hardFail = http == 401 || http == 403 || recoverAttempt >= MAX_LIVE_RECOVER
         if (error != null && !catchUp) noteStreamFailure(channel)
         if (hardFail) {
@@ -1619,7 +1616,6 @@ class PlayerActivity : AppCompatActivity() {
         reloadLiveEdge(exo, channel)
     }
 
-    /** Fully tears down a wedged MediaCodec/ExoPlayer instance and brings up a clean player at the live edge. */
     private fun rebuildLivePlayer(stale: ExoPlayer, channel: Channel) {
         if (player !== stale || isDestroyed) return
         runCatching {
@@ -1780,7 +1776,7 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun prepareSpare(direction: Int, channel: Channel?) {
-        // Phones: one player only — no next/prev pre-buffer to save decoder/RAM.
+
         if (touchPrimary || com.olympus.iptv.ui.DeviceForm.isTelevision(this)) {
             clearSpare(direction)
             return
@@ -2312,7 +2308,7 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun configureSeekPane(channel: Channel) {
-        // Seek/play chrome is transient — show briefly, then auto-hide.
+
         showTransportChrome()
         if (isLiveNow(channel) && touchPrimary) layoutPhonePortraitDock()
     }
@@ -2503,8 +2499,7 @@ class PlayerActivity : AppCompatActivity() {
         lastAppliedFrameRateHz = target
         runCatching {
             if (Build.VERSION.SDK_INT >= 31) {
-                // Uses HDMI 2.1a QMS seamless refresh-rate switching on Google TV Streamer / Android TV 12+
-                // so 23.976 / 50 / 59.94 Hz transitions happen with zero black-screen flicker.
+
                 surface.setFrameRate(
                     target,
                     android.view.Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE,
@@ -3228,7 +3223,7 @@ class PlayerActivity : AppCompatActivity() {
         if (now < acceptReconnectAt || (!force && now - lastReconnectAt < 1_500L)) return
         val exo = player ?: return
         if (!exo.playWhenReady || current == null || isDestroyed) return
-        // Never interrupt a healthy playing stream on transient background network callbacks.
+
         if (!force && exo.isPlaying && exo.playbackState == Player.STATE_READY) return
         lastReconnectAt = now
         if (force) {

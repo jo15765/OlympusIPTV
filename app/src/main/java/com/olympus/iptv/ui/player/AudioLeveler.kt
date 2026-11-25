@@ -3,10 +3,6 @@ package com.olympus.iptv.ui.player
 import android.media.audiofx.DynamicsProcessing
 import android.os.Build
 
-/**
- * Night mode compressor. It rides on the player's audio session, so the stream itself is not re-encoded.
- * API 28 and newer only.
- */
 object AudioLeveler {
     fun attach(audioSessionId: Int): DynamicsProcessing? {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return null

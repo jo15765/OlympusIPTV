@@ -15,10 +15,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/**
- * TiviMate-style 1-tap Player Quick Settings, Recent Channels (last 10 watched),
- * Household Profile switcher, and scannable Web-UI QR dialog.
- */
 object PlayerQuickSheet {
 
     fun showQuickSettings(activity: PlayerActivity) {

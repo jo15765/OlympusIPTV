@@ -7,7 +7,6 @@ import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
 
-/** Resume time and a still frame for a finished capture. Stored next to the app files, not in the catalog. */
 object RecordingProgress {
     private const val POSITIONS = "recording-positions.json"
 
@@ -45,7 +44,6 @@ object RecordingProgress {
     fun thumbFile(context: Context, id: String): File =
         File(File(context.applicationContext.cacheDir, "recording-thumbs"), "$id.jpg")
 
-    /** One frame a second in, written once. MPEG-TS often has no frame the retriever can read. */
     fun ensureThumb(context: Context, id: String, media: File): File? {
         if (id.isBlank() || !media.exists() || media.length() <= 0L) return null
         val dest = thumbFile(context, id)

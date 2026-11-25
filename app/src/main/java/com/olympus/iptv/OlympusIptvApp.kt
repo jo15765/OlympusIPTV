@@ -66,7 +66,7 @@ class OlympusIptvApp : Application() {
     var guideChannels: List<Channel> = emptyList()
     var playbackQueue: List<Channel> = emptyList()
     var guideSource: LoadedPlaylist? = null
-    /** Last channel handed to the player — drives the phone now-playing strip. */
+
     @Volatile var lastPlayed: Channel? = null
     @Volatile var lastPlayedPlaylistId: String? = null
     @Volatile var stagedLineup: Pair<String, LineupConfig>? = null
@@ -115,7 +115,7 @@ class OlympusIptvApp : Application() {
         }
         val disk = readFreshFile(playlistId, week)
         if (disk != null && disk.stamp == stamp && !Watchmode.needsRefresh(cacheFile)) {
-            // Same week + library: keep playable-filtered cards; skip Xtream episode re-checks.
+
             freshHold = disk
             freshFailure = null
             return
@@ -188,20 +188,17 @@ class OlympusIptvApp : Application() {
         override fun onActivityDestroyed(activity: Activity) = Unit
     }
 
-    /** Disk and catalog warm-up runs after the first frame, never inside onCreate. */
     fun warmAfterFirstFrame() {
         if (warmed) return
         warmed = true
         appScope.launch {
-            // The guide's first queries own the database. Ratings, event windows,
-            // and the dashboard snapshot wait until that grid is on screen.
+
             delay(12_000L)
             runCatching { com.olympus.iptv.playlist.TitleRatings.init(this@OlympusIptvApp, catalogDb) }
             runCatching { playlistStore.videoDecoder() }
             runCatching { catalogDb.catchUpEventWindows() }
         }
     }
-
 
     @Volatile private var cloudSyncJob: Job? = null
     @Volatile private var cloudSseActive = false
@@ -219,7 +216,6 @@ class OlympusIptvApp : Application() {
         }
     }
 
-    /** Triggers an immediate non-blocking cloud sync pull (debounced 500 ms). */
     fun nudgeCloudSyncNow() {
         val now = android.os.SystemClock.uptimeMillis()
         if (now - lastNudgeAt < 500L) return
@@ -259,7 +255,6 @@ class OlympusIptvApp : Application() {
     private val cloudPull = Mutex()
     private val cloudStamps = HashMap<String, Long>()
 
-    /** Reads cloud revision numbers as a fast foreground safety net (2.5s pre-login, 4s offline, 15s SSE, 60s background). */
     private fun watchCloudLogin() {
         appScope.launch {
             while (isActive) {

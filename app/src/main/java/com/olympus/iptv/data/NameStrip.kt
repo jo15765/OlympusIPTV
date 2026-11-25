@@ -2,10 +2,6 @@ package com.olympus.iptv.data
 
 import com.olympus.iptv.playlist.DummyEpg
 
-/**
- * High-speed O(1) indexOf-based stream & EPG cleaner + event window evaluator.
- * Eliminates regex backtracking across 40,000+ channels on Android TV.
- */
 object NameStrip {
     data class StreamStatus(
         val cleanChannel: String,
@@ -67,7 +63,6 @@ object NameStrip {
         for (name in names) shown(name)
     }
 
-    /** Single-pass character loop stripping Unicode superscripts (ᴴᴰ, ᶠᴴᴰ, ᴸᶦᵛᵉ, ᴺᵉʷ, ⁴ᴷ) and leaked M3U attributes. */
     fun sanitizeRaw(raw: String): String {
         var s = raw.trim()
         if (s.isEmpty()) return s
@@ -130,10 +125,6 @@ object NameStrip {
         return false
     }
 
-    /**
-     * Fast indexOf-first stream inspector.
-     * Separates channel identity from inline event title & schedule window in O(1).
-     */
     fun inspect(
         rawChannel: String,
         groupTitle: String? = null,
@@ -145,7 +136,6 @@ object NameStrip {
         val ch = sanitizeRaw(rawChannel)
         val cleanEpg = if (isDummyEpgId(epgChannelId)) "" else sanitizeRaw(nowTitle.orEmpty())
 
-        // Fast-path 1: Local US affiliate (`NE | Lincoln | FOX KFXL`)
         val firstPipe = ch.indexOf('|')
         if (firstPipe in 1..4) {
             val secondPipe = ch.indexOf('|', firstPipe + 1)
@@ -161,7 +151,6 @@ object NameStrip {
             }
         }
 
-        // Fast-path 2: Single colon or pipe (`left : right` or `left | right`)
         val colonIdx = ch.indexOf(':')
         val sepIdx = when {
             colonIdx > 0 && (firstPipe < 0 || colonIdx < firstPipe) -> colonIdx
@@ -173,7 +162,7 @@ object NameStrip {
             val rightRaw = ch.substring(sepIdx + 1).trim()
             val endsWithDigits = left.isNotEmpty() && left.last().isDigit() && left.any { it.isLetter() }
             if (endsWithDigits) {
-                // Numbered event slot: `FOX ONE 01: College Basketball ... @ 16 Nov 05:00 AM ET` or `MAX NL 03 :`
+
                 val atIdx = rightRaw.lastIndexOf('@')
                 val inlineEvent = (if (atIdx > 0) rightRaw.substring(0, atIdx) else rightRaw)
                     .trim(' ', '-', ':', '|', '–', '—')
@@ -195,10 +184,10 @@ object NameStrip {
                 val start = if (parsedStart > 0L) parsedStart else -1L
                 return StreamStatus(left, cleanEvent, isEventSlot = true, eventStartMs = start, eventEndMs = parsedEnd)
             } else if (isPlaceholderEvent(rightRaw)) {
-                // Blank or slot-number-only tail (`NFL  | 01 -`, `PRIME-CA | No Event`, `DK | No Event`)
+
                 return StreamStatus(left, null, isEventSlot = true, eventStartMs = 0L, eventEndMs = 0L)
             } else {
-                // Country/Platform/Team prefix (`US: CNN`, `Amazon US: Wipeout`, `NHL: Anaheim Ducks`, `24/7: Bar Rescue`)
+
                 val cleanCh = rightRaw
                 val explicitOffAir = cleanEpg.isNotEmpty() && isPlaceholderEvent(cleanEpg)
                 val airing = if (isPlaceholderEvent(cleanEpg)) {
@@ -216,7 +205,6 @@ object NameStrip {
             }
         }
 
-        // Fast-path 3: Standard channel (`4UV`, `HBO Boxing`, `NFL ARIZONA CARDINALS`)
         val explicitOffAir = cleanEpg.isNotEmpty() && isPlaceholderEvent(cleanEpg)
         val airing = if (isPlaceholderEvent(cleanEpg)) null else stripChannelPrefixFromEpg(cleanEpg, ch)
         return StreamStatus(
@@ -228,7 +216,6 @@ object NameStrip {
         )
     }
 
-    /** Strips duplicate channel name prefix from EPG (`World Poker Tour: Alpha8...` -> `Alpha8...`). */
     fun stripChannelPrefixFromEpg(epgTitle: String, cleanChannelName: String): String {
         val epg = epgTitle.trim()
         val ch = cleanChannelName.trim()

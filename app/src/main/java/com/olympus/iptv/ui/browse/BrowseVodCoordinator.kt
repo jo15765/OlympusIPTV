@@ -803,8 +803,7 @@ internal fun BrowseActivity.showCatalog(fetched: LoadedPlaylist, config: LineupC
             val appJobs = application as OlympusIptvApp
             binding.root.post {
                 if (isDestroyed) return@post
-                // Phones: never warm dashboard/Watchmode on cold open — New / web trigger that later.
-                // TV: still defer, and skip when the catalog stamp is unchanged.
+
                 if (touchPrimary) {
                     appJobs.appScope.launch {
                         delay(6_000L)
@@ -1083,9 +1082,6 @@ internal fun BrowseActivity.showVpnStatus(state: TunnelState) {
         binding.vpnChip.visibility = if (chip.isEmpty()) View.GONE else View.VISIBLE
     }
 
-
-
-
 internal fun BrowseActivity.restoreHeldChannel() {
         val id = holdChannelId ?: return
         val index = visibleChannels.indexOfFirst { it.id == id }
@@ -1197,9 +1193,6 @@ internal fun BrowseActivity.reloadFavorites() {
         }
     }
 
-
-
-
 internal fun BrowseActivity.favoriteMoveDirection(event: KeyEvent): Int? {
         val moved = event.isCtrlPressed || event.isAltPressed || event.isShiftPressed
         return when (event.keyCode) {
@@ -1224,7 +1217,7 @@ internal fun BrowseActivity.applyChannelLayout() {
         channelAdapter.posterMode = posters
         binding.contentHint.visibility = if (posters) View.VISIBLE else View.GONE
         val manager = binding.channelList.layoutManager
-        // Phones: one poster column scrolls smoother than a 2-up grid on mid-range devices.
+
         val posterSpan = com.olympus.iptv.ui.DeviceForm.contentColumns(this)
         if (posters && manager !is androidx.recyclerview.widget.GridLayoutManager) {
             binding.channelList.layoutManager = androidx.recyclerview.widget.GridLayoutManager(this, posterSpan).apply {
@@ -1724,7 +1717,7 @@ internal fun BrowseActivity.showChannels() {
             categoryId == PlaylistLoader.CONTINUE_ID ||
             categoryId == PlaylistLoader.TOP_WATCHED_ID
         ) {
-            // Keep prior rows visible; swap when the list is ready so open feels instant.
+
             binding.libraryStatus.visibility = View.GONE
             channelJob = lifecycleScope.launch {
                 val channels = withContext(Dispatchers.IO) {
@@ -1814,7 +1807,7 @@ internal fun BrowseActivity.rememberGroupScroll() {
         val layout = binding.channelList.layoutManager as? LinearLayoutManager ?: return
         val first = layout.findFirstVisibleItemPosition()
         if (first >= 0) groupScrollOffset[categoryId] = first
-        // Drop huge in-memory pages when returning to the groups list.
+
         if (visibleChannels.size > 400) {
             visibleChannels.clear()
             channelAdapter.submit(emptyList(), null)
@@ -1862,7 +1855,7 @@ internal fun BrowseActivity.loadGroupPage(reset: Boolean) {
             pageCursor = null
             pageExhausted = false
             pageLoading = false
-            // First page paints as soon as DB returns — no blank “updating” flash.
+
             binding.libraryStatus.visibility = View.GONE
             binding.errorText.visibility = View.GONE
             binding.programEmptyText.visibility = View.GONE
@@ -1894,7 +1887,7 @@ internal fun BrowseActivity.loadGroupPage(reset: Boolean) {
             val page = withContext(Dispatchers.IO) {
                 val db = (application as OlympusIptvApp).catalogDb
                 if (pageCategory != null) {
-                    // Opened group: page that category directly so card count and list stay aligned.
+
                     var opened = db.readGroupPage(
                         saved.id,
                         pageBucket,
@@ -1903,7 +1896,7 @@ internal fun BrowseActivity.loadGroupPage(reset: Boolean) {
                         cursor,
                         hiddenChannels
                     )
-                    // If id matched the card count but rows use a different key, retry by group title.
+
                     if (opened.channels.isEmpty() &&
                         cursor == null &&
                         groupName.isNotBlank() &&
@@ -1953,7 +1946,7 @@ internal fun BrowseActivity.loadGroupPage(reset: Boolean) {
             pageLoading = false
             if (cursor == null) {
                 if (named.isEmpty() && !page.exhausted) {
-                    // Keep skeleton while skipping empty filtered pages — do not flash "No channels".
+
                     emptyPageSkips += 1
                     if (emptyPageSkips <= MAX_EMPTY_PAGE_SKIPS) {
                         binding.channelList.post { loadGroupPage(reset = false) }
@@ -2008,7 +2001,7 @@ internal fun BrowseActivity.loadGroupPage(reset: Boolean) {
                 binding.channelList.post { maybePrefetchGroupPage(binding.channelList) }
             }
             if (pageExhausted) deliverPendingChannels()
-            // Skip empty filtered pages without tight recursion — cap so a bad group cannot spin forever.
+
             if (named.isEmpty() && !pageExhausted) {
                 emptyPageSkips += 1
                 if (emptyPageSkips <= MAX_EMPTY_PAGE_SKIPS) {
@@ -2146,7 +2139,6 @@ internal fun BrowseActivity.moveFavorite(channel: Channel, direction: Int) {
         }
     }
 
-
 internal fun BrowseActivity.ensureGroupCountries() {
         if (groupCountriesReady || groupCountriesQueued) return
         val id = playlist?.id ?: return
@@ -2197,7 +2189,6 @@ internal fun BrowseActivity.selectCategory(category: Category, immediate: Boolea
         showChannels()
         openFullGuide()
     }
-
 
 internal fun BrowseActivity.scheduleEpisodePrefetch() {
         if (section != GuideSection.SHOWS) return
@@ -2325,8 +2316,6 @@ internal fun BrowseActivity.restoreAfterPlayer() {
         val row = visibleChannels.indexOfFirst { it.id == returnChannelId }
         focusReturnChannel(row)
     }
-
-    /** Keep the last live stream in the corner preview after leaving full-screen playback. */
 
 internal fun BrowseActivity.focusReturnChannel(row: Int) {
         if (row < 0) {
@@ -2634,7 +2623,6 @@ internal fun BrowseActivity.pagePrefetchRemain(categoryId: String?): Int {
         val count = groupCounts[categoryId] ?: 0
         return if (count >= LARGE_LIVE_GROUP) HUGE_PREFETCH_REMAIN else DEFAULT_PREFETCH_REMAIN
     }
-
 
 internal fun BrowseActivity.markPosterWatched(channel: Channel) {
     val savedId = playlist?.id ?: return

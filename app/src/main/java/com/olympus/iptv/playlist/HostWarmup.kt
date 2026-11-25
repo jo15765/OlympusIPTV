@@ -5,7 +5,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.net.URI
 
-/** Pulls the first few favorite stream hosts and warms DNS plus HTTP keep-alive in a single batch DB lookup. */
 object HostWarmup {
     @Volatile private var warmedFor: String? = null
 

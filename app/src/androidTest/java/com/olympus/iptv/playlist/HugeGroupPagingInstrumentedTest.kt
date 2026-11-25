@@ -12,10 +12,6 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/**
- * On-device proof: opened mega Live groups page via readGroupPage (20 at a time)
- * even when country filters would empty readVisiblePage.
- */
 @RunWith(AndroidJUnit4::class)
 class HugeGroupPagingInstrumentedTest {
     private lateinit var db: CatalogDb
@@ -49,7 +45,6 @@ class HugeGroupPagingInstrumentedTest {
         val counts = db.categoryCounts(playlistId, CatalogDb.LIVE)
         assertEquals(1102, counts[categoryId])
 
-        // Opened-group path used by BrowseActivity.
         val first = db.readGroupPage(
             playlistId = playlistId,
             bucket = CatalogDb.LIVE,
@@ -62,7 +57,6 @@ class HugeGroupPagingInstrumentedTest {
         assertFalse(first.exhausted)
         assertEquals((1..20).map { "247-$it" }, first.channels.map { it.id })
 
-        // Filtered All/board path still hides foreign tags when international is off.
         val filtered = db.readVisiblePage(
             playlistId = playlistId,
             bucket = CatalogDb.LIVE,

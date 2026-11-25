@@ -47,8 +47,8 @@ android {
         applicationId = "com.olympus.iptv"
         minSdk = 24
         targetSdk = 35
-        versionCode = 138
-        versionName = "0.2.138"
+        versionCode = 140
+        versionName = "0.2.140"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "WATCHMODE_API_KEY", "\"$watchmodeKey\"")
         buildConfigField("String", "OPENSUBTITLES_API_KEY", "\"$opensubtitlesKey\"")
@@ -61,9 +61,6 @@ android {
         buildConfigField("String", "GOOGLE_DRIVE_CLIENT_ID", "\"$googleDriveClientId\"")
         buildConfigField("String", "ONEDRIVE_CLIENT_ID", "\"$oneDriveClientId\"")
     }
-
-    // Release stays a single APK. TV sticks only need ARM. Debug keeps every ABI so the emulator still runs.
-    // Passwords stay in the home-folder signing file. They are not written into the project.
 
     signingConfigs {
         if (signingValue("keystore").isNotBlank()) {
@@ -117,7 +114,6 @@ android {
         checkReleaseBuilds = false
     }
 
-    // Never ship portal/data (e.g. store.json ~48MB) or Node portal trees inside the APK.
     packaging {
         jniLibs {
             useLegacyPackaging = false

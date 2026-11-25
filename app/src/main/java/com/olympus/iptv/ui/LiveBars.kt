@@ -6,7 +6,6 @@ import android.view.View
 import android.view.animation.LinearInterpolator
 import android.widget.LinearLayout
 
-/** Three gold bars that pulse next to the channel that is actually playing. */
 object LiveBars {
     fun show(group: LinearLayout?, playing: Boolean) {
         if (group == null) return

@@ -39,7 +39,6 @@ class EpgRepository(
         xmltvFolded = foldXmltv(map)
     }
 
-    /** Parsed names are used only after the guide scan is turned on. Returns true when the choice changes. */
     fun useNameEpg(enabled: Boolean): Boolean {
         if (nameEpg == enabled) return false
         nameEpg = enabled
@@ -154,7 +153,6 @@ class EpgRepository(
         trimCache()
     }
 
-    /** Drop the in-memory guide when the process is asked to free RAM. Disk EPG stays. */
     fun trimForPressure() {
         windows.evictAll()
         cache.clear()

@@ -10,7 +10,7 @@ import android.os.Build
 import android.os.PowerManager
 
 object DeviceForm {
-    /** Heap cap typical of 1.5–2 GB sticks. Larger boxes get a bigger runtime heap. */
+
     const val LOW_HEAP_BYTES = 256L * 1024L * 1024L
 
     @Volatile private var cachedTelevision: Boolean? = null
@@ -49,11 +49,6 @@ object DeviceForm {
         return touch
     }
 
-    /**
-     * Width of the window the user can actually see. On a Galaxy Fold this updates when the
-     * cover closes and the inner screen opens. Configuration.screenWidthDp often stays at the
-     * cover width, which left the cards at the small size.
-     */
     fun windowWidthDp(context: Context): Int {
         val res = context.resources
         val dm = res.displayMetrics
@@ -82,7 +77,6 @@ object DeviceForm {
         return result
     }
 
-    /** A Galaxy Fold inner screen stays in the phone card layout so the cards use the full display. */
     fun isCompact(context: Context): Boolean {
         if (isTelevision(context)) return false
         return windowWidthDp(context) < 900
@@ -91,7 +85,6 @@ object DeviceForm {
     fun isPortrait(context: Context): Boolean =
         context.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
 
-    /** Battery saver on a phone or tablet. Televisions ignore the system saver. */
     fun powerSave(context: Context): Boolean {
         if (isTelevision(context)) return false
         val now = android.os.SystemClock.elapsedRealtime()
@@ -103,7 +96,6 @@ object DeviceForm {
         return on
     }
 
-    /** Poster columns for foldables (SM-F976U Z Fold), tablets, phones, and TVs. */
     fun contentColumns(context: Context): Int {
         if (isTelevision(context)) return contentColumnsFor(1000)
         return contentColumnsFor(windowWidthDp(context))
@@ -116,7 +108,6 @@ object DeviceForm {
         else -> 2
     }
 
-    /** Category card columns for foldables, tablets, and TVs. */
     fun categoryColumns(context: Context): Int {
         if (isTelevision(context)) return categoryColumnsFor(1000)
         return categoryColumnsFor(windowWidthDp(context))
@@ -129,7 +120,6 @@ object DeviceForm {
         else -> 2
     }
 
-    /** Fire Stick / Onn-class sticks versus Shield / Streamer-class boxes. Cached for process lifetime. */
     fun isLowRam(context: Context): Boolean {
         cachedLowRam?.let { return it }
         val manager = context.applicationContext.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
@@ -150,7 +140,6 @@ object DeviceForm {
     fun isLowRam(lowRamDevice: Boolean, maxMemoryBytes: Long): Boolean =
         lowRamDevice || maxMemoryBytes <= LOW_HEAP_BYTES
 
-    /** True on Google TV Streamer (4K) hardware (codename Kirkwood / model Google TV Streamer). */
     fun isGoogleTvStreamer(context: Context): Boolean {
         cachedGoogleTvStreamer?.let { return it }
         val result = isTelevision(context) &&
@@ -162,6 +151,5 @@ object DeviceForm {
         return result
     }
 
-    /** High-RAM Android TV boxes (Google TV Streamer 4K, NVIDIA Shield, etc.) with >= 3 GB RAM. */
     fun isHighEndTv(context: Context): Boolean = isTelevision(context) && !isLowRam(context)
 }

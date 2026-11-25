@@ -170,9 +170,7 @@ object LineupApplier {
     }
 
     private fun countryBlocked(channel: Channel, hiddenCountries: Set<String>, includeInternational: Boolean?): Boolean {
-        // Match CatalogDb.visibilitySql: blank / unknown country stays visible when
-        // Include International is off. Mapping those to OTHER_ID here emptied whole
-        // Live folders (e.g. provider 24/7 Shows) after SQL had already allowed them.
+
         val stored = channel.countryId?.takeIf { it.isNotBlank() && it != CountryIndex.OTHER_ID }
         val inferred = stored ?: CountryIndex.idFor(channel.groupTitle)?.takeIf { it != CountryIndex.OTHER_ID }
         if (includeInternational != true && inferred != null && inferred != "us") return true
@@ -222,11 +220,11 @@ object LineupApplier {
         resolved: String?,
         countriesKnown: Boolean = true
     ): Boolean {
-        // Folder name wins. A stored channel country must not reclassify "24/7".
+
         val fromName = CountryIndex.idFor(groupName)
         val countryId = fromName ?: resolved?.takeIf { it.isNotBlank() && countriesKnown }
         if (includeInternational != true) {
-            // No country means a provider folder such as 24/7, not a foreign folder.
+
             if (countryId != null && countryId != "us") return true
         }
         if (hiddenCountries.isEmpty()) return false

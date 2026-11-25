@@ -13,7 +13,6 @@ import okhttp3.Request
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
-/** Applies a playlist login that was saved on the cloud dashboard. */
 object CloudLogin {
     private val http = OkHttpClient.Builder().callTimeout(8, TimeUnit.SECONDS).build()
 

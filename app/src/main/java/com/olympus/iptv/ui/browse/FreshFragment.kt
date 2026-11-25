@@ -420,7 +420,6 @@ class FreshFragment : Fragment() {
         }
         val isSeries = binding.detailSeriesPane.visibility == View.VISIBLE
 
-        // 1. Focused on primary Play button (Play SXXEXX / Play)
         if (focused === binding.detailPlay) {
             return when (keyCode) {
                 KeyEvent.KEYCODE_DPAD_RIGHT -> {
@@ -431,12 +430,11 @@ class FreshFragment : Fragment() {
                     }
                     true
                 }
-                // Up, Down, and Left do nothing on Play
+
                 else -> true
             }
         }
 
-        // 2. Focused on + Queue button
         if (focused === binding.detailQueue) {
             return when (keyCode) {
                 KeyEvent.KEYCODE_DPAD_LEFT -> {
@@ -449,12 +447,11 @@ class FreshFragment : Fragment() {
                     }
                     true
                 }
-                // Up and Down do nothing on + Queue
+
                 else -> true
             }
         }
 
-        // 3. Focused on a Season chip
         if (focusIsIn(binding.detailSeasonList, focused)) {
             val holder = binding.detailSeasonList.findContainingViewHolder(focused)
             val pos = holder?.bindingAdapterPosition ?: RecyclerView.NO_POSITION
@@ -474,7 +471,7 @@ class FreshFragment : Fragment() {
                     if (pos in 0 until lastIdx) {
                         focusSeasonChip(pos + 1)
                     } else {
-                        // Last season wraps right back to Play SXXEXX
+
                         binding.detailPlay.requestFocus()
                     }
                     true
@@ -485,12 +482,11 @@ class FreshFragment : Fragment() {
                     }
                     true
                 }
-                // Up does nothing on Seasons
+
                 else -> true
             }
         }
 
-        // 4. Focused on an Episode row
         if (focusIsIn(binding.detailEpisodeList, focused)) {
             val holder = binding.detailEpisodeList.findContainingViewHolder(focused)
             val pos = holder?.bindingAdapterPosition ?: RecyclerView.NO_POSITION
@@ -500,7 +496,7 @@ class FreshFragment : Fragment() {
                     if (pos > 0) {
                         focusEpisodeRow(pos - 1)
                     } else {
-                        // First episode in season -> Up returns to the active Season chip
+
                         focusSeasonChip(seasonNumbers.indexOf(season).coerceAtLeast(0))
                     }
                     true
@@ -509,17 +505,16 @@ class FreshFragment : Fragment() {
                     if (pos in 0 until lastEp) {
                         focusEpisodeRow(pos + 1)
                     } else if (lastEp >= 0) {
-                        // Last episode in season -> Down wraps back to first episode
+
                         focusEpisodeRow(0)
                     }
                     true
                 }
-                // Left and Right do nothing when on actual episodes
+
                 else -> true
             }
         }
 
-        // Fallback: keep focus anchored on Play
         binding.detailPlay.requestFocus()
         return true
     }
@@ -955,7 +950,6 @@ class FreshFragment : Fragment() {
                     rowBinding.freshService.text = "★ $number  $service"
                 }
 
-                // Top-right green pill badge (episode/season count or NEW)
                 val badgeNum = Regex("\\d+").find(title.detail)?.value
                 when {
                     !badgeNum.isNullOrBlank() -> {

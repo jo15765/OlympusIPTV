@@ -1,6 +1,5 @@
 package com.olympus.iptv.playlist
 
-/** Same programme on another channel, ignoring punctuation and letter case. */
 object SimilarChannels {
     private val noise = Regex("[^\\p{L}\\p{N}]+")
 

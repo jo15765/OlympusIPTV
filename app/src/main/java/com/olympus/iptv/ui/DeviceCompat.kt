@@ -15,10 +15,6 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import java.io.File
 
-/**
- * Universal Android 7–16 / Fire OS / Google TV / Phone / Tablet / Foldable compatibility helpers
- * plus cached hardware codec & system diagnostics.
- */
 object DeviceCompat {
     private const val REQ_POST_NOTIFICATIONS = 9413
 
@@ -26,10 +22,6 @@ object DeviceCompat {
     @Volatile private var cachedDiag: Map<String, Any?>? = null
     @Volatile private var cachedDiagAt: Long = 0L
 
-    /**
-     * Applies Android 15+ edge-to-edge safe insets (status bar, gesture bar, display cutout)
-     * on touch devices without disturbing set-top TV overscan or mobile guide row heights.
-     */
     fun applySafeInsets(root: View) {
         val ctx = root.context
         if (DeviceForm.isTelevision(ctx)) return
@@ -52,10 +44,6 @@ object DeviceCompat {
         ViewCompat.requestApplyInsets(root)
     }
 
-    /**
-     * Requests POST_NOTIFICATIONS once on Android 13+ touch devices so DVR/Reminder/VPN
-     * notifications appear cleanly. No-op on TVs or older Android versions.
-     */
     fun requestNotificationPermissionIfNeeded(activity: Activity) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
         if (DeviceForm.isTelevision(activity)) return

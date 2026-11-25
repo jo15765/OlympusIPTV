@@ -11,7 +11,6 @@ import com.olympus.iptv.R
 import com.olympus.iptv.playlist.LineupClient
 import com.olympus.iptv.portal.DashboardHost
 
-/** Step 2 of first-run setup: show the phone-pairing QR, then open favorites. */
 class PairingStepActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

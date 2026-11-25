@@ -7,7 +7,6 @@ import androidx.media3.common.Player
 import com.olympus.iptv.playlist.MeteredNetwork
 import com.olympus.iptv.ui.DeviceForm
 
-/** Adaptive cellular video cap based on downstream bandwidth. Wi-Fi and TV stay unlimited. */
 object MobileBitrateCap {
     const val CELLULAR_SLOW_BPS = 2_500_000
     const val CELLULAR_FAST_BPS = 6_000_000

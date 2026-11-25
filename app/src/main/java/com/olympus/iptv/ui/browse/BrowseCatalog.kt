@@ -10,7 +10,6 @@ import com.olympus.iptv.playlist.LineupApplier
 import com.olympus.iptv.playlist.PlaylistLoader
 import com.olympus.iptv.ui.browse.BrowseActivity.GuideSection
 
-/** Category, favorite, and hidden-channel filtering pulled out of the VOD coordinator. */
 internal fun BrowseActivity.libraryBucket(sectionNow: GuideSection): String = when (sectionNow) {
     GuideSection.TV -> CatalogDb.LIVE
     GuideSection.MOVIES -> CatalogDb.VOD
@@ -142,7 +141,7 @@ internal fun BrowseActivity.prepareGroup(
                 nowStartMs = cachedEpg?.startMillis ?: 0L,
                 nowEndMs = cachedEpg?.endMillis ?: 0L
             )
-            // Automatically hide `NO EVENT` / off-air slots and restore them 30 min prior to airtime
+
             if (!status.isVisibleAt(now)) continue
         }
         val name = ChannelNames.present(channel, config)
@@ -150,7 +149,6 @@ internal fun BrowseActivity.prepareGroup(
     }
     return out
 }
-
 
 internal fun BrowseActivity.liveEventsHubChannels(config: LineupConfig): List<Channel> {
     val saved = playlist ?: return emptyList()

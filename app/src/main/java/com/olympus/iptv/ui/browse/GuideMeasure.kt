@@ -4,7 +4,6 @@ import com.olympus.iptv.data.Channel
 import com.olympus.iptv.data.NameStrip
 import com.olympus.iptv.data.PlaylistStore
 
-/** Guide column and row measurement. The numbers live in GuideMetrics; this only applies them. */
 internal fun BrowseActivity.widestNamePx(): Float {
     val size = android.util.TypedValue.applyDimension(
         android.util.TypedValue.COMPLEX_UNIT_SP,

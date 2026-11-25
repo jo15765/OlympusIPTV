@@ -27,7 +27,6 @@
             android:scaleType="centerCrop"
             android:src="@drawable/ic_channel_placeholder" />
 
-        <!-- Top-right green pill badge (no "TV Series" top banner) -->
         <TextView
             android:id="@+id/ratingBadge"
             android:layout_width="wrap_content"
@@ -49,7 +48,6 @@
             android:layout_height="wrap_content"
             android:visibility="gone" />
 
-        <!-- Focus/Hover Emby Overlay: centered Play circle + bottom action circles -->
         <FrameLayout
             android:id="@+id/posterHoverOverlay"
             android:layout_width="match_parent"

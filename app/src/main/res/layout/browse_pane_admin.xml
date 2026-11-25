@@ -37,7 +37,6 @@
             android:textColor="@color/text_secondary"
             android:textSize="12sp" />
 
-        <!-- Section 1: Guide & Lineup (mirrors Web-UI Settings) -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -198,7 +197,6 @@
             </LinearLayout>
         </LinearLayout>
 
-        <!-- Section 2: Device & Network (mirrors Web-UI Settings) -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -364,7 +362,6 @@
             </LinearLayout>
         </LinearLayout>
 
-        <!-- Section 3: Account & Maintenance -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

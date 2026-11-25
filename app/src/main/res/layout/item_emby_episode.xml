@@ -35,7 +35,6 @@
             android:src="@drawable/ic_play_triangle"
             app:tint="@color/text_primary" />
 
-        <!-- Focus/Hover Emby Overlay: bottom-right quick action buttons -->
         <FrameLayout
             android:id="@+id/epHoverOverlay"
             android:layout_width="match_parent"

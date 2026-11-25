@@ -40,7 +40,7 @@ internal fun BrowseActivity.wireGuidePinPad() {
         binding.guidePinClearDigit.setOnClickListener { clearGuidePinDigit() }
         binding.groupPinCancel.setOnClickListener { cancelGroupPinToGroups() }
         binding.groupPinWrongOk.setOnClickListener { dismissWrongPinToGroups() }
-        binding.groupPinScrim.setOnClickListener { /* absorb */ }
+        binding.groupPinScrim.setOnClickListener {  }
         for ((index, key) in guidePinKeys.withIndex()) {
             val col = index % 3
             val row = index / 3
@@ -273,7 +273,6 @@ internal fun BrowseActivity.saveGroupPin(groupId: String, digits: String?) {
         }
     }
 
-
 internal fun BrowseActivity.offerGroupLock(category: Category) {
         val now = android.os.SystemClock.uptimeMillis()
         if (now - pinAt < 500L) return
@@ -429,4 +428,3 @@ internal fun BrowseActivity.clearDial() {
         binding.channelDial.visibility = View.GONE
         binding.channelDialHint.visibility = View.GONE
     }
-

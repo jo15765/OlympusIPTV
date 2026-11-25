@@ -115,7 +115,6 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         }
     }
 
-    /** Returns all currently airing or T-30m sports/event feeds across every provider for the Live Games Hub. */
     fun readLiveEventsHub(
         playlistId: String,
         hiddenChannels: Set<String>,
@@ -173,7 +172,7 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
                     nowEndMs = cachedEpg?.third ?: 0L
                 )
                 if (!status.isVisibleAt(now)) continue
-                // Never include 24/7 VOD/replay loop channels in Live Games Now
+
                 val is247 = ch.name.contains("24/7") ||
                     ch.groupTitle?.contains("24/7") == true ||
                     cachedEpg?.first?.contains("24/7") == true
@@ -229,7 +228,6 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         )
     }
 
-    /** True when a prior TMDB/Watchmode lookup failed and the 7-day negative TTL still holds. */
     fun isMetaMiss(cacheKey: String, ttlMs: Long = META_MISS_TTL_MS): Boolean {
         if (cacheKey.isBlank()) return false
         val savedAt = read {
@@ -394,11 +392,6 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         VisiblePage(visible, cursor, exhausted)
     }
 
-    /**
-     * Page channels for a group the user already opened. Skips country / hidden-group filters
-     * so a card count (e.g. 24/7 Shows 1102) always matches a non-empty list. Only per-channel
-     * hides still apply.
-     */
     fun readGroupPage(
         playlistId: String,
         bucket: String,
@@ -688,7 +681,6 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
 
     data class NamedChannel(val id: String, val name: String, val group: String)
 
-    /** Live rows that may be US local/network affiliates regardless of provider group or separator style. */
     fun localCandidateChannels(playlistId: String): List<NamedChannel> = read {
         if (playlistId.isBlank()) return emptyList()
         val found = ArrayList<NamedChannel>()
@@ -927,7 +919,6 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         searchExportHold = null
     }
 
-    /** Reclaims in-memory snapshots and asks SQLite to drop unused native page-cache memory. */
     fun releaseMemory() {
         searchExportHold = null
         dashHold = null
@@ -1154,7 +1145,7 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
                 categories.add(Category(id = id, name = shown.ifBlank { id }, kind = kind))
             }
         }
-        // Self-heal if channels were ingested before categories or categories had missing IDs
+
         db.rawQuery(
             """
             SELECT COALESCE(NULLIF(category_id, ''), group_title), MAX(NULLIF(group_title, ''))
@@ -1454,10 +1445,7 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         if (oldVersion < 16) {
             ensureEventWindowColumns(db)
             ensureIndexes(db)
-            // Filling event windows touches every live row. Doing that inside this
-            // upgrade transaction locks the database, so the guide spinner and the
-            // dashboard both wait. The columns default to "showing"; catchUpEventWindows
-            // fills the real windows after the first screen is up.
+
             runCatching { File(filesDir, "event-windows.pending").writeText("1") }
         }
         if (oldVersion < 17) {
@@ -1518,7 +1506,7 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
 
     private fun ensureIndexes(db: SQLiteDatabase) {
         db.execSQL(
-            "DROP INDEX IF EXISTS idx_channels_category" 
+            "DROP INDEX IF EXISTS idx_channels_category"
         )
         db.execSQL(
             "CREATE INDEX IF NOT EXISTS idx_channels_category ON channels(playlist_id, bucket, category_id, number, name COLLATE NOCASE, id)"
@@ -1538,8 +1526,7 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         db.execSQL(
             "CREATE INDEX IF NOT EXISTS idx_channels_country ON channels(playlist_id, bucket, country_id, number, name COLLATE NOCASE, id)"
         )
-        // Group + channel number is the scroll order. EPG rows live inside epg_cache.payload
-        // (one JSON blob per channel), so start/end cannot be indexed as their own columns.
+
         db.execSQL(
             "CREATE INDEX IF NOT EXISTS idx_channels_group_order ON channels(playlist_id, bucket, group_title, number, name COLLATE NOCASE)"
         )
@@ -1564,7 +1551,6 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
 
     private val bulkSearch = java.util.concurrent.atomic.AtomicInteger(0)
 
-    /** Drops per-row search triggers for one catalog load. [endBulkSearch] rebuilds the index once. */
     fun beginBulkSearch() = write {
         if (bulkSearch.incrementAndGet() != 1) return@write
         val db = writableDatabase
@@ -1849,7 +1835,6 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         return String(chars, 0, index + 1)
     }
 
-    /** Runs after upgrade, off the database-open path, so the guide and dashboard stay responsive. */
     fun catchUpEventWindows() {
         val marker = File(filesDir, "event-windows.pending")
         if (!marker.exists()) return
@@ -1871,8 +1856,7 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
             val db = writableDatabase
             db.beginTransaction()
             try {
-                // Name and group do not change, so the FTS update trigger would only
-                // rewrite the search index for every live row and stall readers.
+
                 db.execSQL("DROP TRIGGER IF EXISTS channels_fts_update")
                 db.execSQL(
                     "UPDATE channels SET is_event_slot=0, event_start_ms=0, event_end_ms=0 WHERE bucket=?",
@@ -1958,7 +1942,7 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
             add(preWindow.toString())
             add(now.toString())
         }
-        // Pure indexed SQLite C++ aggregation (< 3ms across 40,000 rows!)
+
         db.rawQuery(
             """
             SELECT COALESCE(NULLIF(category_id, ''), group_title), COUNT(*)
@@ -2007,10 +1991,6 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         map
     }
 
-    /**
-     * Majority stored country per live category. One indexed aggregation — no name scan.
-     * The guide uses this so the group list does not wait on [dashboardGroups].
-     */
     fun liveCountryByCategory(playlistId: String): Map<String, String> {
         if (playlistId.isBlank()) return emptyMap()
         val stamp = libraryStamp(playlistId)
@@ -2044,7 +2024,7 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
                     }
                 }
             }
-            // A handful of tagged rows must not mark a whole 24/7 folder as foreign.
+
             val ids = best.keys.toList()
             for (id in ids) {
                 if ((votes[id] ?: 0) <= (blank[id] ?: 0)) best.remove(id)
@@ -2300,10 +2280,10 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
             val (where, args) = bucketNeedleWhere(playlistId, LIVE, needle)
             return@read querySlim(where, args, byName, capped)
         }
-        // Fast path: uses covering index idx_channels_bucket_cat_cover (O(log N), zero table scan).
+
         val byCategory = queryByCategoryIndexed(playlistId, groupId, needle, byName, capped)
         if (byCategory.isNotEmpty()) return@read byCategory
-        // Fallback for M3U groups keyed only by group_title (uses idx_channels_group).
+
         queryByGroupTitleIndexed(playlistId, groupId, groupName, needle, byName, capped)
     }
 
@@ -2581,7 +2561,7 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         if (categoryEdits.isEmpty() && titleEdits.isEmpty()) return 0 to emptyList()
         write {
             val db = writableDatabase
-            // Temporarily drop FTS update trigger so updating group_title doesn't rebuild FTS for 100k+ rows
+
             runCatching { db.execSQL("DROP TRIGGER IF EXISTS channels_fts_update") }
             db.beginTransaction()
             try {
@@ -2733,7 +2713,6 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         }
     }
 
-    /** Once a day, shrink the WAL and drop EPG snapshots older than 24 hours. */
     fun maintainDaily() = write {
         val stamp = File(filesDir, "catalog-maintain.day")
         val day = System.currentTimeMillis() / 86_400_000L
@@ -2742,7 +2721,7 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         val cutoff = System.currentTimeMillis() - 86_400_000L
         val db = writableDatabase
         db.delete("epg_cache", "fetched_at < ?", arrayOf(cutoff.toString()))
-        // VACUUM compacts into the WAL. Checkpoint then drops that file, and optimize refreshes stats.
+
         runCatching { db.execSQL("VACUUM") }
         runCatching { db.execSQL("PRAGMA wal_checkpoint(TRUNCATE)") }
         runCatching { db.execSQL("PRAGMA optimize") }

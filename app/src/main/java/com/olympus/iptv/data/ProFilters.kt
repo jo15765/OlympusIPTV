@@ -2,12 +2,6 @@ package com.olympus.iptv.data
 
 import android.content.Context
 
-/**
- * Zero-overhead runtime helpers for Pro features:
- * - Spoiler-Free Sports score masking
- * - Kids Mode & Profile group filtering
- * - Channel name normalization for Backup Stream Auto-Failover
- */
 object ProFilters {
     private val scorePattern = Regex("""\b\d{1,3}\s*[-:]\s*\d{1,3}\b""")
     private val adultMarkers = listOf("adult", "xxx", "18+", "21+", "nsfw", "erotic", "porn", "mature")

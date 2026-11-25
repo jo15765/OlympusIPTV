@@ -56,7 +56,6 @@ object InsetsPad {
         ViewCompat.requestApplyInsets(view)
     }
 
-    /** At least 28dp on every edge for older TVs. Phone layouts are left alone. */
     fun ensureOverscan(content: View) {
         if (DeviceForm.isTouchPrimary(content.context)) return
         val child = (content as? ViewGroup)?.getChildAt(0) ?: content

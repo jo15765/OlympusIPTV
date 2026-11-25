@@ -4,7 +4,6 @@ import android.app.Dialog
 import android.view.ViewGroup
 import com.olympus.iptv.R
 
-/** Dark slate card and the same focus scale used on the guide. */
 object DialogChrome {
     fun dress(dialog: Dialog) {
         dialog.window?.setBackgroundDrawableResource(R.drawable.bg_login_card)

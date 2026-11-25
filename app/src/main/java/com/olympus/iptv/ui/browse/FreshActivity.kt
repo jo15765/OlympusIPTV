@@ -34,14 +34,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/**
- * Displays recently added ("Just Added / New") programs in an Emby-style poster grid:
- * - Clean full-bleed poster art (no "TV Series" top ribbon)
- * - Top-right green pill badge (episode/unwatched count or NEW)
- * - Focus/hover Play circle + quick Watch / Favorite / More actions
- * - Centered bold title + centered year/network subtitle below
- * - Opens [MediaDetailActivity] on selection.
- */
 class FreshActivity : AppCompatActivity() {
     private lateinit var binding: ActivityFreshBinding
     private var playlistId = ""
@@ -221,7 +213,6 @@ class FreshActivity : AppCompatActivity() {
                 b.freshService.text = sub
                 b.freshService.visibility = if (sub.isBlank()) View.GONE else View.VISIBLE
 
-                // Top-right green pill badge (episode/season count or NEW)
                 val badgeNum = Regex("\\d+").find(card.detail)?.value
                 when {
                     !badgeNum.isNullOrBlank() -> {

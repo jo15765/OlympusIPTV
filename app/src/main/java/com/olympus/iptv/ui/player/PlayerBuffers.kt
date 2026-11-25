@@ -3,7 +3,6 @@ package com.olympus.iptv.ui.player
 import androidx.media3.common.C
 import androidx.media3.exoplayer.DefaultLoadControl
 
-/** Live playback buffers tuned to hold a steady cushion on both raw MPEG-TS and HLS streams. */
 object PlayerBuffers {
     const val MIN_MS = 15_000
     const val MAX_MS = 40_000

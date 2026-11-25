@@ -2,7 +2,6 @@ package com.olympus.iptv.ui.browse
 
 import java.util.Locale
 
-/** Live sports matchups in an EPG title, plus how long is left. */
 object SportsEvent {
     fun isMatchup(title: String): Boolean {
         val trimmed = title.trim()

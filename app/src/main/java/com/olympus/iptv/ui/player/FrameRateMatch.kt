@@ -1,6 +1,5 @@
 package com.olympus.iptv.ui.player
 
-/** Maps a decoded video frame rate to the nearest TV refresh rate. */
 object FrameRateMatch {
     fun targetHz(videoFps: Float): Float = when {
         videoFps <= 0f -> 0f

@@ -7,7 +7,6 @@ import com.olympus.iptv.data.Channel
 import org.json.JSONObject
 import java.io.File
 
-/** User-agent and referer parsed from M3U #EXTVLCOPT lines. Kept beside the catalog, not in it. */
 object StreamHeaders {
     data class Pair(val userAgent: String?, val referer: String?)
 

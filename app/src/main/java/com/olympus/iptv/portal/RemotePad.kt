@@ -6,7 +6,6 @@ import com.olympus.iptv.playlist.CatalogDb
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.first
 
-/** Commands posted by the phone dashboard and read by the player or guide. */
 object RemotePad {
     data class Command(val action: String, val text: String = "")
 
@@ -16,7 +15,6 @@ object RemotePad {
         return commands.tryEmit(Command(action.trim().lowercase(), text))
     }
 
-    /** Resolves a bare or kind-prefixed ("live:123", "vod:456", "series:789") channel ID from the catalog. */
     suspend fun resolveChannel(app: OlympusIptvApp, playlistId: String?, rawId: String): Pair<String, Channel>? {
         val trimmed = rawId.trim()
         if (trimmed.isEmpty()) return null

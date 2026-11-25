@@ -34,7 +34,7 @@ class LineupApplierCountryTest {
 
     @Test
     fun mega247FolderDoesNotEmptyWhenInternationalIsOff() {
-        // Mirrors CatalogDb.readVisiblePage + keep(): SQL allows blank country; keep must not drop them.
+
         val page = (1..1102).map { index ->
             live(
                 id = "247-$index",
@@ -53,7 +53,7 @@ class LineupApplierCountryTest {
     @Test
     fun foreignInferredFromGroupTitleStillHidden() {
         val channel = live("br-1", "Globo", "Brazil", countryId = null)
-        // CountryIndex should parse "Brazil" → blocked when international is off.
+
         val blocked = !LineupApplier.keep(channel, emptySet(), emptySet(), emptySet(), includeInternational = false)
         assertTrue(blocked)
     }

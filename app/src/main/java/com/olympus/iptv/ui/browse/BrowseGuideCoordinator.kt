@@ -144,10 +144,6 @@ internal fun BrowseActivity.rememberEpg(channelId: String, epg: EpgNowNext) {
         for (key in keys) epgCache.remove(key)
     }
 
-
-
-    /** Wires listeners and replays state that arrived while a pane was still a ViewStub. */
-
 internal fun BrowseActivity.wireLazyPanes() {
         panes.onAdminInflated = { admin ->
             if (touchPrimary) {
@@ -205,7 +201,6 @@ internal fun BrowseActivity.wireLazyPanes() {
             pendingRefreshStatus?.let { refresh.refreshStatus.text = it }
         }
     }
-
 
 internal fun BrowseActivity.hostOnCreate(savedInstanceState: Bundle?) {
         val form = com.olympus.iptv.ui.DeviceForm
@@ -314,7 +309,7 @@ internal fun BrowseActivity.hostOnCreate(savedInstanceState: Bundle?) {
             if (touchPrimary) 4 else 8
         binding.channelList.recycledViewPool.setMaxRecycledViews(0, if (touchPrimary) 16 else 32)
         binding.channelList.recycledViewPool.setMaxRecycledViews(1, if (touchPrimary) 8 else 16)
-        // Lazy panes stay deferred until opened so cold start renders groups immediately.
+
         setupPipSwipeOpen()
         lifecycleScope.launch {
             pipGestures = withContext(Dispatchers.IO) {
@@ -384,7 +379,7 @@ internal fun BrowseActivity.hostOnCreate(savedInstanceState: Bundle?) {
                     epgRepo.evictExpired(now)
                     positionNowLine(programAdapter.scrollX)
                     if (binding.guideDate.visibility == View.VISIBLE) tickGuideHeader()
-                    // Refresh any visible rows whose current program has ended or is about to start
+
                     val layout = binding.programList.layoutManager as? LinearLayoutManager
                     if (layout != null && visibleChannels.isNotEmpty()) {
                         val first = layout.findFirstVisibleItemPosition().coerceAtLeast(0)
@@ -420,7 +415,7 @@ internal fun BrowseActivity.hostOnCreate(savedInstanceState: Bundle?) {
                             }
                         }
                     }
-                    // Auto-restore streams that entered the 30-minute pre-event window or remove ended events
+
                     if (section == GuideSection.TV && selectedCategoryId != null && selectedCategoryId != PlaylistLoader.FAVORITES_ID) {
                         val beforeCount = visibleChannels.size
                         val refreshed = prepareGroup(visibleChannels.toList(), activeConfig)
@@ -1176,7 +1171,6 @@ internal fun BrowseActivity.paintParentalChip(locked: Int = activeConfig.groupPi
         }
     }
 
-
 internal fun BrowseActivity.hostOnStop() {
         rememberGuideUi()
         (application as OlympusIptvApp).unwatchLineup(lineupWatch)
@@ -1201,7 +1195,6 @@ internal fun BrowseActivity.hostOnDestroy() {
         refreshLoop?.cancel()
         refreshLoop = null
     }
-
 
 internal fun BrowseActivity.adoptRemoteLineup() {
         val saved = playlist ?: return
@@ -1254,8 +1247,6 @@ internal fun BrowseActivity.hostOnStart() {
         val delayMs = 60_000L - (System.currentTimeMillis() % 60_000L)
         focusHandler.postDelayed(clockTick, delayMs.coerceIn(1_000L, 60_000L))
     }
-
-
 
 internal fun BrowseActivity.hostOnResume() {
         reloadRenamedGroups()
@@ -1538,7 +1529,7 @@ internal fun BrowseActivity.hostDispatchKey(event: KeyEvent): Boolean {
                                 binding.categoryList.findViewHolderForAdapterPosition(nextPos)?.itemView?.requestFocus()
                             }
                         }
-                        // Never allow D-pad DOWN to fall through to Android's geometric focusSearch (which jumps to navRail!)
+
                         return true
                     }
                 }
@@ -1743,7 +1734,7 @@ internal fun BrowseActivity.applyGuideColumns() {
         val phoneCards = touchPrimary && com.olympus.iptv.ui.DeviceForm.isCompact(this)
         val stacked = phoneCards && com.olympus.iptv.ui.DeviceForm.isPortrait(this)
         val phoneChrome = phoneCards
-        // Live TV Guide shows side-by-side Channel List + EPG Program Grid timeline across TV, Tablet, and Mobile.
+
         val showPrograms = live && full
         setNavExpanded(true)
         val blockChannels = live && guideMenu == GuideMenu.PROGRAMS && !phoneChrome
@@ -1755,7 +1746,7 @@ internal fun BrowseActivity.applyGuideColumns() {
         }
         channelAdapter.paintRowFocus(binding.channelList)
         val row = binding.guideRow
-        // TV gets a short column morph; phones skip it — transitions feel laggy on touch devices.
+
         if (!phoneChrome && row.isLaidOut && !skipGuideTransition) {
             TransitionManager.beginDelayedTransition(row, AutoTransition().apply { duration = 180 })
         }
@@ -1875,7 +1866,6 @@ internal fun BrowseActivity.hidePreviewChrome() {
         if (previewReady()) previewCtl.pause()
     }
 
-
 internal fun BrowseActivity.openFullGuide() {
         openStamp += 1
         channelsStamp = -1
@@ -1885,7 +1875,7 @@ internal fun BrowseActivity.openFullGuide() {
         binding.categoryList.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
         binding.groupColumn.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
         if (focusIsIn(binding.categoryList)) currentFocus?.clearFocus()
-        // Phones use stacked now/next cards. Tablets and TV use the hour grid.
+
         val phoneCards = touchPrimary && com.olympus.iptv.ui.DeviceForm.isCompact(this)
         if (section == GuideSection.TV && !phoneCards) {
             if (guideMenu != GuideMenu.PROGRAMS) previousMenu = guideMenu
@@ -1921,7 +1911,6 @@ internal fun BrowseActivity.stopPreview() {
         previewCtl.stop()
     }
 
-
 internal fun BrowseActivity.openProgramGuide() {
         if (section != GuideSection.TV) return
         val row = focusedChannelRow()
@@ -1932,7 +1921,6 @@ internal fun BrowseActivity.openProgramGuide() {
             focusProgram(row, currentProgramColumn(row))
         }
     }
-
 
 internal fun BrowseActivity.offerReminder(channel: Channel) {
         val saved = playlist ?: return
@@ -2091,7 +2079,6 @@ internal fun BrowseActivity.loadGuidePrograms(channels: List<Channel>) {
             }
         }
     }
-
 
 internal suspend fun BrowseActivity.fetchGuidePrograms(saved: SavedPlaylist, channels: List<Channel>, width: Int) {
         if (channels.isEmpty()) return

@@ -6,10 +6,6 @@ import android.net.Uri
 import android.widget.Toast
 import com.olympus.iptv.data.Channel
 
-/**
- * Hands off a stream URL to an installed external video player (VLC, MX Player, Nova, or chooser)
- * when requested by the user.
- */
 object ExternalPlayerBridge {
     const val PKG_VLC = "org.videolan.vlc"
     const val PKG_MX_FREE = "com.mxtech.videoplayer.ad"

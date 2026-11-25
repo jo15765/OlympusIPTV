@@ -95,6 +95,7 @@ Olympus-IPTV is one APK for Android TV / Google TV Streamer (4K) / Fire TV Stick
   - Redesigned **Sanitize Group & Channel Names** with interactive 1-click tag chips, custom tag input, and an explicit **Sanitize Now** button (no auto-run).
   - Added **Parse Channel Names into Guide** action button (`POST /api/epg/parse`) and **Remove Playlist** option (`POST /api/playlist/remove`) in Web-UI Settings.
 - **Cloud API Security & Performance (`nodeapi`)**: Moved bulk sanitize, batch group rename, EPG parse, and per-device playlist removal to parameterized PostgreSQL endpoints on `nodeapi` with real-time `pg_notify` TV refresh, and added constant-time `X-Olympus-Api-Key` header validation (`BuildConfig.PORTAL_API_KEY` / `API_SECRET_KEY`).
+- **Web-UI Startup & Code Cleanup**: Fixed a null-reference JS error on legacy EPG listeners that prevented the initial setup screen from rendering in the Web UI, and stripped inline code comments across the repository.
 
 ## What's in 0.2.132
 

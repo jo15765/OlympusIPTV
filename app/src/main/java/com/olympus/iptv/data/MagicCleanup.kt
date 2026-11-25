@@ -3,7 +3,6 @@ package com.olympus.iptv.data
 import com.olympus.iptv.OlympusIptvApp
 import com.olympus.iptv.playlist.ChannelFailover
 
-/** One pass that strips noisy name tags and adds a short favorite list. */
 object MagicCleanup {
     data class Result(val renamed: Int, val favorites: Int)
 

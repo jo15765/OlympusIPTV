@@ -26,7 +26,6 @@
             android:scaleType="centerCrop"
             android:src="@drawable/ic_channel_placeholder" />
 
-        <!-- Top-right green count/status badge (no "TV Series" top banner) -->
         <TextView
             android:id="@+id/freshCountBadge"
             android:layout_width="wrap_content"
@@ -42,7 +41,6 @@
             android:textStyle="bold"
             android:visibility="gone" />
 
-        <!-- Focus/Hover Emby Overlay: centered Play circle + bottom action circles -->
         <FrameLayout
             android:id="@+id/freshHoverOverlay"
             android:layout_width="match_parent"

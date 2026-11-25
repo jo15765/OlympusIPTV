@@ -15,11 +15,6 @@ import java.net.InetAddress
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 
-/**
- * One OkHttp stack for Xtream, TMDB, Watchmode, logos, and subtitles.
- * OkHttp 5.4.0 caps each HTTP/2 response's headers at 256 KiB.
- * Trailing-dot hosts are refused so a pin check cannot be skipped by a dotted hostname.
- */
 object HttpClients {
     private const val CACHE_BYTES = 50L * 1024L * 1024L
     private const val CACHE_BYTES_LOW_RAM = 20L * 1024L * 1024L
@@ -29,10 +24,6 @@ object HttpClients {
 
     private val dnsCache = ConcurrentHashMap<String, DnsEntry>()
 
-    /**
-     * 60-second in-memory DNS cache preferring IPv4 addresses first so flaky ISP IPv6 routing
-     * never adds Happy-Eyeballs connection stalls on IPTV stream zaps or EPG fetches.
-     */
     private val fastDns = object : Dns {
         override fun lookup(hostname: String): List<InetAddress> {
             val now = System.currentTimeMillis()
@@ -59,7 +50,6 @@ object HttpClients {
         lowRamDevice = com.olympus.iptv.ui.DeviceForm.isLowRam(app)
     }
 
-    /** Resolve DNS and open a keep-alive socket for a few stream hosts before the first tune. */
     fun warm(hosts: List<String>) {
         val unique = hosts.map { it.trim() }.filter { it.isNotEmpty() }.distinct().take(5)
         if (unique.isEmpty()) return
@@ -79,7 +69,6 @@ object HttpClients {
         }.start()
     }
 
-    /** Pre-resolves DNS and pre-opens HTTP/HTTPS keep-alive sockets for upcoming channel stream URLs. */
     fun warmStreamHosts(urls: List<String>) {
         val hosts = urls.mapNotNull { url ->
             runCatching { java.net.URI(url).host }.getOrNull()
@@ -87,7 +76,6 @@ object HttpClients {
         warm(hosts)
     }
 
-    /** Drops keep-alive sockets, DNS cache, and in-flight calls so a network change does not wait out a read timeout. */
     fun evictConnections() {
         dnsCache.clear()
         runCatching { shared.dispatcher.cancelAll() }
@@ -98,7 +86,6 @@ object HttpClients {
 
     val shared: OkHttpClient by lazy { buildShared() }
 
-    /** Same pool and cache as [shared]. Playlist bodies may read for several minutes. */
     val xtream: OkHttpClient by lazy {
         shared.newBuilder()
             .connectTimeout(8, TimeUnit.SECONDS)

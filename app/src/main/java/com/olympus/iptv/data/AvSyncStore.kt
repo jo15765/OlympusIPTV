@@ -5,7 +5,6 @@ import org.json.JSONObject
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 
-/** Per-channel lip-sync offset in milliseconds. Positive means audio plays later. Not a catalog column. */
 object AvSyncStore {
     private const val FILE = "av-sync.json"
     const val STEP_MS = 100

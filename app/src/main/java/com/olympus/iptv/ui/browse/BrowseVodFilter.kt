@@ -11,7 +11,6 @@ import com.olympus.iptv.playlist.EpisodeCache
 import com.olympus.iptv.playlist.EpisodeSequence
 import com.olympus.iptv.ui.browse.BrowseActivity.GuideSection
 
-/** VOD continue, recent, and poster sorting. Holds no views of its own. */
 internal fun BrowseActivity.continueText(channel: Channel): String? {
         val spot = resumeEntry(channel) ?: return null
         val minutes = ((spot.positionMs ?: 0L) / 60_000L).toInt().coerceAtLeast(1)
@@ -104,4 +103,3 @@ internal fun BrowseActivity.continueChannels(sectionNow: GuideSection, config: L
         }
         return prepareGroup(rows, config)
     }
-

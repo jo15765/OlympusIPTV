@@ -11,11 +11,6 @@ import com.olympus.iptv.ui.DeviceForm
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
-/**
- * Refreshes the catalog and new-episode list while the phone is on Wi-Fi and not low on battery.
- * WorkManager is not in the offline dependency set, so this uses the platform job scheduler
- * with the same unmetered-network and battery-not-low constraints on a 6 hour period.
- */
 class CatalogSyncWorker : JobService() {
     override fun onStartJob(params: JobParameters): Boolean {
         val app = application as? OlympusIptvApp ?: return false

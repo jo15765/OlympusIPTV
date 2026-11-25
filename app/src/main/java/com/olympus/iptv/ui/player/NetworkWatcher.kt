@@ -8,10 +8,6 @@ import android.net.NetworkRequest
 import com.olympus.iptv.vpn.AppTunnel
 import com.olympus.iptv.vpn.TunnelState
 
-/**
- * Tells the player when Wi-Fi returns or a VPN city finishes connecting.
- * The player decides whether a stream is actually playing.
- */
 internal class NetworkWatcher(
     private val context: Context,
     private val onReconnect: (Boolean) -> Unit

@@ -2,7 +2,6 @@ package com.olympus.iptv.ui
 
 import android.content.Context
 
-/** Warms the next off-screen posters while a list is idle. */
 object ImagePrefetcher {
     const val AHEAD = 12
 

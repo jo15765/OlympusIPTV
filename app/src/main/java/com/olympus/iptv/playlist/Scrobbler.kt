@@ -8,9 +8,6 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 
-/**
- * Lightweight Simkl / Trakt scrobble. Only one provider can be active (mutex in PlaylistStore).
- */
 object Scrobbler {
     const val NONE = ScrobblerIds.NONE
     const val SIMKL = ScrobblerIds.SIMKL

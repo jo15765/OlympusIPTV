@@ -60,10 +60,6 @@ data class ProState(
     val updatedAt: Long = 0L
 )
 
-/**
- * Fast in-memory cached store for Household Profiles, Playback Defaults, EPG Offset/XMLTV,
- * Timeshift, External Player, Stats HUD, and Offline Downloads.
- */
 object ProFeatureStore {
     private const val PREFS = "olympus_pro_features"
     private const val KEY_STATE = "state_json"

@@ -14,13 +14,6 @@ data class ZipPlace(
     val country: String = "us"
 )
 
-/**
- * 100% reliable US 5-digit ZIP code locator.
- * 1) Checks in-memory cache (0 ms).
- * 2) Tries api.zippopotam.us with a fast 2.5s timeout for exact city/lat/lon.
- * 3) Falls back instantly to an embedded US 3-digit ZIP prefix table (005..999)
- *    so valid US ZIPs NEVER fail offline, behind strict VPNs, or if the API is down.
- */
 object ZipLocator {
     private val cache = ConcurrentHashMap<String, ZipPlace>()
     private val fastHttp by lazy {
@@ -63,10 +56,6 @@ object ZipLocator {
         }
     }.getOrNull()
 
-    /**
-     * Offline 3-digit US ZIP prefix table covering all 50 states + DC + PR (005..999).
-     * Maps every valid US ZIP prefix to its primary regional DMA coordinates & state.
-     */
     internal fun fallbackForPrefix(zip: String): ZipPlace? {
         val p = zip.take(3).toIntOrNull() ?: return null
         val region = when (p) {

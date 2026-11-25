@@ -12,10 +12,6 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import okhttp3.Request
 
-/**
- * Lightweight offline VOD/episode downloader for mobile & tablets.
- * Uses 256 KB buffered writes, 250 MB free-space guard, and single-worker queue to keep UI silky-smooth.
- */
 object OfflineDownloadManager {
     private val worker = Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "olympus-offline-dl").apply {

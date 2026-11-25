@@ -13,7 +13,6 @@ import com.olympus.iptv.playlist.CatalogDb
 import com.olympus.iptv.ui.DeviceForm
 import com.olympus.iptv.ui.browse.BrowseActivity
 
-/** Android TV home row: continue watching, plus a Favorites channel of live stations. */
 object TvLauncherBridge {
     private const val FAVORITES_ROW = "olympus-favorites"
 

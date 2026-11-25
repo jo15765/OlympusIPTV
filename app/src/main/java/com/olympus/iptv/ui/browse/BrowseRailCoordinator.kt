@@ -236,7 +236,7 @@ internal fun BrowseActivity.setSection(next: GuideSection) {
         guideMenu = GuideMenu.GROUPS
         previousMenu = GuideMenu.GROUPS
         armGroupFocus()
-        // Prefer the Continue strip when Movies/Shows have something to resume.
+
         landOnContinue = next != GuideSection.TV
         section = next
         if (next != GuideSection.SHOWS) {
@@ -609,7 +609,7 @@ internal fun BrowseActivity.setupMobileChrome() {
         binding.mobileBottomTabs.visibility = View.VISIBLE
         binding.mobileSectionRow.visibility = View.GONE
         binding.mobileBack.setOnClickListener { onMobileBack() }
-        binding.mobileTitle.setOnClickListener { /* section switching is the bottom tabs */ }
+        binding.mobileTitle.setOnClickListener {  }
         binding.mobileAdmin.setOnClickListener { showAdminPane() }
         binding.mobileAbout.setOnClickListener { showAboutPane() }
         binding.mobileSearch.setOnClickListener { openSearch() }
@@ -949,7 +949,6 @@ internal fun BrowseActivity.focusProgramAtTime(row: Int, time: Long) {
         focusProgram(safeRow, programAdapter.columnAt(channel, time))
     }
 
-
 internal fun BrowseActivity.focusOnGuideRow(): Boolean =
         focusIsIn(binding.channelList) || focusIsIn(binding.programPane)
 
@@ -965,7 +964,6 @@ internal fun BrowseActivity.scheduleGuideFocusRestore(action: () -> Unit) {
         guideFocusRestore = next
         focusHandler.postDelayed(next, 48L)
     }
-
 
 internal fun BrowseActivity.programFocusHeld(): Boolean {
         val slot = currentFocus?.tag as? ProgramGuideAdapter.Slot ?: return false
@@ -1111,7 +1109,7 @@ internal fun BrowseActivity.watchFoldDisplay() {
             override fun onDisplayRemoved(displayId: Int) {}
             override fun onDisplayChanged(displayId: Int) {
                 if (displayId != android.view.Display.DEFAULT_DISPLAY || isDestroyed) return
-                // Ignore refresh-rate / brightness display changes that do not change window size.
+
                 val nowBounds = if (android.os.Build.VERSION.SDK_INT >= 30) {
                     windowManager.currentWindowMetrics.bounds
                 } else {
@@ -1250,7 +1248,6 @@ internal fun BrowseActivity.sectionButton(): View = when (section) {
         GuideSection.MOVIES -> binding.tabVod
         GuideSection.SHOWS -> binding.tabShows
     }
-
 
 internal fun BrowseActivity.cardIcon(category: Category): Int = when (category.id) {
         PlaylistLoader.RECENT_ID, PlaylistLoader.CONTINUE_ID, PlaylistLoader.TOP_WATCHED_ID,

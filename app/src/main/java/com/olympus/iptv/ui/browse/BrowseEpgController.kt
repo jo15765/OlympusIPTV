@@ -14,9 +14,6 @@ import com.olympus.iptv.data.EpgProgram
 import com.olympus.iptv.databinding.ActivityBrowseBinding
 import com.olympus.iptv.playlist.EpgUtils
 
-/**
- * EPG header, NOW line, and synopsis dock — kept out of BrowseActivity's mega-file.
- */
 class BrowseEpgController(
     private val activity: AppCompatActivity,
     private val binding: ActivityBrowseBinding,
@@ -117,7 +114,7 @@ class BrowseEpgController(
     }
 
     fun syncChannelOffset() {
-        // Hide the redundant top-right clock whenever the full guide is visible
+
         if (binding.programPane.visibility == View.VISIBLE) {
             binding.groupClock.visibility = View.GONE
         }

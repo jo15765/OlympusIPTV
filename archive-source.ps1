@@ -1,5 +1,3 @@
-# Source snapshot without the local portal database.
-# portal/data/*.json is about 48 MB and is not part of the app.
 $ErrorActionPreference = "Stop"
 Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem

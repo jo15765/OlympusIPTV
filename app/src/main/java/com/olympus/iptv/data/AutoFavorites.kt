@@ -485,8 +485,6 @@ object AutoFavorites {
         val wantedMajor = if (networks == null) majorFive else majorFive.intersect(networks)
         val fullThreshold = wantedMajor.size.coerceAtMost(4).coerceAtLeast(1)
 
-        // Step 1: Find the closest city/major market that carries the full set of major networks (FOX, ABC, CBS, NBC, PBS).
-        // If a small nearby city only has 1-2 channels, keep searching outward to the closest major city.
         var primaryMarket: String? = null
         var chosenByNet = LinkedHashMap<String, ChannelPick>()
         var bestMajorCount = -1
@@ -502,7 +500,6 @@ object AutoFavorites {
             if (majorCount >= fullThreshold) break
         }
 
-        // Step 2: Fill any still-missing major networks (FOX, ABC, CBS, NBC, PBS, CW) from the next closest major city.
         val resolvedMarket = primaryMarket ?: ordered.first().name
         for ((net, _) in localNetworks) {
             if (networks != null && net !in networks) continue
@@ -516,7 +513,6 @@ object AutoFavorites {
             }
         }
 
-        // Step 3: National US East/West affiliate fallback for any network that has no city-tagged feed in the playlist.
         val preferWest = lon < -105.0
         for ((net, group) in localNetworks) {
             if (networks != null && net !in networks) continue

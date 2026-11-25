@@ -40,7 +40,7 @@ class CategoryAdapter(
     private var selectedId: String? = null
     private var filterQuery = ""
     private var genreFilter = GenreFilter.ALL
-    /** Phone list rows: taller taps, no TV focus-select while scrolling. */
+
     var phoneListMode = false
 
     init {
@@ -89,7 +89,7 @@ class CategoryAdapter(
 
     private fun matchesGenre(category: Category, genre: GenreFilter): Boolean {
         if (genre == GenreFilter.ALL) return true
-        // Always keep pinned smart cards visible at the top
+
         if (category.id.startsWith("__")) return true
         val lower = category.name.lowercase()
         return when (genre) {

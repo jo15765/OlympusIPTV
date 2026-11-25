@@ -6,10 +6,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
-/**
- * Survives configuration changes and returns from Player / Library so Browse
- * can restore section, group, scroll, and EPG focus without re-querying SQLite.
- */
 class BrowseViewModel : ViewModel() {
     data class GuideUiState(
         val sectionKey: String = "live",

@@ -2,7 +2,6 @@ package com.olympus.iptv.ui.browse
 
 import com.olympus.iptv.playlist.DummyEpg
 
-/** Labels for programs that are about to end or about to start. */
 object EpgTiming {
     fun tag(now: Long, start: Long, end: Long): String? {
         if (end <= start) return null

@@ -4,8 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Olympus-IPTV home</title>
-  <style>
-    :root {
+  <style>    :root {
       color-scheme: dark;
       --bg: #141210;
       --side: #1b1814;
@@ -1408,7 +1407,6 @@
       .list, #countries { max-height: 60vh; }
     }
 
-    /* --- Enhanced Dashboard UI & Organization --- */
     .stage-bar {
       display: flex;
       align-items: center;
@@ -1584,8 +1582,6 @@
       .remote-layout { grid-template-columns: 1fr; }
     }
 
-
-    /* --- Toast Notifications, Mobile Drawer & In-Place Row Actions --- */
     .toast-host {
       position: fixed;
       bottom: 20px;
@@ -1634,7 +1630,6 @@
       .toast-host { left: 14px; right: 14px; bottom: 14px; }
     }
 
-    /* --- Revamped Web-UI Aesthetics & Decluttered Flow --- */
     .stage { gap: 14px; }
     .kpi-strip {
       display: flex;
@@ -1677,7 +1672,7 @@
       padding: 10px 14px;
       box-shadow: inset 0 1px 0 rgba(255,244,230,0.06), 0 8px 24px rgba(0,0,0,0.32);
     }
-    /* Unified warm obsidian cards, dirty save glow, and setup flow */
+
     .clean-card, .epg-card, .quick-card {
       background: linear-gradient(180deg, rgba(255,244,230,0.038), rgba(255,244,230,0.014));
       border: 1px solid rgba(226,161,90,0.14);
@@ -1742,7 +1737,7 @@
     @media (prefers-reduced-motion: reduce) {
       .card.panel, .subpanel:not([hidden]), .skel-row::after { animation: none !important; }
     }
-    /* Tactile press feedback & tabular numerals */
+
     .primary, .secondary, .group-step, .fav-step, .remote-btn, .kpi-card {
       transition: transform .1s ease, border-color .15s ease, background .15s ease, box-shadow .15s ease;
     }
@@ -1754,7 +1749,7 @@
     .country-count, .group-count, .fav-num, #channelNote, #favManageCountFoot {
       font-variant-numeric: tabular-nums;
     }
-    /* Live connection status pill */
+
     .live-conn {
       display: inline-flex;
       align-items: center;
@@ -1790,7 +1785,7 @@
       0%, 100% { opacity: 1; transform: scale(1); }
       50% { opacity: 0.5; transform: scale(0.85); }
     }
-    /* Custom dark amber scrollbars */
+
     .list::-webkit-scrollbar, #countries::-webkit-scrollbar, .panel::-webkit-scrollbar, .stage::-webkit-scrollbar {
       width: 8px;
       height: 8px;
@@ -1806,7 +1801,7 @@
     .list::-webkit-scrollbar-thumb:hover, #countries::-webkit-scrollbar-thumb:hover, .panel::-webkit-scrollbar-thumb:hover, .stage::-webkit-scrollbar-thumb:hover {
       background: rgba(226, 161, 90, 0.5);
     }
-    /* Shimmer skeletons */
+
     .skel-list { display: flex; flex-direction: column; gap: 8px; padding: 4px 0; }
     .skel-row {
       position: relative;
@@ -1827,7 +1822,7 @@
     @keyframes skelShimmer {
       100% { transform: translateX(100%); }
     }
-    /* Rich empty state */
+
     .empty-state {
       display: flex;
       flex-direction: column;
@@ -1844,12 +1839,12 @@
     .empty-state-icon { font-size: 24px; line-height: 1; opacity: 0.85; }
     .empty-state-title { font-size: 14px; font-weight: 700; color: var(--text); }
     .empty-state-hint { font-size: 12px; color: var(--muted); max-width: 380px; }
-    /* Toast variants */
+
     .toast-pill { display: inline-flex; align-items: center; gap: 8px; }
     .toast-pill.toast-ok { border-color: rgba(115, 181, 110, 0.55); }
     .toast-pill.toast-warn { border-color: rgba(226, 161, 90, 0.65); }
     .toast-pill.toast-err { border-color: rgba(224, 122, 114, 0.65); color: #ffd4d0; }
-    /* Mobile quick-switch bar */
+
     .mobile-quick-tabs {
       display: none;
       gap: 6px;
@@ -1877,7 +1872,7 @@
     @media (max-width: 860px) {
       .mobile-quick-tabs { display: flex; }
     }
-    /* Settings → Web-UI & Active Streams visual polish */
+
     .web-url-box {
       display: flex;
       align-items: center;
@@ -2177,7 +2172,7 @@
       .kpi-card { flex: 1 1 45%; padding: 8px 10px; }
       .stage-bar { padding: 8px 10px; }
     }
-    /* ── Command Bar, Home Hub, Pill Switches, Floating Remote, Light Theme & Mobile Bottom Nav ── */
+
     .list .row {
       content-visibility: auto;
       contain-intrinsic-size: auto 56px;
@@ -2302,7 +2297,7 @@
       background: rgba(143, 212, 138, 0.12);
       color: #8fd48a;
     }
-    /* Smooth amber pill toggle switches inside Pro & Settings */
+
     #panelPro input[type="checkbox"],
     #panelAdmin input[type="checkbox"],
     #panelRecord input[type="checkbox"] {
@@ -2347,7 +2342,7 @@
     .btn-dirty {
       box-shadow: 0 0 0 2px rgba(230, 166, 92, 0.55), 0 0 18px rgba(230, 166, 92, 0.32) !important;
     }
-    /* Floating Mini TV Remote Drawer */
+
     .mini-remote {
       position: fixed;
       right: 18px;
@@ -2399,7 +2394,7 @@
       gap: 6px;
       margin-top: 8px;
     }
-    /* Command Palette & Shortcuts Modal */
+
     .cmd-overlay {
       position: fixed;
       inset: 0;
@@ -2458,7 +2453,7 @@
       border-color: rgba(230, 166, 92, 0.35);
     }
     .cmd-item small { color: var(--muted); font-size: 11.5px; }
-    /* Mobile Sticky Bottom Nav Bar */
+
     .mobile-bottom-nav { display: none; }
     @media (max-width: 780px) {
       body { padding-bottom: 74px; }
@@ -2497,7 +2492,7 @@
       }
       .mobile-bottom-nav .mbn-ic { font-size: 17px; line-height: 1; }
     }
-    /* Crisp Daylight Theme (optional toggle) */
+
     body.theme-light {
       --bg: #f5f2ec;
       --surface: #ffffff;
@@ -2529,7 +2524,7 @@
       color: #1c1814 !important;
       border-color: rgba(28, 24, 20, 0.18) !important;
     }
-  </style>
+</style>
 </head>
 <body>
   <div class="toast-host" id="toastHost" aria-live="polite"></div>
@@ -3130,71 +3125,24 @@
       </section>
 
       <section class="card panel" id="panelClean" hidden>
-        <div class="panel-head" id="epgHomeHead">
+        <div class="panel-head">
           <div class="epg-title">
             <button class="secondary" id="epgBack" type="button">← Settings</button>
             <div>
-              <h2>EPG &amp; Cleanup</h2>
-              <p class="panel-subhead">Strip messy tags, bulk-rename groups, or reset visibility — then click Save &amp; Sync above.</p>
+              <h2 id="epgToolTitle">EPG &amp; Cleanup Workspace</h2>
+              <p class="panel-subhead">Strip messy tags, bulk-rename groups, or reset visibility — changes sync to all devices instantly.</p>
             </div>
           </div>
         </div>
-        <div class="epg-grid" id="epgCards">
-          <button class="epg-card" id="epgCountries" type="button">
-            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.8 2.5 15.2 0 18M12 3c-2.5 2.8-2.5 15.2 0 18"/></svg>
-            <strong>Show/Hide Countries</strong>
-            <span>Filter visibility of country feeds</span>
-          </button>
-          <button class="epg-card" id="epgLineup" type="button">
-            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
-            <strong>Show/Hide Groups/Channels</strong>
-            <span>Customize lists and visibility</span>
-          </button>
-          <button class="epg-card" id="epgReset" type="button">
-            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.3-5.7"/><path d="M4 4v5h5"/></svg>
-            <strong>Show everything again</strong>
-            <span>Reset all visibility rules</span>
-          </button>
-          <button class="epg-card" id="epgStrip" type="button">
-            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" aria-hidden="true"><path d="M4 7h16M7 7l2 13h6l2-13M10 7V5h4v2"/></svg>
-            <strong>Bulk Channel Stripper</strong>
-            <span>Simplify multiple channel lists</span>
-          </button>
-          <button class="epg-card" id="epgRename" type="button">
-            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" aria-hidden="true"><path d="M4 20h4l10-10-4-4L4 16v4z"/><path d="M13 7l4 4"/></svg>
-            <strong>Bulk Group Renamer</strong>
-            <span>Rename multiple groups at once</span>
-          </button>
-          <button class="epg-card" id="epgSanitize" type="button">
-            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" aria-hidden="true"><path d="M12 3l2.2 4.6L19 8.2l-3.5 3.4.8 4.9L12 14.8 7.7 16.5l.8-4.9L5 8.2l4.8-.6L12 3z"/></svg>
-            <strong>Sanitize Group &amp; Channel Names</strong>
-            <span>Apply the sports and US cleanup</span>
-          </button>
-          <button class="epg-card" id="epgParse" type="button">
-            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" aria-hidden="true"><path d="M5 5h10l4 4v10H5z"/><path d="M15 5v4h4M8 13h8M8 17h5"/></svg>
-            <strong>Parse channel names into the guide</strong>
-            <span>Import name metadata into EPG</span>
-          </button>
-          <button class="epg-card" id="epgImages" type="button">
-            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.4"/><path d="M7 16l3.2-3.2 2.2 2.2L16 11l3 4"/></svg>
-            <strong>Remove images</strong>
-            <span>Remove EPG visual assets</span>
-          </button>
+        <div class="epg-tool-tabs" id="epgToolTabs" role="tablist" aria-label="EPG Cleanup Tools" style="margin-top:12px;">
+          <button class="epg-tool-tab active" type="button" data-epg-tool="rename">Bulk Renamer</button>
+          <button class="epg-tool-tab" type="button" data-epg-tool="strip">Bulk Stripper</button>
+          <button class="epg-tool-tab" type="button" data-epg-tool="sanitize">Sanitize Names</button>
+          <button class="epg-tool-tab" type="button" data-epg-tool="parse">Parse to Guide</button>
+          <button class="epg-tool-tab" type="button" data-epg-tool="images">Remove Images</button>
+          <button class="epg-tool-tab" type="button" data-epg-tool="reset">Show Everything</button>
         </div>
-        <div id="epgTools" hidden>
-          <div class="panel-head">
-            <button class="secondary" id="epgToolsBack" type="button">← All EPG Tools</button>
-            <h2 id="epgToolTitle">EPG &amp; Cleanup</h2>
-            <button id="epgToolSave" type="button" hidden>Save</button>
-          </div>
-          <div class="epg-tool-tabs" id="epgToolTabs" role="tablist" aria-label="EPG Cleanup Tools">
-            <button class="epg-tool-tab" type="button" data-epg-tool="strip">Bulk Stripper</button>
-            <button class="epg-tool-tab" type="button" data-epg-tool="rename">Bulk Renamer</button>
-            <button class="epg-tool-tab" type="button" data-epg-tool="sanitize">Sanitize Names</button>
-            <button class="epg-tool-tab" type="button" data-epg-tool="parse">Parse to Guide</button>
-            <button class="epg-tool-tab" type="button" data-epg-tool="images">Remove Images</button>
-            <button class="epg-tool-tab" type="button" data-epg-tool="reset">Show Everything</button>
-          </div>
+        <div id="epgTools">
           <p class="note" id="epgPageStatus"></p>
           <div class="clean-grid" id="epgCleanPair">
           <article class="clean-card" id="epgStripTool">
@@ -4060,8 +4008,7 @@
     <button type="button" data-mbn-tab="pro" aria-selected="false"><span class="mbn-ic">✨</span>Pro</button>
   </nav>
 
-  <script>
-    const loginForm = document.querySelector("#login");
+  <script>    const loginForm = document.querySelector("#login");
     const editor = document.querySelector("#editor");
     let session = null;
     let accountEmail = "";
@@ -6861,7 +6808,6 @@
       });
     });
 
-    /* Live Status Heartbeat + 1-Click Force Sync */
     let lastLiveSig = "";
     async function pollLiveStatus() {
       if (document.hidden || !session || !session.email) return;
@@ -6984,13 +6930,11 @@
       });
     });
 
-    /* Floating Mini TV Remote Drawer */
     const miniDrawer = document.querySelector("#miniRemoteDrawer");
     document.querySelector("#miniRemoteToggle").addEventListener("click", () => { miniDrawer.hidden = !miniDrawer.hidden; });
     document.querySelector("#miniRemoteClose").addEventListener("click", () => { miniDrawer.hidden = true; });
     document.querySelector("#miniRemoteFullBtn").addEventListener("click", () => { miniDrawer.hidden = true; showTab("remote"); });
 
-    /* Dark / Daylight Theme Toggle */
     const themeBtn = document.querySelector("#themeToggleBtn");
     function applyTheme(light) {
       document.body.classList.toggle("theme-light", light);
@@ -7000,7 +6944,6 @@
     try { if (localStorage.getItem("olympusTheme") === "light") applyTheme(true); } catch (_) {}
     themeBtn.addEventListener("click", () => applyTheme(!document.body.classList.contains("theme-light")));
 
-    /* Command Palette (Ctrl+K / /) */
     const CMD_ENTRIES = [
       { label: "Home Command Center", sub: "Overview & quick setup", run: () => showTab("home") },
       { label: "Household Profiles & Kids Mode", sub: "Pro & Profiles → Profiles", run: () => { showTab("pro"); showProSub("profiles"); } },
@@ -7649,30 +7592,25 @@
       ];
       return SANITIZE_STREAMS;
     }
-    let epgTool = "";
+    let epgTool = "rename";
     function showEpgHome() {
-      epgTool = "";
-      document.querySelector("#epgCards").hidden = false;
-      document.querySelector("#epgTools").hidden = true;
-      document.querySelector("#epgHomeHead").hidden = false;
+      showEpgTool(epgTool || "rename");
     }
     function showEpgTool(which) {
       epgTool = which;
-      document.querySelector("#epgCards").hidden = true;
-      document.querySelector("#epgTools").hidden = false;
-      document.querySelector("#epgHomeHead").hidden = true;
       const pair = document.querySelector("#epgCleanPair");
       if (pair) pair.hidden = which !== "strip" && which !== "rename";
-      document.querySelector("#epgStripTool").hidden = which !== "strip";
-      document.querySelector("#epgRenameTool").hidden = which !== "rename";
-      document.querySelector("#epgImagesTool").hidden = which !== "images";
-      document.querySelector("#epgResetTool").hidden = which !== "reset";
-      document.querySelector("#epgSanitizeTool").hidden = which !== "sanitize";
-      document.querySelector("#epgParseTool").hidden = which !== "parse";
+      if (document.querySelector("#epgStripTool")) document.querySelector("#epgStripTool").hidden = which !== "strip";
+      if (document.querySelector("#epgRenameTool")) document.querySelector("#epgRenameTool").hidden = which !== "rename";
+      if (document.querySelector("#epgImagesTool")) document.querySelector("#epgImagesTool").hidden = which !== "images";
+      if (document.querySelector("#epgResetTool")) document.querySelector("#epgResetTool").hidden = which !== "reset";
+      if (document.querySelector("#epgSanitizeTool")) document.querySelector("#epgSanitizeTool").hidden = which !== "sanitize";
+      if (document.querySelector("#epgParseTool")) document.querySelector("#epgParseTool").hidden = which !== "parse";
       document.querySelectorAll("#epgToolTabs .epg-tool-tab").forEach((btn) => {
         btn.classList.toggle("active", btn.dataset.epgTool === which);
       });
-      document.querySelector("#epgToolSave").hidden = true;
+      const saveBtn = document.querySelector("#epgToolSave");
+      if (saveBtn) saveBtn.hidden = true;
       if (which === "sanitize") resetSanitize();
       if (which === "parse") {
         const parseToggle = document.querySelector("#epgParseEnabled");
@@ -7910,16 +7848,16 @@
         if (btn) btn.disabled = false;
       }
     });
-    document.querySelector("#epgToolsBack").addEventListener("click", showEpgHome);
-    document.querySelector("#epgCountries").addEventListener("click", () => showTab("countries"));
-    document.querySelector("#epgLineup").addEventListener("click", () => showTab("groups"));
-    document.querySelector("#epgReset").addEventListener("click", () => showEpgTool("reset"));
-    document.querySelector("#epgStrip").addEventListener("click", () => showEpgTool("strip"));
-    document.querySelector("#epgRename").addEventListener("click", () => showEpgTool("rename"));
-    document.querySelector("#epgSanitize").addEventListener("click", () => showEpgTool("sanitize"));
-    document.querySelector("#epgParse").addEventListener("click", () => showEpgTool("parse"));
-    document.querySelector("#epgImages").addEventListener("click", () => showEpgTool("images"));
-    document.querySelector("#epgToolSave").addEventListener("click", async () => {
+    document.querySelector("#epgToolsBack")?.addEventListener("click", showEpgHome);
+    document.querySelector("#epgCountries")?.addEventListener("click", () => showTab("countries"));
+    document.querySelector("#epgLineup")?.addEventListener("click", () => showTab("groups"));
+    document.querySelector("#epgReset")?.addEventListener("click", () => showEpgTool("reset"));
+    document.querySelector("#epgStrip")?.addEventListener("click", () => showEpgTool("strip"));
+    document.querySelector("#epgRename")?.addEventListener("click", () => showEpgTool("rename"));
+    document.querySelector("#epgSanitize")?.addEventListener("click", () => showEpgTool("sanitize"));
+    document.querySelector("#epgParse")?.addEventListener("click", () => showEpgTool("parse"));
+    document.querySelector("#epgImages")?.addEventListener("click", () => showEpgTool("images"));
+    document.querySelector("#epgToolSave")?.addEventListener("click", async () => {
       const detail = document.querySelector("#epgPageStatus");
       if (epgTool === "rename") {
         await saveGroupRename();
@@ -8716,7 +8654,6 @@
       });
     }
 
-
     function showToast(message, tone) {
       const host = document.querySelector("#toastHost");
       if (!host || !message) return;
@@ -8806,7 +8743,6 @@
         bar.append(span, undo);
       }
     });
-
 
     function updateAdminBadges() {
       const epgBadge = document.querySelector("#adminEpgBadge");
@@ -9188,7 +9124,7 @@
     });
 
     const savedEmail = sessionStorage.getItem("olympus-email") || "";
-    fetch("/api/setup").then((response) => response.json()).then((status) => {
+    fetch("/api/setup").then((response) => response.json()).then(async (status) => {
       if (!status.ready) {
         const presetDevice = new URLSearchParams(location.search).get("device") || "";
         const deviceField = document.querySelector("#setupDevice");
@@ -9197,13 +9133,26 @@
         loginForm.hidden = true;
         return;
       }
-      if (savedEmail) {
-        document.querySelector("#email").value = savedEmail;
-        loadDevices(savedEmail).catch((failure) => {
-          sessionStorage.removeItem("olympus-email");
-          loginForm.hidden = false;
-          document.querySelector("#loginError").textContent = failure.message || "Could not sign in";
-        });
+      const activeEmail = (status.email || savedEmail || "").trim().toLowerCase();
+      if (activeEmail) {
+        sessionStorage.setItem("olympus-email", activeEmail);
+        document.querySelector("#email").value = activeEmail;
+        document.querySelector("#address").textContent = "Connected to TV at " + location.host + " (" + activeEmail + ")";
+        loginForm.hidden = true;
+        try {
+          accountEmail = activeEmail;
+          if (status.deviceId) {
+            await openDevice(status.deviceId);
+            showTab("favorites");
+          } else {
+            await loadDevices(activeEmail);
+          }
+        } catch (_) {
+          await loadDevices(activeEmail).catch((failure) => {
+            loginForm.hidden = false;
+            document.querySelector("#loginError").textContent = failure.message || "Could not sign in";
+          });
+        }
       } else {
         loginForm.hidden = false;
       }
@@ -9394,8 +9343,7 @@
     function connectSyncStream() {
       if (syncEventSource) { try { syncEventSource.close(); } catch (_) {} syncEventSource = null; }
       if (!session || !session.email || !window.EventSource) return;
-      // On the TV's embedded local Wi-Fi dashboard, edits already talk directly to the TV over LAN;
-      // /api/events SSE is only hosted by the external cloud portal.
+
       if (tvUrl && window.location.origin === new URL(tvUrl).origin) {
         setConnState("online", "Connected · TV");
         return;
@@ -9410,7 +9358,7 @@
         };
         es.onerror = () => {
           if (!everOpened) {
-            // Endpoint not present (e.g. embedded TV host) — stop retrying and stay green.
+
             try { es.close(); } catch (_) {}
             syncEventSource = null;
             setConnState(navigator.onLine ? "online" : "offline", navigator.onLine ? "Connected · TV" : "Offline");
@@ -9562,7 +9510,6 @@
         showToast("✓ Cloned profile from " + sourceDeviceId);
       }
     });
-
-  </script>
+</script>
 </body>
 </html>
