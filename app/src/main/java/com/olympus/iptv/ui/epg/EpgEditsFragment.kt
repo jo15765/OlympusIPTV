@@ -60,24 +60,51 @@ class EpgEditsFragment : Fragment() {
         }
 
         val tabs = listOf(
-            binding.tabPlayback to binding.panelPlayback,
-            binding.tabCuration to binding.panelCuration,
-            binding.tabSecurity to binding.panelSecurity,
-            binding.tabServices to binding.panelServices
+            Triple(binding.tabPlayback, binding.panelPlayback, listOf(
+                binding.cardDecoder, binding.cardDensity, binding.cardPip, binding.cardHideEmpty
+            )),
+            Triple(binding.tabCuration, binding.panelCuration, listOf(
+                binding.cardAutoClean, binding.cardCountries, binding.cardLineup, binding.cardGroups,
+                binding.cardSanitize, binding.cardStrip, binding.cardParse, binding.cardImages, binding.cardReset
+            )),
+            Triple(binding.tabSecurity, binding.panelSecurity, listOf(
+                binding.cardParental, binding.cardPinTimeout
+            )),
+            Triple(binding.tabServices, binding.panelServices, listOf(
+                binding.cardTmdb, binding.cardScrobbler
+            ))
         )
 
-        fun selectTab(selectedTab: View) {
-            tabs.forEach { (tab, panel) ->
+        tabs.forEach { (tab, _, cards) ->
+            val firstCard = cards.first()
+            tab.nextFocusRightId = firstCard.id
+            cards.forEachIndexed { index, card ->
+                card.nextFocusLeftId = tab.id
+                card.nextFocusUpId = if (index == 0) binding.btnBack.id else cards[index - 1].id
+                if (index < cards.lastIndex) {
+                    card.nextFocusDownId = cards[index + 1].id
+                }
+            }
+        }
+
+        fun selectTab(selectedTab: View, focusFirstCard: Boolean = false) {
+            tabs.forEach { (tab, panel, cards) ->
                 val active = tab === selectedTab
                 tab.isSelected = active
                 tab.setBackgroundResource(if (active) R.drawable.bg_button else R.drawable.bg_nav)
                 tab.setTextColor(if (active) requireContext().getColor(R.color.bg) else requireContext().getColor(R.color.text_primary))
                 panel.visibility = if (active) View.VISIBLE else View.GONE
+                if (active) {
+                    binding.epgDetailScroll.scrollTo(0, 0)
+                    if (focusFirstCard) {
+                        cards.first().post { cards.first().requestFocus() }
+                    }
+                }
             }
         }
 
-        tabs.forEach { (tab, _) ->
-            tab.setOnClickListener { selectTab(tab) }
+        tabs.forEach { (tab, _, _) ->
+            tab.setOnClickListener { selectTab(tab, focusFirstCard = true) }
             tab.setOnFocusChangeListener { _, focused -> if (focused) selectTab(tab) }
         }
 

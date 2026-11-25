@@ -47,8 +47,8 @@ android {
         applicationId = "com.olympus.iptv"
         minSdk = 24
         targetSdk = 35
-        versionCode = 140
-        versionName = "0.2.140"
+        versionCode = 144
+        versionName = "0.2.144"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "WATCHMODE_API_KEY", "\"$watchmodeKey\"")
         buildConfigField("String", "OPENSUBTITLES_API_KEY", "\"$opensubtitlesKey\"")
@@ -99,12 +99,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_11
     }
 
-    kotlin {
-        compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)
-        }
-    }
-
     buildFeatures {
         viewBinding = true
         buildConfig = true
@@ -144,6 +138,12 @@ android {
     sourceSets.getByName("main").assets.directories.add(
         project.layout.buildDirectory.get().asFile.resolve("generated/dashboardAssets").path
     )
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)
+    }
 }
 
 tasks.register("assertNoPortalDataInAssets") {
@@ -280,6 +280,6 @@ dependencies {
     implementation(libs.bouncycastle)
     testImplementation(libs.junit)
     androidTestImplementation(libs.junit)
-    androidTestImplementation("androidx.test.ext:junit:1.2.1")
-    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.runner)
 }

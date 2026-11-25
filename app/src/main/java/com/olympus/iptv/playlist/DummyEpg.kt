@@ -13,7 +13,15 @@ object DummyEpg {
     private const val DAY_MS = 24L * 60 * 60 * 1000
 
     private val atTime = Regex(
-        """@\s+(\d{1,2})\s+([A-Za-z]{3,9})\s+(\d{1,2}):(\d{2})\s*(AM|PM)?\s*([A-Za-z]{2,4})?""",
+        """@\s+(\d{1,2})\s+([A-Za-z]{3,9})(?:,?\s+(\d{4}))?\s+(\d{1,2}):(\d{2})\s*(AM|PM)?\s*([A-Za-z]{2,4})?""",
+        RegexOption.IGNORE_CASE
+    )
+    private val atMonthDay = Regex(
+        """@\s+([A-Za-z]{3,9})\s+(\d{1,2})(?:,?\s+(\d{4}))?\s+(\d{1,2}):(\d{2})\s*(AM|PM)?\s*([A-Za-z]{2,4})?""",
+        RegexOption.IGNORE_CASE
+    )
+    private val atNumericDate = Regex(
+        """@\s+(\d{1,2})[./](\d{1,2})(?:[./](\d{2,4}))?\s+(\d{1,2}):(\d{2})\s*(AM|PM)?\s*([A-Za-z]{2,4})?""",
         RegexOption.IGNORE_CASE
     )
     private val parenDot = Regex(
@@ -92,14 +100,22 @@ object DummyEpg {
         if (raw.isEmpty()) return null
         val lastAt = raw.lastIndexOf('@')
         val slice = if (lastAt >= 0) raw.substring(lastAt) else raw
-        val timed = atTime.find(slice) ?: atTime.find(raw) ?: parenMonth.find(raw) ?: parenDot.find(raw) ?: bareMonth.find(raw) ?: return null
+        val timed = findTimed(slice) ?: findTimed(raw) ?: return null
         return matchStart(timed, now)
     }
+
+    private fun findTimed(text: String): MatchResult? =
+        atTime.find(text)
+            ?: atMonthDay.find(text)
+            ?: atNumericDate.find(text)
+            ?: parenMonth.find(text)
+            ?: parenDot.find(text)
+            ?: bareMonth.find(text)
 
     private fun parse(channelName: String, now: Long): Parsed {
         val raw = channelName.trim()
         if (raw.isEmpty()) return Parsed("No event", null)
-        val timed = atTime.find(raw) ?: parenMonth.find(raw) ?: parenDot.find(raw) ?: bareMonth.find(raw)
+        val timed = findTimed(raw)
         val withoutTime = if (timed == null) raw else raw.removeRange(timed.range).trim()
         val title = cleanTitle(withoutTime).ifBlank { cleanTitle(raw) }.ifBlank { "No event" }
         val start = timed?.let { matchStart(it, now) }
@@ -129,8 +145,16 @@ object DummyEpg {
 
     private fun matchStart(match: MatchResult, now: Long): Long? {
         val groups = match.groupValues
-        return when (match.value.trimStart().firstOrNull()) {
-            '@' -> stamp(day = groups[1], monthName = groups[2], year = null, hour = groups[3], minute = groups[4], ampm = groups[5], zone = groups[6], now = now)
+        val head = match.value.trimStart()
+        return when (head.firstOrNull()) {
+            '@' -> when {
+                groups[1].toIntOrNull() != null && groups[2].toIntOrNull() != null ->
+                    stamp(monthNumber = groups[1], day = groups[2], year = groups[3], hour = groups[4], minute = groups[5], ampm = groups[6], zone = groups[7], now = now)
+                groups[1].toIntOrNull() != null ->
+                    stamp(day = groups[1], monthName = groups[2], year = groups[3], hour = groups[4], minute = groups[5], ampm = groups[6], zone = groups[7], now = now)
+                else ->
+                    stamp(day = groups[2], monthName = groups[1], year = groups[3], hour = groups[4], minute = groups[5], ampm = groups[6], zone = groups[7], now = now)
+            }
             '(' -> if (groups[1].toIntOrNull() != null) {
                 stamp(monthNumber = groups[1], day = groups[2], year = groups[3], hour = groups[4], minute = groups[5], ampm = groups[6], zone = groups[7], now = now)
             } else {

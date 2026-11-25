@@ -479,7 +479,7 @@
     .channel-row:hover, .group-row:hover, .country-card:hover { transform: translateY(-1px); border-color: rgba(226, 161, 90, 0.55); }
     #channels.grid .channel-grip, #channels.grid .group-step { display: none; }
     #channels.grid .channel-row { grid-template-columns: 16px 40px minmax(0, 1fr) 36px; min-height: 72px; }
-    #panelClean { overflow: auto; }
+    #panelClean { overflow-x: hidden; overflow-y: auto; }
     #panelClean .panel-head { display: block; }
     .epg-title { display: flex; align-items: center; gap: 12px; }
     .epg-title h2 { margin: 0; }
@@ -722,13 +722,13 @@
     #epgToolsBack { width: auto; margin-bottom: 12px; }
     .sanitize-board { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
     .sanitize-pair { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: stretch; min-height: 280px; }
-    #epgSanitizeTool { position: relative; }
+    #epgSanitizeTool { position: relative; min-width: 0; overflow-x: hidden; }
     .sanitize-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid var(--stroke); }
     .sanitize-head-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
     .sanitize-summary-pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; background: rgba(240,180,90,.12); border: 1px solid rgba(240,180,90,.3); color: var(--accent); font-size: 12px; font-weight: 600; }
-    .sanitize-grid { display: grid; grid-template-columns: 1.5fr 1fr; gap: 16px; }
-    @media (max-width: 900px) { .sanitize-grid { grid-template-columns: 1fr; } }
-    .sanitize-box { background: var(--elev); border: 1px solid var(--stroke); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+    .sanitize-grid { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); gap: 16px; width: 100%; min-width: 0; }
+    @media (max-width: 960px) { .sanitize-grid { grid-template-columns: minmax(0, 1fr); } }
+    .sanitize-box { background: var(--elev); border: 1px solid var(--stroke); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; overflow: hidden; }
     .sanitize-box-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
     .sanitize-box-head h4 { margin: 0; font-size: 14px; font-weight: 700; color: var(--ink); display: flex; align-items: center; gap: 8px; }
     .sanitize-count { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,.07); color: var(--muted); }
@@ -738,12 +738,12 @@
     .sanitize-add-row { display: flex; gap: 8px; }
     .sanitize-add-row input { flex: 1; min-width: 0; padding: 8px 12px; border-radius: 10px; background: var(--bg); border: 1px solid var(--stroke); color: var(--ink); font-size: 13px; }
     .sanitize-add-row button { padding: 8px 14px; border-radius: 10px; font-size: 12.5px; font-weight: 600; white-space: nowrap; }
-    .sanitize-chips { display: flex; flex-wrap: wrap; gap: 8px; max-height: 290px; overflow-y: auto; padding: 4px 2px; }
+    .sanitize-chips { display: flex; flex-wrap: wrap; gap: 8px; max-height: 290px; overflow-x: hidden; overflow-y: auto; padding: 4px 2px; min-width: 0; }
     .sanitize-chip {
-      display: inline-flex; align-items: center; gap: 6px;
+      display: inline-flex; align-items: center; gap: 6px; max-width: 100%;
       padding: 6px 11px; border-radius: 999px; font-size: 12.5px; font-weight: 500;
       border: 1px solid var(--stroke); background: rgba(255,255,255,.03); color: var(--muted);
-      cursor: pointer; transition: all .14s ease; user-select: none;
+      cursor: pointer; transition: all .14s ease; user-select: none; overflow-wrap: anywhere;
     }
     .sanitize-chip:hover { border-color: var(--accent); color: var(--ink); }
     .sanitize-chip.strip {
@@ -7768,33 +7768,53 @@
       const btn = document.querySelector("#sanitizeCleanup");
       if (btn) btn.disabled = true;
       try {
-        const resp = await fetch("/api/sanitize", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            email: session.email,
-            deviceId: session.deviceId,
-            channelStrip: sanitizeLists.channelStrip,
-            channelKept: sanitizeLists.channelKept,
-            groupStrip: sanitizeLists.groupStrip
-          })
-        });
-        const body = await resp.json().catch(() => ({}));
-        if (!resp.ok || body.error) {
-          detail.textContent = body.error || "Could not sanitize catalog.";
-          return;
+        let cCount = 0;
+        let gCount = 0;
+        if (sanitizeLists.channelStrip.length || sanitizeLists.channelKept.length) {
+          const chResp = await fetch("/api/sanitize/channels", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email: session.email,
+              deviceId: session.deviceId,
+              channelStrip: sanitizeLists.channelStrip,
+              channelKept: sanitizeLists.channelKept
+            })
+          });
+          const chBody = await chResp.json().catch(() => ({}));
+          if (!chResp.ok || chBody.error) {
+            detail.textContent = chBody.error || "Could not sanitize channel names.";
+            return;
+          }
+          if (chBody.lineup) session.lineup = Object.assign(blankLineup(), chBody.lineup);
+          cCount = chBody.channelsChanged || 0;
         }
-        if (body.lineup) session.lineup = Object.assign(blankLineup(), body.lineup);
-        for (const group of catalog().groups || []) {
-          let next = group.name || "";
-          sanitizeLists.groupStrip.forEach((token) => { next = replaceGroupText(next, token, ""); });
-          if (next && next !== group.name) group.name = next;
+        if (sanitizeLists.groupStrip.length) {
+          const grResp = await fetch("/api/sanitize/groups", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email: session.email,
+              deviceId: session.deviceId,
+              groupStrip: sanitizeLists.groupStrip
+            })
+          });
+          const grBody = await grResp.json().catch(() => ({}));
+          if (!grResp.ok || grBody.error) {
+            detail.textContent = grBody.error || "Could not sanitize group names.";
+            return;
+          }
+          if (grBody.lineup) session.lineup = Object.assign(blankLineup(), grBody.lineup);
+          gCount = grBody.groupsChanged || 0;
+          for (const group of catalog().groups || []) {
+            let next = group.name || "";
+            sanitizeLists.groupStrip.forEach((token) => { next = replaceGroupText(next, token, ""); });
+            if (next && next !== group.name) group.name = next;
+          }
         }
         orderedCache = null;
         groupCache.clear();
         paintStrip();
-        const gCount = body.groupsChanged || 0;
-        const cCount = body.channelsChanged || 0;
         const doneMsg = "✨ Sanitized " + cCount + " channels & " + gCount + " groups — TV guide refreshed.";
         detail.textContent = doneMsg;
         if (typeof showToast === "function") showToast(doneMsg);

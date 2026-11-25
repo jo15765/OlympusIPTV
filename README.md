@@ -6,7 +6,7 @@
 
 ### For the latest and greatest, build your own APK from this code.
 
-The latest source release is **0.2.137** (versionCode 137). **One APK** installs on Android TV / set-top boxes, Google TV Streamer (4K), Amazon Fire TV Sticks, and phones and tablets. Install it over any prior build. The signing key is the same, so the saved account and playlist stay. Cloud sync uses `https://stream-me-service-api.getjohnathan.com`, which reads and writes the Olympus-IPTV PostgreSQL database.
+The latest source release is **0.2.142** (versionCode 142). **One APK** installs on Android TV / set-top boxes, Google TV Streamer (4K), Amazon Fire TV Sticks, and phones and tablets. Install it over any prior build. The signing key is the same, so the saved account and playlist stay. Cloud sync uses `https://stream-me-service-api.getjohnathan.com`, which reads and writes the Olympus-IPTV PostgreSQL database.
 
 **This is a player only. You must provide your own streams.**
 
@@ -23,6 +23,7 @@ Olympus-IPTV does not include channels, movies, shows, or stream addresses. It p
 </div>
 
 - [Start here](#start-here)
+- [What's in 0.2.142](#whats-in-02142)
 - [What's in 0.2.137](#whats-in-02137)
 - [What's in 0.2.132](#whats-in-02132)
 - [What's in 0.2.127](#whats-in-02127)
@@ -72,7 +73,7 @@ Olympus-IPTV is one APK for Android TV / Google TV Streamer (4K) / Fire TV Stick
 
 | | |
 | --- | --- |
-| Source in this tree | versionName **0.2.132**, versionCode **132** |
+| Source in this tree | versionName **0.2.142**, versionCode **142** |
 | Cloud API | `https://stream-me-service-api.getjohnathan.com` |
 | What to run | Build the release APK from this source or run from Android Studio |
 | Install | Over the existing copy (Android TV, Google TV Streamer, Fire Stick, or phone). Uninstalling wipes the saved account, playlist, and favorites. Downloader works with the same file. |
@@ -83,6 +84,19 @@ Olympus-IPTV is one APK for Android TV / Google TV Streamer (4K) / Fire TV Stick
 ---
 
 <div align="center">
+
+## What's in 0.2.142
+
+- **Unified `24/7 Channels` Group**: Consolidated all live 24/7 channels into a single **24/7 Channels** group (`__247__`) across the TV/mobile guide and Web-UI, alphabetized by the actual channel/show name (ignoring `24/7`, `24-7`, `24x7`, and leading country/quality prefixes).
+- **Accurate Live Event & Guide Sync (ESPN+ / Disney+ Events / PPV)**:
+  - Fixed event-slot detection for sanitized (`16: ...`), country-prefixed (`USA | ESPN+ 37: ...`), and bare matchup names, plus `@ Month Day Time` (`@ Nov 25 7:00PM ET`) and `@ MM/DD Time` formats.
+  - Updated `CatalogDb.insertMissing()` so refreshes overwrite stale channel names, event windows, and clear stale `epg_cache` entries instead of keeping old matchups frozen, and added `pruneMissingLiveChannels()` to remove ended/pruned event slots on cloud sync.
+  - Moved automatic event date/time parsing, `cloud_epg` population, stale live-channel cleanup, and live-window filtering (`eventParser.js`) into `nodeapi` on a 15-minute worker cycle.
+- **Split Channel & Group Name Sanitization**: Split Web-UI sanitization into two dedicated endpoints (`POST /api/sanitize/channels` and `POST /api/sanitize/groups`) using single-pass case-insensitive regex updates in PostgreSQL (`db.js`) plus immediate local SQLite group name updates on the TV (`CatalogDb.sanitizeGroupNames`), and removed horizontal scrollbars on the Sanitize panel.
+- **TV Remote & Set-Top Box Layout Fixes**:
+  - Fixed D-pad left/right focus navigation across all 4 tabs and right-side cards in **EPG Edits** (`activity_epg_edits.xml` & `EpgEditsFragment.kt`).
+  - Redesigned the set-top box **Web-UI Access** screen (`browse_pane_device.xml`) into a compact 2-column TV layout so Email, Device ID, URL, setup steps, Auto-resume, and Remove Playlist all fit without vertical scrolling.
+- **Build & Lint Cleanup**: Moved `kotlin { compilerOptions }` out of `android {}` in `app/build.gradle.kts`, migrated Android test dependencies to `libs.versions.toml`, guarded `JobInfo.Builder.setRequiresBatteryNotLow` for API 26+, and flattened redundant layout wrappers.
 
 ## What's in 0.2.137
 

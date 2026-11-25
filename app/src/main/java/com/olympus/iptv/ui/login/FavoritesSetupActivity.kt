@@ -513,10 +513,8 @@ class FavoritesSetupActivity : AppCompatActivity() {
             for (row in db.localCandidateChannels(playlistId)) {
                 merged.putIfAbsent(row.id, AutoFavorites.GuideChannel(row.id, row.name, row.group))
             }
-            if (merged.size < 200) {
-                for (row in db.liveGuide(playlistId)) {
-                    merged.putIfAbsent(row.id, row)
-                }
+            for (row in db.liveGuide(playlistId)) {
+                merged.putIfAbsent(row.id, row)
             }
             merged.values.toList()
         }

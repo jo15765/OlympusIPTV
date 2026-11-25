@@ -193,6 +193,9 @@ object CatalogIngest {
         val hashes = cache.readHashes(playlist.id, bucket).toMutableMap()
         db.insertMissing(playlist.id, bucket, cloud.categories, emptyList())
         store(db, playlist.id, bucket, cloud.channels, bucket != CatalogDb.SERIES, known, hashes)
+        if (bucket == CatalogDb.LIVE && cloud.channels.size >= 100) {
+            db.pruneMissingLiveChannels(playlist.id, cloud.channels.mapTo(HashSet(cloud.channels.size)) { it.id })
+        }
         cache.writeHashes(playlist.id, bucket, hashes)
         if (cloud.stamp > 0L) {
             stampPrefs.edit().putLong(stampKey, cloud.stamp).apply()

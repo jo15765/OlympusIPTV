@@ -1894,7 +1894,9 @@ internal fun BrowseActivity.loadGroupPage(reset: Boolean) {
                         pageCategory,
                         pageLimit,
                         cursor,
-                        hiddenChannels
+                        hiddenChannels,
+                        if (pageCategory == com.olympus.iptv.playlist.TwentyFourSeven.GROUP_ID) hiddenCountries else emptySet(),
+                        if (pageCategory == com.olympus.iptv.playlist.TwentyFourSeven.GROUP_ID) config.includeInternational else true
                     )
 
                     if (opened.channels.isEmpty() &&

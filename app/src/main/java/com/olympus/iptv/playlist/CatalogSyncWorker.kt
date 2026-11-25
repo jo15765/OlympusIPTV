@@ -6,6 +6,7 @@ import android.app.job.JobScheduler
 import android.app.job.JobService
 import android.content.ComponentName
 import android.content.Context
+import android.os.Build
 import com.olympus.iptv.OlympusIptvApp
 import com.olympus.iptv.ui.DeviceForm
 import kotlinx.coroutines.flow.first
@@ -38,13 +39,14 @@ class CatalogSyncWorker : JobService() {
         fun schedule(context: Context) {
             if (DeviceForm.isTelevision(context)) return
             val scheduler = context.getSystemService(JobScheduler::class.java) ?: return
-            val info = JobInfo.Builder(JOB_ID, ComponentName(context, CatalogSyncWorker::class.java))
+            val builder = JobInfo.Builder(JOB_ID, ComponentName(context, CatalogSyncWorker::class.java))
                 .setRequiredNetworkType(JobInfo.NETWORK_TYPE_UNMETERED)
-                .setRequiresBatteryNotLow(true)
                 .setPersisted(true)
                 .setPeriodic(PERIOD_MS)
-                .build()
-            scheduler.schedule(info)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                builder.setRequiresBatteryNotLow(true)
+            }
+            scheduler.schedule(builder.build())
         }
     }
 }

@@ -51,4 +51,21 @@ class AutoFavoritesLocalTest {
         assertEquals("Atlanta", result.market)
         assertEquals(setOf("a1", "a2", "a3", "a4", "a5"), result.picks.map { it.id }.toSet())
     }
+
+    @Test
+    fun sportsAndNationalPicksWorkEvenWhenUsaPrefixStrippedFromGroups() {
+        val channels = listOf(
+            AutoFavorites.GuideChannel("s1", "ESPN", "Sports"),
+            AutoFavorites.GuideChannel("s2", "ESPN 2", "Sports"),
+            AutoFavorites.GuideChannel("s3", "FOX Sports 1", "Sports"),
+            AutoFavorites.GuideChannel("s4", "SEC Network", "Sports"),
+            AutoFavorites.GuideChannel("n1", "TNT", "Entertainment"),
+            AutoFavorites.GuideChannel("n2", "FX East", "Entertainment"),
+            AutoFavorites.GuideChannel("uk1", "ESPN", "UK | Sports")
+        )
+        val sports = AutoFavorites.sportsPicks(channels).map { it.id }.toSet()
+        assertEquals(setOf("s1", "s2", "s3", "s4"), sports)
+        val national = AutoFavorites.nationalPicks(channels).map { it.id }.toSet()
+        assertEquals(setOf("n1", "n2"), national)
+    }
 }

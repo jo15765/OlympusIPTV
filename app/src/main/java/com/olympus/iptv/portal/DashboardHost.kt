@@ -460,6 +460,8 @@ object DashboardHost {
             method == "POST" && path == "/api/lineup" || method == "PUT" && path == "/api/lineup" -> saveLineup(app, socket, json(body))
             method == "POST" && path == "/api/names/strip-images" -> strip(app, socket, json(body))
             method == "POST" && path == "/api/groups/rename" -> renameGroups(app, socket, json(body))
+            method == "POST" && path == "/api/sanitize/channels" -> sanitizeChannels(app, socket, json(body))
+            method == "POST" && path == "/api/sanitize/groups" -> sanitizeGroups(app, socket, json(body))
             method == "POST" && path == "/api/sanitize" -> sanitize(app, socket, json(body))
             method == "POST" && path == "/api/epg/parse" -> parseGuideNames(app, socket, json(body))
             method == "GET" && path == "/api/recordings" -> recordings(app, socket, query["email"], query["deviceId"])
@@ -1330,7 +1332,25 @@ object DashboardHost {
         )
     }
 
+    private fun sanitizeChannels(app: OlympusIptvApp, socket: Socket, body: JsonObject) {
+        forwardSanitize(app, socket, body, "/api/sanitize/channels", applyLocalGroups = false)
+    }
+
+    private fun sanitizeGroups(app: OlympusIptvApp, socket: Socket, body: JsonObject) {
+        forwardSanitize(app, socket, body, "/api/sanitize/groups", applyLocalGroups = true)
+    }
+
     private fun sanitize(app: OlympusIptvApp, socket: Socket, body: JsonObject) {
+        forwardSanitize(app, socket, body, "/api/sanitize", applyLocalGroups = true)
+    }
+
+    private fun forwardSanitize(
+        app: OlympusIptvApp,
+        socket: Socket,
+        body: JsonObject,
+        endpoint: String,
+        applyLocalGroups: Boolean
+    ) {
         val gate = gate(app, text(body, "email"), text(body, "deviceId")) ?: run {
             writeJson(socket, 401, mapOf("error" to "Device not registered"))
             return
@@ -1342,6 +1362,13 @@ object DashboardHost {
         }
         val email = text(body, "email").ifBlank { gate.playlist.email.orEmpty() }
         val deviceId = text(body, "deviceId").ifBlank { runBlocking { app.playlistStore.deviceId() } }
+        val groupTokens = ArrayList<String>()
+        body.getAsJsonArray("groupStrip")?.forEach { el ->
+            if (el.isJsonPrimitive) {
+                val t = el.asString.trim()
+                if (t.isNotEmpty()) groupTokens.add(t)
+            }
+        }
         val payload = JsonObject().apply {
             addProperty("email", email)
             addProperty("deviceId", deviceId)
@@ -1354,7 +1381,7 @@ object DashboardHost {
             val token = com.olympus.iptv.playlist.LineupClient(app).ensureDeviceToken(email, deviceId)
             val apiKey = com.olympus.iptv.BuildConfig.PORTAL_API_KEY.trim()
             val builder = Request.Builder()
-                .url("$cloudBase/api/sanitize")
+                .url("$cloudBase$endpoint")
                 .post(reqBody)
                 .header("X-Device-Id", deviceId)
             if (!token.isNullOrBlank()) builder.header("X-Device-Token", token)
@@ -1380,6 +1407,12 @@ object DashboardHost {
             writeJson(socket, if (resp.first in 400..599) resp.first else 502, mapOf("error" to msg))
             return
         }
+        var localGroupsChanged = 0
+        if (applyLocalGroups && groupTokens.isNotEmpty()) {
+            localGroupsChanged = runCatching {
+                app.catalogDb.sanitizeGroupNames(gate.playlist.id, groupTokens)
+            }.getOrDefault(0)
+        }
         parsed.get("lineup")?.takeIf { it.isJsonObject }?.let { lineupObj ->
             runCatching {
                 val next = gson.fromJson(lineupObj, LineupConfig::class.java)
@@ -1388,9 +1421,12 @@ object DashboardHost {
                 }
             }
         }
+        if (localGroupsChanged > 0 && (parsed.get("groupsChanged")?.takeIf { it.isJsonPrimitive }?.asInt ?: 0) == 0) {
+            parsed.addProperty("groupsChanged", localGroupsChanged)
+        }
         clearGuideCache()
         app.notifyLineupChanged(gate.playlist.id)
-        writeBytes(socket, 200, "application/json; charset=utf-8", resp.second.toByteArray(), "no-store")
+        writeBytes(socket, 200, "application/json; charset=utf-8", parsed.toString().toByteArray(), "no-store")
     }
 
     private fun parseGuideNames(app: OlympusIptvApp, socket: Socket, body: JsonObject) {

@@ -24,6 +24,7 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
     @Volatile private var liveCountryHold: LiveCountryHold? = null
     @Volatile private var fastCountryHold: FastCountryHold? = null
     @Volatile private var searchExportHold: SearchExportHold? = null
+    @Volatile private var sorted247Hold: Sorted247Hold? = null
 
     private inline fun <T> read(block: () -> T): T {
         try {
@@ -292,6 +293,7 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         dashHold = null
         liveCountryHold = null
         searchExportHold = null
+        sorted247Hold = null
         runCatching { dashFile().delete() }
         runCatching {
             filesDir.listFiles()?.forEach { file ->
@@ -398,8 +400,31 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         categoryId: String,
         limit: Int,
         after: PageCursor?,
-        hiddenChannels: Set<String> = emptySet()
+        hiddenChannels: Set<String> = emptySet(),
+        hiddenCountries: Set<String> = emptySet(),
+        includeInternational: Boolean? = true
     ): VisiblePage = read {
+        if (bucket == LIVE && categoryId == TwentyFourSeven.GROUP_ID) {
+            val all = read247Channels(
+                readableDatabase,
+                playlistId,
+                hiddenChannels,
+                hiddenCountries,
+                includeInternational
+            )
+            val start = if (after == null) {
+                0
+            } else {
+                val idx = all.indexOfFirst { it.id == after.id }
+                if (idx >= 0) idx + 1 else all.size
+            }
+            if (start >= all.size) return@read VisiblePage(emptyList(), after, true)
+            val end = (start + limit).coerceAtMost(all.size)
+            val slice = all.subList(start, end)
+            val last = slice.lastOrNull()
+            val nextCursor = last?.let { PageCursor(it.number, it.name, it.id) } ?: after
+            return@read VisiblePage(slice, nextCursor, end >= all.size)
+        }
         val db = readableDatabase
         val liveNoEventSql = if (bucket == LIVE) {
             " AND UPPER(name) NOT LIKE '%: NO EVENT%' AND UPPER(name) NOT LIKE '%| NO EVENT%'"
@@ -473,6 +498,9 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
 
     fun readCategoryChannels(playlistId: String, bucket: String, categoryId: String): List<com.olympus.iptv.data.Channel> =
         read {
+            if (bucket == LIVE && categoryId == TwentyFourSeven.GROUP_ID) {
+                return@read read247Channels(readableDatabase, playlistId, emptySet(), emptySet(), true)
+            }
             readableDatabase.query(
                 "channels",
                 LIST_COLUMNS,
@@ -483,6 +511,62 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
                 "number, name COLLATE NOCASE"
             ).use { collectList(it) }
         }
+
+    private fun read247Channels(
+        db: SQLiteDatabase,
+        playlistId: String,
+        hiddenChannels: Set<String>,
+        hiddenCountries: Set<String>,
+        includeInternational: Boolean?
+    ): List<com.olympus.iptv.data.Channel> {
+        val stamp = libraryStamp(playlistId)
+        val hiddenHash = hiddenChannels.hashCode()
+        val countriesHash = hiddenCountries.hashCode()
+        sorted247Hold?.let { held ->
+            if (held.playlistId == playlistId &&
+                held.stamp == stamp &&
+                held.hiddenHash == hiddenHash &&
+                held.countriesHash == countriesHash &&
+                held.includeInternational == includeInternational
+            ) {
+                return held.channels
+            }
+        }
+        val out = ArrayList<com.olympus.iptv.data.Channel>()
+        db.query(
+            "channels",
+            LIST_COLUMNS,
+            "playlist_id=? AND bucket=? AND ${TwentyFourSeven.SQL_MATCH} " +
+                "AND UPPER(name) NOT LIKE '%: NO EVENT%' AND UPPER(name) NOT LIKE '%| NO EVENT%'",
+            arrayOf(playlistId, LIVE),
+            null,
+            null,
+            null
+        ).use { cursor ->
+            while (cursor.moveToNext()) {
+                val ch = listRow(cursor)
+                if (!TwentyFourSeven.is247(ch.name, ch.groupTitle)) continue
+                if (!LineupApplier.keep(ch, hiddenChannels, emptySet(), hiddenCountries, includeInternational)) continue
+                out.add(ch.copy(categoryId = TwentyFourSeven.GROUP_ID, groupTitle = TwentyFourSeven.GROUP_NAME))
+            }
+        }
+        out.sortWith(
+            compareBy<com.olympus.iptv.data.Channel>(
+                { TwentyFourSeven.sortKey(it.name) },
+                { it.name.lowercase(java.util.Locale.US) },
+                { it.id }
+            )
+        )
+        sorted247Hold = Sorted247Hold(
+            playlistId = playlistId,
+            stamp = stamp,
+            hiddenHash = hiddenHash,
+            countriesHash = countriesHash,
+            includeInternational = includeInternational,
+            channels = out
+        )
+        return out
+    }
 
     fun readChannel(playlistId: String, bucket: String, channelId: String): com.olympus.iptv.data.Channel? =
         read {
@@ -961,6 +1045,47 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         ).use { it.moveToFirst() }
     }
 
+    fun pruneMissingLiveChannels(playlistId: String, activeIds: Set<String>): Int = write {
+        if (activeIds.size < 100) return@write 0
+        val db = writableDatabase
+        val stale = ArrayList<String>()
+        db.rawQuery(
+            "SELECT id FROM channels WHERE playlist_id=? AND bucket=?",
+            arrayOf(playlistId, LIVE)
+        ).use { cursor ->
+            while (cursor.moveToNext()) {
+                val id = cursor.getString(0) ?: continue
+                if (id !in activeIds) stale.add(id)
+            }
+        }
+        if (stale.isEmpty()) return@write 0
+        var deleted = 0
+        db.beginTransaction()
+        try {
+            val delChan = db.compileStatement("DELETE FROM channels WHERE playlist_id=? AND bucket=? AND id=?")
+            val delEpg = db.compileStatement("DELETE FROM epg_cache WHERE playlist_id=? AND channel_id=?")
+            for (id in stale) {
+                delChan.clearBindings()
+                delChan.bindString(1, playlistId)
+                delChan.bindString(2, LIVE)
+                delChan.bindString(3, id)
+                deleted += delChan.executeUpdateDelete()
+                delEpg.clearBindings()
+                delEpg.bindString(1, playlistId)
+                delEpg.bindString(2, id)
+                delEpg.executeUpdateDelete()
+            }
+            if (deleted > 0) {
+                touchLibrary(db, playlistId)
+                NameStrip.clearCaches()
+            }
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+        deleted
+    }
+
     fun insertMissing(
         playlistId: String,
         bucket: String,
@@ -1030,12 +1155,19 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
                   AND IFNULL(group_title,'') NOT LIKE '%Teams%'
                 """.trimIndent()
             )
-            val catchupStmt = db.compileStatement(
+            val updateExisting = db.compileStatement(
                 """
-                UPDATE channels SET catchup_type=?, catchup_source=?, catchup_days=?, tv_archive=?, tv_archive_duration=?
+                UPDATE channels SET name=?, stream_url=?, logo_url=?,
+                    epg_channel_id=?, catchup_type=?, catchup_source=?, catchup_days=?,
+                    tv_archive=?, tv_archive_duration=?,
+                    is_event_slot=?, event_start_ms=?, event_end_ms=?
                 WHERE playlist_id=? AND bucket=? AND id=?
                 """.trimIndent()
             )
+            val clearStaleEpg = db.compileStatement(
+                "DELETE FROM epg_cache WHERE playlist_id=? AND (channel_id=? OR channel_id=?)"
+            )
+            var updatedAnyLive = false
             for (channel in channels) {
                 channelStmt.clearBindings()
                 channelStmt.bindString(1, playlistId)
@@ -1057,9 +1189,12 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
                 val evStatus = if (bucket == LIVE) {
                     NameStrip.inspect(channel.name, channel.groupTitle, channel.epgChannelId)
                 } else null
-                channelStmt.bindLong(21, if (evStatus?.isEventSlot == true) 1L else 0L)
-                channelStmt.bindLong(22, evStatus?.eventStartMs ?: 0L)
-                channelStmt.bindLong(23, evStatus?.eventEndMs ?: 0L)
+                val evFlag = if (evStatus?.isEventSlot == true) 1L else 0L
+                val evStart = evStatus?.eventStartMs ?: 0L
+                val evEnd = evStatus?.eventEndMs ?: 0L
+                channelStmt.bindLong(21, evFlag)
+                channelStmt.bindLong(22, evStart)
+                channelStmt.bindLong(23, evEnd)
                 val inserted = channelStmt.executeInsert() != -1L
                 val teamGroup = channel.groupTitle?.contains("Teams", ignoreCase = true) == true
                 if (inserted) {
@@ -1082,16 +1217,39 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
                     replaceTeam.bindString(18, playlistId)
                     replaceTeam.bindString(19, bucket)
                     replaceTeam.bindString(20, channel.id)
-                    if (replaceTeam.executeUpdateDelete() > 0) newChannels.add(channel)
+                    if (replaceTeam.executeUpdateDelete() > 0) {
+                        newChannels.add(channel)
+                        if (bucket == LIVE) updatedAnyLive = true
+                    }
                 } else {
-                    catchupStmt.clearBindings()
-                    bindCatchup(catchupStmt, 1, channel)
-                    catchupStmt.bindString(6, playlistId)
-                    catchupStmt.bindString(7, bucket)
-                    catchupStmt.bindString(8, channel.id)
-                    catchupStmt.executeUpdateDelete()
+                    updateExisting.clearBindings()
+                    updateExisting.bindString(1, channel.name)
+                    updateExisting.bindString(2, channel.streamUrl)
+                    bindOptional(updateExisting, 3, channel.logoUrl)
+                    bindOptional(updateExisting, 4, channel.epgChannelId)
+                    bindCatchup(updateExisting, 5, channel)
+                    updateExisting.bindLong(10, evFlag)
+                    updateExisting.bindLong(11, evStart)
+                    updateExisting.bindLong(12, evEnd)
+                    updateExisting.bindString(13, playlistId)
+                    updateExisting.bindString(14, bucket)
+                    updateExisting.bindString(15, channel.id)
+                    if (updateExisting.executeUpdateDelete() > 0) {
+                        newChannels.add(channel)
+                        if (bucket == LIVE) {
+                            updatedAnyLive = true
+                            if (evFlag == 1L) {
+                                clearStaleEpg.clearBindings()
+                                clearStaleEpg.bindString(1, playlistId)
+                                clearStaleEpg.bindString(2, channel.id)
+                                clearStaleEpg.bindString(3, channel.epgChannelId ?: channel.id)
+                                clearStaleEpg.executeUpdateDelete()
+                            }
+                        }
+                    }
                 }
             }
+            if (updatedAnyLive) NameStrip.clearCaches()
             if (newCategories.isNotEmpty() || newChannels.isNotEmpty()) touchLibrary(db, playlistId)
             db.setTransactionSuccessful()
         } finally {
@@ -1119,6 +1277,7 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
 
     private fun touchLibrary(db: SQLiteDatabase, playlistId: String) {
         dashHold = null
+        sorted247Hold = null
         db.execSQL(
             "INSERT INTO library_meta(playlist_id, stamp) VALUES(?, 1) ON CONFLICT(playlist_id) DO UPDATE SET stamp = stamp + 1",
             arrayOf(playlistId)
@@ -1129,6 +1288,7 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         val kind = if (bucket == LIVE) ContentKind.LIVE else ContentKind.VOD
         val categories = ArrayList<Category>()
         val seenIds = HashSet<String>()
+        var has247 = false
         db.query(
             "categories",
             arrayOf("id", "name"),
@@ -1141,8 +1301,13 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
             while (cursor.moveToNext()) {
                 val id = cursor.getString(0) ?: continue
                 val shown = NameImages.strip(cursor.getString(1) ?: "")
+                val label = shown.ifBlank { id }
                 seenIds.add(id)
-                categories.add(Category(id = id, name = shown.ifBlank { id }, kind = kind))
+                if (bucket == LIVE && TwentyFourSeven.is247(label)) {
+                    has247 = true
+                    continue
+                }
+                categories.add(Category(id = id, name = label, kind = kind))
             }
         }
 
@@ -1162,8 +1327,24 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
                 val id = cursor.getString(0) ?: continue
                 if (id == PlaylistLoader.ALL_ID || !seenIds.add(id)) continue
                 val title = NameImages.strip(cursor.getString(1) ?: "").ifBlank { id }
+                if (bucket == LIVE && TwentyFourSeven.is247(title)) {
+                    has247 = true
+                    continue
+                }
                 categories.add(Category(id = id, name = title, kind = kind))
                 addedAny = true
+            }
+            if (bucket == LIVE) {
+                if (!has247) {
+                    db.rawQuery(
+                        "SELECT 1 FROM channels WHERE playlist_id=? AND bucket=? AND ${TwentyFourSeven.SQL_MATCH} LIMIT 1",
+                        arrayOf(playlistId, LIVE)
+                    ).use { c -> if (c.moveToFirst()) has247 = true }
+                }
+                if (has247 && seenIds.add(TwentyFourSeven.GROUP_ID)) {
+                    categories.add(Category(id = TwentyFourSeven.GROUP_ID, name = TwentyFourSeven.GROUP_NAME, kind = ContentKind.LIVE))
+                    addedAny = true
+                }
             }
             if (addedAny) categories.sortBy { it.name.lowercase() }
         }
@@ -1737,6 +1918,14 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         val channelCount: Int
     )
     private data class DashHold(val playlistId: String, val stamp: Long, val body: DashboardSnapshot)
+    private data class Sorted247Hold(
+        val playlistId: String,
+        val stamp: Long,
+        val hiddenHash: Int,
+        val countriesHash: Int,
+        val includeInternational: Boolean?,
+        val channels: List<com.olympus.iptv.data.Channel>
+    )
 
     private data class FastCountryHold(
         val playlistId: String,
@@ -1967,6 +2156,19 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
             }
         }
         map[PlaylistLoader.ALL_ID] = totalActive
+        db.rawQuery(
+            "SELECT COUNT(*) FROM channels WHERE playlist_id=? AND bucket=?$hideSql AND ${TwentyFourSeven.SQL_MATCH}",
+            ArrayList<String>(2 + hiddenIds.size).apply {
+                add(playlistId)
+                add(LIVE)
+                addAll(hiddenIds)
+            }.toTypedArray()
+        ).use { cursor ->
+            if (cursor.moveToFirst()) {
+                val c = cursor.getInt(0)
+                if (c > 0) map[TwentyFourSeven.GROUP_ID] = c
+            }
+        }
         map
     }
 
@@ -2165,6 +2367,7 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         }
         val rows = ArrayList<DashboardGroup>(names.size)
         val seenKeys = HashSet<String>(names.size)
+        var has247Group = false
         for ((key, rawName) in names) {
             seenKeys.add(key)
             val split = key.indexOf('\u0000')
@@ -2174,6 +2377,10 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
                 fallbackTitles[key]?.takeIf { it.isNotBlank() } ?: rawName
             } else {
                 rawName
+            }
+            if (bucket == LIVE && TwentyFourSeven.is247(name)) {
+                has247Group = true
+                continue
             }
             val parsed = CountryIndex.idFor(name).orEmpty()
             val countryId = when {
@@ -2191,6 +2398,10 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
             val id = key.substring(split + 1)
             if (id == PlaylistLoader.ALL_ID) continue
             val resolvedName = fallbackTitles[key]?.takeIf { it.isNotBlank() } ?: id
+            if (bucket == LIVE && TwentyFourSeven.is247(resolvedName)) {
+                has247Group = true
+                continue
+            }
             val parsed = CountryIndex.idFor(resolvedName).orEmpty()
             val countryId = when {
                 parsed.isNotEmpty() -> parsed
@@ -2198,6 +2409,13 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
                 else -> liveCountry[id] ?: titled[id] ?: named[id].orEmpty()
             }
             rows.add(DashboardGroup(id, resolvedName, kindLabel(bucket), count, countryId))
+        }
+        val count247 = db.rawQuery(
+            "SELECT COUNT(*) FROM channels WHERE playlist_id=? AND bucket=? AND ${TwentyFourSeven.SQL_MATCH}",
+            arrayOf(playlistId, LIVE)
+        ).use { c -> if (c.moveToFirst()) c.getInt(0) else 0 }
+        if (count247 > 0 || has247Group) {
+            rows.add(DashboardGroup(TwentyFourSeven.GROUP_ID, TwentyFourSeven.GROUP_NAME, "LIVE", count247, ""))
         }
         rows
     }
@@ -2260,6 +2478,13 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
                 if (c.moveToFirst()) c.getInt(0) else 0
             }
         }
+        if (groupId == TwentyFourSeven.GROUP_ID) {
+            val (where, args) = bucketNeedleWhere(playlistId, LIVE, needle)
+            return@read readableDatabase.rawQuery(
+                "SELECT COUNT(*) FROM channels WHERE $where AND ${TwentyFourSeven.SQL_MATCH}",
+                args
+            ).use { c -> if (c.moveToFirst()) c.getInt(0) else 0 }
+        }
         val catCount = countByCategoryIndexed(playlistId, groupId, needle)
         if (catCount > 0) return@read catCount
         val titleCount = countByGroupTitleIndexed(playlistId, groupId, groupName, needle)
@@ -2280,11 +2505,105 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
             val (where, args) = bucketNeedleWhere(playlistId, LIVE, needle)
             return@read querySlim(where, args, byName, capped)
         }
+        if (groupId == TwentyFourSeven.GROUP_ID) {
+            val (where, args) = bucketNeedleWhere(playlistId, LIVE, needle)
+            val all = querySlim("$where AND ${TwentyFourSeven.SQL_MATCH}", args, false, 10000)
+                .map { it.copy(groupId = TwentyFourSeven.GROUP_ID) }
+                .sortedWith(
+                    compareBy<SlimChannel>(
+                        { TwentyFourSeven.sortKey(it.name) },
+                        { it.name.lowercase(java.util.Locale.US) },
+                        { it.id }
+                    )
+                )
+            return@read if (all.size <= capped) all else all.subList(0, capped)
+        }
 
         val byCategory = queryByCategoryIndexed(playlistId, groupId, needle, byName, capped)
         if (byCategory.isNotEmpty()) return@read byCategory
 
         queryByGroupTitleIndexed(playlistId, groupId, groupName, needle, byName, capped)
+    }
+
+    fun sanitizeGroupNames(playlistId: String, tokens: List<String>): Int = write {
+        val clean = tokens.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+        if (clean.isEmpty()) return@write 0
+        val db = writableDatabase
+        val combined = Regex(
+            clean.sortedByDescending { it.length }.joinToString("|") { Regex.escape(it) },
+            RegexOption.IGNORE_CASE
+        )
+        val multiSpace = Regex("""\s{2,}""")
+        fun stripAll(raw: String): String =
+            multiSpace.replace(combined.replace(raw, " "), " ").trim()
+        var changed = 0
+        db.beginTransaction()
+        try {
+            val catUpdates = ArrayList<Triple<String, String, String>>()
+            db.query(
+                "categories",
+                arrayOf("bucket", "id", "name"),
+                "playlist_id=?",
+                arrayOf(playlistId),
+                null,
+                null,
+                null
+            ).use { cursor ->
+                while (cursor.moveToNext()) {
+                    val bucket = cursor.getString(0) ?: continue
+                    val id = cursor.getString(1) ?: continue
+                    val name = cursor.getString(2) ?: continue
+                    val next = stripAll(name)
+                    if (next.isNotEmpty() && next != name) {
+                        catUpdates.add(Triple(bucket, id, next))
+                    }
+                }
+            }
+            if (catUpdates.isNotEmpty()) {
+                val stmt = db.compileStatement(
+                    "UPDATE categories SET name=? WHERE playlist_id=? AND bucket=? AND id=?"
+                )
+                for ((bucket, id, next) in catUpdates) {
+                    stmt.clearBindings()
+                    stmt.bindString(1, next)
+                    stmt.bindString(2, playlistId)
+                    stmt.bindString(3, bucket)
+                    stmt.bindString(4, id)
+                    changed += stmt.executeUpdateDelete()
+                }
+            }
+            val groupTitles = ArrayList<Pair<String, String>>()
+            db.rawQuery(
+                "SELECT DISTINCT group_title FROM channels WHERE playlist_id=? AND group_title IS NOT NULL AND group_title!=''",
+                arrayOf(playlistId)
+            ).use { cursor ->
+                while (cursor.moveToNext()) {
+                    val raw = cursor.getString(0) ?: continue
+                    val next = stripAll(raw)
+                    if (next.isNotEmpty() && next != raw) groupTitles.add(raw to next)
+                }
+            }
+            if (groupTitles.isNotEmpty()) {
+                val stmt = db.compileStatement(
+                    "UPDATE channels SET group_title=? WHERE playlist_id=? AND group_title=?"
+                )
+                for ((raw, next) in groupTitles) {
+                    stmt.clearBindings()
+                    stmt.bindString(1, next)
+                    stmt.bindString(2, playlistId)
+                    stmt.bindString(3, raw)
+                    stmt.executeUpdateDelete()
+                }
+            }
+            if (changed > 0 || groupTitles.isNotEmpty()) {
+                touchLibrary(db, playlistId)
+                runCatching { dashFile().delete() }
+            }
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+        changed
     }
 
     private fun bucketNeedleWhere(playlistId: String, bucket: String, needle: String): Pair<String, Array<String>> {
@@ -2977,7 +3296,7 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
             val root = JsonParser.parseString(file.readText()).asJsonObject
             if (root.get("playlistId")?.asString != playlistId || root.get("stamp")?.asLong != stamp) return null
             val groupRows = root.getAsJsonArray("groups")
-            if (root.get("countryBasis")?.asString != "sql3") return null
+            if (root.get("countryBasis")?.asString != "sql4") return null
             if (groupRows != null && groupRows.size() > 0) {
                 val first = groupRows[0]
                 if (!first.isJsonObject || !first.asJsonObject.has("countryId")) return null
@@ -3017,7 +3336,7 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         root.addProperty("playlistId", playlistId)
         root.addProperty("stamp", stamp)
         root.addProperty("channelCount", body.channelCount)
-        root.addProperty("countryBasis", "sql3")
+        root.addProperty("countryBasis", "sql4")
         val groups = com.google.gson.JsonArray()
         for (group in body.groups) {
             val row = JsonObject()

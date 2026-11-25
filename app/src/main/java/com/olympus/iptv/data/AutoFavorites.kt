@@ -571,19 +571,29 @@ object AutoFavorites {
         val picks = ArrayList<ChannelPick>()
         for ((target, label) in specs) {
             val want = target.lowercase()
-            var exact: GuideChannel? = null
-            var fallback: GuideChannel? = null
+            var exactUs: GuideChannel? = null
+            var exactAny: GuideChannel? = null
+            var fallbackUs: GuideChannel? = null
+            var fallbackAny: GuideChannel? = null
             for (channel in channels) {
+                val cid = com.olympus.iptv.playlist.CountryIndex.idFor(channel.group)
+                if (cid != null && cid != "us") continue
                 val g = channel.group.uppercase()
-                if (!g.startsWith("USA") && !g.startsWith("US ") && !g.startsWith("US|") && !g.startsWith("US:") && !g.contains("UNITED STATES")) continue
+                val isUs = cid == "us" || g.startsWith("USA") || g.startsWith("US ") || g.startsWith("US|") || g.startsWith("US:") || g.contains("UNITED STATES")
                 val name = bare(channel.name)
                 if (name == want) {
-                    exact = channel
-                    break
+                    if (isUs) {
+                        exactUs = channel
+                        break
+                    } else if (exactAny == null) {
+                        exactAny = channel
+                    }
+                } else if (name == "$want hd" || name == "$want fhd" || name == "$want east" || name == "$want 4k" || name == "$want uhd") {
+                    if (isUs && fallbackUs == null) fallbackUs = channel
+                    else if (fallbackAny == null) fallbackAny = channel
                 }
-                if (fallback == null && (name == "$want hd" || name == "$want fhd" || name == "$want east")) fallback = channel
             }
-            val chosen = exact ?: fallback ?: continue
+            val chosen = exactUs ?: exactAny ?: fallbackUs ?: fallbackAny ?: continue
             picks.add(ChannelPick(chosen.id, chosen.name, label))
         }
         return picks

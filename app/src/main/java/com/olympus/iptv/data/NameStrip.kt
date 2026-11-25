@@ -151,7 +151,12 @@ object NameStrip {
             }
         }
 
-        val colonIdx = ch.indexOf(':')
+        val rawColonIdx = ch.indexOf(':')
+        val colonIdx = if (rawColonIdx > 0 &&
+            rawColonIdx + 1 < ch.length &&
+            ch[rawColonIdx - 1].isDigit() &&
+            ch[rawColonIdx + 1].isDigit()
+        ) -1 else rawColonIdx
         val sepIdx = when {
             colonIdx > 0 && (firstPipe < 0 || colonIdx < firstPipe) -> colonIdx
             firstPipe > 0 -> firstPipe
@@ -161,28 +166,30 @@ object NameStrip {
             val left = ch.substring(0, sepIdx).trim()
             val rightRaw = ch.substring(sepIdx + 1).trim()
             val endsWithDigits = left.isNotEmpty() && left.last().isDigit() && left.any { it.isLetter() }
-            if (endsWithDigits) {
+            val inlineStartMs = DummyEpg.parseEventStartMillis(rightRaw)
+            if (endsWithDigits || inlineStartMs != null) {
 
                 val atIdx = rightRaw.lastIndexOf('@')
                 val inlineEvent = (if (atIdx > 0) rightRaw.substring(0, atIdx) else rightRaw)
                     .trim(' ', '-', ':', '|', '–', '—')
-                val parsedStart = DummyEpg.parseEventStartMillis(rightRaw) ?: nowStartMs
+                val parsedStart = inlineStartMs ?: nowStartMs
                 val parsedEnd = when {
+                    inlineStartMs != null && inlineStartMs > 0L -> inlineStartMs + DEFAULT_EVENT_DURATION_MS
                     nowEndMs > parsedStart -> nowEndMs
                     parsedStart > 0L -> parsedStart + DEFAULT_EVENT_DURATION_MS
                     else -> 0L
+                }
+                if (!isPlaceholderEvent(inlineEvent)) {
+                    val cleanEvent = stripChannelPrefixFromEpg(inlineEvent, left)
+                    val start = if (parsedStart > 0L) parsedStart else -1L
+                    return StreamStatus(left, cleanEvent, isEventSlot = true, eventStartMs = start, eventEndMs = parsedEnd)
                 }
                 if (!isPlaceholderEvent(cleanEpg)) {
                     val event = stripChannelPrefixFromEpg(cleanEpg, left)
                     val start = if (parsedStart > 0L) parsedStart else -1L
                     return StreamStatus(left, event, isEventSlot = true, eventStartMs = start, eventEndMs = parsedEnd)
                 }
-                if (isPlaceholderEvent(inlineEvent)) {
-                    return StreamStatus(left, null, isEventSlot = true, eventStartMs = 0L, eventEndMs = 0L)
-                }
-                val cleanEvent = stripChannelPrefixFromEpg(inlineEvent, left)
-                val start = if (parsedStart > 0L) parsedStart else -1L
-                return StreamStatus(left, cleanEvent, isEventSlot = true, eventStartMs = start, eventEndMs = parsedEnd)
+                return StreamStatus(left, null, isEventSlot = true, eventStartMs = 0L, eventEndMs = 0L)
             } else if (isPlaceholderEvent(rightRaw)) {
 
                 return StreamStatus(left, null, isEventSlot = true, eventStartMs = 0L, eventEndMs = 0L)
@@ -203,6 +210,21 @@ object NameStrip {
                     eventEndMs = if (explicitOffAir) 0L else nowEndMs
                 )
             }
+        }
+
+        val bareStartMs = DummyEpg.parseEventStartMillis(ch)
+        if (bareStartMs != null) {
+            val atIdx = ch.lastIndexOf('@')
+            val inlineEvent = (if (atIdx > 0) ch.substring(0, atIdx) else ch)
+                .trim(' ', '-', ':', '|', '–', '—')
+            val parsedEnd = if (nowEndMs > bareStartMs) nowEndMs else bareStartMs + DEFAULT_EVENT_DURATION_MS
+            return StreamStatus(
+                cleanChannel = inlineEvent.ifBlank { ch },
+                airingEvent = inlineEvent.ifBlank { null },
+                isEventSlot = true,
+                eventStartMs = bareStartMs,
+                eventEndMs = parsedEnd
+            )
         }
 
         val explicitOffAir = cleanEpg.isNotEmpty() && isPlaceholderEvent(cleanEpg)
