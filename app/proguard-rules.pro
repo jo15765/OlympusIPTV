@@ -1,4 +1,6 @@
 # Olympus-IPTV release shrink/obfuscate keeps.
+# Skip slow multi-pass R8 optimization over large kept libs (BouncyCastle/SMBJ/Media3/Cast) while still shrinking unused code & resources.
+-dontoptimize
 
 -keepattributes *Annotation*, Signature, InnerClasses, EnclosingMethod
 -keepattributes SourceFile,LineNumberTable
@@ -31,30 +33,26 @@
 -keep class com.olympus.iptv.playlist.ReviewSnippet { *; }
 -keep class com.olympus.iptv.OlympusIptvApp$FreshHold { *; }
 
-# OkHttp / Okio
+# OkHttp / Okio / Media3 / Coil / Cast ship their own official consumer ProGuard rules.
 -dontwarn okhttp3.**
 -dontwarn okio.**
--keep class okhttp3.** { *; }
--keep interface okhttp3.** { *; }
-
-# Media3
 -dontwarn androidx.media3.**
--keep class androidx.media3.** { *; }
-
-# Coil
 -dontwarn coil.**
--keep class coil.** { *; }
-
-# Cast / Play Services
 -dontwarn com.google.android.gms.**
--keep class com.google.android.gms.cast.** { *; }
--keep class com.google.android.gms.common.** { *; }
 
-# BouncyCastle / SMB (portal / shares)
+# BouncyCastle / SMB (keep only provider & cipher classes used by smbj so R8 strips unused crypto)
 -dontwarn org.bouncycastle.**
--keep class org.bouncycastle.** { *; }
+-keep class org.bouncycastle.jce.provider.** { *; }
+-keep class org.bouncycastle.jcajce.provider.** { *; }
+-keep class org.bouncycastle.crypto.digests.** { *; }
+-keep class org.bouncycastle.crypto.engines.** { *; }
+-keep class org.bouncycastle.crypto.modes.** { *; }
+-keep class org.bouncycastle.crypto.macs.** { *; }
+-keep class org.bouncycastle.crypto.params.** { *; }
 -dontwarn com.hierynomus.**
--keep class com.hierynomus.** { *; }
+-keep class com.hierynomus.security.bc.** { *; }
+-keep class com.hierynomus.smbj.auth.** { *; }
+-keep class com.hierynomus.mssmb2.** { *; }
 
 # Kotlin
 -dontwarn kotlin.**

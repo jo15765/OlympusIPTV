@@ -87,11 +87,11 @@ android {
                 abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86_64")
             }
         }
-    }
-
-    packaging {
-        jniLibs {
-            useLegacyPackaging = false
+        create("fastRelease") {
+            initWith(getByName("release"))
+            isMinifyEnabled = false
+            isShrinkResources = false
+            matchingFallbacks += listOf("release")
         }
     }
 
@@ -117,11 +117,23 @@ android {
 
     // Never ship portal/data (e.g. store.json ~48MB) or Node portal trees inside the APK.
     packaging {
+        jniLibs {
+            useLegacyPackaging = false
+        }
         resources {
             excludes += setOf(
                 "**/portal/data/**",
                 "**/store.json",
-                "META-INF/DEPENDENCIES"
+                "DebugProbesKt.bin",
+                "kotlin-tooling-metadata.json",
+                "META-INF/DEPENDENCIES",
+                "META-INF/LICENSE*",
+                "META-INF/NOTICE*",
+                "META-INF/*.version",
+                "META-INF/maven/**",
+                "META-INF/proguard/**",
+                "META-INF/com.android.tools/**",
+                "org/bouncycastle/x509/CertPathReviewerMessages*.properties"
             )
         }
     }
