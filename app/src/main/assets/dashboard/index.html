@@ -618,6 +618,87 @@
     .admin-note { margin: 12px 2px 0; color: var(--muted); font-size: 13px; }
     .clean-lead { margin: 4px 0 0; color: #C9BBA8; font-size: 14px; }
     .epg-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 16px; }
+    .epg-grid[hidden], #epgTools[hidden], #epgHomeHead[hidden], #epgTools .clean-card[hidden], #epgTools .clean-grid[hidden] { display: none !important; }
+    #epgTools .clean-grid { grid-template-columns: 1fr; }
+    #epgTools .panel-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+    #epgTools .panel-head h2 { margin: 0; font-size: 20px; flex: 1; }
+    .epg-tool-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; padding-bottom: 14px; border-bottom: 1px solid var(--stroke); }
+    .epg-tool-tab {
+      background: var(--elev); color: var(--muted); border: 1px solid var(--stroke);
+      border-radius: 999px; padding: 7px 14px; font-size: 12.5px; font-weight: 600;
+      cursor: pointer; transition: all .15s ease;
+    }
+    .epg-tool-tab:hover { color: var(--ink); border-color: var(--accent); }
+    .epg-tool-tab.active {
+      background: rgba(240, 180, 90, 0.16); color: var(--accent);
+      border-color: var(--accent); box-shadow: 0 0 0 1px rgba(240, 180, 90, 0.25);
+    }
+    #panelAdmin > div[hidden], #adminSubnav[hidden] { display: none !important; }
+    .admin-subnav {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      margin: 0 0 18px; padding: 10px 14px;
+      background: var(--elev); border: 1px solid var(--stroke); border-radius: 14px;
+    }
+    .admin-subnav-back {
+      padding: 6px 12px; border-radius: 999px; font-size: 12.5px; font-weight: 600;
+      background: rgba(255,255,255,.06); color: var(--ink); border: 1px solid var(--stroke);
+      cursor: pointer; margin-right: 4px;
+    }
+    .admin-subnav-back:hover { border-color: var(--accent); color: var(--accent); }
+    .admin-subnav-pills { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; }
+    .admin-subnav-pill {
+      padding: 6px 12px; border-radius: 999px; font-size: 12.5px; font-weight: 600;
+      background: transparent; color: var(--muted); border: 1px solid transparent;
+      cursor: pointer; transition: all .14s ease;
+    }
+    .admin-subnav-pill:hover { color: var(--ink); background: rgba(255,255,255,.05); }
+    .admin-subnav-pill.active {
+      background: rgba(240,180,90,.16); color: var(--accent); border-color: rgba(240,180,90,.45);
+    }
+    .admin-page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+    .admin-page-head h2 { margin: 0 0 4px; font-size: 22px; }
+    .admin-page-head p { margin: 0; color: var(--muted); font-size: 13.5px; }
+    .admin-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 16px; }
+    .admin-surface-card {
+      background: var(--elev); border: 1px solid var(--stroke); border-radius: 16px;
+      padding: 20px; display: flex; flex-direction: column; gap: 12px;
+    }
+    .admin-surface-card h3 { margin: 0; font-size: 16px; font-weight: 700; color: var(--ink); }
+    .admin-surface-card .hint { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.5; }
+    .admin-surface-card.danger-card { border-color: rgba(248,113,113,.35); background: rgba(248,113,113,.04); }
+    .admin-surface-card.danger-card h3 { color: #fca5a5; }
+    .vpn-status-banner {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+      padding: 12px 16px; border-radius: 12px; background: rgba(240,180,90,.08);
+      border: 1px solid rgba(240,180,90,.24); color: var(--ink); font-size: 13.5px; font-weight: 500;
+      margin-bottom: 14px;
+    }
+    .vpn-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+    .vpn-form-grid label { display: block; font-size: 11.5px; font-weight: 600; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .04em; }
+    .vpn-form-grid input, .vpn-form-grid select {
+      width: 100%; padding: 10px 12px; border-radius: 10px;
+      background: var(--bg); border: 1px solid var(--stroke); color: var(--ink); font-size: 13.5px;
+    }
+    .vpn-actions-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
+    .log-terminal-card {
+      background: var(--elev); border: 1px solid var(--stroke); border-radius: 16px; overflow: hidden;
+    }
+    .log-terminal-bar {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+      padding: 12px 16px; border-bottom: 1px solid var(--stroke); background: rgba(255,255,255,.02);
+    }
+    .log-terminal-bar .log-tools { display: flex; align-items: center; gap: 8px; margin: 0; }
+    .log-terminal-bar .log-tools button, .log-terminal-bar .log-tools a {
+      padding: 6px 12px; border-radius: 8px; font-size: 12.5px; font-weight: 600;
+      background: rgba(255,255,255,.06); color: var(--ink); border: 1px solid var(--stroke);
+      text-decoration: none; cursor: pointer;
+    }
+    .log-terminal-bar .log-tools button:hover, .log-terminal-bar .log-tools a:hover { border-color: var(--accent); color: var(--accent); }
+    #adminLogPage #logView {
+      margin: 0; border: 0; border-radius: 0; padding: 16px; min-height: 280px; max-height: 55vh;
+      background: rgba(8,10,14,.65); font-size: 12.5px; line-height: 1.55;
+    }
+    #adminLogPage #logList { padding: 12px 16px; border-top: 1px solid var(--stroke); display: flex; flex-wrap: wrap; gap: 8px; }
     .epg-card {
       display: flex;
       flex-direction: column;
@@ -642,16 +723,38 @@
     #epgToolsBack { width: auto; margin-bottom: 12px; }
     .sanitize-board { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
     .sanitize-pair { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: stretch; min-height: 280px; }
-    .sanitize-col h4 { margin: 0 0 8px; color: #E2A15A; font-size: 15px; }
-    .sanitize-list { max-height: 46vh; overflow: auto; display: flex; flex-direction: column; gap: 6px; }
-    .sanitize-list button { text-align: left; background: #221F1A; color: #F6F1E7; border: 1px solid #433B31; border-radius: 10px; padding: 8px 10px; }
-    .sanitize-list button.on { border-color: #F0C48A; background: #2C271F; }
-    .sanitize-arrows { display: flex; flex-direction: column; justify-content: center; gap: 8px; }
-    .sanitize-arrows button { width: 44px; height: 40px; border-radius: 10px; }
-    #sanitizeCleanup { margin-top: 16px; }
-    #sanitizeBusy { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(20, 18, 16, 0.88); color: #F6F1E7; font-size: 28px; font-weight: 800; z-index: 5; animation: sanitizeFlash 0.7s steps(2, end) infinite; }
     #epgSanitizeTool { position: relative; }
-    @keyframes sanitizeFlash { 50% { opacity: 0.28; } }
+    .sanitize-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid var(--stroke); }
+    .sanitize-head-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .sanitize-summary-pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; background: rgba(240,180,90,.12); border: 1px solid rgba(240,180,90,.3); color: var(--accent); font-size: 12px; font-weight: 600; }
+    .sanitize-grid { display: grid; grid-template-columns: 1.5fr 1fr; gap: 16px; }
+    @media (max-width: 900px) { .sanitize-grid { grid-template-columns: 1fr; } }
+    .sanitize-box { background: var(--elev); border: 1px solid var(--stroke); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+    .sanitize-box-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+    .sanitize-box-head h4 { margin: 0; font-size: 14px; font-weight: 700; color: var(--ink); display: flex; align-items: center; gap: 8px; }
+    .sanitize-count { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,.07); color: var(--muted); }
+    .sanitize-mini-actions { display: flex; gap: 6px; }
+    .sanitize-mini-actions button { padding: 4px 10px; font-size: 11.5px; border-radius: 8px; background: rgba(255,255,255,.05); color: var(--muted); border: 1px solid var(--stroke); cursor: pointer; }
+    .sanitize-mini-actions button:hover { color: var(--ink); border-color: var(--accent); }
+    .sanitize-add-row { display: flex; gap: 8px; }
+    .sanitize-add-row input { flex: 1; min-width: 0; padding: 8px 12px; border-radius: 10px; background: var(--bg); border: 1px solid var(--stroke); color: var(--ink); font-size: 13px; }
+    .sanitize-add-row button { padding: 8px 14px; border-radius: 10px; font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+    .sanitize-chips { display: flex; flex-wrap: wrap; gap: 8px; max-height: 290px; overflow-y: auto; padding: 4px 2px; }
+    .sanitize-chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 11px; border-radius: 999px; font-size: 12.5px; font-weight: 500;
+      border: 1px solid var(--stroke); background: rgba(255,255,255,.03); color: var(--muted);
+      cursor: pointer; transition: all .14s ease; user-select: none;
+    }
+    .sanitize-chip:hover { border-color: var(--accent); color: var(--ink); }
+    .sanitize-chip.strip {
+      background: rgba(240,180,90,.16); border-color: var(--accent); color: var(--accent); font-weight: 600;
+    }
+    .sanitize-chip .chip-dot { font-size: 11px; opacity: .85; }
+    .sanitize-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--stroke); }
+    #sanitizeCleanup { margin-top: 0; }
+    #sanitizeBusy { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--accent); font-weight: 600; }
+    #sanitizeBusy[hidden] { display: none !important; }
     .clean-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
     .clean-card {
       background: #23262f;
@@ -2785,6 +2888,17 @@
       </section>
 
       <section class="card panel" id="panelAdmin" hidden>
+        <div class="admin-subnav" id="adminSubnav" hidden>
+          <button class="admin-subnav-back" id="adminSubnavBack" type="button">← Settings</button>
+          <div class="admin-subnav-pills">
+            <button class="admin-subnav-pill" type="button" data-admin-page="refresh">Refresh &amp; Sync</button>
+            <button class="admin-subnav-pill" type="button" data-admin-page="epg">EPG &amp; Cleanup</button>
+            <button class="admin-subnav-pill" type="button" data-admin-page="web">Web-UI Access</button>
+            <button class="admin-subnav-pill" type="button" data-admin-page="vpn">VPN Tunnel</button>
+            <button class="admin-subnav-pill" type="button" data-admin-page="streams">Active Streams</button>
+            <button class="admin-subnav-pill" type="button" data-admin-page="logs">Error Log</button>
+          </div>
+        </div>
         <div id="adminHome">
           <div class="panel-head">
             <div>
@@ -2834,54 +2948,71 @@
               <span>Review system events and issues</span>
               <em id="adminLogAge">0 errors</em>
             </button>
+            <button class="admin-card" id="adminRemovePlaylistCard" type="button" style="border-color:rgba(248,113,113,.35)">
+              <span class="admin-icon" style="color:#f87171"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg></span>
+              <strong style="color:#fca5a5">Remove Playlist</strong>
+              <span>Reset this TV and enter a new playlist</span>
+              <em style="color:#f87171">Danger zone</em>
+            </button>
           </div>
         </div>
         <div id="adminRefreshPage" hidden>
-          <div class="panel-head">
-            <button class="secondary" id="adminRefreshBack" type="button">Back</button>
-            <h2>Refresh &amp; Maintenance</h2>
+          <div class="admin-page-head">
+            <div>
+              <h2>Refresh &amp; Maintenance</h2>
+              <p>Sync your provider catalog, reset stream health flags, or remove the active playlist.</p>
+            </div>
+            <button class="secondary" id="adminRefreshBack" type="button" hidden>← Settings</button>
           </div>
-          <div class="clean-grid" style="margin-top:12px">
-            <article class="clean-card">
+          <div class="admin-card-grid">
+            <article class="admin-surface-card">
               <h3>Sync Provider Catalog</h3>
               <p class="hint">Fetch new Live TV channels, Movies, and Series from your playlist provider onto this device.</p>
-              <div class="clean-actions" style="justify-content:flex-start">
+              <div class="vpn-actions-row">
                 <button class="primary" id="adminSyncNowBtn" type="button">↻ Sync Catalog on TV Now</button>
               </div>
               <p class="note" id="adminSyncStatus"></p>
             </article>
-            <article class="clean-card">
+            <article class="admin-surface-card">
               <h3>Reset Stream Health History</h3>
               <p class="hint">Clear automatic failure flags on channels that previously timed out so they appear at full brightness again.</p>
-              <div class="clean-actions" style="justify-content:flex-start">
+              <div class="vpn-actions-row">
                 <button class="secondary" id="adminClearHealthBtn" type="button">🩺 Reset Dead Channel Flags</button>
               </div>
               <p class="note" id="adminHealthStatus"></p>
             </article>
+            <article class="admin-surface-card danger-card">
+              <h3>Remove Playlist</h3>
+              <p class="hint">Remove the active playlist, clear the local guide cache on this TV, and return to the setup screen so you can add a new playlist.</p>
+              <div class="vpn-actions-row">
+                <button class="danger" id="adminRemovePlaylistBtn" type="button">🗑 Remove Playlist</button>
+              </div>
+              <p class="note" id="adminRemoveStatus"></p>
+            </article>
           </div>
         </div>
         <div id="adminWebPage" hidden>
-          <div class="panel-head">
-            <button class="secondary" id="adminWebBack" type="button">← Settings</button>
+          <div class="admin-page-head">
             <div>
               <h2>Web-UI Access</h2>
-              <p class="panel-subhead">Manage your TV lineup, favorites, DVR, and remote from any browser on the same Wi-Fi.</p>
+              <p>Manage your TV lineup, favorites, DVR, and remote from any browser on the same Wi-Fi.</p>
             </div>
+            <button class="secondary" id="adminWebBack" type="button" hidden>← Settings</button>
           </div>
-          <div class="clean-grid" style="margin-top:12px">
-            <article class="clean-card">
+          <div class="admin-card-grid">
+            <article class="admin-surface-card">
               <span class="web-status-pill">Online · Local Wi-Fi</span>
               <h3>Dashboard Address</h3>
               <p class="hint" id="adminWebCopy">Open this address on a phone, tablet, or computer on the same Wi-Fi network.</p>
               <div class="web-url-box">
                 <span id="adminWebUrl">Loading address…</span>
               </div>
-              <div class="clean-actions" style="justify-content:flex-start;gap:8px">
+              <div class="vpn-actions-row">
                 <button class="primary" id="adminWebCopyBtn" type="button">📋 Copy Address</button>
                 <a class="secondary" id="adminWebOpenBtn" href="#" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center">↗ Open in New Tab</a>
               </div>
             </article>
-            <article class="clean-card">
+            <article class="admin-surface-card">
               <h3>Device &amp; Connection Details</h3>
               <div class="web-meta-row">
                 <span class="web-meta-key">Device ID</span>
@@ -2904,74 +3035,97 @@
           </div>
         </div>
         <div id="adminLogPage" hidden>
-          <div class="panel-head">
-            <button class="secondary" id="adminLogBack" type="button">Back</button>
-            <h2>Error log</h2>
+          <div class="admin-page-head">
+            <div>
+              <h2>Error Log</h2>
+              <p>Newest entries first. Older archive files stay under 400 KB.</p>
+            </div>
+            <button class="secondary" id="adminLogBack" type="button" hidden>← Settings</button>
           </div>
-          <p class="hint">Newest entries first. Drag the corner of the log to resize it. Older files stay under 400 KB.</p>
-          <div class="log-tools">
-            <button id="logSmaller" type="button">A−</button>
-            <button id="logLarger" type="button">A+</button>
-            <a id="logDownload" href="/api/log" download="olympus-iptv-log.txt">Download</a>
+          <div class="log-terminal-card">
+            <div class="log-terminal-bar">
+              <span class="hint" style="margin:0;font-weight:600">Live Diagnostic Log</span>
+              <div class="log-tools">
+                <button id="logSmaller" type="button" title="Decrease font size">A−</button>
+                <button id="logLarger" type="button" title="Increase font size">A+</button>
+                <a id="logDownload" href="/api/log" download="olympus-iptv-log.txt">⬇ Download Log</a>
+              </div>
+            </div>
+            <pre id="logView">Open a log to read it here.</pre>
+            <div id="logList"></div>
           </div>
-          <pre id="logView">Open a log to read it here.</pre>
-          <div id="logList"></div>
         </div>
         <div id="adminStreamsPage" hidden>
-          <div class="panel-head">
-            <button class="secondary" id="adminStreamsBack" type="button">← Settings</button>
+          <div class="admin-page-head">
             <div>
               <h2>Active Streams</h2>
-              <p class="panel-subhead" id="adminStreamsLead">Checking provider connections and public WAN IP…</p>
+              <p id="adminStreamsLead">Checking provider connections and public WAN IP…</p>
             </div>
-            <button class="secondary" id="adminStreamsRefreshBtn" type="button" style="margin-left:auto">↻ Refresh</button>
+            <div class="vpn-actions-row">
+              <button class="secondary" id="adminStreamsBack" type="button" hidden>← Settings</button>
+              <button class="secondary" id="adminStreamsRefreshBtn" type="button">↻ Refresh</button>
+            </div>
           </div>
           <div id="adminStreamsList"></div>
         </div>
         <div id="adminVpnPage" hidden>
-          <div class="panel-head">
-            <button class="secondary" id="adminVpnBack" type="button">Back</button>
-            <h2>VPN</h2>
-          </div>
-          <p class="hint" id="vpnState">Not connected. The dashboard stays on your Wi-Fi.</p>
-          <div class="clean-fields">
+          <div class="admin-page-head">
             <div>
-              <label for="vpnProvider">Provider</label>
-              <select id="vpnProvider">
-                <option value="pia">PIA VPN</option>
-                <option value="proton">Proton VPN</option>
-                <option value="surfshark">Surfshark</option>
-                <option value="nord">NordVPN</option>
-                <option value="wireguard">WireGuard</option>
-              </select>
+              <h2>VPN Tunnel</h2>
+              <p>Route TV streaming traffic securely while keeping this Web-UI accessible on your local Wi-Fi.</p>
             </div>
-            <div id="vpnUserField">
-              <label for="vpnUser">Username</label>
-              <input id="vpnUser" type="text" autocomplete="off" />
-            </div>
-            <div id="vpnPassField">
-              <label for="vpnPass">Password</label>
-              <input id="vpnPass" type="password" autocomplete="off" />
-            </div>
-            <div id="vpnCodeField" hidden>
-              <label for="vpnCode">Authenticator code</label>
-              <input id="vpnCode" type="text" inputmode="numeric" autocomplete="off" />
-            </div>
+            <button class="secondary" id="adminVpnBack" type="button" hidden>← Settings</button>
           </div>
-          <textarea id="vpnProfile" hidden placeholder="Paste a WireGuard profile" style="width:100%;min-height:140px;margin-top:12px;"></textarea>
-          <p class="hint" id="vpnNordHint" hidden>NordVPN can use the access token from its manual setup page in the password box, with the username token.</p>
-          <p class="hint" id="vpnWireHint" hidden>WireGuard uses a profile instead of a username.</p>
-          <div class="panel-head">
-            <button id="vpnSignIn" type="button">Sign in</button>
-            <button id="vpnDisconnect" class="secondary" type="button" hidden>Disconnect</button>
+          <div class="vpn-status-banner">
+            <span id="vpnState">Not connected. The dashboard stays on your Wi-Fi.</span>
           </div>
-          <input id="vpnFind" type="search" placeholder="Find a city" hidden />
-          <div class="list" id="vpnCities"></div>
-          <div class="panel-head">
-            <button id="vpnGo" type="button" hidden>Connect</button>
-            <button id="vpnBackup" class="secondary" type="button" hidden>Backup city</button>
+          <div class="admin-card-grid">
+            <article class="admin-surface-card">
+              <h3>VPN Account &amp; Credentials</h3>
+              <div class="vpn-form-grid">
+                <div>
+                  <label for="vpnProvider">Provider</label>
+                  <select id="vpnProvider">
+                    <option value="pia">PIA VPN</option>
+                    <option value="proton">Proton VPN</option>
+                    <option value="surfshark">Surfshark</option>
+                    <option value="nord">NordVPN</option>
+                    <option value="wireguard">WireGuard</option>
+                  </select>
+                </div>
+                <div id="vpnUserField">
+                  <label for="vpnUser">Username</label>
+                  <input id="vpnUser" type="text" autocomplete="off" placeholder="VPN username" />
+                </div>
+                <div id="vpnPassField">
+                  <label for="vpnPass">Password</label>
+                  <input id="vpnPass" type="password" autocomplete="off" placeholder="VPN password" />
+                </div>
+                <div id="vpnCodeField" hidden>
+                  <label for="vpnCode">Authenticator Code</label>
+                  <input id="vpnCode" type="text" inputmode="numeric" autocomplete="off" placeholder="6-digit code" />
+                </div>
+              </div>
+              <textarea id="vpnProfile" hidden placeholder="Paste a WireGuard profile" style="width:100%;min-height:140px;padding:10px;border-radius:10px;background:var(--bg);border:1px solid var(--stroke);color:var(--ink);font-family:monospace;font-size:12.5px;"></textarea>
+              <p class="hint" id="vpnNordHint" hidden>NordVPN can use the access token from its manual setup page in the password box, with the username token.</p>
+              <p class="hint" id="vpnWireHint" hidden>WireGuard uses a pasted config profile instead of a username and password.</p>
+              <div class="vpn-actions-row">
+                <button class="primary" id="vpnSignIn" type="button">Sign In</button>
+                <button id="vpnDisconnect" class="secondary" type="button" hidden>Disconnect</button>
+              </div>
+            </article>
+            <article class="admin-surface-card">
+              <h3>Server Location</h3>
+              <p class="hint">Choose a primary server city and optional backup city for automatic failover.</p>
+              <input id="vpnFind" type="search" placeholder="Search city or region…" hidden style="width:100%;padding:9px 12px;border-radius:10px;background:var(--bg);border:1px solid var(--stroke);color:var(--ink)" />
+              <div class="list" id="vpnCities" style="max-height:240px;overflow-y:auto"></div>
+              <div class="vpn-actions-row">
+                <button class="primary" id="vpnGo" type="button" hidden>Connect</button>
+                <button id="vpnBackup" class="secondary" type="button" hidden>Set Backup City</button>
+              </div>
+              <p class="hint" id="vpnBackupNote" hidden></p>
+            </article>
           </div>
-          <p class="hint" id="vpnBackupNote" hidden></p>
         </div>
       </section>
 
@@ -3029,12 +3183,20 @@
         </div>
         <div id="epgTools" hidden>
           <div class="panel-head">
-            <button class="secondary" id="epgToolsBack" type="button">← Back</button>
+            <button class="secondary" id="epgToolsBack" type="button">← All EPG Tools</button>
             <h2 id="epgToolTitle">EPG &amp; Cleanup</h2>
             <button id="epgToolSave" type="button" hidden>Save</button>
           </div>
+          <div class="epg-tool-tabs" id="epgToolTabs" role="tablist" aria-label="EPG Cleanup Tools">
+            <button class="epg-tool-tab" type="button" data-epg-tool="strip">Bulk Stripper</button>
+            <button class="epg-tool-tab" type="button" data-epg-tool="rename">Bulk Renamer</button>
+            <button class="epg-tool-tab" type="button" data-epg-tool="sanitize">Sanitize Names</button>
+            <button class="epg-tool-tab" type="button" data-epg-tool="parse">Parse to Guide</button>
+            <button class="epg-tool-tab" type="button" data-epg-tool="images">Remove Images</button>
+            <button class="epg-tool-tab" type="button" data-epg-tool="reset">Show Everything</button>
+          </div>
           <p class="note" id="epgPageStatus"></p>
-          <div class="clean-grid">
+          <div class="clean-grid" id="epgCleanPair">
           <article class="clean-card" id="epgStripTool">
             <h3>Strip Names <button class="info-dot" type="button" title="Comma-separated. A space you type is kept. An entry with a space or a colon is removed exactly, wherever it appears. A plain word comes off the start or the end. Capitalization does not matter. Save sends it to the TV.">i</button></h3>
             <p class="hint">Remove specific words/characters from group/channel names (comma-separated).</p>
@@ -3097,36 +3259,68 @@
           <p class="hint">Save makes every country, group, and channel visible again.</p>
         </article>
         <article class="clean-card wide" id="epgSanitizeTool" hidden>
-          <h3>Sanitize Group &amp; Channel Names</h3>
-          <p class="hint">The right list of each pair is what Cleanup will remove. Select a label and use the arrows to keep it or put it back.</p>
-          <div class="sanitize-board">
+          <div class="sanitize-head">
             <div>
-              <div class="sanitize-pair">
-                <div class="sanitize-col"><h4>Channel names</h4><div class="sanitize-list" id="channelKept"></div></div>
-                <div class="sanitize-arrows">
-                  <button id="channelToKept" type="button" title="Keep this label">◀</button>
-                  <button id="channelToStrip" type="button" title="Strip this label">▶</button>
-                </div>
-                <div class="sanitize-col"><h4>Strip from channels</h4><div class="sanitize-list" id="channelStrip"></div></div>
-              </div>
+              <h3 style="margin:0 0 4px">Sanitize Group &amp; Channel Names</h3>
+              <p class="hint" style="margin:0">Click any tag to toggle whether it gets removed (gold = remove, dim = keep), or add your own custom tags. Nothing runs until you click <strong>Sanitize Now</strong>.</p>
             </div>
-            <div>
-              <div class="sanitize-pair">
-                <div class="sanitize-col"><h4>Group names</h4><div class="sanitize-list" id="groupKept"></div></div>
-                <div class="sanitize-arrows">
-                  <button id="groupToKept" type="button" title="Keep this label">◀</button>
-                  <button id="groupToStrip" type="button" title="Strip this label">▶</button>
-                </div>
-                <div class="sanitize-col"><h4>Strip from groups</h4><div class="sanitize-list" id="groupStrip"></div></div>
-              </div>
+            <div class="sanitize-head-actions">
+              <span class="sanitize-summary-pill" id="sanitizeSummary">0 tags queued</span>
+              <button class="secondary" id="sanitizeResetDefaults" type="button">Reset Defaults</button>
+              <button class="primary" id="sanitizeCleanup" type="button">✨ Sanitize Now</button>
             </div>
           </div>
-          <button id="sanitizeCleanup" type="button">Cleanup</button>
-          <div id="sanitizeBusy" hidden>Cleaning…</div>
+          <div class="sanitize-grid">
+            <section class="sanitize-box">
+              <div class="sanitize-box-head">
+                <h4>Channel Name Tags <span class="sanitize-count" id="channelStripCount">0 to remove</span></h4>
+                <div class="sanitize-mini-actions">
+                  <button id="channelStripAll" type="button">Select All</button>
+                  <button id="channelKeepAll" type="button">Clear All</button>
+                </div>
+              </div>
+              <div class="sanitize-add-row">
+                <input id="channelAddTag" type="text" placeholder="Add custom channel tag (e.g. 4K, VIP:, BACKUP)" autocomplete="off" />
+                <button class="secondary" id="channelAddTagBtn" type="button">+ Add</button>
+              </div>
+              <div class="sanitize-chips" id="channelTagChips"></div>
+            </section>
+            <section class="sanitize-box">
+              <div class="sanitize-box-head">
+                <h4>Group Name Tags <span class="sanitize-count" id="groupStripCount">0 to remove</span></h4>
+                <div class="sanitize-mini-actions">
+                  <button id="groupStripAll" type="button">Select All</button>
+                  <button id="groupKeepAll" type="button">Clear All</button>
+                </div>
+              </div>
+              <div class="sanitize-add-row">
+                <input id="groupAddTag" type="text" placeholder="Add custom group tag (e.g. USA |, UK |)" autocomplete="off" />
+                <button class="secondary" id="groupAddTagBtn" type="button">+ Add</button>
+              </div>
+              <div class="sanitize-chips" id="groupTagChips"></div>
+            </section>
+          </div>
+          <div class="sanitize-footer">
+            <span class="hint" style="margin:0">Tip: Gold tags with ✓ will be stripped from names and synced to your TV when you click Sanitize Now.</span>
+            <div id="sanitizeBusy" hidden>⏳ Sanitizing &amp; syncing to TV…</div>
+          </div>
         </article>
         <article class="clean-card wide" id="epgParseTool" hidden>
-          <h3>Parse channel names into the guide</h3>
-          <p class="hint">Save fills empty guide slots from the channel name the next time that TV opens the guide.</p>
+          <div class="sanitize-head">
+            <div>
+              <h3 style="margin:0 0 4px">Parse Channel Names into Guide</h3>
+              <p class="hint" style="margin:0">Automatically fill empty EPG guide slots using event and match details parsed from channel names (ideal for live sports, PPV, and 24/7 channels).</p>
+            </div>
+            <div class="sanitize-head-actions">
+              <button class="primary" id="epgParseRunBtn" type="button">✨ Parse Channel Names into Guide</button>
+            </div>
+          </div>
+          <label class="intl-switch" style="margin:4px 0 10px">
+            <input id="epgParseEnabled" type="checkbox" checked />
+            <span class="switch" aria-hidden="true"></span>
+            Keep channel-name EPG parsing active on this TV
+          </label>
+          <p class="note" id="epgParseStatus"></p>
         </article>
         </div>
       </section>
@@ -3811,6 +4005,61 @@
       </div>
     </form>
   </div>
+  <aside class="mini-remote" id="miniRemoteDrawer" hidden aria-label="Floating TV Remote">
+    <div class="mini-remote-head">
+      <span>🎮 Quick TV Remote</span>
+      <button type="button" class="secondary" id="miniRemoteClose" style="padding:2px 8px;font-size:12px">×</button>
+    </div>
+    <div id="miniRemoteNowPlaying" class="hint" hidden style="margin-bottom:8px;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--accent)"></div>
+    <div class="mini-dpad">
+      <button type="button" data-remote="back" title="Back">↩</button>
+      <button type="button" data-remote="up" title="Up">▲</button>
+      <button type="button" data-remote="home" title="Home">⌂</button>
+      <button type="button" data-remote="left" title="Left">◀</button>
+      <button type="button" class="ok-btn" data-remote="ok" title="Select / OK">OK</button>
+      <button type="button" data-remote="right" title="Right">▶</button>
+      <button type="button" data-remote="vol_down" title="Volume Down">🔉</button>
+      <button type="button" data-remote="down" title="Down">▼</button>
+      <button type="button" data-remote="vol_up" title="Volume Up">🔊</button>
+    </div>
+    <div class="mini-remote-row">
+      <button type="button" data-remote="play_pause">⏯ Play</button>
+      <button type="button" data-remote="mute">🔇 Mute</button>
+      <button type="button" id="miniRemoteFullBtn">Full ↗</button>
+    </div>
+  </aside>
+
+  <div class="cmd-overlay" id="cmdModal" hidden>
+    <div class="cmd-box" role="dialog" aria-label="Quick Jump">
+      <input id="cmdInput" type="search" placeholder="Type a setting, tab, or channel (e.g. subtitle, drive, kids, espn)…" autocomplete="off" />
+      <div class="cmd-results" id="cmdResults"></div>
+    </div>
+  </div>
+
+  <div class="cmd-overlay" id="keysModal" hidden>
+    <div class="cmd-box" role="dialog" aria-label="Keyboard Shortcuts" style="padding:18px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <strong style="font-size:16px">Keyboard Shortcuts</strong>
+        <button type="button" class="secondary" id="keysCloseBtn" style="padding:3px 9px">×</button>
+      </div>
+      <div class="list">
+        <div class="row"><span>Open Quick Jump / Search</span><span class="cmd-kbd">Ctrl K or /</span></div>
+        <div class="row"><span>Toggle Floating TV Remote</span><span class="cmd-kbd">R</span></div>
+        <div class="row"><span>Toggle Dark / Daylight Theme</span><span class="cmd-kbd">T</span></div>
+        <div class="row"><span>Close Modals / Remote Drawer</span><span class="cmd-kbd">Esc</span></div>
+        <div class="row"><span>Show This Shortcuts Guide</span><span class="cmd-kbd">?</span></div>
+      </div>
+    </div>
+  </div>
+
+  <nav class="mobile-bottom-nav" id="mobileBottomNav" aria-label="Mobile navigation">
+    <button type="button" data-mbn-tab="home" aria-selected="true"><span class="mbn-ic">⌂</span>Home</button>
+    <button type="button" data-mbn-tab="channels" aria-selected="false"><span class="mbn-ic">▶</span>Channels</button>
+    <button type="button" data-mbn-tab="record" aria-selected="false"><span class="mbn-ic">⏺</span>DVR</button>
+    <button type="button" data-mbn-tab="remote" aria-selected="false"><span class="mbn-ic">🎮</span>Remote</button>
+    <button type="button" data-mbn-tab="pro" aria-selected="false"><span class="mbn-ic">✨</span>Pro</button>
+  </nav>
+
   <script>
     const loginForm = document.querySelector("#login");
     const editor = document.querySelector("#editor");
@@ -4215,8 +4464,7 @@
       const live = String(group.kind || "LIVE").toUpperCase() === "LIVE";
       const countryId = group.countryId || "";
       if (lineup().includeInternational !== true) {
-        if (!countryId) return live;
-        if (countryId !== "us") return true;
+        if (countryId && countryId !== "__other__" && countryId !== homeCountryId()) return true;
       }
       const hidden = lineup().hiddenCountries || [];
       if (!hidden.length) return false;
@@ -4611,12 +4859,20 @@
       return "";
     }
 
+    function homeCountryId() {
+      return String(session?.homeCountry || "us").trim().toLowerCase() || "us";
+    }
+    function isCountryHidden(countryId) {
+      const hidden = lineup().hiddenCountries || [];
+      if (hidden.includes(countryId)) return true;
+      if (lineup().includeInternational !== true && countryId !== homeCountryId() && countryId !== "__other__") return true;
+      return false;
+    }
     function renderCountries() {
       const query = document.querySelector("#countrySearch").value.trim().toLowerCase();
-      const hidden = new Set(lineup().hiddenCountries || []);
       const box = document.querySelector("#countries");
       const list = countryChoices().filter((country) => {
-        const isHidden = hidden.has(country.id);
+        const isHidden = isCountryHidden(country.id);
         const matchesFilter = countryFilter === "both" || (countryFilter === "hidden" ? isHidden : !isHidden);
         return matchesFilter && (!query || country.label.toLowerCase().includes(query));
       });
@@ -4628,7 +4884,7 @@
       list.forEach((country) => {
           const chip = document.createElement("button");
           chip.type = "button";
-          chip.className = "country-card" + (hidden.has(country.id) ? "" : " on");
+          chip.className = "country-card" + (isCountryHidden(country.id) ? "" : " on");
           const label = document.createElement("span");
           label.className = "country-label";
           const flagText = flagFor(country.id, country.label);
@@ -4674,8 +4930,13 @@
           });
           chip.addEventListener("click", () => {
             pushUndoSnapshot();
-            const wasHidden = hidden.has(country.id);
-            lineup().hiddenCountries = toggle(lineup().hiddenCountries, country.id, !wasHidden);
+            const wasHidden = isCountryHidden(country.id);
+            if (lineup().includeInternational !== true && wasHidden && country.id !== homeCountryId()) {
+              lineup().hiddenCountries = countryChoices().map((c) => c.id).filter((id) => id !== homeCountryId() && id !== country.id);
+              lineup().includeInternational = true;
+            } else {
+              lineup().hiddenCountries = toggle(lineup().hiddenCountries, country.id, !wasHidden);
+            }
             syncInternationalFlag();
             if (countryFilter !== "both") {
               renderCountries();
@@ -6911,6 +7172,13 @@
       showTab("admin");
     });
     function showAdminPage(which) {
+      const subnav = document.querySelector("#adminSubnav");
+      if (subnav) {
+        subnav.hidden = which === "home";
+        subnav.querySelectorAll(".admin-subnav-pill").forEach((btn) => {
+          btn.classList.toggle("active", btn.dataset.adminPage === which);
+        });
+      }
       document.querySelector("#adminHome").hidden = which !== "home";
       document.querySelector("#adminRefreshPage").hidden = which !== "refresh";
       document.querySelector("#adminWebPage").hidden = which !== "web";
@@ -6922,7 +7190,20 @@
       if (which === "streams") refreshStreams();
       else stopStreamsPoll();
       if (which === "web") paintAdminWebPage();
+      if (which === "logs" && typeof loadLog === "function") loadLog();
     }
+    document.querySelector("#adminSubnavBack")?.addEventListener("click", () => showAdminPage("home"));
+    document.querySelectorAll("#adminSubnav .admin-subnav-pill").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const target = btn.dataset.adminPage;
+        if (target === "epg") {
+          showTab("clean");
+          showEpgHome();
+        } else if (target) {
+          showAdminPage(target);
+        }
+      });
+    });
     function paintAdminWebPage() {
       const urlEl = document.querySelector("#adminWebUrl");
       const openBtn = document.querySelector("#adminWebOpenBtn");
@@ -7380,25 +7661,42 @@
       document.querySelector("#epgCards").hidden = true;
       document.querySelector("#epgTools").hidden = false;
       document.querySelector("#epgHomeHead").hidden = true;
+      const pair = document.querySelector("#epgCleanPair");
+      if (pair) pair.hidden = which !== "strip" && which !== "rename";
       document.querySelector("#epgStripTool").hidden = which !== "strip";
       document.querySelector("#epgRenameTool").hidden = which !== "rename";
       document.querySelector("#epgImagesTool").hidden = which !== "images";
       document.querySelector("#epgResetTool").hidden = which !== "reset";
       document.querySelector("#epgSanitizeTool").hidden = which !== "sanitize";
       document.querySelector("#epgParseTool").hidden = which !== "parse";
+      document.querySelectorAll("#epgToolTabs .epg-tool-tab").forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.epgTool === which);
+      });
       document.querySelector("#epgToolSave").hidden = true;
       if (which === "sanitize") resetSanitize();
+      if (which === "parse") {
+        const parseToggle = document.querySelector("#epgParseEnabled");
+        if (parseToggle) parseToggle.checked = lineup().nameEpg !== false;
+        const parseStatus = document.querySelector("#epgParseStatus");
+        if (parseStatus) parseStatus.textContent = lineup().nameEpg ? "Currently enabled on this TV." : "";
+      }
       const titles = {
         strip: "Bulk Channel Stripper",
         rename: "Bulk Group Renamer",
-        images: "Remove images",
-        reset: "Show everything again",
+        images: "Remove Images & Emojis",
+        reset: "Show Everything Again",
         sanitize: "Sanitize Group & Channel Names",
-        parse: "Parse channel names into the guide"
+        parse: "Parse Channel Names into Guide"
       };
-      document.querySelector("#epgToolTitle").textContent = titles[which] || "EPG edits";
+      document.querySelector("#epgToolTitle").textContent = titles[which] || "EPG & Cleanup";
       document.querySelector("#epgPageStatus").textContent = "";
+      document.querySelector("#panelClean")?.scrollTo?.({ top: 0, behavior: "smooth" });
     }
+    document.querySelectorAll("#epgToolTabs .epg-tool-tab").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        if (btn.dataset.epgTool) showEpgTool(btn.dataset.epgTool);
+      });
+    });
     function mergeStrip(current, extra) {
       const out = Array.isArray(current) ? current.slice() : [];
       const seen = new Set(out.map((token) => String(token).toLowerCase()));
@@ -7410,55 +7708,99 @@
       });
       return out;
     }
-    const sanitizePick = { channel: "", group: "" };
     const sanitizeLists = { channelKept: [], channelStrip: [], groupKept: [], groupStrip: [] };
     function resetSanitize() {
       sanitizeLists.channelKept = [];
       sanitizeLists.channelStrip = sanitizeStreamTokens().slice();
       sanitizeLists.groupKept = [];
-      sanitizeLists.groupStrip = ["USA |"];
-      sanitizePick.channel = "";
-      sanitizePick.group = "";
+      sanitizeLists.groupStrip = ["USA |", "US |", "US:"];
+      paintSanitize();
+    }
+    function toggleSanitizeToken(kind, token) {
+      const kept = sanitizeLists[kind + "Kept"];
+      const strip = sanitizeLists[kind + "Strip"];
+      const lower = token.toLowerCase();
+      const sIdx = strip.findIndex((item) => item.toLowerCase() === lower);
+      if (sIdx >= 0) {
+        const [moved] = strip.splice(sIdx, 1);
+        if (!kept.some((item) => item.toLowerCase() === lower)) kept.push(moved);
+      } else {
+        const kIdx = kept.findIndex((item) => item.toLowerCase() === lower);
+        if (kIdx >= 0) {
+          const [moved] = kept.splice(kIdx, 1);
+          strip.push(moved);
+        } else {
+          strip.push(token);
+        }
+      }
+      paintSanitize();
+    }
+    function addCustomSanitizeToken(kind, inputEl) {
+      const raw = String(inputEl?.value || "").trim();
+      if (!raw) return;
+      const parts = raw.split(",").map((s) => s.trim()).filter(Boolean);
+      const kept = sanitizeLists[kind + "Kept"];
+      const strip = sanitizeLists[kind + "Strip"];
+      parts.forEach((token) => {
+        const lower = token.toLowerCase();
+        const kIdx = kept.findIndex((item) => item.toLowerCase() === lower);
+        if (kIdx >= 0) kept.splice(kIdx, 1);
+        if (!strip.some((item) => item.toLowerCase() === lower)) strip.unshift(token);
+      });
+      if (inputEl) inputEl.value = "";
+      paintSanitize();
+    }
+    function setAllSanitize(kind, toStrip) {
+      const all = sanitizeLists[kind + "Strip"].concat(sanitizeLists[kind + "Kept"]);
+      if (toStrip) {
+        sanitizeLists[kind + "Strip"] = all;
+        sanitizeLists[kind + "Kept"] = [];
+      } else {
+        sanitizeLists[kind + "Strip"] = [];
+        sanitizeLists[kind + "Kept"] = all;
+      }
       paintSanitize();
     }
     function paintSanitize() {
-      ["channelKept", "channelStrip", "groupKept", "groupStrip"].forEach((id) => {
-        const box = document.querySelector("#" + id);
-        const kind = id.startsWith("channel") ? "channel" : "group";
+      const renderKind = (kind, boxId, countId) => {
+        const box = document.querySelector("#" + boxId);
+        if (!box) return;
+        const strip = sanitizeLists[kind + "Strip"];
+        const kept = sanitizeLists[kind + "Kept"];
+        const countEl = document.querySelector("#" + countId);
+        if (countEl) countEl.textContent = strip.length + " to remove";
         box.replaceChildren();
-        const tokens = sanitizeLists[id];
-        if (!tokens.length) {
+        const combined = strip.map((t) => ({ token: t, active: true }))
+          .concat(kept.map((t) => ({ token: t, active: false })));
+        if (!combined.length) {
           const empty = document.createElement("div");
-          empty.textContent = "None";
-          empty.style.color = "#C9BBA8";
+          empty.textContent = "No tags yet — add one above.";
+          empty.style.color = "var(--muted)";
+          empty.style.fontSize = "12.5px";
           box.append(empty);
           return;
         }
-        tokens.forEach((token) => {
-          const row = document.createElement("button");
-          row.type = "button";
-          row.textContent = token;
-          if (sanitizePick[kind] === token) row.className = "on";
-          row.addEventListener("click", () => {
-            sanitizePick[kind] = token;
-            paintSanitize();
-          });
-          box.append(row);
+        combined.forEach(({ token, active }) => {
+          const chip = document.createElement("button");
+          chip.type = "button";
+          chip.className = "sanitize-chip" + (active ? " strip" : "");
+          chip.title = active ? "Click to keep (do not remove)" : "Click to mark for removal";
+          const dot = document.createElement("span");
+          dot.className = "chip-dot";
+          dot.textContent = active ? "✓" : "+";
+          chip.append(dot, document.createTextNode(token));
+          chip.addEventListener("click", () => toggleSanitizeToken(kind, token));
+          box.append(chip);
         });
-      });
-    }
-    function moveSanitize(kind, toStrip) {
-      const token = sanitizePick[kind];
-      if (!token) return;
-      const kept = sanitizeLists[kind + "Kept"];
-      const strip = sanitizeLists[kind + "Strip"];
-      const from = toStrip ? kept : strip;
-      const to = toStrip ? strip : kept;
-      const index = from.findIndex((item) => item.toLowerCase() === token.toLowerCase());
-      if (index < 0) return;
-      const [moved] = from.splice(index, 1);
-      if (!to.some((item) => item.toLowerCase() === moved.toLowerCase())) to.push(moved);
-      paintSanitize();
+      };
+      renderKind("channel", "channelTagChips", "channelStripCount");
+      renderKind("group", "groupTagChips", "groupStripCount");
+      const totalC = sanitizeLists.channelStrip.length;
+      const totalG = sanitizeLists.groupStrip.length;
+      const summary = document.querySelector("#sanitizeSummary");
+      if (summary) summary.textContent = totalC + " channel · " + totalG + " group tags queued";
+      const btn = document.querySelector("#sanitizeCleanup");
+      if (btn) btn.disabled = (totalC + totalG) === 0;
     }
     function withoutHeld(current, held, strip) {
       const skip = new Set(held.map((token) => String(token).toLowerCase()));
@@ -7485,42 +7827,89 @@
       const busy = document.querySelector("#sanitizeBusy");
       const detail = document.querySelector("#epgPageStatus");
       busy.hidden = false;
-      const current = lineup();
-      current.namePrefixes = withoutHeld(current.namePrefixes, sanitizeLists.channelKept, sanitizeLists.channelStrip);
-      current.nameSuffixes = withoutHeld(current.nameSuffixes, sanitizeLists.channelKept, sanitizeLists.channelStrip);
-      const names = current.groupNames || {};
-      Object.keys(names).forEach((id) => {
-        let next = names[id];
-        sanitizeLists.groupStrip.forEach((token) => { next = dropToken(next, token); });
-        if (next) names[id] = next;
-        else delete names[id];
-      });
-      current.groupNames = names;
-      paintStrip();
-      const saved = await saveLineup(true);
-      if (!saved) {
-        busy.hidden = true;
-        detail.textContent = "The cleanup is on this page, but the save did not stick.";
-        return;
-      }
-      for (const token of sanitizeLists.groupStrip) {
-        document.querySelector("#groupFind").value = token;
-        document.querySelector("#groupReplace").value = "";
-        if (!planGroupRename().changed) continue;
-        const renamed = await saveGroupRename();
-        if (!renamed) {
-          busy.hidden = true;
+      const btn = document.querySelector("#sanitizeCleanup");
+      if (btn) btn.disabled = true;
+      try {
+        const resp = await fetch("/api/sanitize", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: session.email,
+            deviceId: session.deviceId,
+            channelStrip: sanitizeLists.channelStrip,
+            channelKept: sanitizeLists.channelKept,
+            groupStrip: sanitizeLists.groupStrip
+          })
+        });
+        const body = await resp.json().catch(() => ({}));
+        if (!resp.ok || body.error) {
+          detail.textContent = body.error || "Could not sanitize catalog.";
           return;
         }
+        if (body.lineup) session.lineup = Object.assign(blankLineup(), body.lineup);
+        for (const group of catalog().groups || []) {
+          let next = group.name || "";
+          sanitizeLists.groupStrip.forEach((token) => { next = replaceGroupText(next, token, ""); });
+          if (next && next !== group.name) group.name = next;
+        }
+        orderedCache = null;
+        groupCache.clear();
+        paintStrip();
+        const gCount = body.groupsChanged || 0;
+        const cCount = body.channelsChanged || 0;
+        const doneMsg = "✨ Sanitized " + cCount + " channels & " + gCount + " groups — TV guide refreshed.";
+        detail.textContent = doneMsg;
+        if (typeof showToast === "function") showToast(doneMsg);
+      } finally {
+        busy.hidden = true;
+        if (btn) btn.disabled = (sanitizeLists.channelStrip.length + sanitizeLists.groupStrip.length) === 0;
       }
-      busy.hidden = true;
-      showEpgHome();
     }
-    document.querySelector("#channelToKept").addEventListener("click", () => moveSanitize("channel", false));
-    document.querySelector("#channelToStrip").addEventListener("click", () => moveSanitize("channel", true));
-    document.querySelector("#groupToKept").addEventListener("click", () => moveSanitize("group", false));
-    document.querySelector("#groupToStrip").addEventListener("click", () => moveSanitize("group", true));
+    document.querySelector("#channelStripAll")?.addEventListener("click", () => setAllSanitize("channel", true));
+    document.querySelector("#channelKeepAll")?.addEventListener("click", () => setAllSanitize("channel", false));
+    document.querySelector("#groupStripAll")?.addEventListener("click", () => setAllSanitize("group", true));
+    document.querySelector("#groupKeepAll")?.addEventListener("click", () => setAllSanitize("group", false));
+    document.querySelector("#channelAddTagBtn")?.addEventListener("click", () => addCustomSanitizeToken("channel", document.querySelector("#channelAddTag")));
+    document.querySelector("#channelAddTag")?.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addCustomSanitizeToken("channel", e.target); } });
+    document.querySelector("#groupAddTagBtn")?.addEventListener("click", () => addCustomSanitizeToken("group", document.querySelector("#groupAddTag")));
+    document.querySelector("#groupAddTag")?.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addCustomSanitizeToken("group", e.target); } });
+    document.querySelector("#sanitizeResetDefaults")?.addEventListener("click", () => resetSanitize());
     document.querySelector("#sanitizeCleanup").addEventListener("click", () => sanitizeNames());
+    document.querySelector("#epgParseRunBtn")?.addEventListener("click", async () => {
+      if (!session) return;
+      const btn = document.querySelector("#epgParseRunBtn");
+      const toggle = document.querySelector("#epgParseEnabled");
+      const status = document.querySelector("#epgParseStatus");
+      const enabled = toggle ? toggle.checked : true;
+      if (btn) btn.disabled = true;
+      if (status) status.textContent = "Updating EPG parser on cloud & TV…";
+      try {
+        const resp = await fetch("/api/epg/parse", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: session.email,
+            deviceId: session.deviceId,
+            enabled
+          })
+        });
+        const body = await resp.json().catch(() => ({}));
+        if (!resp.ok || body.error) {
+          const msg = body.error || "Could not update EPG parser.";
+          if (status) status.textContent = msg;
+          if (typeof showToast === "function") showToast(msg);
+          return;
+        }
+        if (body.lineup) session.lineup = Object.assign(blankLineup(), body.lineup);
+        const msg = enabled
+          ? "✨ Channel-name EPG parsing enabled — TV guide refreshed."
+          : "Channel-name EPG parsing disabled — TV guide refreshed.";
+        if (status) status.textContent = msg;
+        if (typeof showToast === "function") showToast(msg);
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    });
     document.querySelector("#epgToolsBack").addEventListener("click", showEpgHome);
     document.querySelector("#epgCountries").addEventListener("click", () => showTab("countries"));
     document.querySelector("#epgLineup").addEventListener("click", () => showTab("groups"));
@@ -7963,19 +8352,21 @@
       document.querySelector("#deviceAddNote").hidden = false;
     }
     function applyInternational(on, rewrite) {
+      const home = homeCountryId();
       lineup().includeInternational = on;
       if (!on) {
-        lineup().hiddenCountries = countryChoices().map((country) => country.id).filter((id) => id !== "us");
+        lineup().hiddenCountries = countryChoices().map((country) => country.id).filter((id) => id !== home && id !== "__other__");
       } else if (rewrite) {
-        lineup().hiddenCountries = (lineup().hiddenCountries || []).filter((id) => id === "us");
+        lineup().hiddenCountries = (lineup().hiddenCountries || []).filter((id) => id === home);
       }
       const box = document.querySelector("#includeInternational");
       if (box) box.checked = on;
       if (tab === "countries") renderCountries();
     }
     function syncInternationalFlag() {
+      const home = homeCountryId();
       const hidden = new Set(lineup().hiddenCountries || []);
-      const on = countryChoices().some((country) => country.id !== "us" && !hidden.has(country.id));
+      const on = countryChoices().some((country) => country.id !== home && !hidden.has(country.id));
       lineup().includeInternational = on;
       const box = document.querySelector("#includeInternational");
       if (box) box.checked = on;
@@ -8460,6 +8851,47 @@
       }
     });
 
+    async function handleRemovePlaylist() {
+      const ok = window.confirm(
+        "Remove this playlist from the TV?\n\nThis clears the local guide, recordings, and playlist credentials on this device and returns to the setup screen."
+      );
+      if (!ok) return;
+      const status = document.querySelector("#adminRemoveStatus");
+      const btn = document.querySelector("#adminRemovePlaylistBtn");
+      const card = document.querySelector("#adminRemovePlaylistCard");
+      if (btn) btn.disabled = true;
+      if (card) card.disabled = true;
+      if (status) status.textContent = "Removing playlist...";
+      try {
+        const resp = await fetch("/api/playlist/remove", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: (session && session.email) || accountEmail || "",
+            deviceId: (session && session.deviceId) || ""
+          })
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok || data.error) throw new Error(data.error || "Could not remove playlist.");
+        localStorage.removeItem(SESSION_KEY);
+        session = null;
+        showToast("Playlist removed — ready for new setup");
+        if (typeof showAddDevice === "function") {
+          showAddDevice();
+        } else {
+          window.location.reload();
+        }
+      } catch (err) {
+        if (status) status.textContent = err.message || "Could not remove playlist.";
+        showToast(err.message || "Could not remove playlist.");
+      } finally {
+        if (btn) btn.disabled = false;
+        if (card) card.disabled = false;
+      }
+    }
+    document.querySelector("#adminRemovePlaylistBtn")?.addEventListener("click", handleRemovePlaylist);
+    document.querySelector("#adminRemovePlaylistCard")?.addEventListener("click", handleRemovePlaylist);
+
     document.querySelector("#groupsInvert")?.addEventListener("click", () => {
       visibleGroups().forEach((g) => {
         if (selectedGroups.has(g.id)) selectedGroups.delete(g.id);
@@ -8895,6 +9327,15 @@
       const webCopy = document.querySelector("#adminWebCopy");
       if (webCopy) webCopy.textContent = line;
       paintAdminWebPage();
+      if (!session) {
+        if (info.configured === false) {
+          const setupDev = document.querySelector("#setupDevice");
+          if (setupDev && info.deviceId && !setupDev.value) setupDev.value = info.deviceId;
+          showAddDevice();
+        } else if (info.configured === true) {
+          showSignIn();
+        }
+      }
     }).catch(() => {
       document.querySelector("#address").textContent = "Stay on this Wi-Fi. This page is not published on the internet.";
     });
@@ -9123,59 +9564,5 @@
     });
 
   </script>
-  <aside class="mini-remote" id="miniRemoteDrawer" hidden aria-label="Floating TV Remote">
-    <div class="mini-remote-head">
-      <span>🎮 Quick TV Remote</span>
-      <button type="button" class="secondary" id="miniRemoteClose" style="padding:2px 8px;font-size:12px">×</button>
-    </div>
-    <div id="miniRemoteNowPlaying" class="hint" hidden style="margin-bottom:8px;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--accent)"></div>
-    <div class="mini-dpad">
-      <button type="button" data-remote="back" title="Back">↩</button>
-      <button type="button" data-remote="up" title="Up">▲</button>
-      <button type="button" data-remote="home" title="Home">⌂</button>
-      <button type="button" data-remote="left" title="Left">◀</button>
-      <button type="button" class="ok-btn" data-remote="ok" title="Select / OK">OK</button>
-      <button type="button" data-remote="right" title="Right">▶</button>
-      <button type="button" data-remote="vol_down" title="Volume Down">🔉</button>
-      <button type="button" data-remote="down" title="Down">▼</button>
-      <button type="button" data-remote="vol_up" title="Volume Up">🔊</button>
-    </div>
-    <div class="mini-remote-row">
-      <button type="button" data-remote="play_pause">⏯ Play</button>
-      <button type="button" data-remote="mute">🔇 Mute</button>
-      <button type="button" id="miniRemoteFullBtn">Full ↗</button>
-    </div>
-  </aside>
-
-  <div class="cmd-overlay" id="cmdModal" hidden>
-    <div class="cmd-box" role="dialog" aria-label="Quick Jump">
-      <input id="cmdInput" type="search" placeholder="Type a setting, tab, or channel (e.g. subtitle, drive, kids, espn)…" autocomplete="off" />
-      <div class="cmd-results" id="cmdResults"></div>
-    </div>
-  </div>
-
-  <div class="cmd-overlay" id="keysModal" hidden>
-    <div class="cmd-box" role="dialog" aria-label="Keyboard Shortcuts" style="padding:18px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-        <strong style="font-size:16px">Keyboard Shortcuts</strong>
-        <button type="button" class="secondary" id="keysCloseBtn" style="padding:3px 9px">×</button>
-      </div>
-      <div class="list">
-        <div class="row"><span>Open Quick Jump / Search</span><span class="cmd-kbd">Ctrl K or /</span></div>
-        <div class="row"><span>Toggle Floating TV Remote</span><span class="cmd-kbd">R</span></div>
-        <div class="row"><span>Toggle Dark / Daylight Theme</span><span class="cmd-kbd">T</span></div>
-        <div class="row"><span>Close Modals / Remote Drawer</span><span class="cmd-kbd">Esc</span></div>
-        <div class="row"><span>Show This Shortcuts Guide</span><span class="cmd-kbd">?</span></div>
-      </div>
-    </div>
-  </div>
-
-  <nav class="mobile-bottom-nav" id="mobileBottomNav" aria-label="Mobile navigation">
-    <button type="button" data-mbn-tab="home" aria-selected="true"><span class="mbn-ic">⌂</span>Home</button>
-    <button type="button" data-mbn-tab="channels" aria-selected="false"><span class="mbn-ic">▶</span>Channels</button>
-    <button type="button" data-mbn-tab="record" aria-selected="false"><span class="mbn-ic">⏺</span>DVR</button>
-    <button type="button" data-mbn-tab="remote" aria-selected="false"><span class="mbn-ic">🎮</span>Remote</button>
-    <button type="button" data-mbn-tab="pro" aria-selected="false"><span class="mbn-ic">✨</span>Pro</button>
-  </nav>
 </body>
 </html>

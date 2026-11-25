@@ -903,9 +903,10 @@ internal fun BrowseActivity.focusHomeContinue() {
     }
 
 internal fun BrowseActivity.showDashboardUrl(url: String) {
-        dashboardUrlText = url
+        val clean = url.substringBefore('?')
+        dashboardUrlText = clean
         val urlValue = panes.deviceOrNull?.deviceUrlValue ?: return
-        urlValue.text = url
+        urlValue.text = clean
         urlValue.setTextColor(getColor(R.color.accent))
     }
 
@@ -933,6 +934,25 @@ internal fun BrowseActivity.removePlaylistAndRestart() {
             lifecycleScope.launch {
                 runCatching {
                     withContext(Dispatchers.IO) {
+                        val savedEmail = app.playlistStore.session.first()?.email.orEmpty()
+                        val deviceId = app.playlistStore.deviceId()
+                        val cloudBase = com.olympus.iptv.BuildConfig.PORTAL_CLOUD_URL.trim().trimEnd('/')
+                        if (cloudBase.startsWith("http") && savedEmail.isNotBlank() && deviceId.isNotBlank()) {
+                            runCatching {
+                                val token = com.olympus.iptv.playlist.LineupClient(app).ensureDeviceToken(savedEmail, deviceId)
+                                val json = com.olympus.iptv.data.AppJson.gson.toJson(mapOf("email" to savedEmail, "deviceId" to deviceId))
+                                val mediaType = okhttp3.MediaType.Companion.run { "application/json; charset=utf-8".toMediaType() }
+                                val reqBody = okhttp3.RequestBody.Companion.run { json.toRequestBody(mediaType) }
+                                val builder = okhttp3.Request.Builder()
+                                    .url("$cloudBase/api/playlist/remove")
+                                    .post(reqBody)
+                                    .header("X-Device-Id", deviceId)
+                                if (!token.isNullOrBlank()) builder.header("X-Device-Token", token)
+                                val apiKey = com.olympus.iptv.BuildConfig.PORTAL_API_KEY.trim()
+                                if (apiKey.isNotEmpty()) builder.header("X-Olympus-Api-Key", apiKey)
+                                com.olympus.iptv.playlist.HttpClients.shared.newCall(builder.build()).execute().close()
+                            }
+                        }
                         runCatching { AppTunnel.disconnect(screen()) }
                         runCatching { stopService(Intent(screen(), RecordingService::class.java)) }
                         app.playlistStore.resetDevice()

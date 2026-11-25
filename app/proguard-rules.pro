@@ -1,6 +1,8 @@
-# Olympus-IPTV release shrink/obfuscate keeps.
-# Skip slow multi-pass R8 optimization over large kept libs (BouncyCastle/SMBJ/Media3/Cast) while still shrinking unused code & resources.
+# Olympus-IPTV release shrink keeps.
+# Skip slow multi-pass R8 optimization & identifier obfuscation over large libs (bcprov-jdk18on ~6,500 classes)
+# while still shrinking unused code & resources and keeping crash stack traces readable.
 -dontoptimize
+-dontobfuscate
 
 -keepattributes *Annotation*, Signature, InnerClasses, EnclosingMethod
 -keepattributes SourceFile,LineNumberTable

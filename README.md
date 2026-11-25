@@ -6,7 +6,7 @@
 
 ### For the latest and greatest, build your own APK from this code.
 
-The latest source release is **0.2.132** (versionCode 132). **One APK** installs on Android TV / set-top boxes, Google TV Streamer (4K), Amazon Fire TV Sticks, and phones and tablets. Install it over any prior build. The signing key is the same, so the saved account and playlist stay. Cloud sync uses `https://stream-me-service-api.getjohnathan.com`, which reads and writes the Olympus-IPTV PostgreSQL database.
+The latest source release is **0.2.137** (versionCode 137). **One APK** installs on Android TV / set-top boxes, Google TV Streamer (4K), Amazon Fire TV Sticks, and phones and tablets. Install it over any prior build. The signing key is the same, so the saved account and playlist stay. Cloud sync uses `https://stream-me-service-api.getjohnathan.com`, which reads and writes the Olympus-IPTV PostgreSQL database.
 
 **This is a player only. You must provide your own streams.**
 
@@ -23,6 +23,7 @@ Olympus-IPTV does not include channels, movies, shows, or stream addresses. It p
 </div>
 
 - [Start here](#start-here)
+- [What's in 0.2.137](#whats-in-02137)
 - [What's in 0.2.132](#whats-in-02132)
 - [What's in 0.2.127](#whats-in-02127)
 - [What's in 0.2.118](#whats-in-02118)
@@ -83,6 +84,18 @@ Olympus-IPTV is one APK for Android TV / Google TV Streamer (4K) / Fire TV Stick
 
 <div align="center">
 
+## What's in 0.2.137
+
+- **Local Major Networks (`FOX`, `ABC`, `CBS`, `NBC`, `PBS`)**: Expanded SQLite local candidate matching across all IPTV naming formats (`ABC7`, `CBS2`, `NBC4`, `FOX5`, non-pipe `US Locals` groups), added offline 3-digit US ZIP fallback (`ZipLocator`), and updated smaller-city ZIPs to automatically resolve to the closest major city carrying all 5 major networks.
+- **Cleaner First-Time Setup & Default Visibility**: Removed the redundant top starter-pack buttons during initial channel scanning. When `Include International` is set to No, only the ZIP code's home country (plus un-prefixed provider folders) stays active while foreign countries are hidden, and all groups for visible countries start active.
+- **Self-Healing Group Names & Categories**: Fixed missing/numeric category IDs (`112`, `151`, `152`…) by deriving category rows from channel metadata during ingest, self-healing `readCategories()` and `dashboardGroups()`, and invalidating stale disk dashboard caches (`countryBasis = "sql3"`).
+- **Revamped Web-UI Dashboard**:
+  - Added a unified Settings sub-navigation bar and card-based drill-down layouts for Refresh & Maintenance, Web-UI Access, VPN Tunnel, Active Streams, and Error Log.
+  - Cleaned up EPG & Cleanup drill-down views with a 1-click tool switcher pill bar so inactive cards stay hidden.
+  - Redesigned **Sanitize Group & Channel Names** with interactive 1-click tag chips, custom tag input, and an explicit **Sanitize Now** button (no auto-run).
+  - Added **Parse Channel Names into Guide** action button (`POST /api/epg/parse`) and **Remove Playlist** option (`POST /api/playlist/remove`) in Web-UI Settings.
+- **Cloud API Security & Performance (`nodeapi`)**: Moved bulk sanitize, batch group rename, EPG parse, and per-device playlist removal to parameterized PostgreSQL endpoints on `nodeapi` with real-time `pg_notify` TV refresh, and added constant-time `X-Olympus-Api-Key` header validation (`BuildConfig.PORTAL_API_KEY` / `API_SECRET_KEY`).
+
 ## What's in 0.2.132
 
 </div>
@@ -115,6 +128,7 @@ Olympus-IPTV is one APK for Android TV / Google TV Streamer (4K) / Fire TV Stick
     - Created offline-capable **`ZipLocator`** (2.5s API + built-in US 3-digit ZIP prefix table `005–999`) wired into TV, mobile, cloud login, and Web-UI; upgraded **`AutoFavorites`** with precompiled regexes, single-pass network pre-indexing, all IPTV local channel naming formats, city aliases, and 3-tier fallback (closest DMA → same-state affiliates → US East/West feeds), plus a **📍 Home ZIP** bar in **Favorites → Auto Build**.
     - Hardened `RecordingFiles` and `OfflineDownloadManager` with safe `filesDir` fallback whenever `getExternalFilesDir(null)` is unavailable on AOSP boxes or Fire OS 6 devices.
     - Optimized Android Studio build speed & release APK size: added `-dontoptimize` in `proguard-rules.pro` (eliminates the 88% R8 stall), enabled `org.gradle.vfs.watch=true` + 6 GB G1GC daemon heap, added a signed `fastRelease` build variant for 3–6s local test installs, removed redundant blanket `-keep` rules for OkHttp/Media3/Coil/Cast/Play Services, scoped BouncyCastle/SMBJ keeps to runtime-used packages, and stripped `DebugProbesKt.bin` + unused `META-INF`/localized metadata.
+    - Added **TiviMate-Grade Player & Guide Polish** (`PlayerQuickSheet`, `PlayerActivity`, `ChannelActions`): 1-tap **`⚡ Quick`** player sheet (Recent Channels last-10 switcher, live **Stats for Nerds** toggle, live **Subtitle Size** picker `S/M/L/XL`, **Household Profile** switcher, **Open in External Player**, and scannable **Web Dashboard QR Code**), long-press `Last` button for Recent Channels, live **`↻ Reconnecting (1/3)…`** countdown pill during transient drops, and **Download for Offline** + **Open in External Player** actions in the Guide long-press context menu.
   - Kept set-top TV guide scroll alignment (`scheduleGuideAlign` / `alignGuide`) scoped independently from mobile touch scroll locking so both TV and mobile stay perfectly aligned.
   - Hardened DVR (`RecordingService` auto-stop when idle, shared HTTP pool, pre-flight `< 250 MB` storage guard with automatic SMB fallback, mid-recording `100 MB` low-space safety cutoff + 256 KB buffered writes, auto-reconnect on transient direct-stream drops, accurate SMB byte sizes, 500-entry HLS dedup cap, immediate start on dashboard schedule save) and Reminders (`ReminderClock` alarm deduplication + cloud-sync arming), backed by unit tests.
   - Migrated build config to AGP 9.5 native DSL & built-in Kotlin with **0 compiler warnings**.

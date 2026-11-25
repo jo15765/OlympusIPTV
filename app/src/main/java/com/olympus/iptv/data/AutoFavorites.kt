@@ -378,12 +378,13 @@ object AutoFavorites {
 
     private val nonLocalSuffix = Regex("""\b(news|sports?|business|weather|soul|life|kids|create|world|action|movies?|golazo|now|live|deportes|espanol|spanish|plus|extra|24/7)\b""", RegexOption.IGNORE_CASE)
     private val knownLocalNetworks = setOf("ABC", "CBS", "NBC", "FOX", "CW", "PBS", "ION", "MY")
+    private val networkTokenRegex = Regex("""^(abc|cbs|nbc|fox|cw|pbs|ion)\d{0,2}$""", RegexOption.IGNORE_CASE)
     private val networkWordRegex: Map<String, Regex> = knownLocalNetworks.associateWith { net ->
-        Regex("""\b${Regex.escape(net)}\b""")
+        Regex("""\b${Regex.escape(net)}\d{0,2}\b""")
     }
     private val shortAliasRegex = HashMap<String, Regex>()
     private val wordSplit = Regex("""[^a-z0-9]+""")
-    private val usPrefixRegex = Regex("^US:\\s*", RegexOption.IGNORE_CASE)
+    private val usPrefixRegex = Regex("^(?:(?:USA?|UNITED STATES)\\s*[:|\\-\u2013]\\s*|\\[(?:US|USA)\\]\\s*)", RegexOption.IGNORE_CASE)
     private val digitsRegex = Regex("(\\d+)")
     private val cityAliasesMap = mapOf(
         "new york" to listOf("new york", "nyc", "manhattan"),
@@ -410,18 +411,22 @@ object AutoFavorites {
 
     private fun localNetworkIn(name: String, group: String): String? {
         val upper = name.uppercase()
+        val gUpper = group.uppercase()
+        val isLocalGroup = gUpper.contains("LOCAL") ||
+            gUpper.contains("AFFILIATE") ||
+            localNetworks.any { (_, g) -> gUpper == g.uppercase() }
         val tokens = wordSplit.split(name.lowercase())
         var found: String? = null
         for (t in tokens) {
-            if (t.length !in 2..3) continue
-            val u = t.uppercase()
+            if (t.length !in 2..5) continue
+            val m = networkTokenRegex.matchEntire(t) ?: continue
+            val u = m.groupValues[1].uppercase()
             if (u in knownLocalNetworks) {
                 found = u
                 break
             }
         }
         if (found == null) {
-            val gUpper = group.uppercase()
             for ((net, _) in localNetworks) {
                 if (networkWordRegex[net]?.containsMatchIn(gUpper) == true) {
                     found = net
@@ -430,7 +435,7 @@ object AutoFavorites {
             }
         }
         if (found == null) return null
-        if (nonLocalSuffix.containsMatchIn(name) && !upper.contains("LOCAL")) return null
+        if (!isLocalGroup && nonLocalSuffix.containsMatchIn(name) && !upper.contains("LOCAL")) return null
         return found
     }
 
@@ -461,6 +466,8 @@ object AutoFavorites {
         return false
     }
 
+    private val majorFive = setOf("ABC", "CBS", "NBC", "FOX", "PBS")
+
     private fun bestLocal(
         channels: List<GuideChannel>,
         lat: Double,
@@ -475,63 +482,62 @@ object AutoFavorites {
             byNetwork.getOrPut(net) { ArrayList() }.add(channel)
         }
 
-        // Tier 1: Closest market(s) within 220 km
-        var fallbackMarket: String? = null
-        var fallbackByNet: LinkedHashMap<String, ChannelPick>? = null
+        val wantedMajor = if (networks == null) majorFive else majorFive.intersect(networks)
+        val fullThreshold = wantedMajor.size.coerceAtMost(4).coerceAtLeast(1)
+
+        // Step 1: Find the closest city/major market that carries the full set of major networks (FOX, ABC, CBS, NBC, PBS).
+        // If a small nearby city only has 1-2 channels, keep searching outward to the closest major city.
+        var primaryMarket: String? = null
+        var chosenByNet = LinkedHashMap<String, ChannelPick>()
+        var bestMajorCount = -1
         for (market in ordered) {
-            val distance = haversine(lat, lon, market.lat, market.lon)
-            if (fallbackByNet != null && distance > 220.0) break
             val picksByNet = pickLocalByNetwork(byNetwork, market.name, networks)
             if (picksByNet.isEmpty()) continue
-            if (picksByNet.size >= 3) return LocalResult(market.name, picksByNet.values.toList())
-            if (fallbackByNet == null || picksByNet.size > fallbackByNet.size) {
-                fallbackMarket = market.name
-                fallbackByNet = picksByNet
+            val majorCount = wantedMajor.count { it in picksByNet }
+            if (majorCount > bestMajorCount || (majorCount == bestMajorCount && picksByNet.size > chosenByNet.size)) {
+                primaryMarket = market.name
+                chosenByNet = picksByNet
+                bestMajorCount = majorCount
             }
+            if (majorCount >= fullThreshold) break
         }
 
-        // Tier 2: Supplement missing core networks from nearest same-state markets
-        val primaryMarket = fallbackMarket ?: ordered.first().name
-        val primaryState = primaryMarket.substringAfter(",", "").trim().uppercase()
-        val chosenByNet = fallbackByNet ?: LinkedHashMap()
-        if (chosenByNet.size < 4 && primaryState.length == 2) {
+        // Step 2: Fill any still-missing major networks (FOX, ABC, CBS, NBC, PBS, CW) from the next closest major city.
+        val resolvedMarket = primaryMarket ?: ordered.first().name
+        for ((net, _) in localNetworks) {
+            if (networks != null && net !in networks) continue
+            if (net in chosenByNet) continue
             for (market in ordered) {
-                val st = market.name.substringAfter(",", "").trim().uppercase()
-                if (st != primaryState) continue
-                for ((net, _) in localNetworks) {
-                    if (networks != null && net !in networks) continue
-                    if (net in chosenByNet) continue
-                    val hit = pickSingleLocal(byNetwork[net].orEmpty(), net, market.name)
-                    if (hit != null) chosenByNet[net] = hit
+                val hit = pickSingleLocal(byNetwork[net].orEmpty(), net, market.name)
+                if (hit != null) {
+                    chosenByNet[net] = hit
+                    break
                 }
-                if (chosenByNet.size >= 4) break
             }
         }
 
-        // Tier 3: National US East/West affiliate fallback so a user NEVER gets 0 locals
-        if (chosenByNet.size < 4) {
-            val preferWest = lon < -105.0
-            for ((net, group) in localNetworks) {
-                if (networks != null && net !in networks) continue
-                if (net in chosenByNet) continue
-                val pool = byNetwork[net].orEmpty()
-                if (pool.isEmpty()) continue
-                val best = pool.sortedWith(
-                    compareBy<GuideChannel> {
-                        val l = it.name.lowercase()
-                        when {
-                            preferWest && l.contains("west") -> 0
-                            !preferWest && l.contains("east") -> 0
-                            l.contains("east") || l.contains("west") -> 1
-                            else -> 2
-                        }
-                    }.thenBy { if (it.group.equals(group, ignoreCase = true) || it.group.contains("local", ignoreCase = true)) 0 else 1 }
-                        .thenBy { it.name.length }
-                ).firstOrNull() ?: continue
-                chosenByNet[net] = ChannelPick(best.id, best.name)
-            }
+        // Step 3: National US East/West affiliate fallback for any network that has no city-tagged feed in the playlist.
+        val preferWest = lon < -105.0
+        for ((net, group) in localNetworks) {
+            if (networks != null && net !in networks) continue
+            if (net in chosenByNet) continue
+            val pool = byNetwork[net].orEmpty()
+            if (pool.isEmpty()) continue
+            val best = pool.sortedWith(
+                compareBy<GuideChannel> {
+                    val l = it.name.lowercase()
+                    when {
+                        preferWest && l.contains("west") -> 0
+                        !preferWest && l.contains("east") -> 0
+                        l.contains("east") || l.contains("west") -> 1
+                        else -> 2
+                    }
+                }.thenBy { if (it.group.equals(group, ignoreCase = true) || it.group.contains("local", ignoreCase = true)) 0 else 1 }
+                    .thenBy { it.name.length }
+            ).firstOrNull() ?: continue
+            chosenByNet[net] = ChannelPick(best.id, best.name)
         }
-        return LocalResult(primaryMarket, chosenByNet.values.toList())
+        return LocalResult(resolvedMarket, chosenByNet.values.toList())
     }
 
     private fun pickLocalByNetwork(

@@ -177,11 +177,7 @@ class LoginActivity : AppCompatActivity() {
 
     private fun showDashboard(url: String) {
         dashBase = url.substringBefore('?')
-        val shown = if (knownDevice.isBlank()) {
-            dashBase
-        } else {
-            dashBase + "?device=" + Uri.encode(knownDevice)
-        }
+        val shown = dashBase
         binding.portalHint.text = getString(R.string.portal_hint, shown)
         binding.dashboardAddress.text = shown
         binding.qrCode.setImageBitmap(QrBitmap.encode(shown, 256))
@@ -294,10 +290,13 @@ class LoginActivity : AppCompatActivity() {
                 }
                 store.saveSession(playlist)
                 val lineup = store.lineup(playlist.id)
+                val isFresh = (lineup.revision ?: 0L) == 0L
                 store.saveLineup(
                     playlist.id,
                     lineup.copy(
                         includeInternational = binding.checkInternational.isChecked,
+                        hiddenGroups = if (isFresh) emptyList() else lineup.hiddenGroups,
+                        hiddenCountries = if (isFresh) emptyList() else lineup.hiddenCountries,
                         revision = System.currentTimeMillis()
                     )
                 )

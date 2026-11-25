@@ -688,14 +688,21 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
 
     data class NamedChannel(val id: String, val name: String, val group: String)
 
-    /** Live rows whose names carry a market, so ZIP matching does not depend on the group title. */
+    /** Live rows that may be US local/network affiliates regardless of provider group or separator style. */
     fun localCandidateChannels(playlistId: String): List<NamedChannel> = read {
         if (playlistId.isBlank()) return emptyList()
         val found = ArrayList<NamedChannel>()
         readableDatabase.rawQuery(
             "SELECT id, name, IFNULL(group_title, '') FROM channels " +
-                "WHERE playlist_id=? AND bucket=? AND (name LIKE '%|%' OR IFNULL(group_title, '') LIKE 'USA |%') " +
-                "LIMIT 20000",
+                "WHERE playlist_id=? AND bucket=? AND (" +
+                "name LIKE '%|%' OR name LIKE '%ABC%' OR name LIKE '%CBS%' OR name LIKE '%NBC%' OR " +
+                "name LIKE '%FOX%' OR name LIKE '%PBS%' OR name LIKE '%CW%' OR name LIKE '%ION%' OR " +
+                "IFNULL(group_title, '') LIKE '%LOCAL%' OR IFNULL(group_title, '') LIKE '%AFFILIATE%' OR " +
+                "IFNULL(group_title, '') LIKE '%ABC%' OR IFNULL(group_title, '') LIKE '%CBS%' OR " +
+                "IFNULL(group_title, '') LIKE '%NBC%' OR IFNULL(group_title, '') LIKE '%FOX%' OR " +
+                "IFNULL(group_title, '') LIKE '%USA%' OR IFNULL(group_title, '') LIKE 'US %' OR " +
+                "IFNULL(group_title, '') LIKE 'US:%'" +
+                ") LIMIT 25000",
             arrayOf(playlistId, LIVE)
         ).use { cursor ->
             while (cursor.moveToNext()) {
@@ -983,7 +990,9 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         db.beginTransaction()
         try {
             val categoryStmt = db.compileStatement(
-                "INSERT OR IGNORE INTO categories (playlist_id, bucket, id, name) VALUES (?,?,?,?)"
+                "INSERT INTO categories (playlist_id, bucket, id, name) VALUES (?,?,?,?) " +
+                    "ON CONFLICT(playlist_id, bucket, id) DO UPDATE SET name=excluded.name " +
+                    "WHERE excluded.name != '' AND excluded.name != excluded.id"
             )
             for (category in categories) {
                 categoryStmt.clearBindings()
@@ -992,6 +1001,24 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
                 categoryStmt.bindString(3, category.id)
                 categoryStmt.bindString(4, category.name)
                 if (categoryStmt.executeInsert() != -1L) newCategories.add(category)
+            }
+            val derivedCatStmt = db.compileStatement(
+                "INSERT OR IGNORE INTO categories (playlist_id, bucket, id, name) VALUES (?,?,?,?)"
+            )
+            val derivedSeen = HashSet<String>()
+            for (channel in channels) {
+                val cid = channel.categoryId?.trim().orEmpty()
+                val title = channel.groupTitle?.trim().orEmpty()
+                if (cid.isNotEmpty() && title.isNotEmpty() && derivedSeen.add(cid)) {
+                    derivedCatStmt.clearBindings()
+                    derivedCatStmt.bindString(1, playlistId)
+                    derivedCatStmt.bindString(2, bucket)
+                    derivedCatStmt.bindString(3, cid)
+                    derivedCatStmt.bindString(4, title)
+                    if (derivedCatStmt.executeInsert() != -1L) {
+                        newCategories.add(Category(id = cid, name = title, kind = channel.kind))
+                    }
+                }
             }
             val channelStmt = db.compileStatement(
                 """
@@ -1100,6 +1127,7 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
     }
 
     private fun touchLibrary(db: SQLiteDatabase, playlistId: String) {
+        dashHold = null
         db.execSQL(
             "INSERT INTO library_meta(playlist_id, stamp) VALUES(?, 1) ON CONFLICT(playlist_id) DO UPDATE SET stamp = stamp + 1",
             arrayOf(playlistId)
@@ -1109,6 +1137,7 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
     private fun readCategories(db: SQLiteDatabase, playlistId: String, bucket: String): List<Category> {
         val kind = if (bucket == LIVE) ContentKind.LIVE else ContentKind.VOD
         val categories = ArrayList<Category>()
+        val seenIds = HashSet<String>()
         db.query(
             "categories",
             arrayOf("id", "name"),
@@ -1119,9 +1148,33 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
             "name COLLATE NOCASE"
         ).use { cursor ->
             while (cursor.moveToNext()) {
+                val id = cursor.getString(0) ?: continue
                 val shown = NameImages.strip(cursor.getString(1) ?: "")
-            categories.add(Category(id = cursor.getString(0), name = shown, kind = kind))
+                seenIds.add(id)
+                categories.add(Category(id = id, name = shown.ifBlank { id }, kind = kind))
             }
+        }
+        // Self-heal if channels were ingested before categories or categories had missing IDs
+        db.rawQuery(
+            """
+            SELECT COALESCE(NULLIF(category_id, ''), group_title), MAX(NULLIF(group_title, ''))
+            FROM channels
+            WHERE playlist_id=? AND bucket=?
+              AND COALESCE(NULLIF(category_id, ''), group_title) IS NOT NULL
+              AND COALESCE(NULLIF(category_id, ''), group_title) != ''
+            GROUP BY COALESCE(NULLIF(category_id, ''), group_title)
+            """.trimIndent(),
+            arrayOf(playlistId, bucket)
+        ).use { cursor ->
+            var addedAny = false
+            while (cursor.moveToNext()) {
+                val id = cursor.getString(0) ?: continue
+                if (id == PlaylistLoader.ALL_ID || !seenIds.add(id)) continue
+                val title = NameImages.strip(cursor.getString(1) ?: "").ifBlank { id }
+                categories.add(Category(id = id, name = title, kind = kind))
+                addedAny = true
+            }
+            if (addedAny) categories.sortBy { it.name.lowercase() }
         }
         return categories
     }
@@ -2018,9 +2071,10 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
             }
         }
         val counts = LinkedHashMap<String, Int>()
+        val fallbackTitles = HashMap<String, String>()
         db.rawQuery(
             """
-            SELECT bucket, COALESCE(NULLIF(category_id, ''), group_title), COUNT(*)
+            SELECT bucket, COALESCE(NULLIF(category_id, ''), group_title), MAX(NULLIF(group_title, '')), COUNT(*)
             FROM channels
             WHERE playlist_id=?
               AND COALESCE(NULLIF(category_id, ''), group_title) IS NOT NULL
@@ -2032,7 +2086,10 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
             while (cursor.moveToNext()) {
                 val b = cursor.getString(0) ?: continue
                 val keyId = cursor.getString(1) ?: continue
-                counts[b + "\u0000" + keyId] = (counts[b + "\u0000" + keyId] ?: 0) + cursor.getInt(2)
+                val key = b + "\u0000" + keyId
+                val title = NameImages.strip(cursor.getString(2) ?: "")
+                if (title.isNotEmpty() && title != keyId) fallbackTitles[key] = title
+                counts[key] = (counts[key] ?: 0) + cursor.getInt(3)
             }
         }
         val stamp = libraryStamp(playlistId)
@@ -2128,11 +2185,16 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         }
         val rows = ArrayList<DashboardGroup>(names.size)
         val seenKeys = HashSet<String>(names.size)
-        for ((key, name) in names) {
+        for ((key, rawName) in names) {
             seenKeys.add(key)
             val split = key.indexOf('\u0000')
             val bucket = key.substring(0, split)
             val id = key.substring(split + 1)
+            val name = if (rawName == id || rawName.isBlank()) {
+                fallbackTitles[key]?.takeIf { it.isNotBlank() } ?: rawName
+            } else {
+                rawName
+            }
             val parsed = CountryIndex.idFor(name).orEmpty()
             val countryId = when {
                 parsed.isNotEmpty() -> parsed
@@ -2148,13 +2210,14 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
             val bucket = key.substring(0, split)
             val id = key.substring(split + 1)
             if (id == PlaylistLoader.ALL_ID) continue
-            val parsed = CountryIndex.idFor(id).orEmpty()
+            val resolvedName = fallbackTitles[key]?.takeIf { it.isNotBlank() } ?: id
+            val parsed = CountryIndex.idFor(resolvedName).orEmpty()
             val countryId = when {
                 parsed.isNotEmpty() -> parsed
                 bucket != LIVE -> ""
                 else -> liveCountry[id] ?: titled[id] ?: named[id].orEmpty()
             }
-            rows.add(DashboardGroup(id, id, kindLabel(bucket), count, countryId))
+            rows.add(DashboardGroup(id, resolvedName, kindLabel(bucket), count, countryId))
         }
         rows
     }
@@ -2462,9 +2525,23 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         playlistId: String,
         find: String,
         replacement: String
+    ): Pair<Int, List<com.olympus.iptv.data.GroupRename.Sample>> =
+        replaceGroupLabelsBatch(playlistId, listOf(find), replacement)
+
+    fun replaceGroupLabelsBatch(
+        playlistId: String,
+        finds: List<String>,
+        replacement: String
     ): Pair<Int, List<com.olympus.iptv.data.GroupRename.Sample>> {
-        val needle = find.trim()
-        if (playlistId.isBlank() || needle.isEmpty()) return 0 to emptyList()
+        val needles = finds.map { it.trim() }.filter { it.isNotEmpty() }.distinctBy { it.lowercase() }
+        if (playlistId.isBlank() || needles.isEmpty()) return 0 to emptyList()
+        fun applyAll(input: String): String {
+            var cur = input
+            for (needle in needles) {
+                cur = com.olympus.iptv.data.GroupRename.replaceAll(cur, needle, replacement).trim()
+            }
+            return cur
+        }
         val samples = ArrayList<com.olympus.iptv.data.GroupRename.Sample>()
         val categoryEdits = ArrayList<Array<String>>()
         readableDatabase.query(
@@ -2478,7 +2555,7 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         ).use { cursor ->
             while (cursor.moveToNext()) {
                 val name = cursor.getString(2) ?: continue
-                val next = com.olympus.iptv.data.GroupRename.replaceAll(name, needle, replacement).trim()
+                val next = applyAll(name)
                 if (next.isEmpty() || next == name) continue
                 categoryEdits.add(arrayOf(next, playlistId, cursor.getString(0), cursor.getString(1)))
                 if (samples.size < 4) {
@@ -2493,7 +2570,7 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         ).use { cursor ->
             while (cursor.moveToNext()) {
                 val name = cursor.getString(0) ?: continue
-                val next = com.olympus.iptv.data.GroupRename.replaceAll(name, needle, replacement).trim()
+                val next = applyAll(name)
                 if (next.isEmpty() || next == name) continue
                 titleEdits.add(name to next)
                 if (samples.size < 4 && samples.none { it.before == name }) {
@@ -2504,22 +2581,36 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         if (categoryEdits.isEmpty() && titleEdits.isEmpty()) return 0 to emptyList()
         write {
             val db = writableDatabase
+            // Temporarily drop FTS update trigger so updating group_title doesn't rebuild FTS for 100k+ rows
+            runCatching { db.execSQL("DROP TRIGGER IF EXISTS channels_fts_update") }
             db.beginTransaction()
             try {
+                val catStmt = db.compileStatement(
+                    "UPDATE categories SET name=? WHERE playlist_id=? AND bucket=? AND id=?"
+                )
                 for (row in categoryEdits) {
-                    val values = ContentValues()
-                    values.put("name", row[0])
-                    db.update("categories", values, "playlist_id=? AND bucket=? AND id=?", arrayOf(row[1], row[2], row[3]))
+                    catStmt.clearBindings()
+                    catStmt.bindString(1, row[0])
+                    catStmt.bindString(2, row[1])
+                    catStmt.bindString(3, row[2])
+                    catStmt.bindString(4, row[3])
+                    catStmt.executeUpdateDelete()
                 }
+                val titleStmt = db.compileStatement(
+                    "UPDATE channels SET group_title=? WHERE playlist_id=? AND group_title=?"
+                )
                 for ((before, after) in titleEdits) {
-                    val values = ContentValues()
-                    values.put("group_title", after)
-                    db.update("channels", values, "playlist_id=? AND group_title=?", arrayOf(playlistId, before))
+                    titleStmt.clearBindings()
+                    titleStmt.bindString(1, after)
+                    titleStmt.bindString(2, playlistId)
+                    titleStmt.bindString(3, before)
+                    titleStmt.executeUpdateDelete()
                 }
                 touchLibrary(db, playlistId)
                 db.setTransactionSuccessful()
             } finally {
                 db.endTransaction()
+                runCatching { ensureSearchTriggers(db) }
             }
         }
         val changed = if (categoryEdits.isNotEmpty()) categoryEdits.size else titleEdits.size
@@ -2907,7 +2998,7 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
             val root = JsonParser.parseString(file.readText()).asJsonObject
             if (root.get("playlistId")?.asString != playlistId || root.get("stamp")?.asLong != stamp) return null
             val groupRows = root.getAsJsonArray("groups")
-            if (root.get("countryBasis")?.asString != "sql2") return null
+            if (root.get("countryBasis")?.asString != "sql3") return null
             if (groupRows != null && groupRows.size() > 0) {
                 val first = groupRows[0]
                 if (!first.isJsonObject || !first.asJsonObject.has("countryId")) return null
@@ -2947,7 +3038,7 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         root.addProperty("playlistId", playlistId)
         root.addProperty("stamp", stamp)
         root.addProperty("channelCount", body.channelCount)
-        root.addProperty("countryBasis", "sql2")
+        root.addProperty("countryBasis", "sql3")
         val groups = com.google.gson.JsonArray()
         for (group in body.groups) {
             val row = JsonObject()

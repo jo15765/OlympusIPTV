@@ -109,12 +109,13 @@ class CountriesFragment : Fragment() {
                 app.catalogDb.dashboardSnapshot(playlistId).countries
             }
             config = app.playlistStore.lineup(playlistId)
+            val home = app.playlistStore.account(playlistId)?.homeCountry?.trim()?.lowercase()?.takeIf { it.isNotBlank() } ?: "us"
             val hidden = config.hiddenCountries.orEmpty().toSet()
             shown.clear()
             if (config.includeInternational == true) {
                 shown.addAll(options.map { it.id }.filter { it !in hidden })
             } else {
-                shown.addAll(options.map { it.id }.filter { it == "us" && it !in hidden })
+                shown.addAll(options.map { it.id }.filter { it == home && it !in hidden })
             }
             ready = true
             if (!viewActive()) return@launch

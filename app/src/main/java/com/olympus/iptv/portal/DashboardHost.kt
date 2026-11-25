@@ -28,6 +28,8 @@ import com.olympus.iptv.playlist.PlaylistLoader
 import com.olympus.iptv.playlist.XtreamClient
 import com.olympus.iptv.ui.player.StreamSessions
 import com.olympus.iptv.record.RecordingFiles
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.BufferedOutputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -412,7 +414,22 @@ object DashboardHost {
         when {
             method == "GET" && (path == "/" || path == "/index.html") -> writePortalPage(socket, context)
             method == "GET" && path == "/logo.png" -> writeBytes(socket, 200, "image/png", logoBytes(context), "public, max-age=86400", allowGzip = false)
-            method == "GET" && path == "/api/info" -> writeJson(socket, 200, mapOf("url" to url(), "urls" to listOf(url()), "privateNetwork" to true))
+            method == "GET" && path == "/api/info" -> {
+                val app = context.applicationContext as? OlympusIptvApp
+                val configured = app != null && session(app) != null
+                val devId = if (app != null) runBlocking { app.playlistStore.deviceId() } else ""
+                writeJson(
+                    socket,
+                    200,
+                    mapOf(
+                        "url" to url(),
+                        "urls" to listOf(url()),
+                        "privateNetwork" to true,
+                        "configured" to configured,
+                        "deviceId" to devId
+                    )
+                )
+            }
             method == "GET" && path == "/api/logs" -> {
                 val files = com.olympus.iptv.AppLog.list().map {
                     mapOf("name" to it.name, "bytes" to it.bytes, "current" to it.current)
@@ -448,6 +465,8 @@ object DashboardHost {
             method == "POST" && path == "/api/lineup" || method == "PUT" && path == "/api/lineup" -> saveLineup(app, socket, json(body))
             method == "POST" && path == "/api/names/strip-images" -> strip(app, socket, json(body))
             method == "POST" && path == "/api/groups/rename" -> renameGroups(app, socket, json(body))
+            method == "POST" && path == "/api/sanitize" -> sanitize(app, socket, json(body))
+            method == "POST" && path == "/api/epg/parse" -> parseGuideNames(app, socket, json(body))
             method == "GET" && path == "/api/recordings" -> recordings(app, socket, query["email"], query["deviceId"])
             method == "POST" && path == "/api/recordings" -> saveRecordings(app, socket, json(body))
             method == "GET" && path == "/api/recordings/file" -> readRecording(app, socket, query)
@@ -461,6 +480,7 @@ object DashboardHost {
             method == "GET" && path == "/api/diagnostics" -> writeJson(socket, 200, mapOf("ok" to true, "diagnostics" to com.olympus.iptv.ui.DeviceCompat.diagnostics(app)))
             method == "GET" && path == "/api/live-status" -> liveStatus(app, socket)
             method == "POST" && path == "/api/sync/now" -> forceSyncNow(app, socket, json(body))
+            method == "POST" && path == "/api/playlist/remove" -> removePlaylist(app, socket, json(body))
             method == "GET" && path == "/api/downloads" -> listDownloads(app, socket, query["email"], query["deviceId"])
             method == "POST" && path == "/api/downloads/start" -> startDownload(app, socket, json(body))
             method == "POST" && path == "/api/downloads/delete" -> deleteDownload(app, socket, json(body))
@@ -764,29 +784,65 @@ object DashboardHost {
     }
 
     private fun devices(app: OlympusIptvApp, socket: Socket, body: JsonObject) {
-        val email = text(body, "email")
+        val email = text(body, "email").trim().lowercase()
         val session = session(app)
         val saved = session?.email?.trim()?.lowercase().orEmpty()
-        if (session == null || saved.isBlank() || email.trim().lowercase() != saved) {
+        if (session == null || saved.isBlank() || email != saved) {
             writeJson(socket, 401, mapOf("error" to "That email is not on a TV yet. Open Olympus-IPTV once with this email."))
             return
         }
         val deviceId = runBlocking { app.playlistStore.deviceId() }
         val lineup = runBlocking { app.playlistStore.lineup(session.id) }
+        val merged = LinkedHashMap<String, Map<String, Any?>>()
+        merged[deviceId] = mapOf(
+            "id" to deviceId,
+            "name" to "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}".trim(),
+            "local" to true,
+            "hiddenCountries" to lineup.hiddenCountries.orEmpty().size,
+            "hiddenGroups" to lineup.hiddenGroups.orEmpty().size,
+            "hiddenChannels" to lineup.hiddenChannels.orEmpty().size
+        )
+        // Merge any other devices registered under the same email from the cloud portal (fast 2.5s timeout).
+        val cloudBase = com.olympus.iptv.BuildConfig.PORTAL_CLOUD_URL.trim().trimEnd('/')
+        if (cloudBase.startsWith("http")) {
+            runCatching {
+                val quickHttp = com.olympus.iptv.playlist.HttpClients.shared.newBuilder()
+                    .connectTimeout(2500, java.util.concurrent.TimeUnit.MILLISECONDS)
+                    .readTimeout(2500, java.util.concurrent.TimeUnit.MILLISECONDS)
+                    .build()
+                val reqBody = gson.toJson(mapOf("email" to saved))
+                    .toRequestBody("application/json; charset=utf-8".toMediaType())
+                val apiKey = com.olympus.iptv.BuildConfig.PORTAL_API_KEY.trim()
+                val reqBuilder = Request.Builder().url("$cloudBase/api/devices").post(reqBody)
+                if (apiKey.isNotEmpty()) reqBuilder.header("X-Olympus-Api-Key", apiKey)
+                val req = reqBuilder.build()
+                quickHttp.newCall(req).execute().use { resp ->
+                    if (!resp.isSuccessful) return@use
+                    val root = JsonParser.parseString(resp.body?.string().orEmpty()).asJsonObject
+                    val arr = root.getAsJsonArray("devices") ?: return@use
+                    for (el in arr) {
+                        val obj = el.takeIf { it.isJsonObject }?.asJsonObject ?: continue
+                        val id = obj.get("id")?.takeIf { !it.isJsonNull }?.asString?.trim().orEmpty()
+                        if (id.isBlank() || merged.containsKey(id)) continue
+                        merged[id] = mapOf(
+                            "id" to id,
+                            "name" to (obj.get("name")?.takeIf { !it.isJsonNull }?.asString ?: id),
+                            "local" to false,
+                            "hiddenCountries" to (obj.get("hiddenCountries")?.takeIf { !it.isJsonNull }?.asInt ?: 0),
+                            "hiddenGroups" to (obj.get("hiddenGroups")?.takeIf { !it.isJsonNull }?.asInt ?: 0),
+                            "hiddenChannels" to (obj.get("hiddenChannels")?.takeIf { !it.isJsonNull }?.asInt ?: 0)
+                        )
+                    }
+                }
+            }
+        }
         writeJson(
             socket,
             200,
             mapOf(
                 "ok" to true,
                 "email" to saved,
-                "devices" to listOf(
-                    mapOf(
-                        "id" to deviceId,
-                        "hiddenCountries" to lineup.hiddenCountries.orEmpty().size,
-                        "hiddenGroups" to lineup.hiddenGroups.orEmpty().size,
-                        "hiddenChannels" to lineup.hiddenChannels.orEmpty().size
-                    )
-                )
+                "devices" to merged.values.toList()
             )
         )
     }
@@ -1240,8 +1296,12 @@ object DashboardHost {
             writeJson(socket, 401, mapOf("error" to "Device not registered"))
             return
         }
-        val find = text(body, "find")
-        if (find.isBlank()) {
+        val batchFinds = body.get("finds")?.takeIf { it.isJsonArray }?.asJsonArray
+            ?.mapNotNull { it.takeIf { el -> el.isJsonPrimitive }?.asString?.trim() }
+            ?.filter { it.isNotEmpty() }
+            .orEmpty()
+        val finds = if (batchFinds.isNotEmpty()) batchFinds else listOf(text(body, "find")).filter { it.isNotBlank() }
+        if (finds.isEmpty()) {
             writeJson(socket, 400, mapOf("error" to "Type the text to find first."))
             return
         }
@@ -1250,15 +1310,19 @@ object DashboardHost {
         } else {
             ""
         }
-        val result = app.catalogDb.replaceGroupLabels(gate.playlist.id, find, replacement)
+        val result = app.catalogDb.replaceGroupLabelsBatch(gate.playlist.id, finds, replacement)
         clearGuideCache()
         val lineup = filled(runBlocking { app.playlistStore.lineup(gate.playlist.id) })
         val names = lineup.groupNames.orEmpty().mapNotNull { (id, name) ->
-            val next = com.olympus.iptv.data.GroupRename.replaceAll(name, find, replacement).trim()
+            var next = name
+            for (needle in finds) {
+                next = com.olympus.iptv.data.GroupRename.replaceAll(next, needle, replacement).trim()
+            }
             if (next.isEmpty()) null else id to next
         }.toMap()
         val next = lineup.copy(groupNames = names, revision = System.currentTimeMillis())
         runBlocking { app.playlistStore.saveLineup(gate.playlist.id, next) }
+        app.notifyLineupChanged(gate.playlist.id)
         writeJson(
             socket,
             200,
@@ -1269,6 +1333,124 @@ object DashboardHost {
                 "lineup" to next
             )
         )
+    }
+
+    private fun sanitize(app: OlympusIptvApp, socket: Socket, body: JsonObject) {
+        val gate = gate(app, text(body, "email"), text(body, "deviceId")) ?: run {
+            writeJson(socket, 401, mapOf("error" to "Device not registered"))
+            return
+        }
+        val cloudBase = com.olympus.iptv.BuildConfig.PORTAL_CLOUD_URL.trim().trimEnd('/')
+        if (!cloudBase.startsWith("http")) {
+            writeJson(socket, 503, mapOf("error" to "Cloud API URL is not configured"))
+            return
+        }
+        val email = text(body, "email").ifBlank { gate.playlist.email.orEmpty() }
+        val deviceId = text(body, "deviceId").ifBlank { runBlocking { app.playlistStore.deviceId() } }
+        val payload = JsonObject().apply {
+            addProperty("email", email)
+            addProperty("deviceId", deviceId)
+            body.get("channelStrip")?.let { add("channelStrip", it) }
+            body.get("channelKept")?.let { add("channelKept", it) }
+            body.get("groupStrip")?.let { add("groupStrip", it) }
+        }
+        val resp: Pair<Int, String> = runCatching {
+            val reqBody = payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
+            val token = com.olympus.iptv.playlist.LineupClient(app).ensureDeviceToken(email, deviceId)
+            val apiKey = com.olympus.iptv.BuildConfig.PORTAL_API_KEY.trim()
+            val builder = Request.Builder()
+                .url("$cloudBase/api/sanitize")
+                .post(reqBody)
+                .header("X-Device-Id", deviceId)
+            if (!token.isNullOrBlank()) builder.header("X-Device-Token", token)
+            if (apiKey.isNotEmpty()) builder.header("X-Olympus-Api-Key", apiKey)
+            val client = com.olympus.iptv.playlist.HttpClients.shared.newBuilder()
+                .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+                .build()
+            client.newCall(builder.build()).execute().use { r ->
+                r.code to (r.body?.string().orEmpty())
+            }
+        }.getOrElse { err ->
+            writeJson(socket, 502, mapOf("error" to (err.message ?: "Cloud API unreachable")))
+            return
+        }
+        val parsed = runCatching { JsonParser.parseString(resp.second).asJsonObject }.getOrNull()
+        if (resp.first !in 200..299 || parsed == null) {
+            val msg = parsed?.get("error")?.takeIf { it.isJsonPrimitive }?.asString
+                ?: if (resp.first == 502 || resp.first == 404) {
+                    "Cloud API returned ${resp.first} — make sure the latest nodeapi is deployed & running."
+                } else {
+                    "Cloud sanitize failed (${resp.first})"
+                }
+            writeJson(socket, if (resp.first in 400..599) resp.first else 502, mapOf("error" to msg))
+            return
+        }
+        parsed.get("lineup")?.takeIf { it.isJsonObject }?.let { lineupObj ->
+            runCatching {
+                val next = gson.fromJson(lineupObj, LineupConfig::class.java)
+                if (next != null) {
+                    runBlocking { app.playlistStore.saveLineup(gate.playlist.id, next) }
+                }
+            }
+        }
+        clearGuideCache()
+        app.notifyLineupChanged(gate.playlist.id)
+        writeBytes(socket, 200, "application/json; charset=utf-8", resp.second.toByteArray(), "no-store")
+    }
+
+    private fun parseGuideNames(app: OlympusIptvApp, socket: Socket, body: JsonObject) {
+        val gate = gate(app, text(body, "email"), text(body, "deviceId")) ?: run {
+            writeJson(socket, 401, mapOf("error" to "Device not registered"))
+            return
+        }
+        val enabled = flag(body, "enabled", true)
+        val cloudBase = com.olympus.iptv.BuildConfig.PORTAL_CLOUD_URL.trim().trimEnd('/')
+        if (!cloudBase.startsWith("http")) {
+            writeJson(socket, 503, mapOf("error" to "Cloud API URL is not configured"))
+            return
+        }
+        val email = text(body, "email").ifBlank { gate.playlist.email.orEmpty() }
+        val deviceId = text(body, "deviceId").ifBlank { runBlocking { app.playlistStore.deviceId() } }
+        val payload = JsonObject().apply {
+            addProperty("email", email)
+            addProperty("deviceId", deviceId)
+            addProperty("enabled", enabled)
+        }
+        val resp: Pair<Int, String> = runCatching {
+            val reqBody = payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
+            val token = com.olympus.iptv.playlist.LineupClient(app).ensureDeviceToken(email, deviceId)
+            val apiKey = com.olympus.iptv.BuildConfig.PORTAL_API_KEY.trim()
+            val builder = Request.Builder()
+                .url("$cloudBase/api/epg/parse")
+                .post(reqBody)
+                .header("X-Device-Id", deviceId)
+            if (!token.isNullOrBlank()) builder.header("X-Device-Token", token)
+            if (apiKey.isNotEmpty()) builder.header("X-Olympus-Api-Key", apiKey)
+            com.olympus.iptv.playlist.HttpClients.shared.newCall(builder.build()).execute().use { r ->
+                r.code to (r.body?.string().orEmpty())
+            }
+        }.getOrElse { err ->
+            writeJson(socket, 502, mapOf("error" to (err.message ?: "Cloud API unreachable")))
+            return
+        }
+        val parsed = runCatching { JsonParser.parseString(resp.second).asJsonObject }.getOrNull()
+        if (resp.first !in 200..299 || parsed == null) {
+            val msg = parsed?.get("error")?.takeIf { it.isJsonPrimitive }?.asString
+                ?: "Cloud EPG parse failed (${resp.first}) — make sure the latest nodeapi is deployed."
+            writeJson(socket, if (resp.first in 400..599) resp.first else 502, mapOf("error" to msg))
+            return
+        }
+        parsed.get("lineup")?.takeIf { it.isJsonObject }?.let { lineupObj ->
+            runCatching {
+                val next = gson.fromJson(lineupObj, LineupConfig::class.java)
+                if (next != null) {
+                    runBlocking { app.playlistStore.saveLineup(gate.playlist.id, next) }
+                }
+            }
+        }
+        clearGuideCache()
+        app.notifyLineupChanged(gate.playlist.id)
+        writeBytes(socket, 200, "application/json; charset=utf-8", resp.second.toByteArray(), "no-store")
     }
 
     private fun strip(app: OlympusIptvApp, socket: Socket, body: JsonObject) {
@@ -1691,6 +1873,53 @@ object DashboardHost {
         )
     }
 
+    private fun removePlaylist(app: OlympusIptvApp, socket: Socket, body: JsonObject) {
+        val ok = runCatching {
+            val savedEmail = runBlocking { app.playlistStore.session.first()?.email.orEmpty() }
+            val email = text(body, "email").ifBlank { savedEmail }
+            val deviceId = text(body, "deviceId").ifBlank { runBlocking { app.playlistStore.deviceId() } }
+            val cloudBase = com.olympus.iptv.BuildConfig.PORTAL_CLOUD_URL.trim().trimEnd('/')
+            if (cloudBase.startsWith("http") && email.isNotBlank() && deviceId.isNotBlank()) {
+                runCatching {
+                    val token = com.olympus.iptv.playlist.LineupClient(app).ensureDeviceToken(email, deviceId)
+                    val payload = gson.toJson(mapOf("email" to email, "deviceId" to deviceId))
+                        .toRequestBody("application/json; charset=utf-8".toMediaType())
+                    val builder = Request.Builder()
+                        .url("$cloudBase/api/playlist/remove")
+                        .post(payload)
+                        .header("X-Device-Id", deviceId)
+                    if (!token.isNullOrBlank()) builder.header("X-Device-Token", token)
+                    val apiKey = com.olympus.iptv.BuildConfig.PORTAL_API_KEY.trim()
+                    if (apiKey.isNotEmpty()) builder.header("X-Olympus-Api-Key", apiKey)
+                    com.olympus.iptv.playlist.HttpClients.shared.newCall(builder.build()).execute().close()
+                }
+            }
+            runBlocking {
+                runCatching { com.olympus.iptv.vpn.AppTunnel.disconnect(app) }
+                runCatching { app.stopService(android.content.Intent(app, com.olympus.iptv.record.RecordingService::class.java)) }
+                app.playlistStore.resetDevice()
+                app.catalogDb.wipeAll()
+                com.olympus.iptv.remind.ReminderStore.clear(app)
+                com.olympus.iptv.playlist.EpisodeCache.clear(app.filesDir)
+                runCatching { java.io.File(app.getExternalFilesDir(null), "recordings").deleteRecursively() }
+                runCatching { java.io.File(app.filesDir, "watchmode-week.json").delete() }
+                runCatching { java.io.File(app.filesDir, "fresh-cards.json").delete() }
+                guideHold = null
+                logoAllow.clear()
+                app.stagedLineup = null
+            }
+            val intent = android.content.Intent(app, com.olympus.iptv.ui.login.LoginActivity::class.java).apply {
+                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            }
+            app.startActivity(intent)
+        }.isSuccess
+        if (ok) {
+            writeJson(socket, 200, mapOf("ok" to true))
+        } else {
+            writeJson(socket, 500, mapOf("error" to "Could not remove playlist"))
+        }
+    }
+
     private fun readRecording(app: OlympusIptvApp, socket: Socket, query: Map<String, String>) {
         val gate = gate(app, query["email"], query["deviceId"]) ?: run {
             writeJson(socket, 401, mapOf("error" to "Device not registered"))
@@ -1827,7 +2056,7 @@ object DashboardHost {
             merged.putIfAbsent(row.id, AutoFavorites.GuideChannel(row.id, row.name, row.group))
         }
         val rows = merged.values.toList()
-        guideHold = GuideHold(playlistId, stamp, rows)
+        if (rows.isNotEmpty()) guideHold = GuideHold(playlistId, stamp, rows)
         return rows
     }
 
@@ -2025,10 +2254,13 @@ object DashboardHost {
         val deviceId = runBlocking {
             app.playlistStore.saveSession(playlist)
             val lineup = app.playlistStore.lineup(playlist.id)
+            val isFresh = (lineup.revision ?: 0L) == 0L
             app.playlistStore.saveLineup(
                 playlist.id,
                 lineup.copy(
                     includeInternational = includeInternational,
+                    hiddenGroups = if (isFresh) emptyList() else lineup.hiddenGroups,
+                    hiddenCountries = if (isFresh) emptyList() else lineup.hiddenCountries,
                     revision = System.currentTimeMillis()
                 )
             )

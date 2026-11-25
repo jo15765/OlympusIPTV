@@ -61,6 +61,14 @@ internal fun BrowseActivity.showRowOptions(seed: com.olympus.iptv.data.Channel? 
         if (touchPrimary) {
             labels += getString(R.string.open_in_pip)
             actions += 7
+            if (section != GuideSection.TV && channel.streamUrl.isNotBlank()) {
+                labels += "📥 Download for Offline"
+                actions += 10
+            }
+        }
+        if (channel.streamUrl.isNotBlank()) {
+            labels += "▶ Open in External Player"
+            actions += 11
         }
         val runAction: (Int) -> Unit = { action ->
             when (action) {
@@ -78,6 +86,34 @@ internal fun BrowseActivity.showRowOptions(seed: com.olympus.iptv.data.Channel? 
                 6 -> openVodRatings(channel)
                 7 -> play(channel, enterPip = true)
                 8 -> play(channel)
+                10 -> {
+                    com.olympus.iptv.record.OfflineDownloadManager.enqueue(
+                        this@showRowOptions,
+                        channel.name,
+                        channel.id,
+                        channel.streamUrl
+                    )
+                    android.widget.Toast.makeText(
+                        this@showRowOptions,
+                        "Downloading ${channel.name} for offline viewing…",
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                }
+                11 -> {
+                    val pkg = com.olympus.iptv.data.ProFeatureStore.playback(this@showRowOptions).externalPlayerPackage
+                    val launched = com.olympus.iptv.ui.player.ExternalPlayerBridge.launch(
+                        this@showRowOptions,
+                        channel,
+                        pkg
+                    )
+                    if (!launched) {
+                        android.widget.Toast.makeText(
+                            this@showRowOptions,
+                            "No external player app found",
+                            android.widget.Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
                 9 -> hideGuideChannel(channel)
             }
         }

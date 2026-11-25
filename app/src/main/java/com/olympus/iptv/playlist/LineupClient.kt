@@ -608,8 +608,19 @@ class LineupClient(
     companion object {
         private val sharedGson get() = com.olympus.iptv.data.AppJson.gson
 
+        private val apiKeyInterceptor = okhttp3.Interceptor { chain ->
+            val key = BuildConfig.PORTAL_API_KEY.trim()
+            val req = if (key.isNotEmpty() && chain.request().header("X-Olympus-Api-Key") == null) {
+                chain.request().newBuilder().header("X-Olympus-Api-Key", key).build()
+            } else {
+                chain.request()
+            }
+            chain.proceed(req)
+        }
+
         private val defaultHttp by lazy {
             HttpClients.shared.newBuilder()
+                .addInterceptor(apiKeyInterceptor)
                 .connectTimeout(6, TimeUnit.SECONDS)
                 .readTimeout(10, TimeUnit.SECONDS)
                 .callTimeout(15, TimeUnit.SECONDS)
@@ -618,6 +629,7 @@ class LineupClient(
 
         private val catalogHttp by lazy {
             HttpClients.shared.newBuilder()
+                .addInterceptor(apiKeyInterceptor)
                 .connectTimeout(20, TimeUnit.SECONDS)
                 .readTimeout(90, TimeUnit.SECONDS)
                 .callTimeout(0, TimeUnit.SECONDS)
@@ -626,6 +638,7 @@ class LineupClient(
 
         private val sseHttp by lazy {
             HttpClients.shared.newBuilder()
+                .addInterceptor(apiKeyInterceptor)
                 .connectTimeout(8, TimeUnit.SECONDS)
                 .readTimeout(0, TimeUnit.SECONDS)
                 .callTimeout(0, TimeUnit.SECONDS)

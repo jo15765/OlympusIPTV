@@ -396,6 +396,15 @@ class PlayerActivity : AppCompatActivity() {
             hidePlaybackMenu()
             enterPip(manual = true)
         }
+        binding.btnQuickPro.setOnClickListener {
+            hidePlaybackMenu()
+            PlayerQuickSheet.showQuickSettings(this)
+        }
+        binding.btnLast.setOnLongClickListener {
+            hidePlaybackMenu()
+            PlayerQuickSheet.showRecentChannels(this)
+            true
+        }
         binding.btnSkipIntro.setOnClickListener { onSkipIntro() }
         binding.btnPlayNext.setOnClickListener { playPendingNext() }
         binding.btnCancelNext.setOnClickListener { cancelNext() }
@@ -708,6 +717,10 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun playbackErrorOpen(): Boolean =
         ::binding.isInitialized && binding.playbackErrorCard.visibility == View.VISIBLE
+
+    internal fun currentChannel(): Channel? = current
+    internal fun activePlaylistId(): String? = playlistId
+    internal fun tuneChannelById(id: String) = playById(id)
 
     private fun exitToGuide() {
         hideHandler.removeCallbacks(leaveAfterBack)
@@ -1428,7 +1441,7 @@ class PlayerActivity : AppCompatActivity() {
         }
         if (playbackErrorOpen()) return
         binding.channelMeta.text = getString(R.string.playback_reconnecting)
-        binding.connectingBadge.setText(R.string.playback_reconnecting_pill)
+        binding.connectingBadge.text = "↻ Reconnecting ($recoverAttempt/$MAX_LIVE_RECOVER)…"
         binding.connectingBadge.visibility = View.VISIBLE
         val wait = 1_000L shl (recoverAttempt - 1).coerceAtMost(3)
         recoverJob = lifecycleScope.launch {
@@ -2248,7 +2261,8 @@ class PlayerActivity : AppCompatActivity() {
             binding.btnSleep,
             binding.btnCast,
             binding.btnTrailer,
-            binding.btnPip
+            binding.btnPip,
+            binding.btnQuickPro
         ).filter { it.visibility == View.VISIBLE }
         shown.forEachIndexed { index, button ->
             val previous = shown[if (index == 0) 0 else index - 1]

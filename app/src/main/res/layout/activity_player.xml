@@ -550,13 +550,28 @@
             android:background="@drawable/bg_button"
             android:focusable="true"
             android:nextFocusLeft="@id/btnTrailer"
-            android:nextFocusRight="@id/btnPip"
+            android:nextFocusRight="@id/btnQuickPro"
             android:nextFocusUp="@id/btnPip"
             android:nextFocusDown="@id/btnPip"
             android:text="@string/pip"
             android:textAllCaps="false"
             android:textColor="@color/bg"
             android:visibility="gone" />
+
+        <Button
+            android:id="@+id/btnQuickPro"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:layout_marginStart="12dp"
+            android:background="@drawable/bg_button_secondary"
+            android:focusable="true"
+            android:nextFocusLeft="@id/btnPip"
+            android:nextFocusRight="@id/btnQuickPro"
+            android:nextFocusUp="@id/btnQuickPro"
+            android:nextFocusDown="@id/btnQuickPro"
+            android:text="⚡ Quick"
+            android:textAllCaps="false"
+            android:textColor="@color/text_primary" />
     </LinearLayout>
 
     <LinearLayout

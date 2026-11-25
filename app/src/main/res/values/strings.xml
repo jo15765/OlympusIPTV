@@ -185,7 +185,7 @@
     <string name="login_zip_invalid">That ZIP code was not found</string>
     <string name="login_email_required">Enter the email address for this lineup</string>
     <string name="device_id_label">Device ID %1$s</string>
-    <string name="portal_hint">On your home network, open %1$s. That dashboard stays on this network. Sign in with this email and device ID to edit countries, groups, and channels.</string>
+    <string name="portal_hint">On your home network, open %1$s. Sign in with your email to manage all devices linked to your account.</string>
     <string name="portal_hint_offline">The home dashboard runs on this PC. Start it, then open its network address from a phone or computer on the same Wi-Fi.</string>
     <string name="dashboard_label">Home Dashboard:</string>
     <string name="dashboard_line">Home dashboard %1$s</string>

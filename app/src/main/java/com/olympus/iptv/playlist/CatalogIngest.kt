@@ -132,6 +132,25 @@ object CatalogIngest {
             if (!liveReady.isCompleted) liveReady.complete(false)
             if (reached) {
                 synchronized(settled) { settled.add(playlist.id) }
+                runCatching {
+                    val lineup = app.playlistStore.lineup(playlist.id)
+                    if (lineup.includeInternational != true && lineup.hiddenCountries.isNullOrEmpty()) {
+                        val home = playlist.homeCountry?.trim()?.lowercase()?.takeIf { it.isNotBlank() } ?: "us"
+                        val hidden = db.countryChoices(playlist.id)
+                            .map { it.id }
+                            .filter { it != home && it != CountryIndex.OTHER_ID }
+                        if (hidden.isNotEmpty()) {
+                            app.playlistStore.saveLineup(
+                                playlist.id,
+                                lineup.copy(
+                                    includeInternational = false,
+                                    hiddenCountries = hidden,
+                                    revision = System.currentTimeMillis()
+                                )
+                            )
+                        }
+                    }
+                }
                 app.playlistStore.saveLastRefreshAt(playlist.id, System.currentTimeMillis())
             }
         }

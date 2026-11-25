@@ -24,6 +24,7 @@ val tmdbKey = localProperty("tmdb.apiKey")
 val portalCloudUrl = localProperty("portal.cloudUrl").ifBlank {
     "https://stream-me-service-api.getjohnathan.com"
 }
+val portalApiKey = localProperty("portal.apiKey")
 
 val googleDriveClientId = localProperty("googleDrive.clientId")
 val oneDriveClientId = localProperty("oneDrive.clientId")
@@ -46,8 +47,8 @@ android {
         applicationId = "com.olympus.iptv"
         minSdk = 24
         targetSdk = 35
-        versionCode = 133
-        versionName = "0.2.133"
+        versionCode = 138
+        versionName = "0.2.138"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "WATCHMODE_API_KEY", "\"$watchmodeKey\"")
         buildConfigField("String", "OPENSUBTITLES_API_KEY", "\"$opensubtitlesKey\"")
@@ -56,6 +57,7 @@ android {
         buildConfigField("String", "MAILGUN_FROM_EMAIL", "\"$mailgunFrom\"")
         buildConfigField("String", "TMDB_API_KEY", "\"$tmdbKey\"")
         buildConfigField("String", "PORTAL_CLOUD_URL", "\"$portalCloudUrl\"")
+        buildConfigField("String", "PORTAL_API_KEY", "\"$portalApiKey\"")
         buildConfigField("String", "GOOGLE_DRIVE_CLIENT_ID", "\"$googleDriveClientId\"")
         buildConfigField("String", "ONEDRIVE_CLIENT_ID", "\"$oneDriveClientId\"")
     }
@@ -212,6 +214,19 @@ tasks.matching { it.name == "assembleRelease" }.configureEach {
         val dest = File(downloadsDir, "olympus-iptv-$releaseName.apk")
         apk.copyTo(dest, overwrite = true)
         println("Release APK: ${dest.absolutePath}")
+    }
+}
+
+tasks.matching { it.name == "assembleFastRelease" }.configureEach {
+    val releaseName = android.defaultConfig.versionName
+    val apkProvider = layout.buildDirectory.file("outputs/apk/fastRelease/app-fastRelease.apk")
+    val downloadsDir = File(System.getProperty("user.home"), "Downloads")
+    doLast {
+        val apk = apkProvider.get().asFile
+        if (!apk.exists() || releaseName.isNullOrBlank()) return@doLast
+        val dest = File(downloadsDir, "olympus-iptv-$releaseName-fast.apk")
+        apk.copyTo(dest, overwrite = true)
+        println("Fast Release APK: ${dest.absolutePath}")
     }
 }
 
