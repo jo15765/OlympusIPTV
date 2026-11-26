@@ -64,6 +64,7 @@ clearcast-tuner/
 │   ├── docker-compose.yml        # API + Worker (+ optional local-db Postgres profile)
 │   └── .env.example              # Safe environment variable template
 ├── local.properties.example      # Optional Android cloud API URL template
+├── CHANGELOG.md                  # Complete version-by-version revision history (0.2.83 → latest)
 └── .gitignore                    # Blocks .env, keystores, APKs, local dumps, node_modules
 ```
 
@@ -187,6 +188,20 @@ api.yourdomain.com {
 - Rotate `CREDENTIALS_KEY` and `PGPASSWORD` before exposing any server to the internet.
 - Keep `BIND_HOST=127.0.0.1` and `ENABLE_WEB_DASHBOARD=false` unless you intentionally configure TLS + authentication in front of your server.
 - Enable **GitHub Secret Scanning & Push Protection** in your repository settings before pushing.
+
+---
+
+## Revision History & Changelog
+
+For the complete version-by-version release notes (**0.2.83 through latest**), see [**`CHANGELOG.md`**](./CHANGELOG.md).
+
+| Version | Highlights |
+| --- | --- |
+| **Unreleased (Post-0.2.142)** | Monorepo Docker `cloud-api/` backend (Brotli/Gzip, GIN FTS, advisory locks, AES-256-GCM, optional `local-db` Postgres), strict 15m pre / 30m post-event hard cutoff & Dummy EPG parity, D-Pad focus blackhole fixes, indexed `24/7 Channels`, Search keyboard/cross-catalog fix, Obsidian & Gold LAN dashboard refresh |
+| **[0.2.142](./CHANGELOG.md#whats-in-02142)** | Unified `24/7 Channels` group, live event & guide sync (`ESPN+` / `Disney+` / PPV), split channel/group sanitization, TV EPG Edits & Web-UI Access layout polish |
+| **[0.2.137](./CHANGELOG.md#whats-in-02137)** | Local major networks (`FOX`/`ABC`/`CBS`/`NBC`/`PBS`) with offline ZIP fallback, self-healing group names, revamped Web-UI Settings & EPG tools, API key auth |
+| **[0.2.132](./CHANGELOG.md#whats-in-02132)** | Mobile Live TV guide row alignment & scroll lock, pinch-to-zoom & 2× long-press gestures, Google Drive & OneDrive DVR cloud upload |
+| **[0.2.127 – 0.2.83](./CHANGELOG.md#whats-in-02127)** | Pro Features & Household Profiles, universal Android 7–16 / Fire OS / Google TV Streamer (4K) support, cloud sync, title pages, and DVR/Reminders foundation |
 
 ---
 
