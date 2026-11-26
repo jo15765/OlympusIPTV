@@ -86,10 +86,15 @@ Sports and PPV IPTV providers often list hundreds of channels like `ESPN+ 16: NO
 - **Search (`SearchActivity.kt`):** Searches Live TV (active events only), Movies, and TV Shows simultaneously with per-section counts and full TV/Mobile soft-keyboard support.
 
 ### 3. Embedded LAN Web Dashboard (No WAN Exposure)
-- Runs directly on your TV/Android device over your local Wi-Fi (`DashboardHost.kt`), serving the gzipped Obsidian & Gold web UI (`app/src/main/assets/dashboard/index.html`) for managing countries, groups, channel order, favorites, DVR recordings, reminders, and TV remote control from any phone or laptop on the same network.
+- Runs directly on your TV/Android device over your local Wi-Fi (`DashboardHost.kt`), serving the gzipped **Cinema Obsidian & Molten Gold** web UI (`app/src/main/assets/dashboard/index.html`) for managing countries, groups, channel order, favorites, DVR recordings, reminders, and TV remote control from any phone or laptop on the same network.
+- Designed for dense catalogs without endless scrolling: **zero-scroll 4-column Favorites Auto Build**, **2-column compact Groups grid** with instant category filter chips (`Live TV`, `Sports`, `24/7`, `Movies`, `Shows`, `18+`), and **single-line Channels rows** with an **A–Z Quick Jump strip**.
 - On the cloud backend (`cloud-api/server.js`), static WAN dashboard hosting is **disabled by default** (`ENABLE_WEB_DASHBOARD=false`) so your VPS only exposes `/api/*` endpoints.
 
-### 4. Hardened 3-Tier Cloud Sync (`cloud-api/`)
+### 4. Multi-Generation Fire TV Stick & Low-RAM Performance
+- **One APK across Fire TV & Android**: Supports **Fire OS 6 (API 25)**, **Fire OS 7 (API 28)**, **Fire OS 8 (API 30)**, Android TV, Google TV Streamer (4K), and Android phones/tablets (`minSdk = 24`, bundling both 32-bit `armeabi-v7a` and 64-bit `arm64-v8a`, GMS-free Cast fallback, and automatic low-RAM scaling).
+- **Zero-Churn Hot Paths**: Cached `NameStrip.statusCache` inspections, deduplicated SQLite live-window & EPG helpers (`CatalogDb`), and pre-compiled regex constants across `ChannelFailover`, `BrowseVodFilter`, `SearchTileAdapter`, and `FreshFragment`/`FreshActivity` keep scrolling and channel zapping snappy even on 1 GB–2 GB sticks.
+
+### 5. Hardened 3-Tier Cloud Sync (`cloud-api/`)
 - **Fast Ingestion (`worker.js`):** Fetches all 6 Xtream endpoints in parallel with native Node 22 `fetch` + timeouts/retries, performs 1,000-row PostgreSQL `UNNEST` bulk upserts across 3 staged commits, prunes stale VOD/Series/Categories, and uses **PostgreSQL session advisory locks** (`pg_try_advisory_lock`) so duplicate worker containers never collide.
 - **Fast Delivery (`server.js`):** Pre-compresses cached catalog snapshots with **Brotli (q4)** and **Gzip**, serves `ETag` / `304 Not Modified`, supports `?since=<epochMs>` delta sync, invalidates cache in real time via `LISTEN olympus_sync`, and powers sub-millisecond full-text search via the PostgreSQL GIN index (`idx_cloud_channels_name_fts`).
 - **Security by Default:**
@@ -197,7 +202,7 @@ For the complete version-by-version release notes (**0.2.83 through latest**), s
 
 | Version | Highlights |
 | --- | --- |
-| **Unreleased (Post-0.2.142)** | Monorepo Docker `cloud-api/` backend (Brotli/Gzip, GIN FTS, advisory locks, AES-256-GCM, optional `local-db` Postgres), strict 15m pre / 30m post-event hard cutoff & Dummy EPG parity, D-Pad focus blackhole fixes, indexed `24/7 Channels`, Search keyboard/cross-catalog fix, Obsidian & Gold LAN dashboard refresh |
+| **Unreleased (Post-0.2.142)** | Monorepo Docker `cloud-api/` backend (Brotli/Gzip, GIN FTS, advisory locks, AES-256-GCM, optional `local-db` Postgres), strict 15m pre / 30m post-event hard cutoff & Dummy EPG parity, D-Pad focus blackhole fixes, indexed `24/7 Channels`, Search keyboard/cross-catalog fix, zero-scroll Favorites / 2-col Groups / A–Z Channels LAN UI, and hot-path `NameStrip`/SQLite/Regex optimizations |
 | **[0.2.142](./CHANGELOG.md#whats-in-02142)** | Unified `24/7 Channels` group, live event & guide sync (`ESPN+` / `Disney+` / PPV), split channel/group sanitization, TV EPG Edits & Web-UI Access layout polish |
 | **[0.2.137](./CHANGELOG.md#whats-in-02137)** | Local major networks (`FOX`/`ABC`/`CBS`/`NBC`/`PBS`) with offline ZIP fallback, self-healing group names, revamped Web-UI Settings & EPG tools, API key auth |
 | **[0.2.132](./CHANGELOG.md#whats-in-02132)** | Mobile Live TV guide row alignment & scroll lock, pinch-to-zoom & 2× long-press gestures, Google Drive & OneDrive DVR cloud upload |

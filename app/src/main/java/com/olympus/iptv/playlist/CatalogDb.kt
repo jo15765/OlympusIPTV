@@ -116,6 +116,43 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         }
     }
 
+    private fun loadCachedEpgNow(
+        db: SQLiteDatabase,
+        playlistId: String,
+        now: Long,
+        maxAgeMs: Long = 0L
+    ): Map<String, Triple<String, Long, Long>> {
+        val out = HashMap<String, Triple<String, Long, Long>>()
+        runCatching {
+            val sql = if (maxAgeMs > 0L) {
+                "SELECT channel_id, payload FROM epg_cache WHERE playlist_id=? AND fetched_at >= ?"
+            } else {
+                "SELECT channel_id, payload FROM epg_cache WHERE playlist_id=?"
+            }
+            val args = if (maxAgeMs > 0L) {
+                arrayOf(playlistId, (now - maxAgeMs).toString())
+            } else {
+                arrayOf(playlistId)
+            }
+            db.rawQuery(sql, args).use { cur ->
+                while (cur.moveToNext()) {
+                    val cid = cur.getString(0) ?: continue
+                    val payload = cur.getString(1) ?: continue
+                    val programs = decodeEpg(payload)
+                    val current = programs.firstOrNull { now >= it.startMillis && now < it.endMillis + NameStrip.POST_EVENT_GRACE_MS }
+                        ?: programs.firstOrNull { it.startMillis > now }
+                    if (current != null) {
+                        out[cid] = Triple(current.title, current.startMillis, current.endMillis)
+                    }
+                }
+            }
+        }
+        return out
+    }
+
+    private fun liveEventWindowSql(): String =
+        "(is_event_slot = 0 OR event_start_ms = -1 OR (event_start_ms > 0 AND ? >= event_start_ms AND ? < event_end_ms))"
+
     fun readLiveEventsHub(
         playlistId: String,
         hiddenChannels: Set<String>,
@@ -125,24 +162,7 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         val db = readableDatabase
         val preWindow = now + NameStrip.PRE_EVENT_WINDOW_MS
         val postGraceCutoff = now - NameStrip.POST_EVENT_GRACE_MS
-        val epgNowByChannel = HashMap<String, Triple<String, Long, Long>>()
-        runCatching {
-            db.rawQuery(
-                "SELECT channel_id, payload FROM epg_cache WHERE playlist_id=? AND fetched_at >= ?",
-                arrayOf(playlistId, (now - 6L * 3_600_000L).toString())
-            ).use { cur ->
-                while (cur.moveToNext()) {
-                    val cid = cur.getString(0) ?: continue
-                    val payload = cur.getString(1) ?: continue
-                    val programs = decodeEpg(payload)
-                    val current = programs.firstOrNull { now >= it.startMillis && now < it.endMillis + NameStrip.POST_EVENT_GRACE_MS }
-                        ?: programs.firstOrNull { it.startMillis > now }
-                    if (current != null) {
-                        epgNowByChannel[cid] = Triple(current.title, current.startMillis, current.endMillis)
-                    }
-                }
-            }
-        }
+        val epgNowByChannel = loadCachedEpgNow(db, playlistId, now, maxAgeMs = 6L * 3_600_000L)
         db.query(
             "channels",
             LIST_COLUMNS,
@@ -150,11 +170,7 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
             playlist_id=? AND bucket=?
             AND name NOT LIKE '%24/7%'
             AND IFNULL(group_title, '') NOT LIKE '%24/7%'
-            AND (
-                is_event_slot = 0
-                OR event_start_ms = -1
-                OR (event_start_ms > 0 AND ? >= event_start_ms AND ? < event_end_ms)
-            )
+            AND ${liveEventWindowSql()}
             """.trimIndent(),
             arrayOf(playlistId, LIVE, preWindow.toString(), postGraceCutoff.toString()),
             null,
@@ -422,7 +438,7 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         val postGraceCutoff = now - NameStrip.POST_EVENT_GRACE_MS
         val liveFilterSql = if (bucket == LIVE) {
             " AND UPPER(name) NOT LIKE '%: NO EVENT%' AND UPPER(name) NOT LIKE '%| NO EVENT%'" +
-                " AND (is_event_slot = 0 OR event_start_ms = -1 OR (event_start_ms > 0 AND ? >= event_start_ms AND ? < event_end_ms))"
+                " AND ${liveEventWindowSql()}"
         } else {
             ""
         }
@@ -510,7 +526,7 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
                     LIST_COLUMNS,
                     "playlist_id=? AND bucket=? AND (category_id=? OR group_title=?) " +
                         "AND UPPER(name) NOT LIKE '%: NO EVENT%' AND UPPER(name) NOT LIKE '%| NO EVENT%' " +
-                        "AND (is_event_slot = 0 OR event_start_ms = -1 OR (event_start_ms > 0 AND ? >= event_start_ms AND ? < event_end_ms))",
+                        "AND ${liveEventWindowSql()}",
                     arrayOf(playlistId, bucket, categoryId, categoryId, preWindow.toString(), postGraceCutoff.toString()),
                     null,
                     null,
@@ -2270,25 +2286,7 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         val preWindow = now + NameStrip.PRE_EVENT_WINDOW_MS
         val postGraceCutoff = now - NameStrip.POST_EVENT_GRACE_MS
         val hiddenSet = hiddenChannels.filterTo(HashSet()) { it.isNotBlank() }
-
-        val epgNowByChannel = HashMap<String, Triple<String, Long, Long>>()
-        runCatching {
-            db.rawQuery(
-                "SELECT channel_id, payload FROM epg_cache WHERE playlist_id=?",
-                arrayOf(playlistId)
-            ).use { cur ->
-                while (cur.moveToNext()) {
-                    val cid = cur.getString(0) ?: continue
-                    val payload = cur.getString(1) ?: continue
-                    val programs = decodeEpg(payload)
-                    val current = programs.firstOrNull { now >= it.startMillis && now < it.endMillis + NameStrip.POST_EVENT_GRACE_MS }
-                        ?: programs.firstOrNull { it.startMillis > now }
-                    if (current != null) {
-                        epgNowByChannel[cid] = Triple(current.title, current.startMillis, current.endMillis)
-                    }
-                }
-            }
-        }
+        val epgNowByChannel = loadCachedEpgNow(db, playlistId, now)
 
         db.rawQuery(
             """
@@ -2297,11 +2295,7 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
             WHERE playlist_id=? AND bucket=?
               AND UPPER(name) NOT LIKE '%: NO EVENT%'
               AND UPPER(name) NOT LIKE '%| NO EVENT%'
-              AND (
-                is_event_slot = 0
-                OR event_start_ms = -1
-                OR (event_start_ms > 0 AND ? >= event_start_ms AND ? < event_end_ms)
-              )
+              AND ${liveEventWindowSql()}
             """.trimIndent(),
             arrayOf(playlistId, LIVE, preWindow.toString(), postGraceCutoff.toString())
         ).use { cursor ->
@@ -3552,6 +3546,7 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         const val SERIES = "series"
         private const val PARSE_EXAMPLES = 4
         private val TOKEN_SPLIT = Regex("[^\\p{L}\\p{N}]+")
+        private val NEW_WORD_REGEX = Regex("\\bnew\\b")
         private val episodePattern = Regex("(?i)\\bS(\\d{1,2})\\s*E(\\d{1,3})\\b|\\bSeason\\s+(\\d{1,2})\\s+Episode\\s+(\\d{1,3})\\b")
         private val services = listOf(
             "netflix" to "Netflix",
@@ -3568,7 +3563,7 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
 
         private fun serviceOf(group: String, category: String, name: String): String? {
             val haystack = "$group $category $name".lowercase()
-            if (!Regex("\\bnew\\b").containsMatchIn(haystack) && !haystack.contains("this week")) return null
+            if (!NEW_WORD_REGEX.containsMatchIn(haystack) && !haystack.contains("this week")) return null
             return services.firstOrNull { haystack.contains(it.first) }?.second
         }
 

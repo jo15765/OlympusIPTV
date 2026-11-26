@@ -2644,6 +2644,199 @@
     body.theme-light .side {
       box-shadow: 0 4px 16px rgba(28, 24, 20, 0.06);
     }
+
+    /* === Favorites Zero-Scroll Compact Grid === */
+    #panelFavorites .fav-top-head { margin-bottom: 6px; }
+    #panelFavorites .fav-subtabs { margin-bottom: 8px; }
+    #favPaneAuto .fav-surface-scroll { padding: 10px 14px 8px; overflow-y: auto; }
+    #favPaneAuto .fav-surface-head { margin-bottom: 6px; }
+    #favPaneAuto .fav-surface-head h3 { margin: 0 0 2px; font-size: 15px; }
+    #favPaneAuto .fav-surface-head .hint { font-size: 12px; }
+    .fav-zip-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin: 6px 0 8px;
+      padding: 7px 11px;
+      border-radius: 11px;
+      border: 1px solid rgba(226, 161, 90, 0.22);
+      background: rgba(226, 161, 90, 0.06);
+    }
+    .fav-zip-left { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .fav-zip-bar .intl-switch { margin: 0; font-size: 12.5px; }
+    #favPaneAuto .preset-subhead { margin: 8px 0 5px; font-size: 10.5px; letter-spacing: 0.08em; }
+    #favPaneAuto .quick-cards {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 7px;
+    }
+    @media (max-width: 1120px) {
+      #favPaneAuto .quick-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
+    @media (max-width: 760px) {
+      #favPaneAuto .quick-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 500px) {
+      #favPaneAuto .quick-cards { grid-template-columns: 1fr; }
+    }
+    #favPaneAuto .quick-card {
+      padding: 8px 10px;
+      min-height: 54px;
+      gap: 9px;
+      border-radius: 11px;
+    }
+    #favPaneAuto .quick-icon { width: 30px; height: 30px; border-radius: 8px; flex-shrink: 0; }
+    #favPaneAuto .quick-icon svg { width: 16px; height: 16px; }
+    #favPaneAuto .quick-copy strong { font-size: 12.5px; line-height: 1.2; }
+    #favPaneAuto .quick-copy span {
+      font-size: 11px;
+      line-height: 1.25;
+      display: -webkit-box;
+      -webkit-line-clamp: 1;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    #favPaneAuto .quick-footer { padding: 8px 14px; }
+
+    /* === Groups & Channels Warm Obsidian-Gold Dense Polish === */
+    body:not(.theme-light) .group-row,
+    body:not(.theme-light) .channel-row {
+      background: rgba(31, 26, 21, 0.82);
+      border: 1px solid rgba(255, 232, 198, 0.07);
+    }
+    body:not(.theme-light) .group-row:hover,
+    body:not(.theme-light) .channel-row:hover {
+      background: rgba(42, 35, 27, 0.92);
+      border-color: rgba(226, 161, 90, 0.42);
+    }
+    body:not(.theme-light) .group-row.picked,
+    body:not(.theme-light) .group-row.editing,
+    body:not(.theme-light) .channel-row.picked {
+      background: rgba(54, 43, 27, 0.9);
+      border-color: rgba(226, 161, 90, 0.65);
+    }
+    .group-row {
+      grid-template-columns: 14px 16px 34px minmax(0, 1fr) auto auto 22px 22px 22px;
+      gap: 8px;
+      min-height: 38px;
+      padding: 5px 9px;
+    }
+    .group-row.editing {
+      grid-template-columns: 14px 16px 34px minmax(0, 1fr) auto auto auto 22px 22px 22px;
+    }
+    .group-row:not(.editing) .group-display { display: none; }
+    .group-count {
+      font-variant-numeric: tabular-nums;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: rgba(226, 161, 90, 0.12);
+      color: var(--accent);
+      border: 1px solid rgba(226, 161, 90, 0.22);
+      text-align: center;
+      white-space: nowrap;
+    }
+    #groups.compact-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px;
+      align-content: start;
+    }
+    #groups.compact-grid .group-empty { grid-column: 1 / -1; }
+    @media (max-width: 1040px) {
+      #groups.compact-grid { grid-template-columns: 1fr; }
+    }
+
+    .smart-filter-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin: 4px 0 6px;
+    }
+    .smart-chips {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      flex-wrap: wrap;
+    }
+    .smart-chip {
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 11.5px;
+      font-weight: 700;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 232, 198, 0.12);
+      color: var(--muted);
+      transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
+    }
+    .smart-chip:hover { border-color: rgba(226, 161, 90, 0.45); color: var(--text); }
+    .smart-chip[aria-pressed="true"] {
+      background: rgba(226, 161, 90, 0.2);
+      border-color: var(--accent);
+      color: #fff3df;
+    }
+
+    /* Channels Compact Single-Line & A-Z Quick Jump Strip */
+    .channel-row {
+      min-height: 40px;
+      padding: 4px 9px;
+      gap: 8px;
+      grid-template-columns: 14px 16px 32px minmax(0, 1fr) auto 24px 24px 34px 24px;
+    }
+    .channel-logo { width: 30px; height: 30px; border-radius: 7px; }
+    .channel-copy {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+    .channel-title { flex: 1; min-width: 0; }
+    .channel-sub { margin-top: 0; flex-shrink: 0; }
+    #channels.grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+      gap: 6px;
+      align-content: start;
+    }
+    #channels.grid .channel-row {
+      grid-template-columns: 16px 32px minmax(0, 1fr) auto 34px 24px;
+      min-height: 46px;
+    }
+    .az-strip {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      flex-wrap: wrap;
+      margin: 2px 0 6px;
+      padding: 4px 6px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.025);
+      border: 1px solid rgba(255, 232, 198, 0.07);
+    }
+    .az-btn {
+      min-width: 24px;
+      height: 22px;
+      padding: 0 5px;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+    }
+    .az-btn:hover { background: rgba(226, 161, 90, 0.14); color: var(--text); }
+    .az-btn[aria-pressed="true"] {
+      background: var(--accent);
+      color: #1a1106;
+      border-color: var(--accent);
+    }
 </style>
 </head>
 <body>
@@ -2954,10 +3147,20 @@
             <button class="primary" id="smartLineupBtn" type="button" title="Enable Smart Auto-Clean Names and hide duplicate backup channels">✨ 1-Click Smart Lineup</button>
           </div>
         </div>
-        <div class="group-tools">
-          <label><input class="group-check" id="groupsSelectAll" type="checkbox" /> Select All</label>
+        <div class="smart-filter-bar">
+          <div class="smart-chips" id="groupQuickChips" role="group" aria-label="Filter groups by type">
+            <label style="margin:0 6px 0 0;display:inline-flex;align-items:center;gap:6px;font-size:12.5px"><input class="group-check" id="groupsSelectAll" type="checkbox" /> Select All</label>
+            <button class="smart-chip" type="button" data-gcat="all" aria-pressed="true">All</button>
+            <button class="smart-chip" type="button" data-gcat="live" aria-pressed="false">Live TV</button>
+            <button class="smart-chip" type="button" data-gcat="sports" aria-pressed="false">Sports</button>
+            <button class="smart-chip" type="button" data-gcat="247" aria-pressed="false">24/7</button>
+            <button class="smart-chip" type="button" data-gcat="movies" aria-pressed="false">Movies</button>
+            <button class="smart-chip" type="button" data-gcat="series" aria-pressed="false">Shows</button>
+            <button class="smart-chip" type="button" data-gcat="adult" aria-pressed="false">18+</button>
+          </div>
+          <button class="smart-chip" id="groupsCompactToggle" type="button" aria-pressed="true" title="Toggle 2-column compact grid">⊞ 2-Col Grid</button>
         </div>
-        <div class="list" id="groups"></div>
+        <div class="list compact-grid" id="groups"></div>
         <div class="group-bulk">
           <button id="groupsDelete" type="button" class="danger"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M9 7V5h6v2M8 7l1 13h6l1-13"/></svg>Bulk Delete</button>
           <button id="groupsBulkHide" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12s4-6 9-6 9 6 9 6-4 6-9 6-9-6-9-6z"/><path d="M4 5l16 14"/></svg>Bulk Hide</button>
@@ -2999,6 +3202,7 @@
           </div>
           <span id="channelBulkStatus"></span>
         </div>
+        <div class="az-strip" id="channelAzStrip" aria-label="Jump to channel by starting letter"></div>
         <div class="list" id="channels"></div>
       </section>
 
@@ -3417,12 +3621,14 @@
               </div>
             </div>
             <p id="quickStatus"></p>
-            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0 12px;padding:10px 12px;border-radius:12px;border:1px solid var(--border);background:rgba(230,166,92,0.06)">
-              <span style="font-size:13px;font-weight:600">📍 Home ZIP for Local Channels:</span>
-              <input id="quickZipInput" type="text" inputmode="numeric" maxlength="5" placeholder="5-digit ZIP (e.g. 75201)" style="width:180px;padding:7px 10px" />
-              <button class="primary" id="quickZipFindBtn" type="button" style="padding:7px 13px;font-size:13px">Find &amp; Add My Locals</button>
+            <div class="fav-zip-bar">
+              <div class="fav-zip-left">
+                <span style="font-size:12.5px;font-weight:600">📍 Home ZIP:</span>
+                <input id="quickZipInput" type="text" inputmode="numeric" maxlength="5" placeholder="5-digit ZIP (e.g. 75201)" style="width:165px;padding:5px 9px;font-size:12.5px" />
+                <button class="primary" id="quickZipFindBtn" type="button" style="padding:5px 11px;font-size:12.5px">Find &amp; Add My Locals</button>
+              </div>
+              <label class="intl-switch"><input id="includeInternational" type="checkbox" /><span class="switch" aria-hidden="true"></span> Include International</label>
             </div>
-            <label class="intl-switch"><input id="includeInternational" type="checkbox" /><span class="switch" aria-hidden="true"></span> Include International Channels</label>
             <div class="preset-subhead">Essentials &amp; Sports</div>
             <div class="quick-cards" id="quickCardsWrap">
               <button class="quick-card" id="quickLocal" type="button" aria-pressed="false" data-quick-mode="local" data-quick-city="1">
@@ -5061,6 +5267,22 @@
       }
       return true;
     }
+    let groupCategoryFilter = "all";
+    let channelLetterFilter = "";
+
+    function matchesGroupCategory(group, cat) {
+      if (!cat || cat === "all") return true;
+      const kind = String(group.kind || "LIVE").toUpperCase();
+      const text = (groupName(group) + " " + (group.name || "")).toLowerCase();
+      if (cat === "movies") return kind === "VOD" || /\b(movie|movies|4k|cinema|vod|releases)\b/.test(text);
+      if (cat === "series") return kind === "SERIES" || /\b(series|shows|tv shows|episodes)\b/.test(text);
+      if (cat === "247") return group.id === "__247__" || text.includes("24/7") || text.includes("24-7");
+      if (cat === "sports") return /\b(sport|nfl|nba|mlb|nhl|ncaa|espn|ppv|ufc|boxing|soccer|dazn|f1|racing|golf|tennis|mls)\b/.test(text);
+      if (cat === "adult") return /(?:^|\s|\|)(18\+|xxx|adult|porn|erotic)/i.test(text);
+      if (cat === "live") return kind === "LIVE" && !/(?:^|\s|\|)(18\+|xxx|adult)/i.test(text);
+      return true;
+    }
+
     function visibleGroups() {
       const groupQuery = document.querySelector("#groupSearch").value.trim().toLowerCase();
       const hidden = new Set(lineup().hiddenGroups || []);
@@ -5068,7 +5290,7 @@
         const isHidden = hidden.has(group.id);
         const matchesFilter = groupFilter === "both" || (groupFilter === "hidden" ? isHidden : !isHidden);
         const label = (groupName(group) + " " + (group.name || "")).toLowerCase();
-        return matchesFilter && wildcardMatch(label, groupQuery);
+        return matchesFilter && matchesGroupCategory(group, groupCategoryFilter) && wildcardMatch(label, groupQuery);
       });
     }
     function paintGroupSelectAll() {
@@ -5447,9 +5669,16 @@
         if (!stem || !seenStems.has(stem)) { if (stem) seenStems.add(stem); return true; }
         return false;
       }) : all;
-      const matches = channelAlpha
-        ? deduped.slice().sort((a, b) => channelName(a).localeCompare(channelName(b)))
+      const lettered = channelLetterFilter
+        ? deduped.filter((ch) => {
+            const first = (channelName(ch) || "").trim().charAt(0).toUpperCase();
+            if (channelLetterFilter === "#") return !/[A-Z]/.test(first);
+            return first === channelLetterFilter;
+          })
         : deduped;
+      const matches = channelAlpha
+        ? lettered.slice().sort((a, b) => channelName(a).localeCompare(channelName(b)))
+        : lettered;
       channelWindowItems = matches;
       if (!keepWindow) channelWindowStart = 0;
       const total = groupTotals.get(group.id + "\n" + queryKey) ?? matches.length;
@@ -7674,6 +7903,50 @@
       });
     });
     document.querySelector("#hideBackupDupes")?.addEventListener("change", () => renderChannels());
+    document.querySelectorAll("#groupQuickChips [data-gcat]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        groupCategoryFilter = btn.dataset.gcat || "all";
+        document.querySelectorAll("#groupQuickChips [data-gcat]").forEach((b) =>
+          b.setAttribute("aria-pressed", String(b === btn))
+        );
+        renderGroups();
+      });
+    });
+    document.querySelector("#groupsCompactToggle")?.addEventListener("click", (e) => {
+      const btn = e.currentTarget;
+      const box = document.querySelector("#groups");
+      const next = !box.classList.contains("compact-grid");
+      box.classList.toggle("compact-grid", next);
+      btn.setAttribute("aria-pressed", String(next));
+      btn.textContent = next ? "⊞ 2-Col Grid" : "☰ 1-Col List";
+    });
+    (function initChannelAzStrip() {
+      const strip = document.querySelector("#channelAzStrip");
+      if (!strip) return;
+      const letters = ["All", "#", ..."ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("")];
+      letters.forEach((ltr) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "az-btn";
+        b.textContent = ltr;
+        const val = ltr === "All" ? "" : ltr;
+        b.setAttribute("aria-pressed", String(val === channelLetterFilter));
+        b.addEventListener("click", () => {
+          channelLetterFilter = val;
+          strip.querySelectorAll(".az-btn").forEach((el) =>
+            el.setAttribute("aria-pressed", String(el === b))
+          );
+          renderChannels();
+        });
+        strip.append(b);
+      });
+      document.querySelector("#channelGroup")?.addEventListener("change", () => {
+        channelLetterFilter = "";
+        strip.querySelectorAll(".az-btn").forEach((el, i) =>
+          el.setAttribute("aria-pressed", String(i === 0))
+        );
+      });
+    })();
     document.querySelector("#channelsBulkFav")?.addEventListener("click", async () => {
       const ids = Array.from(selectedChannels);
       if (!ids.length || !session) return;

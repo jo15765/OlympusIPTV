@@ -20,7 +20,9 @@ All notable changes across **ClearCast Tuner (Olympus-IPTV)** and its optional *
   - Wired the `MediaDetailActivity` profile button (`btnDetailUser`), fixed `24/7 Channels` UI hangs via indexed keyset pagination (`CatalogDb` v18), and fixed Search soft-keyboard invocation + cross-catalog Movies/TV Shows results.
   - Auto-registered TV logins into Cloud PostgreSQL (`POST /api/setup`) on initial cloud pull.
 - **Embedded LAN Dashboard Refresh**:
-  - Upgraded the in-app LAN dashboard (`app/src/main/assets/dashboard/index.html`) with the **Cinema Obsidian & Molten Gold** design system (atmospheric backdrop, frosted glass panels, glowing active nav rail, animated KPI cards with tabular numerals, and pulsing live connection indicator).
+  - Upgraded the in-app LAN dashboard (`app/src/main/assets/dashboard/index.html`) with the **Cinema Obsidian & Molten Gold** design system, zero-scroll 4-column Favorites Auto Build, 2-column compact Groups grid with category filter chips (`Live TV`, `Sports`, `24/7`, `Movies`, `Shows`, `18+`), and compact single-line Channels rows with an A–Z Quick Jump strip.
+- **Hot-Path Performance & Reusability Refactors**:
+  - Activated `NameStrip.statusCache` (bounded 8,000-entry cache), deduplicated live-window SQL & EPG cache loaders in `CatalogDb`, and hoisted per-item regex allocations across `ChannelFailover`, `BrowseVodFilter`, `SearchTileAdapter`, `FreshFragment`, and `FreshActivity`.
 
 ---
 

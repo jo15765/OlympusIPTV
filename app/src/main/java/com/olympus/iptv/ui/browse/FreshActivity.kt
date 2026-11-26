@@ -213,7 +213,7 @@ class FreshActivity : AppCompatActivity() {
                 b.freshService.text = sub
                 b.freshService.visibility = if (sub.isBlank()) View.GONE else View.VISIBLE
 
-                val badgeNum = Regex("\\d+").find(card.detail)?.value
+                val badgeNum = FRESH_BADGE_DIGITS.find(card.detail)?.value
                 when {
                     !badgeNum.isNullOrBlank() -> {
                         b.freshCountBadge.visibility = View.VISIBLE
@@ -256,6 +256,7 @@ class FreshActivity : AppCompatActivity() {
     }
 
     companion object {
+        private val FRESH_BADGE_DIGITS = Regex("\\d+")
         private const val EXTRA_PLAYLIST_ID = "playlist_id"
 
         fun intent(context: Context, playlistId: String): Intent =

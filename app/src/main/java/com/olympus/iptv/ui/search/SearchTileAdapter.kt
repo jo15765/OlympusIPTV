@@ -14,6 +14,8 @@ import com.olympus.iptv.data.Titles
 import com.olympus.iptv.databinding.ItemSearchHeaderBinding
 import com.olympus.iptv.databinding.ItemSearchTileBinding
 
+private val SEARCH_YEAR_REGEX = Regex("""\b(19|20)\d{2}\b""")
+
 data class SearchEntry(
     val header: String? = null,
     val channel: Channel? = null,
@@ -146,7 +148,7 @@ class SearchTileAdapter(
                 binding.ratingBadge.text = "★ $number"
                 binding.ratingBadge.visibility = android.view.View.VISIBLE
             }
-            val year = Regex("""\b(19|20)\d{2}\b""").find(item.name)?.value
+            val year = SEARCH_YEAR_REGEX.find(item.name)?.value
             if (year.isNullOrBlank()) {
                 binding.tileMeta.visibility = android.view.View.GONE
             } else {

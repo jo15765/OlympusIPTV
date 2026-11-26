@@ -42,8 +42,10 @@ internal fun BrowseActivity.posterRatingLabel(channel: Channel): String? {
         return "★ $number"
     }
 
+private val POSTER_YEAR_REGEX = Regex("""\b(19|20)\d{2}\b""")
+
 internal fun BrowseActivity.posterMetaLine(channel: Channel): String? {
-        val year = Regex("""\b(19|20)\d{2}\b""").find(channel.name)?.value
+        val year = POSTER_YEAR_REGEX.find(channel.name)?.value
         val resume = continueText(channel)
         return listOfNotNull(year, resume).joinToString(" · ").ifBlank { null }
     }

@@ -4,12 +4,17 @@ import com.olympus.iptv.data.Channel
 import com.olympus.iptv.data.NameStrip
 
 object ChannelFailover {
+    private val BRACKETS = Regex("""\[.*?]|[({].*?[)}]""")
+    private val QUALITY_TAGS = Regex("""\b(fhd|uhd|hd|sd|4k|backup|feed|east|west)\b""")
+    private val DIGITS = Regex("""\d+""")
+    private val SPACES = Regex("""\s+""")
+
     fun stem(name: String): String =
         name.lowercase()
-            .replace(Regex("""\[.*?]|[({].*?[)}]"""), " ")
-            .replace(Regex("""\b(fhd|uhd|hd|sd|4k|backup|feed|east|west)\b"""), " ")
-            .replace(Regex("""\d+"""), " ")
-            .replace(Regex("""\s+"""), " ")
+            .replace(BRACKETS, " ")
+            .replace(QUALITY_TAGS, " ")
+            .replace(DIGITS, " ")
+            .replace(SPACES, " ")
             .trim()
 
     fun alternate(

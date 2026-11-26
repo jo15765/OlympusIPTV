@@ -163,6 +163,29 @@ object NameStrip {
         nowStartMs: Long = 0L,
         nowEndMs: Long = 0L
     ): StreamStatus {
+        val cacheable = nowTitle.isNullOrBlank() && nowStartMs == 0L && nowEndMs == 0L
+        val cacheKey = if (cacheable) {
+            if (epgChannelId.isNullOrBlank()) rawChannel else "$rawChannel\u0000$epgChannelId"
+        } else null
+        if (cacheKey != null) {
+            statusCache[cacheKey]?.let { return it }
+        }
+        val result = inspectUncached(rawChannel, groupTitle, epgChannelId, nowTitle, nowStartMs, nowEndMs)
+        if (cacheKey != null) {
+            if (statusCache.size > 8_000) statusCache.clear()
+            statusCache[cacheKey] = result
+        }
+        return result
+    }
+
+    private fun inspectUncached(
+        rawChannel: String,
+        groupTitle: String? = null,
+        epgChannelId: String? = null,
+        nowTitle: String? = null,
+        nowStartMs: Long = 0L,
+        nowEndMs: Long = 0L
+    ): StreamStatus {
         val ch = sanitizeRaw(rawChannel)
         val cleanEpg = if (isDummyEpgId(epgChannelId)) "" else sanitizeRaw(nowTitle.orEmpty())
 

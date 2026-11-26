@@ -950,7 +950,7 @@ class FreshFragment : Fragment() {
                     rowBinding.freshService.text = "★ $number  $service"
                 }
 
-                val badgeNum = Regex("\\d+").find(title.detail)?.value
+                val badgeNum = BADGE_DIGITS.find(title.detail)?.value
                 when {
                     !badgeNum.isNullOrBlank() -> {
                         rowBinding.freshCountBadge.visibility = View.VISIBLE
@@ -1137,6 +1137,7 @@ class FreshFragment : Fragment() {
         const val EXTRA_PLAYLIST_ID = "playlist_id"
         private const val COLUMNS = 4
         private val SEASON_ONLY = Regex("Season \\d+\\.")
+        private val BADGE_DIGITS = Regex("\\d+")
 
         fun newInstance(playlistId: String): FreshFragment =
             FreshFragment().apply {
