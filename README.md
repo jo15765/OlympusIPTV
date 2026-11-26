@@ -106,7 +106,7 @@ Sports and PPV IPTV providers often list hundreds of channels like `ESPN+ 16: NO
   - **SSRF protection** (`assertSafeProviderUrl`) blocking private/link-local/metadata IPs.
   - **Zod** request validation, **Pino** structured logging with secret redaction, rate limiting, `idle_in_transaction_session_timeout=30000`, non-root Docker user (`USER node`), `cap_drop: [ALL]`, `no-new-privileges:true`, and localhost-only port binding (`127.0.0.1:8443:3000`).
 
-### 6. Dispatcharr-Style Power Features (`cloud-api/dispatch.js` + Android)
+### 6. Advanced Tuner, Failover & Export Features (`cloud-api/dispatch.js` + Android)
 - **Multi-Provider Consolidation & Cross-Provider Failover:** Register backup Xtream providers in priority order (`GET/POST /api/providers`, `DELETE /api/providers/:id`). The background worker ingests backup feeds without cluttering the primary guide; if a live channel fails in `PlayerActivity` and no local sibling exists, ClearCast queries `GET /api/channels/:id/alternates` and fails over seamlessly to the matching channel on your backup provider.
 - **Filtered M3U & XMLTV Export:** Export your cleaned, lineup-filtered live catalog (respecting hidden groups/channels, custom renames, catch-up tags, and the strict live event window) to any external player via `GET /api/export/playlist.m3u` and `GET /api/export/epg.xml`.
 - **Xtream Catch-Up / Archive Parity:** `tv_archive` and `tv_archive_duration` are ingested by the worker, synced through `/api/catalog/sync`, parsed by `LineupClient`, and exposed server-side via `GET /api/catchup/url` alongside direct on-device `CatchupUrls` playback.
@@ -216,7 +216,7 @@ For the complete version-by-version release notes (**0.2.83 through latest**), s
 
 | Version | Highlights |
 | --- | --- |
-| **Unreleased (Post-0.2.142)** | Monorepo Docker `cloud-api/` backend (Brotli/Gzip, GIN FTS, advisory locks, AES-256-GCM, optional `local-db` Postgres & `gluetun` VPN profiles), Dispatcharr-style Tier 1 & 2 features (multi-provider failover, M3U/XMLTV export, Xtream catch-up parity, opt-in HDHomeRun tuner & shared stream proxy, DVR series rules, stream health telemetry), strict 15m pre / 30m post-event hard cutoff & Dummy EPG parity, D-Pad focus fixes, indexed `24/7 Channels`, zero-scroll Favorites / 2-col Groups / A–Z Channels LAN UI, and hot-path `NameStrip`/SQLite/Regex optimizations |
+| **Unreleased (Post-0.2.142)** | Monorepo Docker `cloud-api/` backend (Brotli/Gzip, GIN FTS, advisory locks, AES-256-GCM, optional `local-db` Postgres & `gluetun` VPN profiles), multi-provider failover, M3U/XMLTV export, Xtream catch-up parity, opt-in HDHomeRun tuner & shared stream proxy, DVR series rules, stream health telemetry, strict 15m pre / 30m post-event hard cutoff & Dummy EPG parity, D-Pad focus fixes, indexed `24/7 Channels`, zero-scroll Favorites / 2-col Groups / A–Z Channels LAN UI, and hot-path `NameStrip`/SQLite/Regex optimizations |
 | **[0.2.142](./CHANGELOG.md#whats-in-02142)** | Unified `24/7 Channels` group, live event & guide sync (`ESPN+` / `Disney+` / PPV), split channel/group sanitization, TV EPG Edits & Web-UI Access layout polish |
 | **[0.2.137](./CHANGELOG.md#whats-in-02137)** | Local major networks (`FOX`/`ABC`/`CBS`/`NBC`/`PBS`) with offline ZIP fallback, self-healing group names, revamped Web-UI Settings & EPG tools, API key auth |
 | **[0.2.132](./CHANGELOG.md#whats-in-02132)** | Mobile Live TV guide row alignment & scroll lock, pinch-to-zoom & 2× long-press gestures, Google Drive & OneDrive DVR cloud upload |
