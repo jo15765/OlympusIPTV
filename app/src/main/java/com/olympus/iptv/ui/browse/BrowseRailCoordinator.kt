@@ -1304,7 +1304,7 @@ internal fun BrowseActivity.cardDetail(category: Category): String {
             }
             else -> {
                 val count = groupCounts[category.id]
-                if (count == null) ""
+                if (count == null || count <= 0) ""
                 else {
                     val label = if (titles) R.string.group_titles else R.string.group_channels
                     getString(label, count)

@@ -479,6 +479,8 @@ class LineupClient(
         var kind = ""
         var seriesId: String? = null
         var season: Int? = null
+        var tvArchive: Boolean? = null
+        var tvArchiveDuration: Int? = null
         reader.beginObject()
         while (reader.hasNext()) {
             when (reader.nextName()) {
@@ -497,6 +499,20 @@ class LineupClient(
                         season = runCatching { reader.nextInt() }.getOrNull()
                     }
                 }
+                "tvArchive" -> {
+                    if (reader.peek() == JsonToken.NULL) {
+                        reader.nextNull()
+                    } else {
+                        tvArchive = runCatching { reader.nextBoolean() }.getOrNull()
+                    }
+                }
+                "tvArchiveDuration" -> {
+                    if (reader.peek() == JsonToken.NULL) {
+                        reader.nextNull()
+                    } else {
+                        tvArchiveDuration = runCatching { reader.nextInt() }.getOrNull()
+                    }
+                }
                 else -> reader.skipValue()
             }
         }
@@ -510,7 +526,9 @@ class LineupClient(
             categoryId = categoryId,
             kind = contentKind(kind),
             seriesId = seriesId,
-            season = season
+            season = season,
+            tvArchive = tvArchive,
+            tvArchiveDuration = tvArchiveDuration
         )
     }
 
@@ -605,6 +623,116 @@ class LineupClient(
         }
         runCatching { postJson("${baseUrl()}/api/catalog", payload, token, deviceId) }
     }
+
+    data class DvrSeriesRule(
+        val id: String = "",
+        val titlePattern: String,
+        val channelId: String = "",
+        val channelName: String = "",
+        val leadMinutes: Int = 2,
+        val tailMinutes: Int = 5,
+        val keepLast: Int = 5,
+        val enabled: Boolean = true
+    )
+
+    fun fetchAlternateFeeds(email: String, deviceId: String, channelId: String): List<Channel> {
+        if (!email.contains("@") || deviceId.isBlank() || channelId.isBlank()) return emptyList()
+        val token = ensureDeviceToken(email, deviceId)
+        val url = "${baseUrl()}/api/channels/${enc(channelId)}/alternates?email=${enc(email)}&deviceId=${enc(deviceId)}"
+        val arr = runCatching { getJson(url, token, deviceId)?.getAsJsonArray("alternates") }.getOrNull() ?: return emptyList()
+        val out = ArrayList<Channel>(arr.size())
+        for (el in arr) {
+            val obj = el.asJsonObject
+            val id = obj.get("id")?.takeIf { !it.isJsonNull }?.asString ?: continue
+            val name = obj.get("name")?.takeIf { !it.isJsonNull }?.asString ?: continue
+            val streamUrl = obj.get("streamUrl")?.takeIf { !it.isJsonNull }?.asString ?: continue
+            out.add(
+                Channel(
+                    id = id,
+                    name = name,
+                    streamUrl = streamUrl,
+                    logoUrl = obj.get("logoUrl")?.takeIf { !it.isJsonNull }?.asString,
+                    groupTitle = obj.get("groupTitle")?.takeIf { !it.isJsonNull }?.asString,
+                    kind = ContentKind.LIVE
+                )
+            )
+        }
+        return out
+    }
+
+    fun pushStreamTelemetry(
+        email: String,
+        deviceId: String,
+        channelId: String,
+        channelName: String,
+        bitrateKbps: Int,
+        bufferCount: Int,
+        rebufferMs: Int,
+        failed: Boolean,
+        status: String
+    ) {
+        if (!email.contains("@") || deviceId.isBlank() || channelId.isBlank()) return
+        val token = ensureDeviceToken(email, deviceId)
+        val payload = JsonObject().apply {
+            addProperty("email", email)
+            addProperty("deviceId", deviceId)
+            addProperty("channelId", channelId)
+            addProperty("channelName", channelName)
+            addProperty("bitrateKbps", bitrateKbps)
+            addProperty("bufferCount", bufferCount)
+            addProperty("rebufferMs", rebufferMs)
+            addProperty("failed", failed)
+            addProperty("status", status)
+        }
+        runCatching { postJson("${baseUrl()}/api/telemetry/heartbeat", payload, token, deviceId) }
+    }
+
+    fun fetchDvrRules(email: String, deviceId: String): List<DvrSeriesRule> {
+        if (!email.contains("@") || deviceId.isBlank()) return emptyList()
+        val token = ensureDeviceToken(email, deviceId)
+        val url = "${baseUrl()}/api/dvr/rules?email=${enc(email)}&deviceId=${enc(deviceId)}"
+        val arr = runCatching { getJson(url, token, deviceId)?.getAsJsonArray("rules") }.getOrNull() ?: return emptyList()
+        return arr.mapNotNull { el ->
+            runCatching {
+                val o = el.asJsonObject
+                DvrSeriesRule(
+                    id = o.get("id")?.asString.orEmpty(),
+                    titlePattern = o.get("titlePattern")?.asString.orEmpty(),
+                    channelId = o.get("channelId")?.takeIf { !it.isJsonNull }?.asString.orEmpty(),
+                    channelName = o.get("channelName")?.takeIf { !it.isJsonNull }?.asString.orEmpty(),
+                    leadMinutes = o.get("leadMinutes")?.takeIf { !it.isJsonNull }?.asInt ?: 2,
+                    tailMinutes = o.get("tailMinutes")?.takeIf { !it.isJsonNull }?.asInt ?: 5,
+                    keepLast = o.get("keepLast")?.takeIf { !it.isJsonNull }?.asInt ?: 5,
+                    enabled = o.get("enabled")?.takeIf { !it.isJsonNull }?.asBoolean ?: true
+                )
+            }.getOrNull()
+        }
+    }
+
+    fun upsertDvrRule(email: String, deviceId: String, rule: DvrSeriesRule): String? {
+        if (!email.contains("@") || deviceId.isBlank()) return null
+        val token = ensureDeviceToken(email, deviceId)
+        val payload = JsonObject().apply {
+            addProperty("email", email)
+            addProperty("deviceId", deviceId)
+            if (rule.id.isNotBlank()) addProperty("id", rule.id)
+            addProperty("titlePattern", rule.titlePattern)
+            addProperty("channelId", rule.channelId)
+            addProperty("channelName", rule.channelName)
+            addProperty("leadMinutes", rule.leadMinutes)
+            addProperty("tailMinutes", rule.tailMinutes)
+            addProperty("keepLast", rule.keepLast)
+            addProperty("enabled", rule.enabled)
+        }
+        return runCatching { postJson("${baseUrl()}/api/dvr/rules", payload, token, deviceId)?.get("id")?.asString }.getOrNull()
+    }
+
+    fun exportPlaylistUrl(email: String, deviceId: String, useProxy: Boolean = false): String =
+        "${baseUrl()}/api/export/playlist.m3u?email=${enc(email)}&deviceId=${enc(deviceId)}" +
+            if (useProxy) "&proxy=1" else ""
+
+    fun exportEpgUrl(email: String, deviceId: String): String =
+        "${baseUrl()}/api/export/epg.xml?email=${enc(email)}&deviceId=${enc(deviceId)}"
 
     private fun getJson(url: String, token: String?, deviceId: String, client: OkHttpClient = http): JsonObject? {
         val builder = Request.Builder().url(url).get().header("X-Device-Id", deviceId)

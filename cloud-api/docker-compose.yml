@@ -31,6 +31,12 @@ services:
       API_SECRET_KEY: ${API_SECRET_KEY:-}
       CREDENTIALS_KEY: ${CREDENTIALS_KEY:-}
       ENABLE_WEB_DASHBOARD: ${ENABLE_WEB_DASHBOARD:-false}
+      ENABLE_HDHR: ${ENABLE_HDHR:-false}
+      ENABLE_STREAM_PROXY: ${ENABLE_STREAM_PROXY:-false}
+      HDHR_DEVICE_ID: ${HDHR_DEVICE_ID:-CC202601}
+      HDHR_TUNER_COUNT: ${HDHR_TUNER_COUNT:-4}
+      HDHR_ACCOUNT_EMAIL: ${HDHR_ACCOUNT_EMAIL:-}
+      HDHR_DEVICE_CODE: ${HDHR_DEVICE_CODE:-__shared__}
       LOG_LEVEL: ${LOG_LEVEL:-info}
     ports:
       - "${BIND_HOST:-127.0.0.1}:${PUBLISH_PORT:-8443}:3000"
@@ -98,5 +104,26 @@ services:
       timeout: 5s
       retries: 5
 
+  # Optional Gluetun VPN sidecar for centralized VPN routing:
+  # Run with: docker compose --profile vpn up -d
+  gluetun:
+    image: qmcgaw/gluetun:latest
+    container_name: olympus-gluetun
+    profiles: ["vpn"]
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    environment:
+      VPN_SERVICE_PROVIDER: ${VPN_SERVICE_PROVIDER:-mullvad}
+      VPN_TYPE: ${VPN_TYPE:-wireguard}
+      WIREGUARD_PRIVATE_KEY: ${WIREGUARD_PRIVATE_KEY:-}
+      WIREGUARD_ADDRESSES: ${WIREGUARD_ADDRESSES:-}
+      SERVER_COUNTRIES: ${VPN_SERVER_COUNTRIES:-United States}
+    volumes:
+      - gluetun_data:/gluetun
+
 volumes:
   pgdata:
+  gluetun_data:

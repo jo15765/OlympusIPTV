@@ -241,6 +241,9 @@ CREATE TABLE IF NOT EXISTS cloud_channels (
     is_event_slot   BOOLEAN NOT NULL DEFAULT FALSE,
     event_start_ms  BIGINT NOT NULL DEFAULT 0,
     event_end_ms    BIGINT NOT NULL DEFAULT 0,
+    source_id       TEXT NOT NULL DEFAULT 'primary',
+    tv_archive      BOOLEAN NOT NULL DEFAULT FALSE,
+    tv_archive_duration INTEGER NOT NULL DEFAULT 0,
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (account_id, device_code, kind, id)
 );
@@ -248,6 +251,52 @@ CREATE TABLE IF NOT EXISTS cloud_channels (
 CREATE INDEX IF NOT EXISTS idx_cloud_channels_kind ON cloud_channels(account_id, device_code, kind);
 CREATE INDEX IF NOT EXISTS idx_cloud_channels_live_active ON cloud_channels(account_id, device_code, is_event_slot, event_start_ms, event_end_ms) WHERE kind = 'live';
 CREATE INDEX IF NOT EXISTS idx_cloud_channels_name_fts ON cloud_channels USING gin (to_tsvector('simple', name));
+
+CREATE TABLE IF NOT EXISTS provider_sources (
+    id              TEXT PRIMARY KEY,
+    account_id      UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    device_code     TEXT NOT NULL DEFAULT '__shared__',
+    label           TEXT NOT NULL DEFAULT 'Backup Provider',
+    priority        INTEGER NOT NULL DEFAULT 10,
+    enabled         BOOLEAN NOT NULL DEFAULT TRUE,
+    login           JSONB NOT NULL,
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_provider_sources_acct ON provider_sources(account_id, device_code, priority);
+
+CREATE TABLE IF NOT EXISTS dvr_series_rules (
+    id              TEXT PRIMARY KEY,
+    account_id      UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    device_code     TEXT NOT NULL DEFAULT '__shared__',
+    title_pattern   TEXT NOT NULL,
+    channel_id      TEXT,
+    channel_name    TEXT,
+    lead_minutes    INTEGER NOT NULL DEFAULT 2,
+    tail_minutes    INTEGER NOT NULL DEFAULT 5,
+    keep_last       INTEGER NOT NULL DEFAULT 5,
+    enabled         BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_dvr_series_rules_acct ON dvr_series_rules(account_id, device_code);
+
+CREATE TABLE IF NOT EXISTS stream_telemetry (
+    id              BIGSERIAL PRIMARY KEY,
+    account_id      UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    device_code     TEXT NOT NULL DEFAULT '__shared__',
+    channel_id      TEXT NOT NULL,
+    channel_name    TEXT,
+    bitrate_kbps    INTEGER NOT NULL DEFAULT 0,
+    buffer_count    INTEGER NOT NULL DEFAULT 0,
+    rebuffer_ms     INTEGER NOT NULL DEFAULT 0,
+    failed          BOOLEAN NOT NULL DEFAULT FALSE,
+    status          TEXT NOT NULL DEFAULT 'playing',
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_stream_telemetry_recent ON stream_telemetry(account_id, updated_at DESC);
 
 CREATE TABLE IF NOT EXISTS cloud_epg (
     id              BIGSERIAL PRIMARY KEY,

@@ -44,6 +44,7 @@ const db = require("./db");
 const eventParser = require("./eventParser");
 const autoFavorites = require("./auto-favorites");
 const security = require("./security");
+const { registerDispatchRoutes } = require("./dispatch");
 const log = security.logger.child({ service: "olympus-api" });
 
 const catalogCache = new LRUCache({
@@ -885,11 +886,13 @@ app.get("/api/catalog/sync", requireDeviceAuth, async (req, res) => {
           ? db.pool.query(
               `SELECT c.id, c.name, c.stream_url AS "streamUrl", c.logo_url AS "logoUrl",
                       COALESCE(NULLIF(c.group_title, ''), cat.name) AS "groupTitle",
-                      c.category_id AS "categoryId", c.kind, c.series_id AS "seriesId", c.season
+                      c.category_id AS "categoryId", c.kind, c.series_id AS "seriesId", c.season,
+                      c.tv_archive AS "tvArchive", c.tv_archive_duration AS "tvArchiveDuration"
                FROM cloud_channels c
                LEFT JOIN cloud_categories cat
                  ON cat.account_id = c.account_id AND cat.device_code = c.device_code AND cat.kind = c.kind AND cat.id = c.category_id
                WHERE c.account_id = $1 AND (c.device_code = $2 OR c.device_code = '__shared__') AND c.kind = 'live'
+                 AND COALESCE(c.source_id, 'primary') = 'primary'
                  AND c.updated_at > $5::timestamptz
                  AND (c.is_event_slot = FALSE OR c.event_start_ms < 0 OR (c.event_start_ms > 0 AND $3::bigint >= c.event_start_ms AND $4::bigint < c.event_end_ms))`,
               [account.id, deviceId, preWindowMs, nowMs - 30 * 60 * 1000, sinceIso]
@@ -927,7 +930,8 @@ app.get("/api/catalog/sync", requireDeviceAuth, async (req, res) => {
             ? await db.pool.query(
                 `SELECT c.id, c.name, c.stream_url AS "streamUrl", c.logo_url AS "logoUrl",
                         COALESCE(NULLIF(c.group_title, ''), cat.name) AS "groupTitle",
-                        c.category_id AS "categoryId", c.kind, c.series_id AS "seriesId", c.season
+                        c.category_id AS "categoryId", c.kind, c.series_id AS "seriesId", c.season,
+                        c.tv_archive AS "tvArchive", c.tv_archive_duration AS "tvArchiveDuration"
                  FROM cloud_channels c
                  LEFT JOIN cloud_categories cat
                    ON cat.account_id = c.account_id
@@ -935,6 +939,7 @@ app.get("/api/catalog/sync", requireDeviceAuth, async (req, res) => {
                   AND cat.kind = c.kind
                   AND cat.id = c.category_id
                  WHERE c.account_id = $1 AND (c.device_code = $2 OR c.device_code = '__shared__') AND c.kind = 'live'
+                   AND COALESCE(c.source_id, 'primary') = 'primary'
                    AND (
                      c.is_event_slot = FALSE
                      OR c.event_start_ms < 0
@@ -1157,6 +1162,8 @@ async function startCacheInvalidator() {
     if (!apiShuttingDown) setTimeout(startCacheInvalidator, 10000);
   }
 }
+
+registerDispatchRoutes(app, { db, requireDeviceAuth, liveEventWindowBounds, log });
 
 const port = Number(process.env.PORT || 8443);
 const httpServer = app.listen(port, "0.0.0.0", () => {

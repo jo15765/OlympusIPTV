@@ -1228,6 +1228,10 @@ class PlayerActivity : AppCompatActivity() {
                     recoverAttempt = 0
                     armUpNext(exo, channel)
                     refreshStreamTracks()
+                    if (channel != null && channel.kind == ContentKind.LIVE && channel.seriesId.isNullOrBlank()) {
+                        val kbps = ((exo.videoFormat?.bitrate ?: 0).coerceAtLeast(0)) / 1000
+                        reportStreamTelemetry(channel, status = "playing", failed = false, bitrateKbps = kbps)
+                    }
                     if (binding.channelMeta.text == getString(R.string.playback_reconnecting)) {
                         refreshEpgQuietly()
                     }
@@ -1683,6 +1687,19 @@ class PlayerActivity : AppCompatActivity() {
                 backup = com.olympus.iptv.playlist.ChannelFailover.alternate(channel, siblings, setOf(channel.id))
             }
             if (backup == null) {
+                val app = application as OlympusIptvApp
+                val email = runCatching { app.playlistStore.session.first()?.email?.trim().orEmpty() }.getOrDefault("")
+                val deviceId = runCatching { app.playlistStore.deviceId() }.getOrDefault("")
+                if (email.contains("@") && deviceId.isNotBlank()) {
+                    val cloudAlts = runCatching {
+                        com.olympus.iptv.playlist.LineupClient(app).fetchAlternateFeeds(email, deviceId, channel.id)
+                    }.getOrDefault(emptyList())
+                    backup = cloudAlts.firstOrNull { it.id !in skip && it.streamUrl != channel.streamUrl }
+                        ?: cloudAlts.firstOrNull { it.id != channel.id && it.streamUrl != channel.streamUrl }
+                }
+            }
+            if (backup == null) {
+                reportStreamTelemetry(channel, status = "failed", failed = true)
                 withContext(Dispatchers.Main) { onResult?.invoke(false) }
                 return@launch
             }
@@ -1704,6 +1721,40 @@ class PlayerActivity : AppCompatActivity() {
                 ).show()
                 onResult?.invoke(true)
             }
+        }
+    }
+
+    private var lastTelemetryKey: String = ""
+    private var lastTelemetryAt: Long = 0L
+
+    private fun reportStreamTelemetry(
+        channel: Channel,
+        status: String,
+        failed: Boolean,
+        bitrateKbps: Int = 0
+    ) {
+        val now = SystemClock.elapsedRealtime()
+        val key = "${channel.id}:$status:$failed"
+        if (key == lastTelemetryKey && now - lastTelemetryAt < 60_000L) return
+        lastTelemetryKey = key
+        lastTelemetryAt = now
+        val app = application as OlympusIptvApp
+        app.appScope.launch(Dispatchers.IO) {
+            val email = runCatching { app.playlistStore.session.first()?.email?.trim().orEmpty() }.getOrDefault("")
+            if (!email.contains("@")) return@launch
+            val deviceId = runCatching { app.playlistStore.deviceId() }.getOrDefault("")
+            if (deviceId.isBlank()) return@launch
+            com.olympus.iptv.playlist.LineupClient(app).pushStreamTelemetry(
+                email = email,
+                deviceId = deviceId,
+                channelId = channel.id,
+                channelName = channel.name,
+                bitrateKbps = bitrateKbps,
+                bufferCount = if (status == "buffering") 1 else 0,
+                rebufferMs = 0,
+                failed = failed,
+                status = status
+            )
         }
     }
 

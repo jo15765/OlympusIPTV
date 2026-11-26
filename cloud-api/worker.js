@@ -2,6 +2,7 @@ require("dotenv").config();
 const { Pool } = require("pg");
 const eventParser = require("./eventParser");
 const security = require("./security");
+const { ensureDispatchSchema } = require("./dispatch");
 const log = security.logger.child({ service: "olympus-worker" });
 
 const sslConfig = process.env.PGSSLMODE === "disable"
@@ -138,16 +139,19 @@ async function bulkUpsertLiveChannels(client, accountId, deviceCode, rows) {
       `INSERT INTO cloud_channels (
          account_id, device_code, id, name, stream_url, logo_url,
          group_title, category_id, kind, epg_channel_id,
-         is_event_slot, event_start_ms, event_end_ms, updated_at
+         is_event_slot, event_start_ms, event_end_ms,
+         source_id, tv_archive, tv_archive_duration, updated_at
        )
        SELECT $1::uuid, $2::text, u.id, u.name, u.stream_url, u.logo_url,
               u.group_title, u.category_id, 'live', u.epg_channel_id,
-              u.is_event_slot, u.event_start_ms, u.event_end_ms, NOW()
+              u.is_event_slot, u.event_start_ms, u.event_end_ms,
+              u.source_id, u.tv_archive, u.tv_archive_duration, NOW()
        FROM UNNEST(
          $3::text[], $4::text[], $5::text[], $6::text[],
          $7::text[], $8::text[], $9::text[],
-         $10::boolean[], $11::bigint[], $12::bigint[]
-       ) AS u(id, name, stream_url, logo_url, group_title, category_id, epg_channel_id, is_event_slot, event_start_ms, event_end_ms)
+         $10::boolean[], $11::bigint[], $12::bigint[],
+         $13::text[], $14::boolean[], $15::integer[]
+       ) AS u(id, name, stream_url, logo_url, group_title, category_id, epg_channel_id, is_event_slot, event_start_ms, event_end_ms, source_id, tv_archive, tv_archive_duration)
        ON CONFLICT (account_id, device_code, kind, id) DO UPDATE SET
          name = EXCLUDED.name,
          stream_url = EXCLUDED.stream_url,
@@ -158,6 +162,9 @@ async function bulkUpsertLiveChannels(client, accountId, deviceCode, rows) {
          is_event_slot = EXCLUDED.is_event_slot,
          event_start_ms = EXCLUDED.event_start_ms,
          event_end_ms = EXCLUDED.event_end_ms,
+         source_id = EXCLUDED.source_id,
+         tv_archive = EXCLUDED.tv_archive,
+         tv_archive_duration = EXCLUDED.tv_archive_duration,
          updated_at = NOW()`,
       [
         accountId,
@@ -171,7 +178,10 @@ async function bulkUpsertLiveChannels(client, accountId, deviceCode, rows) {
         slice.map((r) => r.epgChannelId),
         slice.map((r) => r.isEventSlot),
         slice.map((r) => r.eventStartMs),
-        slice.map((r) => r.eventEndMs)
+        slice.map((r) => r.eventEndMs),
+        slice.map((r) => r.sourceId || "primary"),
+        slice.map((r) => Boolean(r.tvArchive)),
+        slice.map((r) => Number(r.tvArchiveDuration || 0))
       ]
     );
   }
@@ -374,7 +384,10 @@ async function syncAccountLogin(row) {
       epgChannelId: stream.epg_channel_id || null,
       isEventSlot: Boolean(ev.isEventSlot),
       eventStartMs: Number(ev.eventStartMs || 0),
-      eventEndMs: Number(ev.eventEndMs || 0)
+      eventEndMs: Number(ev.eventEndMs || 0),
+      sourceId: "primary",
+      tvArchive: Number(stream.tv_archive || 0) === 1,
+      tvArchiveDuration: Number(stream.tv_archive_duration || 0)
     });
     if (ev.isEventSlot && ev.eventStartMs > 0 && ev.eventTitle) {
       parsedEvents.push({
@@ -552,6 +565,63 @@ async function withSyncAdvisoryLock(accountId, deviceCode, fn) {
   }
 }
 
+async function syncBackupSources(accountId, deviceCode) {
+  const { rows } = await pool.query(
+    `SELECT id, label, login FROM provider_sources
+     WHERE account_id = $1 AND device_code = $2 AND enabled = TRUE
+     ORDER BY priority ASC`,
+    [accountId, deviceCode]
+  );
+  for (const src of rows) {
+    try {
+      const login = security.decryptLogin(src.login || {});
+      if (login.mode === "m3u") continue;
+      const host = String(login.server || login.xtreamHost || "").replace(/\/+$/, "");
+      const user = login.username || login.xtreamUser || "";
+      const pass = login.password || login.xtreamPassword || "";
+      if (!host || !user || !pass) continue;
+      await security.assertSafeProviderUrl(host);
+      const authQuery = `username=${encodeURIComponent(user)}&password=${encodeURIComponent(pass)}`;
+      const liveRaw = await fetchJson(`${host}/player_api.php?${authQuery}&action=get_live_streams`);
+      const liveList = asList(liveRaw, "Backup live channels").list || [];
+      if (!liveList.length) continue;
+      const syncNow = Date.now();
+      const encUser = encodeURIComponent(user);
+      const encPass = encodeURIComponent(pass);
+      const backupRows = [];
+      for (const stream of liveList) {
+        if (!stream || !stream.stream_id) continue;
+        const rawId = String(stream.stream_id);
+        const streamName = String(stream.name || "");
+        const ev = eventParser.inspectEvent(streamName, syncNow);
+        backupRows.push({
+          id: `${src.id}:${rawId}`,
+          name: streamName,
+          streamUrl: `${host}/live/${encUser}/${encPass}/${rawId}.ts`,
+          logoUrl: stream.stream_icon || null,
+          groupTitle: stream.category_name || src.label || "Backup",
+          categoryId: `${src.id}:${String(stream.category_id || "")}`,
+          epgChannelId: stream.epg_channel_id || null,
+          isEventSlot: Boolean(ev.isEventSlot),
+          eventStartMs: Number(ev.eventStartMs || 0),
+          eventEndMs: Number(ev.eventEndMs || 0),
+          sourceId: src.id,
+          tvArchive: Number(stream.tv_archive || 0) === 1,
+          tvArchiveDuration: Number(stream.tv_archive_duration || 0)
+        });
+      }
+      const client = await pool.connect();
+      try {
+        await bulkUpsertLiveChannels(client, accountId, deviceCode, backupRows);
+      } finally {
+        client.release();
+      }
+    } catch (err) {
+      log.warn({ sourceId: src.id, err: err.message }, "backup provider sync failed");
+    }
+  }
+}
+
 async function syncDeviceByKey(accountId, deviceCode) {
   const key = `${accountId}:${deviceCode}`;
   if (activeSyncs.has(key)) return;
@@ -562,7 +632,10 @@ async function syncDeviceByKey(accountId, deviceCode) {
       [accountId, deviceCode]
     );
     for (const row of rows) {
-      await withSyncAdvisoryLock(row.account_id, row.device_code, () => syncAccountLogin(row));
+      await withSyncAdvisoryLock(row.account_id, row.device_code, async () => {
+        await syncAccountLogin(row);
+        await syncBackupSources(row.account_id, row.device_code);
+      });
     }
   } finally {
     activeSyncs.delete(key);
@@ -572,13 +645,18 @@ async function syncDeviceByKey(accountId, deviceCode) {
 async function runWorkerCycle() {
   console.log(`[Worker] Cycle started at ${new Date().toISOString()}`);
   try {
+    await ensureDispatchSchema(pool).catch(() => {});
+    await pool.query(`DELETE FROM stream_telemetry WHERE updated_at < NOW() - INTERVAL '7 days'`).catch(() => {});
     const { rows } = await pool.query(`SELECT account_id, device_code, login FROM provider_logins`);
     for (const row of rows) {
       const key = `${row.account_id}:${row.device_code}`;
       if (activeSyncs.has(key)) continue;
       activeSyncs.add(key);
       try {
-        await withSyncAdvisoryLock(row.account_id, row.device_code, () => syncAccountLogin(row));
+        await withSyncAdvisoryLock(row.account_id, row.device_code, async () => {
+          await syncAccountLogin(row);
+          await syncBackupSources(row.account_id, row.device_code);
+        });
       } finally {
         activeSyncs.delete(key);
       }

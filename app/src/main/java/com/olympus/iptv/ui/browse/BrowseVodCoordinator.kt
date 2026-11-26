@@ -1597,7 +1597,7 @@ internal fun BrowseActivity.refreshGroupCounts() {
         val hiddenCountries = activeConfig.hiddenCountries.orEmpty().toSet()
         val includeInternational = activeConfig.includeInternational
         val now = System.currentTimeMillis()
-        val minuteBucket = if (bucket == CatalogDb.LIVE) now / 300_000L else 0L
+        val minuteBucket = if (bucket == CatalogDb.LIVE) now / 60_000L else 0L
         lifecycleScope.launch {
             val stamp = withContext(Dispatchers.IO) { app.catalogDb.libraryStamp(saved.id) }
             if (token != groupCountToken || isDestroyed) return@launch
