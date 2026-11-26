@@ -1,6 +1,7 @@
 require("dotenv").config();
 const crypto = require("crypto");
 const { Pool, Client } = require("pg");
+const { LRUCache } = require("lru-cache");
 const security = require("./security");
 
 const sslConfig = process.env.PGSSLMODE === "disable"
@@ -9,33 +10,31 @@ const sslConfig = process.env.PGSSLMODE === "disable"
     ? { ca: process.env.PGSSLCA.replace(/\\n/g, "\n"), rejectUnauthorized: true }
     : { rejectUnauthorized: false };
 
+const basePoolOpts = {
+  ssl: sslConfig,
+  max: 15,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 8000,
+  statement_timeout: 25000,
+  query_timeout: 30000,
+  keepAlive: true,
+  keepAliveInitialDelayMillis: 10000,
+  options: "-c idle_in_transaction_session_timeout=30000"
+};
+
 const pgConfig = process.env.DATABASE_URL
-  ? {
-      connectionString: process.env.DATABASE_URL,
-      ssl: sslConfig,
-      max: 15,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 8000,
-      statement_timeout: 25000,
-      query_timeout: 30000,
-      options: "-c idle_in_transaction_session_timeout=30000"
-    }
-  : {
+  ? Object.assign({ connectionString: process.env.DATABASE_URL }, basePoolOpts)
+  : Object.assign({
       host: process.env.PGHOST || "127.0.0.1",
       port: Number(process.env.PGPORT || 5432),
       database: process.env.PGDATABASE || "clearcast_iptv",
       user: process.env.PGUSER || "postgres",
-      password: process.env.PGPASSWORD || "",
-      ssl: sslConfig,
-      max: 15,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 8000,
-      statement_timeout: 25000,
-      query_timeout: 30000,
-      options: "-c idle_in_transaction_session_timeout=30000"
-    };
+      password: process.env.PGPASSWORD || ""
+    }, basePoolOpts);
 
 const pool = new Pool(pgConfig);
+const accountCache = new LRUCache({ max: 500, ttl: 10 * 60 * 1000 });
+const tokenHashCache = new LRUCache({ max: 1000, ttl: 5 * 60 * 1000 });
 
 pool.on("error", (err) => {
   console.error("[pg-pool] unexpected error:", err.message);
@@ -63,6 +62,8 @@ async function ensureAccount(email) {
   if (!norm || !norm.includes("@") || norm.length > 254) {
     throw new Error("Valid email required");
   }
+  const cached = accountCache.get(norm);
+  if (cached) return cached;
   const { rows } = await pool.query(
     `INSERT INTO accounts (email, updated_at)
      VALUES ($1, NOW())
@@ -70,6 +71,7 @@ async function ensureAccount(email) {
      RETURNING id, email`,
     [norm]
   );
+  if (rows[0]) accountCache.set(norm, rows[0]);
   return rows[0];
 }
 
@@ -116,17 +118,24 @@ async function rotateDeviceToken(accountId, deviceCode) {
      WHERE account_id = $1 AND device_code = $2`,
     [accountId, deviceCode, tokenHash]
   );
+  tokenHashCache.set(`${accountId}:${deviceCode}`, tokenHash);
   return plainToken;
 }
 
 async function verifyDeviceToken(accountId, deviceCode, presentedToken) {
   if (!presentedToken) return false;
-  const { rows } = await pool.query(
-    `SELECT token_hash FROM devices WHERE account_id = $1 AND device_code = $2`,
-    [accountId, deviceCode]
-  );
-  if (!rows.length || !rows[0].token_hash) return false;
-  return timingSafeEqualHex(rows[0].token_hash, sha256(presentedToken));
+  const key = `${accountId}:${deviceCode}`;
+  let storedHash = tokenHashCache.get(key);
+  if (!storedHash) {
+    const { rows } = await pool.query(
+      `SELECT token_hash FROM devices WHERE account_id = $1 AND device_code = $2`,
+      [accountId, deviceCode]
+    );
+    if (!rows.length || !rows[0].token_hash) return false;
+    storedHash = rows[0].token_hash;
+    tokenHashCache.set(key, storedHash);
+  }
+  return timingSafeEqualHex(storedHash, sha256(presentedToken));
 }
 
 async function claimPairingCode(pairingCode) {
@@ -560,7 +569,6 @@ async function upsertSnapshot(accountId, deviceCode, snapshot) {
   );
 }
 
-// Dedicated auto-reconnecting LISTEN/NOTIFY client for real-time SSE push
 function startNotificationListener(onEvent) {
   let active = true;
   async function connect() {
@@ -933,3 +941,4 @@ module.exports = {
   renameGroups,
   removeDevicePlaylist
 };
+

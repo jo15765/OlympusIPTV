@@ -1,11 +1,11 @@
 "use strict";
 
 const PRE_EVENT_WINDOW_MS = 15 * 60 * 1000;
-const DEFAULT_EVENT_DURATION_MS = 165 * 60 * 1000; // 2h 45m
-const BASKETBALL_EVENT_DURATION_MS = 135 * 60 * 1000; // 2h 15m
-const SOCCER_EVENT_DURATION_MS = 130 * 60 * 1000; // 2h 10m
-const HIGH_SCHOOL_EVENT_DURATION_MS = 120 * 60 * 1000; // 2h
-const SHORT_EVENT_DURATION_MS = 90 * 60 * 1000; // 1h 30m
+const DEFAULT_EVENT_DURATION_MS = 165 * 60 * 1000;
+const BASKETBALL_EVENT_DURATION_MS = 135 * 60 * 1000;
+const SOCCER_EVENT_DURATION_MS = 130 * 60 * 1000;
+const HIGH_SCHOOL_EVENT_DURATION_MS = 120 * 60 * 1000;
+const SHORT_EVENT_DURATION_MS = 90 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 function eventDurationMs(title, rawChannel = "") {
@@ -274,3 +274,4 @@ module.exports = {
   isLiveNow,
   isPlaceholderEvent
 };
+

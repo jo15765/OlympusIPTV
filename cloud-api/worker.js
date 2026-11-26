@@ -1,10 +1,3 @@
-/**
- * Olympus-IPTV Cloud Ingestion Worker Service
- * Standalone Node.js service designed to run in Docker / Server.
- * Automatically polls Xtream credentials every 30 minutes, normalizes catalog,
- * upserts into PostgreSQL database, and emits real-time NOTIFY push signals.
- */
-
 require("dotenv").config();
 const { Pool } = require("pg");
 const eventParser = require("./eventParser");
@@ -17,30 +10,28 @@ const sslConfig = process.env.PGSSLMODE === "disable"
     ? { ca: process.env.PGSSLCA.replace(/\\n/g, "\n"), rejectUnauthorized: true }
     : { rejectUnauthorized: false };
 
+const basePoolOpts = {
+  ssl: sslConfig,
+  max: 10,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000,
+  keepAlive: true,
+  keepAliveInitialDelayMillis: 10000,
+  options: "-c idle_in_transaction_session_timeout=30000"
+};
+
 const pgConfig = process.env.DATABASE_URL
-  ? {
-      connectionString: process.env.DATABASE_URL,
-      ssl: sslConfig,
-      max: 10,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 10000,
-      options: "-c idle_in_transaction_session_timeout=30000"
-    }
-  : {
+  ? Object.assign({ connectionString: process.env.DATABASE_URL }, basePoolOpts)
+  : Object.assign({
       host: process.env.PGHOST || "127.0.0.1",
       port: Number(process.env.PGPORT || 5432),
       database: process.env.PGDATABASE || "clearcast_iptv",
       user: process.env.PGUSER || "postgres",
-      password: process.env.PGPASSWORD || "",
-      ssl: sslConfig,
-      max: 10,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 10000,
-      options: "-c idle_in_transaction_session_timeout=30000"
-    };
+      password: process.env.PGPASSWORD || ""
+    }, basePoolOpts);
 
 const pool = new Pool(pgConfig);
-const SYNC_INTERVAL_MS = 15 * 60 * 1000; // 15 Minutes
+const SYNC_INTERVAL_MS = 15 * 60 * 1000;
 
 log.info({ encryption: security.encryptionEnabled }, "Starting Olympus-IPTV Centralized Ingestion Service");
 
@@ -107,7 +98,7 @@ async function writeSyncLog(accountId, deviceCode, status, counts, duration, det
   );
 }
 
-const BATCH_SIZE = 1000;
+const BATCH_SIZE = 2500;
 
 function dedupeByKey(items, keyFn) {
   const map = new Map();
@@ -313,7 +304,6 @@ async function syncAccountLogin(row) {
 
   console.log(`[Worker] Syncing Xtream catalog for Account=${accountId}, Device=${deviceCode}, host=${hostOnly}...`);
 
-  // Fetch all 6 Xtream endpoints in parallel
   const [
     liveCatRaw,
     liveStreamRaw,
@@ -427,7 +417,7 @@ async function syncAccountLogin(row) {
 
   const client = await pool.connect();
   try {
-    // Stage 1: Categories + Live Channels + Auto-parsed Event EPG (commit immediately so Live TV is available in seconds)
+
     await client.query("BEGIN");
     await bulkUpsertCategories(client, accountId, deviceCode, "live", liveCats);
     await bulkUpsertCategories(client, accountId, deviceCode, "vod", vodCats);
@@ -450,7 +440,6 @@ async function syncAccountLogin(row) {
     await client.query("COMMIT");
     console.log(`[Worker] Stage 1 committed for ${deviceCode}: Live=${liveRows.length}, EventsEPG=${parsedEvents.length} (${Date.now() - startTime}ms)`);
 
-    // Stage 2: VOD Movies (+ prune removed VOD items & categories)
     if (vodRows.length > 0) {
       await client.query("BEGIN");
       await bulkUpsertVodChannels(client, accountId, deviceCode, vodRows);
@@ -472,7 +461,6 @@ async function syncAccountLogin(row) {
       log.info({ deviceCode, vod: vodRows.length, elapsedMs: Date.now() - startTime }, "Stage 2 committed");
     }
 
-    // Stage 3: Series (+ prune removed series/categories + old log retention) + Sync Log + Final NOTIFY
     await client.query("BEGIN");
     if (seriesRows.length > 0) {
       await bulkUpsertSeries(client, accountId, deviceCode, seriesRows);
@@ -705,3 +693,4 @@ process.on("SIGINT", () => shutdown("SIGINT"));
 startWorker().catch((err) => {
   log.error({ err: err.message }, "Worker startup failed");
 });
+

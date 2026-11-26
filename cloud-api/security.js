@@ -20,10 +20,6 @@ const logger = pino({
   }
 });
 
-// ----------------------------------------------------------------------------
-// AES-256-GCM Credential Encryption at Rest (backward-compatible with plaintext)
-// Set CREDENTIALS_KEY in .env (any high-entropy string; hashed to 32-byte key).
-// ----------------------------------------------------------------------------
 const RAW_CRED_KEY = String(process.env.CREDENTIALS_KEY || "").trim();
 const CRED_KEY = RAW_CRED_KEY
   ? crypto.createHash("sha256").update(RAW_CRED_KEY).digest()
@@ -83,26 +79,23 @@ function decryptLogin(login) {
   return out;
 }
 
-// ----------------------------------------------------------------------------
-// SSRF Protection: blocks private, loopback, link-local & cloud metadata IPs
-// ----------------------------------------------------------------------------
 function isBlockedIpv4(ip) {
   const parts = ip.split(".").map(Number);
   if (parts.length !== 4 || parts.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) return true;
   const [a, b] = parts;
-  if (a === 0 || a === 10 || a === 127) return true; // 0.0.0.0/8, 10.0.0.0/8, loopback
-  if (a === 169 && b === 254) return true; // link-local & AWS/GCP/Azure metadata
-  if (a === 172 && b >= 16 && b <= 31) return true; // RFC1918
-  if (a === 192 && b === 168) return true; // RFC1918
-  if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT
-  if (a >= 224) return true; // multicast / reserved
+  if (a === 0 || a === 10 || a === 127) return true;
+  if (a === 169 && b === 254) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 100 && b >= 64 && b <= 127) return true;
+  if (a >= 224) return true;
   return false;
 }
 
 function isBlockedIpv6(ip) {
   const norm = ip.toLowerCase();
   if (norm === "::1" || norm === "::") return true;
-  if (norm.startsWith("fc") || norm.startsWith("fd")) return true; // unique local
+  if (norm.startsWith("fc") || norm.startsWith("fd")) return true;
   if (norm.startsWith("fe80:") || norm.startsWith("fe8") || norm.startsWith("fe9") || norm.startsWith("fea") || norm.startsWith("feb")) return true;
   if (norm.startsWith("::ffff:")) {
     return isBlockedIpv4(norm.slice(7));
@@ -158,9 +151,6 @@ async function assertSafeProviderUrl(rawUrl) {
   return parsed.toString();
 }
 
-// ----------------------------------------------------------------------------
-// Zod Input Validation Schemas
-// ----------------------------------------------------------------------------
 const setupSchema = z.object({
   email: z.string().trim().email("Valid email required").max(254),
   deviceId: z.string().trim().min(1, "Enter the device ID shown on the TV").max(128),
@@ -184,3 +174,4 @@ module.exports = {
   setupSchema,
   encryptionEnabled: Boolean(CRED_KEY)
 };
+

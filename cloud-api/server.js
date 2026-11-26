@@ -2,6 +2,38 @@ require("dotenv").config();
 const crypto = require("crypto");
 const path = require("path");
 const zlib = require("zlib");
+const util = require("util");
+const gzipAsync = util.promisify(zlib.gzip);
+const brotliAsync = util.promisify(zlib.brotliCompress);
+const POST_EVENT_GRACE_MS = 30 * 60 * 1000;
+
+function liveEventWindowBounds(nowMs) {
+  return {
+    preWindowMs: nowMs + eventParser.PRE_EVENT_WINDOW_MS,
+    postGraceCutoffMs: nowMs - POST_EVENT_GRACE_MS
+  };
+}
+
+function sendCompressedJson(req, res, entry) {
+  res.setHeader("ETag", entry.etag);
+  res.setHeader("Cache-Control", "private, max-age=30");
+  if (req.headers["if-none-match"] === entry.etag) {
+    return res.sendStatus(304);
+  }
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
+  const acceptEnc = String(req.headers["accept-encoding"] || "");
+  if (acceptEnc.includes("br") && entry.br) {
+    res.setHeader("Content-Encoding", "br");
+    res.setHeader("Vary", "Accept-Encoding");
+    return res.send(entry.br);
+  }
+  if (acceptEnc.includes("gzip")) {
+    res.setHeader("Content-Encoding", "gzip");
+    res.setHeader("Vary", "Accept-Encoding");
+    return res.send(entry.gzip);
+  }
+  return res.send(entry.raw);
+}
 const express = require("express");
 const compression = require("compression");
 const helmet = require("helmet");
@@ -40,15 +72,12 @@ app.use(
   })
 );
 
-// Cloudflare and the CloudClusters gateway both add X-Forwarded-For.
-// express-rate-limit rejects those requests unless Express trusts the proxies.
 const trustProxy = String(process.env.TRUST_PROXY ?? "2").trim();
 if (trustProxy === "true") app.set("trust proxy", true);
 else if (trustProxy !== "false" && trustProxy !== "0") {
   app.set("trust proxy", Number(trustProxy) || 2);
 }
 
-// Security headers (relaxed CSP inline script only for embedded portal/public/index.html)
 app.use(
   helmet({
     contentSecurityPolicy: false,
@@ -66,7 +95,6 @@ app.use(
 );
 app.use(express.json({ limit: "2mb" }));
 
-// CORS lockdown (configure CORS_ORIGIN in .env for production)
 const allowedOrigin = (process.env.CORS_ORIGIN || "*").trim();
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
@@ -76,7 +104,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// Rate limiting against brute-force / scraping
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 180,
@@ -90,7 +117,6 @@ const authLimiter = rateLimit({
 });
 app.use("/api/", apiLimiter);
 
-// Shared API Key Gate (blocks bots, scrapers, and unauthorized callers when API_SECRET_KEY is set in .env)
 const API_SECRET_KEY = String(process.env.API_SECRET_KEY || "").trim();
 function timingSafeMatch(a, b) {
   const bufA = Buffer.from(String(a || ""), "utf8");
@@ -108,19 +134,12 @@ app.use("/api/", (req, res, next) => {
   next();
 });
 
-// WAN web dashboard is disabled by default (LAN dashboard lives inside the Android app).
-// Set ENABLE_WEB_DASHBOARD=true in .env if you ever want to serve /public over WAN.
 if (String(process.env.ENABLE_WEB_DASHBOARD || "false").toLowerCase() === "true") {
   app.use(express.static(path.join(__dirname, "public")));
 }
 
 const STRICT_TOKENS = String(process.env.STRICT_DEVICE_TOKENS || "false").toLowerCase() === "true";
 
-// Zero-Trust Device Auth Middleware:
-// - Always validates email -> account_id
-// - Verifies X-Device-Token against SHA-256 hash in PostgreSQL
-// - Smooth transition: if STRICT_DEVICE_TOKENS=false, legacy clients without a token header
-//   still work while new clients enforce cryptographic token verification.
 async function requireDeviceAuth(req, res, next) {
   try {
     const email = req.body?.email || req.query?.email;
@@ -144,9 +163,6 @@ async function requireDeviceAuth(req, res, next) {
   }
 }
 
-// ----------------------------------------------------------------------------
-// Health & Setup
-// ----------------------------------------------------------------------------
 app.get("/api/health", async (_req, res) => {
   try {
     await db.pool.query("SELECT 1");
@@ -264,9 +280,6 @@ app.get("/api/provider-login", authLimiter, async (req, res) => {
   }
 });
 
-// ----------------------------------------------------------------------------
-// 1. Device Registration, Token Issuance & 6-Digit Pairing
-// ----------------------------------------------------------------------------
 app.post("/api/register", authLimiter, async (req, res) => {
   try {
     const { email, deviceId, platform, deviceName } = req.body || {};
@@ -279,7 +292,7 @@ app.post("/api/register", authLimiter, async (req, res) => {
     res.json({
       ok: true,
       deviceId: reg.deviceCode,
-      deviceToken: reg.deviceToken, // Returned once on first registration; stored as SHA-256 in DB
+      deviceToken: reg.deviceToken,
       pairingCode: reg.pairingCode,
       devices: rows.map((r) => r.device_code)
     });
@@ -306,10 +319,7 @@ app.post("/api/devices/rotate-token", requireDeviceAuth, async (req, res) => {
   }
 });
 
-// ----------------------------------------------------------------------------
-// 2. Real-Time Push Sync (PostgreSQL LISTEN/NOTIFY -> Server-Sent Events)
-// ----------------------------------------------------------------------------
-const sseClients = new Map(); // accountId -> Set<res>
+const sseClients = new Map();
 
 db.startNotificationListener((evt) => {
   const listeners = sseClients.get(evt.account_id);
@@ -353,9 +363,6 @@ data: {"ok":true}
   });
 });
 
-// ----------------------------------------------------------------------------
-// 3. Devices, Multi-TV Cloning & Shared Household Toggle
-// ----------------------------------------------------------------------------
 app.post("/api/devices", requireDeviceAuth, async (req, res) => {
   try {
     const account = req.auth.account;
@@ -407,9 +414,6 @@ app.post("/api/devices/shared-mode", requireDeviceAuth, async (req, res) => {
   }
 });
 
-// ----------------------------------------------------------------------------
-// 4. Login, Lineup Config & 1-Click Undo History
-// ----------------------------------------------------------------------------
 app.post("/api/login", authLimiter, async (req, res) => {
   try {
     const { email, deviceId } = req.body || {};
@@ -566,9 +570,6 @@ app.post("/api/epg/parse", requireDeviceAuth, async (req, res) => {
   }
 });
 
-// ----------------------------------------------------------------------------
-// 5. Shared Favorites
-// ----------------------------------------------------------------------------
 app.get("/api/favorites", requireDeviceAuth, async (req, res) => {
   try {
     res.json(await db.getFavorites(req.auth.account.id));
@@ -712,9 +713,6 @@ app.post("/api/favorites/auto", requireDeviceAuth, async (req, res) => {
   }
 });
 
-// ----------------------------------------------------------------------------
-// End-User Error & Crash Logs Upload Endpoint
-// ----------------------------------------------------------------------------
 app.post("/api/logs/error", async (req, res) => {
   try {
     const { email, deviceId, platform, tag, message, stackTrace, appVersion, detail } = req.body || {};
@@ -774,9 +772,6 @@ async function lookupZip(zip) {
   }
 }
 
-// ----------------------------------------------------------------------------
-// 6. Cross-Device Continue Watching & Watch History
-// ----------------------------------------------------------------------------
 app.get("/api/watch-history", requireDeviceAuth, async (req, res) => {
   try {
     const items = await db.getWatchHistory(req.auth.account.id, req.query.limit);
@@ -795,9 +790,6 @@ app.post("/api/watch-history", requireDeviceAuth, async (req, res) => {
   }
 });
 
-// ----------------------------------------------------------------------------
-// 7. Remote DVR Recordings & Program Reminders
-// ----------------------------------------------------------------------------
 app.get("/api/recordings", requireDeviceAuth, async (req, res) => {
   try {
     res.json({ ok: true, recordings: await db.getRecordings(req.auth.account.id, req.auth.deviceId) });
@@ -871,9 +863,6 @@ app.delete("/api/reminders/:id", requireDeviceAuth, async (req, res) => {
   }
 });
 
-// ----------------------------------------------------------------------------
-// Cloud Catalog Ingestion Endpoints (Centralized Database Sync)
-// ----------------------------------------------------------------------------
 app.get("/api/catalog/sync", requireDeviceAuth, async (req, res) => {
   try {
     const { account, deviceId } = req.auth;
@@ -980,10 +969,10 @@ app.get("/api/catalog/sync", requireDeviceAuth, async (req, res) => {
             channels: filteredChannels,
             stamp: nowMs
           }), "utf8");
-          const gzip = zlib.gzipSync(raw, { level: 6 });
-          const br = zlib.brotliCompressSync(raw, {
-            params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 4 }
-          });
+          const [gzip, br] = await Promise.all([
+            gzipAsync(raw, { level: 6 }),
+            brotliAsync(raw, { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 4 } })
+          ]);
           const etag = `"${crypto.createHash("sha1").update(gzip).digest("hex")}"`;
           const built = { raw, gzip, br, etag };
           catalogCache.set(cacheKey, built, { ttl: kind === "live" ? 60 * 1000 : 5 * 60 * 1000 });
@@ -999,32 +988,12 @@ app.get("/api/catalog/sync", requireDeviceAuth, async (req, res) => {
       }
     }
 
-    res.setHeader("ETag", entry.etag);
-    res.setHeader("Cache-Control", "private, max-age=30");
-    if (req.headers["if-none-match"] === entry.etag) {
-      return res.sendStatus(304);
-    }
-    res.setHeader("Content-Type", "application/json; charset=utf-8");
-    const acceptEnc = String(req.headers["accept-encoding"] || "");
-    if (acceptEnc.includes("br") && entry.br) {
-      res.setHeader("Content-Encoding", "br");
-      res.setHeader("Vary", "Accept-Encoding");
-      return res.send(entry.br);
-    }
-    if (acceptEnc.includes("gzip")) {
-      res.setHeader("Content-Encoding", "gzip");
-      res.setHeader("Vary", "Accept-Encoding");
-      return res.send(entry.gzip);
-    }
-    return res.send(entry.raw);
+    return sendCompressedJson(req, res, entry);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// ----------------------------------------------------------------------------
-// 8. Catalog Snapshots & Profile Export/Import
-// ----------------------------------------------------------------------------
 app.get("/api/catalog/search", requireDeviceAuth, async (req, res) => {
   try {
     const q = String(req.query.q || "").trim();
@@ -1036,8 +1005,7 @@ app.get("/api/catalog/search", requireDeviceAuth, async (req, res) => {
     let channels = [];
     if (q.length >= 2) {
       const nowMs = Date.now();
-      const preWindowMs = nowMs + eventParser.PRE_EVENT_WINDOW_MS;
-      const postGraceCutoffMs = nowMs - 30 * 60 * 1000;
+      const { preWindowMs, postGraceCutoffMs } = liveEventWindowBounds(nowMs);
       const params = [req.auth.account.id, req.auth.deviceId, q, preWindowMs, postGraceCutoffMs, limit];
       const kindClause = kind && ["live", "vod", "series"].includes(kind) ? ` AND kind = $7` : "";
       if (kindClause) params.push(kind);
@@ -1061,7 +1029,7 @@ app.get("/api/catalog/search", requireDeviceAuth, async (req, res) => {
 
 app.get("/api/catalog/group", requireDeviceAuth, async (req, res) => {
   try {
-    // Channels stay local in SQLite on the TV/Mobile device; return empty when offline from LAN
+
     res.json({ channels: [], total: 0, offlineHint: "Connect on home Wi-Fi to browse individual channels in this group." });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -1198,6 +1166,8 @@ const httpServer = app.listen(port, "0.0.0.0", () => {
   });
   startCacheInvalidator();
 });
+httpServer.keepAliveTimeout = 65000;
+httpServer.headersTimeout = 66000;
 
 let apiShuttingDown = false;
 async function shutdownApi(signal) {
@@ -1218,3 +1188,4 @@ async function shutdownApi(signal) {
 
 process.on("SIGTERM", () => shutdownApi("SIGTERM"));
 process.on("SIGINT", () => shutdownApi("SIGINT"));
+
