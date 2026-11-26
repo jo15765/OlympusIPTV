@@ -82,13 +82,16 @@ Sports and PPV IPTV providers often list hundreds of channels like `ESPN+ 16: NO
   - **Upcoming events** appear **15 minutes before kickoff** (`PRE_EVENT_WINDOW_MS`).
   - **Completed events** remain visible for at most **30 minutes after scheduled end** (`POST_EVENT_GRACE_MS`) for overtime/wrap-up, and are **hard-hidden at exactly 30 minutes** across the guide, Dummy EPG, search, and cloud API.
 
-### 2. Instant Indexed `24/7 Channels` & Cross-Catalog Search
-- `CatalogDb` indexes `24/7` channels (`idx_channels_247`) with keyset pagination so opening `24/7 Channels` across 200k+ streams is instant without UI freezes.
+### 2. Instant Indexed `24/7 Channels`, Unified `Nutflix` Card & Clean Program Guide
+- **`24/7 Channels`:** `CatalogDb` indexes `24/7` channels (`idx_channels_247`) with keyset pagination so opening `24/7 Channels` across 200k+ streams is instant without UI freezes, and exempts untagged 24/7 channels from `"__other__"` country hiding while still filtering out foreign-prefixed 24/7 groups when international is off.
+- **Unified `Nutflix` (18+) Card:** All 18+/adult live groups automatically merge into a single **`Nutflix`** card (`AdultGroup.kt`, safely excluding `Adult Swim`) that is always pinned as the **last card** in Live TV.
+- **Clutter-Free Program Guide:** Program guide cells display clean show titles without duplicate start/end clocks (shown once under the channel name in the left column) and without `"Ending in ..."` or `"Up Next"` title prefixes.
 - **Search (`SearchActivity.kt`):** Searches Live TV (active events only), Movies, and TV Shows simultaneously with per-section counts and full TV/Mobile soft-keyboard support.
 
 ### 3. Embedded LAN Web Dashboard (No WAN Exposure)
 - Runs directly on your TV/Android device over your local Wi-Fi (`DashboardHost.kt`), serving the gzipped **Cinema Obsidian & Molten Gold** web UI (`app/src/main/assets/dashboard/index.html`) for managing countries, groups, channel order, favorites, DVR recordings, reminders, and TV remote control from any phone or laptop on the same network.
-- Designed for dense catalogs without endless scrolling: **zero-scroll 4-column Favorites Auto Build**, **2-column compact Groups grid** with instant category filter chips (`Live TV`, `Sports`, `24/7`, `Movies`, `Shows`, `18+`), and **single-line Channels rows** with an **A–Z Quick Jump strip**.
+- **Multi-Device Management:** View and switch between both your active local TV and offline cloud-synced devices under the same email, edit offline device lineups/favorites directly from the LAN dashboard, or remove stale devices (`POST /api/devices/delete`).
+- **Streamlined Layout:** Zero-scroll 4-column Favorites Auto Build, **Live-TV-only** Groups (2-column compact grid with `All Live`, `Sports`, `24/7`, `18+` chips) and Channels (single-line rows with an A–Z Quick Jump strip), and a compact Settings hub that fits cleanly without cutting off bottom cards.
 - On the cloud backend (`cloud-api/server.js`), static WAN dashboard hosting is **disabled by default** (`ENABLE_WEB_DASHBOARD=false`) so your VPS only exposes `/api/*` endpoints.
 
 ### 4. Multi-Generation Fire TV Stick & Low-RAM Performance
@@ -98,13 +101,13 @@ Sports and PPV IPTV providers often list hundreds of channels like `ESPN+ 16: NO
 ### 5. Hardened 3-Tier Cloud Sync (`cloud-api/`)
 - **Fast Ingestion (`worker.js`):** Fetches all 6 Xtream endpoints in parallel with native Node 22 `fetch` + timeouts/retries, performs **2,500-row** PostgreSQL `UNNEST` bulk upserts across 3 staged commits over persistent TCP keep-alive pools, prunes stale VOD/Series/Categories, and uses **PostgreSQL session advisory locks** (`pg_try_advisory_lock`) so duplicate worker containers never collide.
 - **Fast Delivery (`server.js` & `db.js`):**
-  - **Zero-DB-RTT Auth Caching:** Caches `ensureAccount` (`accountCache`) and device token hashes (`tokenHashCache`, auto-invalidated on rotation) in RAM via `LRUCache`, cutting per-request auth overhead from 2 PostgreSQL round-trips to `< 0.1 ms`.
-  - **Non-Blocking Parallel Compression:** Pre-compresses cached catalog snapshots asynchronously in parallel (`Promise.all([gzipAsync, brotliAsync])` on libuv's threadpool) so cold cache builds never block the Node.js event loop, serving `ETag` / `304 Not Modified`, `?since=<epochMs>` delta sync, real-time `LISTEN olympus_sync` cache invalidation, and sub-millisecond full-text search via the PostgreSQL GIN index (`idx_cloud_channels_name_fts`).
-  - **Proxy-Tuned Keep-Alive:** `httpServer.keepAliveTimeout = 65s` / `headersTimeout = 66s` and PostgreSQL TCP keep-alive keep upstream connections warm behind Caddy, Nginx, or Cloudflare.
+  - **Zero-DB-RTT Auth Caching:** Caches `ensureAccount` (`accountCache`) and device token hashes (`tokenHashCache`, auto-invalidated on rotation or device deletion) in RAM via `LRUCache`, cutting per-request auth overhead from 2 PostgreSQL round-trips to `< 0.1 ms`.
+  - **Low-Memory Non-Blocking Parallel Compression:** Pre-compresses cached catalog snapshots asynchronously in parallel (`Promise.all([gzipAsync, brotliAsync])` on libuv's threadpool) and retains only compressed `br`/`gzip` buffers in RAM (~75% lower cache footprint), skips double-compression on pre-compressed and streaming routes, disables global weak ETag overhead, caches M3U/XMLTV exports for 60s, and serves `ETag` / `304 Not Modified`, `?since=<epochMs>` delta sync, real-time `LISTEN olympus_sync` cache invalidation, and sub-millisecond full-text search via the PostgreSQL GIN index (`idx_cloud_channels_name_fts`).
+  - **Proxy-Tuned Keep-Alive & Pool Control:** `httpServer.keepAliveTimeout = 65s` / `headersTimeout = 66s`, configurable `PG_POOL_MAX`, and PostgreSQL TCP keep-alive keep upstream connections warm behind Caddy, Nginx, or Cloudflare.
 - **Security by Default:**
   - **AES-256-GCM** encryption at rest for provider passwords & M3U URLs (`CREDENTIALS_KEY`), with automatic startup migration of legacy plaintext rows.
-  - **SSRF protection** (`assertSafeProviderUrl`) blocking private/link-local/metadata IPs.
-  - **Zod** request validation, **Pino** structured logging with secret redaction, rate limiting, `idle_in_transaction_session_timeout=30000`, non-root Docker user (`USER node`), `cap_drop: [ALL]`, `no-new-privileges:true`, and localhost-only port binding (`127.0.0.1:8443:3000`).
+  - **SSRF protection** (`assertSafeProviderUrl`) blocking private/link-local/metadata IPs, plus stream proxy concurrency caps (`MAX_PROXY_RELAYS`, `MAX_CLIENTS_PER_RELAY`).
+  - **Zod** request validation, **Pino** structured logging with expanded secret/token redaction, `Cache-Control: no-store` on credential routes, rate limiting, `idle_in_transaction_session_timeout=30000`, non-root Docker user (`USER node`), `cap_drop: [ALL]`, `no-new-privileges:true`, and localhost-only port binding (`127.0.0.1:8443:3000`).
 
 ### 6. Advanced Tuner, Failover & Export Features (`cloud-api/dispatch.js` + Android)
 - **Multi-Provider Consolidation & Cross-Provider Failover:** Register backup Xtream providers in priority order (`GET/POST /api/providers`, `DELETE /api/providers/:id`). The background worker ingests backup feeds without cluttering the primary guide; if a live channel fails in `PlayerActivity` and no local sibling exists, ClearCast queries `GET /api/channels/:id/alternates` and fails over seamlessly to the matching channel on your backup provider.
@@ -216,7 +219,7 @@ For the complete version-by-version release notes (**0.2.83 through latest**), s
 
 | Version | Highlights |
 | --- | --- |
-| **Unreleased (Post-0.2.142)** | Monorepo Docker `cloud-api/` backend (Brotli/Gzip, GIN FTS, advisory locks, AES-256-GCM, optional `local-db` Postgres & `gluetun` VPN profiles), multi-provider failover, M3U/XMLTV export, Xtream catch-up parity, opt-in HDHomeRun tuner & shared stream proxy, DVR series rules, stream health telemetry, strict 15m pre / 30m post-event hard cutoff & Dummy EPG parity, D-Pad focus fixes, indexed `24/7 Channels`, zero-scroll Favorites / 2-col Groups / A–Z Channels LAN UI, and hot-path `NameStrip`/SQLite/Regex optimizations |
+| **Unreleased (Post-0.2.142)** | Monorepo Docker `cloud-api/` backend (low-memory Brotli/Gzip, GIN FTS, 60s export cache, proxy relay caps, instant token revocation, advisory locks, AES-256-GCM, optional `local-db` Postgres & `gluetun` VPN profiles), multi-provider failover, M3U/XMLTV export, Xtream catch-up parity, opt-in HDHomeRun tuner & shared stream proxy, DVR series rules, stream health telemetry, strict 15m pre / 30m post-event hard cutoff & Dummy EPG parity, cleaner TV guide cells, `24/7 Channels` country-filter fix, unified `Nutflix` (18+) last card, multi-device offline editing & deletion, Live-only Groups/Channels & compact Settings LAN UI, D-Pad focus fixes, and Fire TV hot-path optimizations |
 | **[0.2.142](./CHANGELOG.md#whats-in-02142)** | Unified `24/7 Channels` group, live event & guide sync (`ESPN+` / `Disney+` / PPV), split channel/group sanitization, TV EPG Edits & Web-UI Access layout polish |
 | **[0.2.137](./CHANGELOG.md#whats-in-02137)** | Local major networks (`FOX`/`ABC`/`CBS`/`NBC`/`PBS`) with offline ZIP fallback, self-healing group names, revamped Web-UI Settings & EPG tools, API key auth |
 | **[0.2.132](./CHANGELOG.md#whats-in-02132)** | Mobile Live TV guide row alignment & scroll lock, pinch-to-zoom & 2× long-press gestures, Google Drive & OneDrive DVR cloud upload |
