@@ -100,6 +100,9 @@ class MediaDetailActivity : AppCompatActivity() {
 
         binding.btnDetailBack.setOnClickListener { finish() }
         binding.btnDetailCast.setOnClickListener { CastBridge.showChooser(this, channel) }
+        binding.btnDetailUser.setOnClickListener {
+            startActivity(Intent(this, com.olympus.iptv.ui.home.HomeActivity::class.java))
+        }
         binding.btnDetailSettings.setOnClickListener { finish() }
         binding.posterCard.setOnClickListener { playPrimary() }
         binding.btnHeroPlay.setOnClickListener { playPrimary() }

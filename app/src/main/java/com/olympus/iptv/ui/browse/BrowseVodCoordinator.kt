@@ -1594,12 +1594,15 @@ internal fun BrowseActivity.refreshGroupCounts() {
         val token = ++groupCountToken
         val app = application as OlympusIptvApp
         val hiddenChannels = activeConfig.hiddenChannels.orEmpty().toSet()
+        val hiddenCountries = activeConfig.hiddenCountries.orEmpty().toSet()
+        val includeInternational = activeConfig.includeInternational
         val now = System.currentTimeMillis()
         val minuteBucket = if (bucket == CatalogDb.LIVE) now / 300_000L else 0L
         lifecycleScope.launch {
             val stamp = withContext(Dispatchers.IO) { app.catalogDb.libraryStamp(saved.id) }
             if (token != groupCountToken || isDestroyed) return@launch
-            val key = saved.id + "\u0000" + bucket + "\u0000" + stamp + "\u0000" + minuteBucket + "\u0000" + hiddenChannels.hashCode()
+            val key = saved.id + "\u0000" + bucket + "\u0000" + stamp + "\u0000" + minuteBucket + "\u0000" +
+                hiddenChannels.hashCode() + "\u0000" + hiddenCountries.hashCode() + "\u0000" + includeInternational
             val cached = groupCountCache[key]
             if (cached != null) {
                 val changed = groupCounts != cached
@@ -1611,7 +1614,13 @@ internal fun BrowseActivity.refreshGroupCounts() {
             }
             val counts = withContext(Dispatchers.IO) {
                 if (bucket == CatalogDb.LIVE) {
-                    app.catalogDb.activeLiveCategoryCounts(saved.id, hiddenChannels, now)
+                    app.catalogDb.activeLiveCategoryCounts(
+                        saved.id,
+                        hiddenChannels,
+                        now,
+                        hiddenCountries,
+                        includeInternational
+                    )
                 } else {
                     app.catalogDb.categoryCounts(saved.id, bucket)
                 }

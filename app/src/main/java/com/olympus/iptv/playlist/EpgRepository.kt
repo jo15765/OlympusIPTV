@@ -104,6 +104,12 @@ class EpgRepository(
         channel: Channel
     ): List<EpgProgram> {
         val key = cacheKey(playlist, channel)
+        if (channel.kind == ContentKind.LIVE &&
+            (com.olympus.iptv.data.NameStrip.isDummyEpgId(channel.epgChannelId) ||
+                DummyEpg.parseEventStartMillis(channel.name) != null)
+        ) {
+            return DummyEpg.programs(channel.name).map { EpgTiming.dress(it, System.currentTimeMillis()) }
+        }
         cache[key]?.let { return it }
         val playlistId = playlist?.id
         val stored = if (playlistId.isNullOrBlank()) null else disk?.readEpg(playlistId, channel.epgChannelId ?: channel.id)

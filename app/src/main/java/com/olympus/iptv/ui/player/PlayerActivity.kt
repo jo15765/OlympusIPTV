@@ -137,6 +137,7 @@ class PlayerActivity : AppCompatActivity() {
     internal var playbackReady = false
     private var playbackToken = 0
     private var recoverAttempt = 0
+    private var tvPlayerRecreated = false
     private var stallJob: Job? = null
     private var stallMarkPosition = Long.MIN_VALUE
     private var stallMarkAt = 0L
@@ -817,7 +818,8 @@ class PlayerActivity : AppCompatActivity() {
         seedMeta: String? = null,
         seedNext: String? = null,
         startAt: Long? = null,
-        failover: Boolean = false
+        failover: Boolean = false,
+        rebuilding: Boolean = false
     ) {
         val seed = current ?: queue.getOrNull(index)
         if (seed == null) {
@@ -854,7 +856,10 @@ class PlayerActivity : AppCompatActivity() {
         audioAppliedFor = null
         closeSubtitlePanel()
         playbackToken += 1
-        recoverAttempt = 0
+        if (!rebuilding) {
+            recoverAttempt = 0
+            tvPlayerRecreated = false
+        }
         if (!failover) {
             stallTried.clear()
             stallFamily = null
@@ -1327,13 +1332,13 @@ class PlayerActivity : AppCompatActivity() {
                 playCurrent()
                 return@postDelayed
             }
-            if (recoverAttempt >= 2 && DeviceForm.isTelevision(this)) {
-                recoverAttempt = 0
+            if (recoverAttempt >= 2 && DeviceForm.isTelevision(this) && !tvPlayerRecreated) {
+                tvPlayerRecreated = true
                 runCatching { active.stop() }
                 discardSparePlayers()
                 runCatching { active.release() }
                 if (player === active) player = null
-                playCurrent()
+                playCurrent(rebuilding = true)
                 return@postDelayed
             }
             recoverLive(active, channel, null)
@@ -2229,6 +2234,7 @@ class PlayerActivity : AppCompatActivity() {
             binding.btnCast.isFocused ||
             binding.btnTrailer.isFocused ||
             binding.btnPip.isFocused ||
+            binding.btnQuickPro.isFocused ||
             binding.btnSkipIntro.isFocused
 
     private fun showPlaybackMenu() {

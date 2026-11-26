@@ -9,17 +9,32 @@ import android.view.WindowManager
 object SoftKeyboard {
     fun keepOffUntilAsked(activity: AppCompatActivity, field: EditText) {
         if (DeviceForm.isTouchPrimary(activity)) {
-            activity.window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE)
-            field.showSoftInputOnFocus = true
-            field.requestFocus()
-            field.post {
-                val imm = activity.getSystemService(InputMethodManager::class.java)
-                imm?.showSoftInput(field, 0)
-            }
+            show(activity, field)
             return
         }
         activity.window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN)
         field.showSoftInputOnFocus = false
+    }
+
+    fun show(activity: AppCompatActivity, field: EditText) {
+        val touch = DeviceForm.isTouchPrimary(activity)
+        activity.window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE)
+        field.showSoftInputOnFocus = true
+        field.isFocusable = true
+        field.isFocusableInTouchMode = true
+        field.requestFocus()
+        field.post {
+            val imm = activity.getSystemService(InputMethodManager::class.java)
+            val flag = if (touch) {
+                0
+            } else {
+                @Suppress("DEPRECATION")
+                InputMethodManager.SHOW_FORCED
+            }
+            imm?.showSoftInput(field, flag)
+            WindowCompat.getInsetsController(activity.window, field)
+                .show(androidx.core.view.WindowInsetsCompat.Type.ime())
+        }
     }
 
     fun showWhenFocused(activity: AppCompatActivity, field: EditText) {

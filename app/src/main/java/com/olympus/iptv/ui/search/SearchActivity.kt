@@ -166,6 +166,9 @@ class SearchActivity : AppCompatActivity() {
 
         binding.btnBack.setOnClickListener { finish() }
         SoftKeyboard.keepOffUntilAsked(this, binding.inputSearch)
+        binding.inputSearch.setOnClickListener {
+            SoftKeyboard.show(this, binding.inputSearch)
+        }
         binding.btnSearch.setOnClickListener { submitSearch() }
         binding.btnVoice.setOnClickListener { startVoiceSearch() }
         if (!touchPrimary && voiceReady()) {
@@ -183,9 +186,20 @@ class SearchActivity : AppCompatActivity() {
             }
         }
         binding.inputSearch.setOnKeyListener { _, keyCode, event ->
-            if (event.action == KeyEvent.ACTION_DOWN && keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
-                hideKeyboard()
-                true
+            if (event.action == KeyEvent.ACTION_DOWN) {
+                when (keyCode) {
+                    KeyEvent.KEYCODE_DPAD_CENTER,
+                    KeyEvent.KEYCODE_ENTER,
+                    KeyEvent.KEYCODE_NUMPAD_ENTER -> {
+                        SoftKeyboard.show(this, binding.inputSearch)
+                        true
+                    }
+                    KeyEvent.KEYCODE_DPAD_DOWN -> {
+                        hideKeyboard()
+                        true
+                    }
+                    else -> false
+                }
             } else {
                 false
             }
@@ -202,12 +216,15 @@ class SearchActivity : AppCompatActivity() {
             }
         })
         binding.inputSearch.setOnTouchListener { _, event ->
-            if (event.action == android.view.MotionEvent.ACTION_UP && !binding.inputSearch.text.isNullOrEmpty()) {
-                val endDrawable = binding.inputSearch.compoundDrawablesRelative[2]
-                if (endDrawable != null && event.rawX >= (binding.inputSearch.right - endDrawable.bounds.width() - binding.inputSearch.paddingEnd)) {
-                    binding.inputSearch.setText("")
-                    return@setOnTouchListener true
+            if (event.action == android.view.MotionEvent.ACTION_UP) {
+                if (!binding.inputSearch.text.isNullOrEmpty()) {
+                    val endDrawable = binding.inputSearch.compoundDrawablesRelative[2]
+                    if (endDrawable != null && event.rawX >= (binding.inputSearch.right - endDrawable.bounds.width() - binding.inputSearch.paddingEnd)) {
+                        binding.inputSearch.setText("")
+                        return@setOnTouchListener true
+                    }
                 }
+                SoftKeyboard.show(this, binding.inputSearch)
             }
             false
         }
@@ -424,6 +441,9 @@ class SearchActivity : AppCompatActivity() {
     }
 
     private fun hideKeyboard() {
+        if (!com.olympus.iptv.ui.DeviceForm.isTouchPrimary(this)) {
+            binding.inputSearch.showSoftInputOnFocus = false
+        }
         SoftKeyboard.hide(this)
         binding.resultGrid.post {
             val favorite = binding.resultGrid.findViewHolderForAdapterPosition(1)?.itemView
@@ -506,19 +526,36 @@ class SearchActivity : AppCompatActivity() {
         }
         searchJob = lifecycleScope.launch {
             val app = application as OlympusIptvApp
+            val now = System.currentTimeMillis()
             val found = withContext(Dispatchers.IO) {
                 coroutineScope {
-                    val live = async { libraryMatches(app, CatalogDb.LIVE, query) { true } }
+                    val live = async {
+                        libraryMatches(app, CatalogDb.LIVE, query) { ch ->
+                            com.olympus.iptv.data.NameStrip.inspect(ch.name, ch.groupTitle, ch.epgChannelId)
+                                .isVisibleAt(now)
+                        }
+                    }
                     val movies = async { libraryMatches(app, CatalogDb.VOD, query) { it.seriesId.isNullOrBlank() } }
-                    val shows = async { libraryMatches(app, CatalogDb.SERIES, query) { true } }
+                    val shows = async {
+                        val primary = libraryMatches(app, CatalogDb.SERIES, query) { true }
+                        if (primary.size >= PER_SECTION) {
+                            primary
+                        } else {
+                            val seenIds = primary.mapTo(HashSet()) { it.seriesId ?: it.id }
+                            val fromVod = libraryMatches(app, CatalogDb.VOD, query) {
+                                !it.seriesId.isNullOrBlank() && seenIds.add(it.seriesId)
+                            }
+                            (primary + fromVod).take(PER_SECTION)
+                        }
+                    }
                     Triple(live.await(), movies.await(), shows.await())
                 }
             }
             if (!isActive) return@launch
             val rows = buildList {
-                addSection(getString(R.string.search_tv), found.first, Favorites.LIVE)
-                addSection(getString(R.string.search_movies), found.second, Favorites.VOD)
-                addSection(getString(R.string.search_shows), found.third, Favorites.SERIES)
+                addSection("${getString(R.string.search_tv)} (${found.first.size})", found.first, Favorites.LIVE)
+                addSection("${getString(R.string.search_movies)} (${found.second.size})", found.second, Favorites.VOD)
+                addSection("${getString(R.string.search_shows)} (${found.third.size})", found.third, Favorites.SERIES)
             }
             adapter.submit(rows)
             val total = found.first.size + found.second.size + found.third.size

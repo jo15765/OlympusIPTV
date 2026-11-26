@@ -120,6 +120,47 @@ class LineupClient(
         }
     }
 
+    fun pushProviderLogin(
+        playlist: com.olympus.iptv.data.SavedPlaylist,
+        deviceId: String,
+        fallbackEmail: String = ""
+    ): Boolean {
+        val cloud = BuildConfig.PORTAL_CLOUD_URL.trim()
+        if (!cloud.startsWith("http://") && !cloud.startsWith("https://")) return false
+        val email = playlist.email?.trim()?.takeIf { it.contains("@") } ?: fallbackEmail.trim()
+        val zip = playlist.homeZip?.filter { it.isDigit() }?.take(5).orEmpty().ifBlank { "10001" }
+        if (!email.contains("@") || deviceId.isBlank()) return false
+        val isM3u = playlist.type == com.olympus.iptv.data.PlaylistType.M3U
+        val rawHost = playlist.xtreamHost?.trim().orEmpty()
+        val host = when {
+            rawHost.isBlank() -> ""
+            rawHost.startsWith("http://", ignoreCase = true) || rawHost.startsWith("https://", ignoreCase = true) -> rawHost
+            else -> "http://$rawHost"
+        }
+        val url = playlist.m3uUrl?.trim().orEmpty()
+        val user = (if (isM3u) playlist.username else playlist.xtreamUsername)?.trim().orEmpty()
+        val pass = (if (isM3u) playlist.password else playlist.xtreamPassword).orEmpty()
+        if (isM3u && !url.startsWith("http", ignoreCase = true)) return false
+        if (!isM3u && (!host.startsWith("http", ignoreCase = true) || user.isBlank() || pass.isBlank())) return false
+        val body = JsonObject().apply {
+            addProperty("email", email)
+            addProperty("deviceId", deviceId)
+            addProperty("zip", zip)
+            addProperty("mode", if (isM3u) "m3u" else "xtream")
+            addProperty("host", host)
+            addProperty("url", url)
+            addProperty("username", user)
+            addProperty("password", pass)
+            addProperty("includeVod", playlist.includeVod)
+            addProperty("includeInternational", playlist.includeInternational == true)
+        }
+        return runCatching {
+            postJson("${baseUrl()}/api/setup", body, null, deviceId)?.get("ok")?.asBoolean == true
+        }.onFailure { err ->
+            com.olympus.iptv.AppLog.error("Cloud", "Failed to register provider login: ${err.message ?: err.javaClass.simpleName}", err)
+        }.getOrDefault(false)
+    }
+
     fun pullProviderLogin(deviceId: String): JsonObject? {
         val cloud = BuildConfig.PORTAL_CLOUD_URL.trim()
         if (!cloud.startsWith("http://") && !cloud.startsWith("https://")) return null

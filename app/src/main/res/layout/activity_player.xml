@@ -393,7 +393,7 @@
             android:layout_height="48dp"
             android:background="@drawable/bg_button"
             android:focusable="true"
-            android:nextFocusLeft="@id/btnAudio"
+            android:nextFocusLeft="@id/btnMenuBack"
             android:nextFocusRight="@id/btnSubtitles"
             android:nextFocusUp="@id/btnAudio"
             android:nextFocusDown="@id/btnAudio"

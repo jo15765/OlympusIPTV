@@ -1,10 +1,7 @@
-
-# Gradle
+# Gradle & Kotlin
 .gradle/
 build/
 **/build/
-
-# Kotlin
 .kotlin/
 
 # Android Studio / IntelliJ
@@ -12,29 +9,44 @@ build/
 *.iml
 local.properties
 
-# Android build output
+# Android build output & packages
 captures/
 .externalNativeBuild/
 .cxx/
-
-# Generated files
 *.apk
 *.aab
 
-# Signing credentials
+# Signing credentials & certificates
 *.jks
 *.keystore
+*.pem
+*.key
+*.crt
+*.p12
 keystore.properties
+signing.properties
 
-# Environment variables and secrets
+# Environment variables & secrets (root and cloud-api)
 .env
 .env.*
+**/.env
+**/.env.*
 !.env.example
+!**/.env.example
+
+# Node.js / Cloud API runtime artifacts & local data dumps
+node_modules/
+**/node_modules/
+cloud-api/data/
+cloud-api/certs/
+cloud-api/public/
+cloud-api/*.log
+npm-debug.log*
 
 # OS files
 .DS_Store
 Thumbs.db
 
-# Local portal snapshots are not source. Keep clones and archives small.
+# Local portal snapshots & archives
 portal/data/*.json
 olympus-source.zip

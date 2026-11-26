@@ -1365,12 +1365,21 @@ internal fun BrowseActivity.hostDispatchKey(event: KeyEvent): Boolean {
             when (event.keyCode) {
                 KeyEvent.KEYCODE_DPAD_RIGHT -> {
                     if (panes.isVpnVisible()) panes.vpnBack.requestFocus()
-                    else if (panes.isAdminVisible()) panes.cardAdminRefresh.requestFocus()
+                    else if (panes.isAdminVisible()) {
+                        val toolsBack = panes.adminRoot?.findViewById<View>(R.id.adminToolsBack)
+                        if (toolsBack != null && toolsBack.visibility == View.VISIBLE && toolsBack.isShown) {
+                            toolsBack.requestFocus()
+                        } else {
+                            panes.cardAdminRefresh.requestFocus()
+                        }
+                    }
                     else if (panes.isDeviceVisible()) panes.deviceBack.requestFocus()
                     else if (panes.isRefreshVisible()) panes.refreshNowCard.requestFocus()
                     else if (binding.groupColumn.visibility == View.VISIBLE) {
                         showMenu(GuideMenu.GROUPS)
                         focusGroups()
+                    } else if (binding.contentColumn.visibility == View.VISIBLE) {
+                        focusChannelPane()
                     }
                     return true
                 }
@@ -1522,8 +1531,12 @@ internal fun BrowseActivity.hostDispatchKey(event: KeyEvent): Boolean {
                 }
                 KeyEvent.KEYCODE_DPAD_DOWN -> {
                     if (pos >= 0 && total > 0) {
-                        val nextPos = pos + span
-                        if (nextPos < total) {
+                        val nextPos = when {
+                            pos + span < total -> pos + span
+                            pos / span < (total - 1) / span -> total - 1
+                            else -> -1
+                        }
+                        if (nextPos >= 0) {
                             binding.categoryList.scrollToPosition(nextPos)
                             binding.categoryList.post {
                                 binding.categoryList.findViewHolderForAdapterPosition(nextPos)?.itemView?.requestFocus()
@@ -2099,11 +2112,25 @@ internal suspend fun BrowseActivity.fetchGuidePrograms(saved: SavedPlaylist, cha
                     selectedCategoryId != null &&
                     selectedCategoryId != PlaylistLoader.FAVORITES_ID
                 ) {
+                    val catId = selectedCategoryId
                     visibleChannels.removeAll { it.id == id }
                     channelAdapter.remove(id)
                     programAdapter.submit(visibleChannels)
+                    if (catId != null) {
+                        val updated = HashMap(groupCounts)
+                        val nextCount = if (pageExhausted || visibleChannels.isEmpty()) {
+                            visibleChannels.size
+                        } else {
+                            ((updated[catId] ?: visibleChannels.size) - 1).coerceAtLeast(visibleChannels.size)
+                        }
+                        if (nextCount > 0) updated[catId] = nextCount else updated.remove(catId)
+                        groupCounts = updated
+                        groupCountCache.clear()
+                        categoryAdapter.refreshDetails()
+                    }
                     if (visibleChannels.isEmpty()) {
                         finishChannelPane(emptyList())
+                        if (hideEmptyGroups) render(restoreFocus = false, reloadChannels = false)
                     }
                     return@forEach
                 }

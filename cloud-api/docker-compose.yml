@@ -1,0 +1,102 @@
+services:
+  olympus-api:
+    build: .
+    container_name: olympus-cloud-api
+    restart: unless-stopped
+    command: ["node", "server.js"]
+    mem_limit: 512m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      DATABASE_URL: ${DATABASE_URL:-}
+      PGHOST: ${PGHOST:-postgres}
+      PGPORT: ${PGPORT:-5432}
+      PGDATABASE: ${PGDATABASE:-clearcast_iptv}
+      PGUSER: ${PGUSER:-postgres}
+      PGPASSWORD: ${PGPASSWORD:-}
+      PGSSLMODE: ${PGSSLMODE:-require}
+      PGSSLCA: ${PGSSLCA:-}
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      TRUST_PROXY: ${TRUST_PROXY:-1}
+      STRICT_DEVICE_TOKENS: ${STRICT_DEVICE_TOKENS:-false}
+      API_SECRET_KEY: ${API_SECRET_KEY:-}
+      CREDENTIALS_KEY: ${CREDENTIALS_KEY:-}
+      ENABLE_WEB_DASHBOARD: ${ENABLE_WEB_DASHBOARD:-false}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - "${BIND_HOST:-127.0.0.1}:${PUBLISH_PORT:-8443}:3000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  olympus-worker:
+    build: .
+    container_name: olympus-ingestion-worker
+    restart: unless-stopped
+    command: ["node", "worker.js"]
+    mem_limit: 512m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL:-}
+      PGHOST: ${PGHOST:-postgres}
+      PGPORT: ${PGPORT:-5432}
+      PGDATABASE: ${PGDATABASE:-clearcast_iptv}
+      PGUSER: ${PGUSER:-postgres}
+      PGPASSWORD: ${PGPASSWORD:-}
+      PGSSLMODE: ${PGSSLMODE:-require}
+      PGSSLCA: ${PGSSLCA:-}
+      CREDENTIALS_KEY: ${CREDENTIALS_KEY:-}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      olympus-api:
+        condition: service_healthy
+
+  # Optional local PostgreSQL for all-in-one self-hosting:
+  # Run with: docker compose --profile local-db up -d --build
+  postgres:
+    image: postgres:16-alpine
+    container_name: olympus-postgres
+    profiles: ["local-db"]
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${PGDATABASE:-clearcast_iptv}
+      POSTGRES_USER: ${PGUSER:-postgres}
+      POSTGRES_PASSWORD: ${PGPASSWORD:-change_me_local_pg}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PGUSER:-postgres} -d ${PGDATABASE:-clearcast_iptv}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:

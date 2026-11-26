@@ -14,12 +14,42 @@ object NameStrip {
             if (!isEventSlot) return true
             if (eventStartMs == 0L) return false
             if (eventStartMs < 0L) return true
-            return now >= (eventStartMs - PRE_EVENT_WINDOW_MS) && now < eventEndMs
+            return now >= (eventStartMs - PRE_EVENT_WINDOW_MS) && now < (eventEndMs + POST_EVENT_GRACE_MS)
         }
     }
 
-    const val PRE_EVENT_WINDOW_MS = 30L * 60L * 1000L
-    private const val DEFAULT_EVENT_DURATION_MS = 3L * 60L * 60L * 1000L
+    const val PRE_EVENT_WINDOW_MS = 15L * 60L * 1000L
+    const val POST_EVENT_GRACE_MS = 30L * 60L * 1000L
+    private const val DEFAULT_EVENT_DURATION_MS = 165L * 60L * 1000L
+    private const val BASKETBALL_EVENT_DURATION_MS = 135L * 60L * 1000L
+    private const val SOCCER_EVENT_DURATION_MS = 130L * 60L * 1000L
+    private const val HIGH_SCHOOL_EVENT_DURATION_MS = 120L * 60L * 1000L
+    private const val SHORT_EVENT_DURATION_MS = 90L * 60L * 1000L
+
+    private val LEADING_REGION_PREFIX = Regex("^(?:[A-Z]{2,3}|INTL|LATAM|EURO|ENG|ESP|FRE|GER)\\s*[|:]\\s+", RegexOption.IGNORE_CASE)
+
+    private fun stripLeadingRegionPrefix(text: String): String {
+        val m = LEADING_REGION_PREFIX.find(text) ?: return text
+        val rest = text.substring(m.range.last + 1).trimStart()
+        return if (rest.contains(':') || rest.contains('|') || rest.contains('@')) rest else text
+    }
+
+    internal fun eventDurationMs(title: String?, rawChannel: String? = null): Long {
+        val lower = "${title.orEmpty()} ${rawChannel.orEmpty()}".lowercase()
+        return when {
+            "press conference" in lower || "weigh-in" in lower || "weigh in" in lower || "open mic" in lower ->
+                SHORT_EVENT_DURATION_MS
+            "nfhs" in lower || "high school" in lower || "junior varsity" in lower || "sophomore" in lower || "freshman" in lower ->
+                HIGH_SCHOOL_EVENT_DURATION_MS
+            "dazn" in lower || "fanatiz" in lower || "soccer" in lower || "premier league" in lower ||
+                "champions league" in lower || "mls" in lower || "nwsl" in lower || "efl" in lower ||
+                "fa cup" in lower || "laliga" in lower || "serie a" in lower || "bundesliga" in lower ->
+                SOCCER_EVENT_DURATION_MS
+            "ncaab" in lower || "ncaaw" in lower || "basketball" in lower || "espn+" in lower || "disney+" in lower ->
+                BASKETBALL_EVENT_DURATION_MS
+            else -> DEFAULT_EVENT_DURATION_MS
+        }
+    }
 
     val sanitizeStreams = listOf(
         "USA", "US:", "HD", "GA | Atlanta |", "Big10+", "BLKET:", "DAZN US", "Dirtvision",
@@ -151,20 +181,22 @@ object NameStrip {
             }
         }
 
-        val rawColonIdx = ch.indexOf(':')
+        val strippedCh = stripLeadingRegionPrefix(ch)
+        val pipeAfterStrip = strippedCh.indexOf('|')
+        val rawColonIdx = strippedCh.indexOf(':')
         val colonIdx = if (rawColonIdx > 0 &&
-            rawColonIdx + 1 < ch.length &&
-            ch[rawColonIdx - 1].isDigit() &&
-            ch[rawColonIdx + 1].isDigit()
+            rawColonIdx + 1 < strippedCh.length &&
+            strippedCh[rawColonIdx - 1].isDigit() &&
+            strippedCh[rawColonIdx + 1].isDigit()
         ) -1 else rawColonIdx
         val sepIdx = when {
-            colonIdx > 0 && (firstPipe < 0 || colonIdx < firstPipe) -> colonIdx
-            firstPipe > 0 -> firstPipe
+            colonIdx > 0 && (pipeAfterStrip < 0 || colonIdx < pipeAfterStrip) -> colonIdx
+            pipeAfterStrip > 0 -> pipeAfterStrip
             else -> -1
         }
         if (sepIdx > 0) {
-            val left = ch.substring(0, sepIdx).trim()
-            val rightRaw = ch.substring(sepIdx + 1).trim()
+            val left = strippedCh.substring(0, sepIdx).trim()
+            val rightRaw = strippedCh.substring(sepIdx + 1).trim()
             val endsWithDigits = left.isNotEmpty() && left.last().isDigit() && left.any { it.isLetter() }
             val inlineStartMs = DummyEpg.parseEventStartMillis(rightRaw)
             if (endsWithDigits || inlineStartMs != null) {
@@ -172,11 +204,12 @@ object NameStrip {
                 val atIdx = rightRaw.lastIndexOf('@')
                 val inlineEvent = (if (atIdx > 0) rightRaw.substring(0, atIdx) else rightRaw)
                     .trim(' ', '-', ':', '|', '–', '—')
+                val durationMs = eventDurationMs(inlineEvent, rawChannel)
                 val parsedStart = inlineStartMs ?: nowStartMs
                 val parsedEnd = when {
-                    inlineStartMs != null && inlineStartMs > 0L -> inlineStartMs + DEFAULT_EVENT_DURATION_MS
+                    inlineStartMs != null && inlineStartMs > 0L -> inlineStartMs + durationMs
                     nowEndMs > parsedStart -> nowEndMs
-                    parsedStart > 0L -> parsedStart + DEFAULT_EVENT_DURATION_MS
+                    parsedStart > 0L -> parsedStart + durationMs
                     else -> 0L
                 }
                 if (!isPlaceholderEvent(inlineEvent)) {

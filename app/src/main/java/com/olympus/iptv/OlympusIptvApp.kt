@@ -252,6 +252,7 @@ class OlympusIptvApp : Application() {
     }
 
     @Volatile private var cloudLoginRevision = -1L
+    @Volatile private var pushedLocalLogin = false
     private val cloudPull = Mutex()
     private val cloudStamps = HashMap<String, Long>()
 
@@ -293,6 +294,15 @@ class OlympusIptvApp : Application() {
             val saved = runCatching { playlistStore.session.first() }.getOrNull() ?: return
             val email = saved.email?.trim().orEmpty()
             if (email.isBlank()) return
+            if (loginRev == 0L && !pushedLocalLogin) {
+                val pushed = kotlinx.coroutines.withContext(Dispatchers.IO) {
+                    client.pushProviderLogin(saved, deviceId, email)
+                }
+                if (pushed) {
+                    pushedLocalLogin = true
+                    cloudStamps.remove("login")
+                }
+            }
             val lineupRev = number("lineup")
             val prevLineupRev = cloudStamps["lineup"]
             if (prevLineupRev != lineupRev) {

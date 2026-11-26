@@ -7,33 +7,49 @@ import java.util.Locale
 import java.util.TimeZone
 
 object DummyEpg {
-    private const val EVENT_MS = 3L * 60 * 60 * 1000
+    private const val EVENT_MS = 165L * 60 * 1000
     private const val UPCOMING_MS = 36L * 60 * 60 * 1000
     private const val ENDED_MS = 6L * 60 * 60 * 1000
     private const val DAY_MS = 24L * 60 * 60 * 1000
 
+    private val isoDateTime = Regex(
+        """\b(\d{4})-(\d{2})-(\d{2})[T\s]+(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?\s*([A-Za-z]{2,10})?""",
+        RegexOption.IGNORE_CASE
+    )
     private val atTime = Regex(
-        """@\s+(\d{1,2})\s+([A-Za-z]{3,9})(?:,?\s+(\d{4}))?\s+(\d{1,2}):(\d{2})\s*(AM|PM)?\s*([A-Za-z]{2,4})?""",
+        """@\s*(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3,9})(?:,?\s+(\d{4}))?[\s,\-|]+(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?\s*([A-Za-z]{2,10})?""",
         RegexOption.IGNORE_CASE
     )
     private val atMonthDay = Regex(
-        """@\s+([A-Za-z]{3,9})\s+(\d{1,2})(?:,?\s+(\d{4}))?\s+(\d{1,2}):(\d{2})\s*(AM|PM)?\s*([A-Za-z]{2,4})?""",
+        """@\s*([A-Za-z]{3,9})\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s+(\d{4}))?[\s,\-|]+(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?\s*([A-Za-z]{2,10})?""",
         RegexOption.IGNORE_CASE
     )
     private val atNumericDate = Regex(
-        """@\s+(\d{1,2})[./](\d{1,2})(?:[./](\d{2,4}))?\s+(\d{1,2}):(\d{2})\s*(AM|PM)?\s*([A-Za-z]{2,4})?""",
+        """@\s*(\d{1,2})[./\-](\d{1,2})(?:[./\-](\d{2,4}))?[\s,\-|]+(\d{1,2}):(\d{2})\s*(AM|PM)?\s*([A-Za-z]{2,10})?""",
         RegexOption.IGNORE_CASE
     )
     private val parenDot = Regex(
-        """\(\s*(\d{1,2})[./](\d{1,2})(?:[./](\d{2,4}))?\s+(\d{1,2}):(\d{2})\s*(AM|PM)?\s*([A-Za-z]{2,4})?\s*\)""",
+        """\(\s*(\d{1,2})[./\-](\d{1,2})(?:[./\-](\d{2,4}))?[\s,\-|]+(\d{1,2}):(\d{2})\s*(AM|PM)?\s*([A-Za-z]{2,10})?\s*\)""",
         RegexOption.IGNORE_CASE
     )
     private val parenMonth = Regex(
-        """\(\s*([A-Za-z]{3,9})\s+(\d{1,2})(?:\s+(\d{4}))?\s+(\d{1,2}):(\d{2})\s*(AM|PM)?\s*([A-Za-z]{2,4})?\s*\)""",
+        """\(\s*([A-Za-z]{3,9})\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s+(\d{4}))?[\s,\-|]+(\d{1,2}):(\d{2})\s*(AM|PM)?\s*([A-Za-z]{2,10})?\s*\)""",
         RegexOption.IGNORE_CASE
     )
     private val bareMonth = Regex(
-        """\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(\d{1,2})(?:,?\s+(\d{4}))?\s+(\d{1,2}):(\d{2})\s*(AM|PM)?\s*([A-Za-z]{2,4})?\s*$""",
+        """\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s+(\d{4}))?[\s,\-|]+(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?\s*([A-Za-z]{2,10})?""",
+        RegexOption.IGNORE_CASE
+    )
+    private val bareDayMonth = Regex(
+        """\b(\d{1,2})(?:st|nd|rd|th)?\s+(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)(?:,?\s+(\d{4}))?[\s,\-|]+(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?\s*([A-Za-z]{2,10})?""",
+        RegexOption.IGNORE_CASE
+    )
+    private val bareNumeric = Regex(
+        """\b(\d{1,2})[./\-](\d{1,2})(?:[./\-](\d{2,4}))?[\s,\-|]+(\d{1,2}):(\d{2})\s*(AM|PM)?\s*([A-Za-z]{2,10})?""",
+        RegexOption.IGNORE_CASE
+    )
+    private val timeOnly = Regex(
+        """(?:@\s*|\b)(\d{1,2}):(\d{2})\s*(AM|PM)\s*(ET|EST|EDT|CT|CST|CDT|MT|MST|MDT|PT|PST|PDT|GMT|UTC|UK|BST|CET|CEST|LONDON)?\b""",
         RegexOption.IGNORE_CASE
     )
     private val indexPrefix = Regex("""^[A-Za-z][A-Za-z0-9 &'+\-]{0,24}\s+\d{1,4}\s*[:|\-–—]\s*""")
@@ -61,14 +77,14 @@ object DummyEpg {
     )
 
     fun programs(channelName: String, now: Long = System.currentTimeMillis()): List<EpgProgram> =
-        fromParsed(parse(channelName, now), now)
+        fromParsed(parse(channelName, now), channelName, now)
 
     fun titled(channelName: String, now: Long = System.currentTimeMillis()): Pair<String, List<EpgProgram>> {
         val parsed = parse(channelName, now)
-        return parsed.title to fromParsed(parsed, now)
+        return parsed.title to fromParsed(parsed, channelName, now)
     }
 
-    private fun fromParsed(parsed: Parsed, now: Long): List<EpgProgram> {
+    private fun fromParsed(parsed: Parsed, rawChannel: String, now: Long): List<EpgProgram> {
         val title = parsed.title
         val start = parsed.startMillis
         if (start == null) {
@@ -78,12 +94,17 @@ object DummyEpg {
                 EpgProgram(title, day + DAY_MS, day + 2 * DAY_MS)
             )
         }
-        val end = start + EVENT_MS
-        val thirtyMinMs = 30L * 60L * 1000L
+        val durationMs = com.olympus.iptv.data.NameStrip.eventDurationMs(title, rawChannel)
+        val end = start + durationMs
+        val hardEnd = end + com.olympus.iptv.data.NameStrip.POST_EVENT_GRACE_MS
+        val preWindow = com.olympus.iptv.data.NameStrip.PRE_EVENT_WINDOW_MS
         if (now in start until end) {
             return listOf(EpgProgram(title, start, end))
         }
-        if (start > now && start - now <= thirtyMinMs) {
+        if (now in end until hardEnd) {
+            return listOf(EpgProgram(title, start, hardEnd))
+        }
+        if (start > now && start - now <= preWindow) {
             return listOf(
                 EpgProgram("Starting soon: $title", now, start),
                 EpgProgram(title, start, end)
@@ -105,12 +126,16 @@ object DummyEpg {
     }
 
     private fun findTimed(text: String): MatchResult? =
-        atTime.find(text)
+        isoDateTime.find(text)
+            ?: atTime.find(text)
             ?: atMonthDay.find(text)
             ?: atNumericDate.find(text)
             ?: parenMonth.find(text)
             ?: parenDot.find(text)
             ?: bareMonth.find(text)
+            ?: bareDayMonth.find(text)
+            ?: bareNumeric.find(text)
+            ?: timeOnly.find(text)
 
     private fun parse(channelName: String, now: Long): Parsed {
         val raw = channelName.trim()
@@ -145,22 +170,30 @@ object DummyEpg {
 
     private fun matchStart(match: MatchResult, now: Long): Long? {
         val groups = match.groupValues
-        val head = match.value.trimStart()
-        return when (head.firstOrNull()) {
-            '@' -> when {
-                groups[1].toIntOrNull() != null && groups[2].toIntOrNull() != null ->
-                    stamp(monthNumber = groups[1], day = groups[2], year = groups[3], hour = groups[4], minute = groups[5], ampm = groups[6], zone = groups[7], now = now)
-                groups[1].toIntOrNull() != null ->
-                    stamp(day = groups[1], monthName = groups[2], year = groups[3], hour = groups[4], minute = groups[5], ampm = groups[6], zone = groups[7], now = now)
-                else ->
-                    stamp(day = groups[2], monthName = groups[1], year = groups[3], hour = groups[4], minute = groups[5], ampm = groups[6], zone = groups[7], now = now)
-            }
-            '(' -> if (groups[1].toIntOrNull() != null) {
-                stamp(monthNumber = groups[1], day = groups[2], year = groups[3], hour = groups[4], minute = groups[5], ampm = groups[6], zone = groups[7], now = now)
-            } else {
-                stamp(day = groups[2], monthName = groups[1], year = groups[3], hour = groups[4], minute = groups[5], ampm = groups[6], zone = groups[7], now = now)
-            }
-            else -> stamp(day = groups[2], monthName = groups[1], year = groups[3], hour = groups[4], minute = groups[5], ampm = groups[6], zone = groups[7], now = now)
+        if (groups.size == 5) {
+            val zoneId = zoneId(groups[4])
+            val clock = Calendar.getInstance(zoneId).apply { timeInMillis = now }
+            val hourNum = groups[1].toIntOrNull() ?: return null
+            val minNum = groups[2].toIntOrNull() ?: return null
+            clock.set(Calendar.HOUR_OF_DAY, to24(hourNum, groups[3]))
+            clock.set(Calendar.MINUTE, minNum)
+            clock.set(Calendar.SECOND, 0)
+            clock.set(Calendar.MILLISECOND, 0)
+            return clock.timeInMillis
+        }
+        val g1Num = groups[1].toIntOrNull()
+        val g2Num = groups[2].toIntOrNull()
+        val g3Num = groups[3].toIntOrNull()
+        val min = groups[5].ifBlank { "00" }
+        return when {
+            g1Num != null && g1Num >= 2000 && g2Num != null && g3Num != null ->
+                stamp(day = groups[3], monthNumber = groups[2], year = groups[1], hour = groups[4], minute = min, ampm = groups[6], zone = groups[7].ifBlank { "CET" }, now = now)
+            g1Num != null && g2Num != null ->
+                stamp(monthNumber = groups[1], day = groups[2], year = groups[3], hour = groups[4], minute = min, ampm = groups[6], zone = groups[7], now = now)
+            g1Num != null ->
+                stamp(day = groups[1], monthName = groups[2], year = groups[3], hour = groups[4], minute = min, ampm = groups[6], zone = groups[7], now = now)
+            else ->
+                stamp(day = groups[2], monthName = groups[1], year = groups[3], hour = groups[4], minute = min, ampm = groups[6], zone = groups[7], now = now)
         }
     }
 
@@ -203,13 +236,14 @@ object DummyEpg {
     private fun zoneId(token: String?): TimeZone {
         val key = token?.trim()?.uppercase(Locale.US).orEmpty()
         val id = when (key) {
-            "ET", "EST", "EDT" -> "America/New_York"
+            "ET", "EST", "EDT", "TORONTO" -> "America/New_York"
             "CT", "CST", "CDT" -> "America/Chicago"
             "MT", "MST", "MDT" -> "America/Denver"
             "PT", "PST", "PDT" -> "America/Los_Angeles"
             "AST", "ADT" -> "America/Halifax"
-            "UK", "BST", "WET", "WEST" -> "Europe/London"
-            "CET", "CEST" -> "Europe/Berlin"
+            "UK", "BST", "WET", "WEST", "LONDON", "DUBLIN", "LISBON" -> "Europe/London"
+            "CET", "CEST", "PARIS", "BERLIN", "MADRID", "ROME" -> "Europe/Berlin"
+            "SYDNEY" -> "Australia/Sydney"
             "GMT", "UTC" -> "UTC"
             else -> return TimeZone.getDefault()
         }

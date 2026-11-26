@@ -178,6 +178,13 @@ object CatalogIngest {
             return false
         }
         if (cloud.channels.isEmpty() && cloud.categories.isEmpty()) {
+            if (bucket == CatalogDb.LIVE) {
+                runCatching {
+                    withContext(Dispatchers.IO) {
+                        client.pushProviderLogin(playlist, deviceId, email)
+                    }
+                }
+            }
             report("Cloud $bucket catalog is empty, so the app is loading channels from the provider instead")
             return false
         }

@@ -1,3 +1,8 @@
-# Add this line to your existing root local.properties file
-# Point it to the machine/server running `node portal/server.js` (port 8443):
-portal.cloudUrl=http://YOUR_SERVER_OR_PC_IP:8443
+# Copy into your local (gitignored) `local.properties` file.
+#
+# Optional: Point the Android app to your self-hosted `cloud-api` instance
+# to enable 3-tier Cloud Sync, multi-device pairing, and background PostgreSQL ingestion.
+# Leave commented out to run ClearCast Tuner 100% standalone (local SQLite + LAN dashboard).
+#
+# portal.cloudUrl=https://your-cloud-api-domain.example.com
+# portal.apiKey=YOUR_OPTIONAL_API_SECRET_KEY
