@@ -56,9 +56,11 @@ object LineupApplier {
                 id != PlaylistLoader.ALL_ID &&
                     id != PlaylistLoader.FAVORITES_ID &&
                     id !in hiddenGroups &&
-                    !countryHidden(it.value.name, hiddenCountries, it.value.kind, config.includeInternational, null)
+                    (id == TwentyFourSeven.GROUP_ID ||
+                        id == AdultGroup.GROUP_ID ||
+                        !countryHidden(it.value.name, hiddenCountries, it.value.kind, config.includeInternational, null))
             }.sortedWith(
-                compareBy({ groupRank[it.value.id] ?: Int.MAX_VALUE }, { it.index })
+                compareBy({ it.value.id == AdultGroup.GROUP_ID }, { groupRank[it.value.id] ?: Int.MAX_VALUE }, { it.index })
             ).map { indexed ->
                 indexed.value.copy(name = GroupRename.shown(indexed.value.id, indexed.value.name, config))
             }
@@ -93,16 +95,18 @@ object LineupApplier {
                 category.id != PlaylistLoader.ALL_ID &&
                     category.id != PlaylistLoader.FAVORITES_ID &&
                     category.id !in hiddenGroups &&
-                    !countryHidden(
-                        category.name,
-                        hiddenCountries,
-                        category.kind,
-                        config.includeInternational,
-                        countries[category.id],
-                        countriesKnown
-                    )
+                    (category.id == TwentyFourSeven.GROUP_ID ||
+                        category.id == AdultGroup.GROUP_ID ||
+                        !countryHidden(
+                            category.name,
+                            hiddenCountries,
+                            category.kind,
+                            config.includeInternational,
+                            countries[category.id],
+                            countriesKnown
+                        ))
             }
-            .sortedWith(compareBy({ groupRank[it.value.id] ?: Int.MAX_VALUE }, { it.index }))
+            .sortedWith(compareBy({ it.value.id == AdultGroup.GROUP_ID }, { groupRank[it.value.id] ?: Int.MAX_VALUE }, { it.index }))
             .map { indexed ->
                 val name = GroupRename.shown(indexed.value.id, indexed.value.name, config)
                 if (name == indexed.value.name) indexed.value else indexed.value.copy(name = name)
@@ -176,6 +180,8 @@ object LineupApplier {
         if (includeInternational != true && inferred != null && inferred != "us") return true
         if (hiddenCountries.isEmpty()) return false
         if (inferred == null) {
+            if (TwentyFourSeven.is247(channel.name, channel.groupTitle)) return false
+            if (AdultGroup.isAdultGroup(channel.groupTitle)) return false
             return channel.kind == ContentKind.LIVE && CountryIndex.OTHER_ID in hiddenCountries
         }
         return inferred in hiddenCountries

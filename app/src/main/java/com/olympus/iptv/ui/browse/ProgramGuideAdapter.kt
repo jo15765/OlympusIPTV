@@ -359,7 +359,7 @@ class ProgramGuideAdapter(
                         channel = channel,
                         program = block.program,
                         title = com.olympus.iptv.data.ProFilters.maskSportsSpoilers(rawTitle, maskSports),
-                        time = block.program.guideClock.takeIf { it.isNotEmpty() },
+                        time = null,
                         left = block.left,
                         width = block.width,
                         slot = Slot(position, index)
@@ -495,12 +495,7 @@ class ProgramGuideAdapter(
                     .trim(' ', ':', '|', '-', '–', '—')
                     .ifBlank { stripped.trim(' ', ':', '|', '-', '–', '—') }
             }
-            val isFallback = isChannelFiller(title, com.olympus.iptv.data.NameStrip.shown(channel.name, channel.groupTitle))
-            if (isFallback) return clean
-            val now = System.currentTimeMillis()
-            val timing = EpgTiming.tag(now, program.startMillis, program.endMillis)
-            if (timing.isNullOrBlank()) return clean
-            return "$timing · $clean"
+            return clean
         }
 
         private fun label(

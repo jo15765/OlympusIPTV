@@ -12,13 +12,14 @@ const sslConfig = process.env.PGSSLMODE === "disable"
 
 const basePoolOpts = {
   ssl: sslConfig,
-  max: 15,
+  max: Number(process.env.PG_POOL_MAX || 15),
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 8000,
   statement_timeout: 25000,
   query_timeout: 30000,
   keepAlive: true,
   keepAliveInitialDelayMillis: 10000,
+  allowExitOnIdle: false,
   options: "-c idle_in_transaction_session_timeout=30000"
 };
 
@@ -136,6 +137,10 @@ async function verifyDeviceToken(accountId, deviceCode, presentedToken) {
     tokenHashCache.set(key, storedHash);
   }
   return timingSafeEqualHex(storedHash, sha256(presentedToken));
+}
+
+function evictDeviceToken(accountId, deviceCode) {
+  tokenHashCache.delete(`${accountId}:${deviceCode}`);
 }
 
 async function claimPairingCode(pairingCode) {
@@ -913,6 +918,7 @@ module.exports = {
   registerDevice,
   rotateDeviceToken,
   verifyDeviceToken,
+  evictDeviceToken,
   claimPairingCode,
   setSharedMode,
   getLineup,

@@ -1,7 +1,11 @@
 const crypto = require("crypto");
+const { LRUCache } = require("lru-cache");
 const security = require("./security");
 
 const activeRelays = new Map();
+const exportCache = new LRUCache({ max: 16, ttl: 60 * 1000, maxSize: 32 * 1024 * 1024, sizeCalculation: (v) => Buffer.byteLength(v, "utf8") + 64 });
+const MAX_PROXY_RELAYS = Math.max(1, Number(process.env.MAX_PROXY_RELAYS || 20));
+const MAX_CLIENTS_PER_RELAY = Math.max(1, Number(process.env.MAX_CLIENTS_PER_RELAY || 10));
 const HDHR_ENABLED = String(process.env.ENABLE_HDHR || "false").toLowerCase() === "true";
 const PROXY_ENABLED = String(process.env.ENABLE_STREAM_PROXY || "false").toLowerCase() === "true";
 const HDHR_DEVICE_ID = String(process.env.HDHR_DEVICE_ID || "CC202601").replace(/[^0-9A-Fa-f]/g, "").slice(0, 8) || "CC202601";
@@ -157,6 +161,7 @@ function registerDispatchRoutes(app, { db, requireDeviceAuth, liveEventWindowBou
           updatedAt: r.updated_at
         };
       });
+      res.setHeader("Cache-Control", "no-store");
       res.json({ ok: true, providers: safe });
     } catch (err) {
       res.status(500).json({ error: err.message });
@@ -234,28 +239,35 @@ function registerDispatchRoutes(app, { db, requireDeviceAuth, liveEventWindowBou
 
   app.get("/api/export/playlist.m3u", requireDeviceAuth, async (req, res) => {
     try {
-      const channels = await loadFilteredLiveChannels(db, req.auth.account.id, req.auth.deviceId, liveEventWindowBounds);
-      const base = `${req.protocol}://${req.get("host")}`;
       const useProxy = PROXY_ENABLED && String(req.query.proxy || "") === "1";
-      const lines = ["#EXTM3U"];
-      for (const ch of channels) {
-        const attrs = [
-          `tvg-id="${String(ch.epg_channel_id || ch.id).replace(/"/g, "")}"`,
-          `tvg-name="${String(ch.displayName).replace(/"/g, "")}"`,
-          ch.logo_url ? `tvg-logo="${String(ch.logo_url).replace(/"/g, "")}"` : "",
-          `group-title="${String(ch.displayGroup).replace(/"/g, "")}"`,
-          ch.tv_archive ? `catchup="xc" catchup-days="${ch.tv_archive_duration || 3}"` : ""
-        ].filter(Boolean).join(" ");
-        lines.push(`#EXTINF:-1 ${attrs},${ch.displayName}`);
-        if (useProxy) {
-          lines.push(`${base}/api/proxy/stream/${encodeURIComponent(ch.id)}?email=${encodeURIComponent(req.auth.account.email)}&deviceId=${encodeURIComponent(req.auth.deviceId)}`);
-        } else {
-          lines.push(ch.stream_url);
+      const cacheKey = `m3u:${req.auth.account.id}:${req.auth.deviceId}:${useProxy ? 1 : 0}`;
+      let body = exportCache.get(cacheKey);
+      if (!body) {
+        const channels = await loadFilteredLiveChannels(db, req.auth.account.id, req.auth.deviceId, liveEventWindowBounds);
+        const base = `${req.protocol}://${req.get("host")}`;
+        const lines = ["#EXTM3U"];
+        for (const ch of channels) {
+          const attrs = [
+            `tvg-id="${String(ch.epg_channel_id || ch.id).replace(/"/g, "")}"`,
+            `tvg-name="${String(ch.displayName).replace(/"/g, "")}"`,
+            ch.logo_url ? `tvg-logo="${String(ch.logo_url).replace(/"/g, "")}"` : "",
+            `group-title="${String(ch.displayGroup).replace(/"/g, "")}"`,
+            ch.tv_archive ? `catchup="xc" catchup-days="${ch.tv_archive_duration || 3}"` : ""
+          ].filter(Boolean).join(" ");
+          lines.push(`#EXTINF:-1 ${attrs},${ch.displayName}`);
+          if (useProxy) {
+            lines.push(`${base}/api/proxy/stream/${encodeURIComponent(ch.id)}?email=${encodeURIComponent(req.auth.account.email)}&deviceId=${encodeURIComponent(req.auth.deviceId)}`);
+          } else {
+            lines.push(ch.stream_url);
+          }
         }
+        body = lines.join("\n") + "\n";
+        exportCache.set(cacheKey, body);
       }
       res.setHeader("Content-Type", "audio/x-mpegurl; charset=utf-8");
       res.setHeader("Content-Disposition", 'inline; filename="clearcast-playlist.m3u"');
-      res.send(lines.join("\n") + "\n");
+      res.setHeader("Cache-Control", "private, max-age=60");
+      res.send(body);
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
@@ -263,29 +275,36 @@ function registerDispatchRoutes(app, { db, requireDeviceAuth, liveEventWindowBou
 
   app.get("/api/export/epg.xml", requireDeviceAuth, async (req, res) => {
     try {
-      const nowMs = Date.now();
-      const [channels, epgRes] = await Promise.all([
-        loadFilteredLiveChannels(db, req.auth.account.id, req.auth.deviceId, liveEventWindowBounds),
-        db.pool.query(
-          `SELECT channel_id, title, start_millis, end_millis, description
-           FROM cloud_epg
-           WHERE account_id = $1 AND (device_code = $2 OR device_code = '__shared__')
-             AND end_millis > $3 AND start_millis < $4
-           ORDER BY channel_id, start_millis`,
-          [req.auth.account.id, req.auth.deviceId, nowMs - 24 * 3600 * 1000, nowMs + 48 * 3600 * 1000]
-        )
-      ]);
-      const parts = ['<?xml version="1.0" encoding="UTF-8"?>', '<tv generator-info-name="ClearCast-Tuner">'];
-      for (const ch of channels) {
-        const cid = escapeXml(ch.epg_channel_id || ch.id);
-        parts.push(`  <channel id="${cid}"><display-name>${escapeXml(ch.displayName)}</display-name>${ch.logo_url ? `<icon src="${escapeXml(ch.logo_url)}"/>` : ""}</channel>`);
+      const cacheKey = `xmltv:${req.auth.account.id}:${req.auth.deviceId}`;
+      let xml = exportCache.get(cacheKey);
+      if (!xml) {
+        const nowMs = Date.now();
+        const [channels, epgRes] = await Promise.all([
+          loadFilteredLiveChannels(db, req.auth.account.id, req.auth.deviceId, liveEventWindowBounds),
+          db.pool.query(
+            `SELECT channel_id, title, start_millis, end_millis, description
+             FROM cloud_epg
+             WHERE account_id = $1 AND (device_code = $2 OR device_code = '__shared__')
+               AND end_millis > $3 AND start_millis < $4
+             ORDER BY channel_id, start_millis`,
+            [req.auth.account.id, req.auth.deviceId, nowMs - 24 * 3600 * 1000, nowMs + 48 * 3600 * 1000]
+          )
+        ]);
+        const parts = ['<?xml version="1.0" encoding="UTF-8"?>', '<tv generator-info-name="ClearCast-Tuner">'];
+        for (const ch of channels) {
+          const cid = escapeXml(ch.epg_channel_id || ch.id);
+          parts.push(`  <channel id="${cid}"><display-name>${escapeXml(ch.displayName)}</display-name>${ch.logo_url ? `<icon src="${escapeXml(ch.logo_url)}"/>` : ""}</channel>`);
+        }
+        for (const p of epgRes.rows) {
+          parts.push(`  <programme start="${formatXmltvDate(p.start_millis)}" stop="${formatXmltvDate(p.end_millis)}" channel="${escapeXml(p.channel_id)}"><title>${escapeXml(p.title)}</title>${p.description ? `<desc>${escapeXml(p.description)}</desc>` : ""}</programme>`);
+        }
+        parts.push("</tv>");
+        xml = parts.join("\n");
+        exportCache.set(cacheKey, xml);
       }
-      for (const p of epgRes.rows) {
-        parts.push(`  <programme start="${formatXmltvDate(p.start_millis)}" stop="${formatXmltvDate(p.end_millis)}" channel="${escapeXml(p.channel_id)}"><title>${escapeXml(p.title)}</title>${p.description ? `<desc>${escapeXml(p.description)}</desc>` : ""}</programme>`);
-      }
-      parts.push("</tv>");
       res.setHeader("Content-Type", "application/xml; charset=utf-8");
-      res.send(parts.join("\n"));
+      res.setHeader("Cache-Control", "private, max-age=60");
+      res.send(xml);
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
@@ -304,6 +323,7 @@ function registerDispatchRoutes(app, { db, requireDeviceAuth, liveEventWindowBou
       const pass = encodeURIComponent(login.password || login.xtreamPassword || "");
       const startStr = formatXtreamStart(startMs);
       const url = `${host}/timeshift/${user}/${pass}/${durationMin}/${startStr}/${encodeURIComponent(channelId)}.ts`;
+      res.setHeader("Cache-Control", "no-store");
       res.json({ ok: true, url, start: startStr, durationMin });
     } catch (err) {
       res.status(500).json({ error: err.message });
@@ -386,6 +406,12 @@ function registerDispatchRoutes(app, { db, requireDeviceAuth, liveEventWindowBou
 
       const relayKey = `${req.auth.account.id}:${channelId}`;
       let relay = activeRelays.get(relayKey);
+      if (!relay && activeRelays.size >= MAX_PROXY_RELAYS) {
+        return res.status(503).json({ error: "Maximum concurrent proxy relays reached" });
+      }
+      if (relay && relay.clients.size >= MAX_CLIENTS_PER_RELAY) {
+        return res.status(503).json({ error: "Maximum clients reached for this relay" });
+      }
 
       res.setHeader("Content-Type", "video/mp2t");
       res.setHeader("Cache-Control", "no-store");

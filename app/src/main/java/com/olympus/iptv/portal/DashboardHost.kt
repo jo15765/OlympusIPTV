@@ -447,6 +447,7 @@ object DashboardHost {
             method == "GET" && path == "/api/logo" -> serveLogo(app, socket, query["u"].orEmpty())
             method == "POST" && path == "/api/register" -> register(app, socket, json(body))
             method == "POST" && path == "/api/devices" -> devices(app, socket, json(body))
+            method == "POST" && path == "/api/devices/delete" -> deleteDevice(app, socket, json(body))
             method == "POST" && path == "/api/login" -> login(app, socket, json(body))
             method == "GET" && path == "/api/favorites" -> favorites(app, socket, query["email"], query["deviceId"])
             method == "POST" && path == "/api/favorites" -> saveFavorites(app, socket, json(body))
@@ -780,16 +781,12 @@ object DashboardHost {
         writeJson(socket, 200, mapOf("ok" to true, "devices" to listOf(gate.deviceId)))
     }
 
-    private fun devices(app: OlympusIptvApp, socket: Socket, body: JsonObject) {
-        val email = text(body, "email").trim().lowercase()
-        val session = session(app)
-        val saved = session?.email?.trim()?.lowercase().orEmpty()
-        if (session == null || saved.isBlank() || email != saved) {
-            writeJson(socket, 401, mapOf("error" to "That email is not on a TV yet. Open Olympus-IPTV once with this email."))
-            return
-        }
-        val deviceId = runBlocking { app.playlistStore.deviceId() }
-        val lineup = runBlocking { app.playlistStore.lineup(session.id) }
+    private fun fetchMergedDevices(
+        app: OlympusIptvApp,
+        saved: String,
+        deviceId: String,
+        lineup: LineupConfig
+    ): List<Map<String, Any?>> {
         val merged = LinkedHashMap<String, Map<String, Any?>>()
         merged[deviceId] = mapOf(
             "id" to deviceId,
@@ -801,16 +798,21 @@ object DashboardHost {
         )
 
         val cloudBase = com.olympus.iptv.BuildConfig.PORTAL_CLOUD_URL.trim().trimEnd('/')
-        if (cloudBase.startsWith("http")) {
+        if (cloudBase.startsWith("http") && saved.isNotBlank() && deviceId.isNotBlank()) {
             runCatching {
+                val token = com.olympus.iptv.playlist.LineupClient(app).ensureDeviceToken(saved, deviceId)
                 val quickHttp = com.olympus.iptv.playlist.HttpClients.shared.newBuilder()
-                    .connectTimeout(2500, java.util.concurrent.TimeUnit.MILLISECONDS)
-                    .readTimeout(2500, java.util.concurrent.TimeUnit.MILLISECONDS)
+                    .connectTimeout(3000, java.util.concurrent.TimeUnit.MILLISECONDS)
+                    .readTimeout(3500, java.util.concurrent.TimeUnit.MILLISECONDS)
                     .build()
-                val reqBody = gson.toJson(mapOf("email" to saved))
+                val reqBody = gson.toJson(mapOf("email" to saved, "deviceId" to deviceId))
                     .toRequestBody("application/json; charset=utf-8".toMediaType())
                 val apiKey = com.olympus.iptv.BuildConfig.PORTAL_API_KEY.trim()
-                val reqBuilder = Request.Builder().url("$cloudBase/api/devices").post(reqBody)
+                val reqBuilder = Request.Builder()
+                    .url("$cloudBase/api/devices")
+                    .header("X-Device-Id", deviceId)
+                    .post(reqBody)
+                if (!token.isNullOrBlank()) reqBuilder.header("X-Device-Token", token)
                 if (apiKey.isNotEmpty()) reqBuilder.header("X-Olympus-Api-Key", apiKey)
                 val req = reqBuilder.build()
                 quickHttp.newCall(req).execute().use { resp ->
@@ -823,7 +825,7 @@ object DashboardHost {
                         if (id.isBlank() || merged.containsKey(id)) continue
                         merged[id] = mapOf(
                             "id" to id,
-                            "name" to (obj.get("name")?.takeIf { !it.isJsonNull }?.asString ?: id),
+                            "name" to (obj.get("name")?.takeIf { !it.isJsonNull }?.asString?.takeIf { it.isNotBlank() } ?: id),
                             "local" to false,
                             "hiddenCountries" to (obj.get("hiddenCountries")?.takeIf { !it.isJsonNull }?.asInt ?: 0),
                             "hiddenGroups" to (obj.get("hiddenGroups")?.takeIf { !it.isJsonNull }?.asInt ?: 0),
@@ -833,15 +835,72 @@ object DashboardHost {
                 }
             }
         }
+        return merged.values.toList()
+    }
+
+    private fun devices(app: OlympusIptvApp, socket: Socket, body: JsonObject) {
+        val email = text(body, "email").trim().lowercase()
+        val session = session(app)
+        val saved = session?.email?.trim()?.lowercase().orEmpty()
+        if (session == null || saved.isBlank() || email != saved) {
+            writeJson(socket, 401, mapOf("error" to "That email is not on a TV yet. Open Olympus-IPTV once with this email."))
+            return
+        }
+        val deviceId = runBlocking { app.playlistStore.deviceId() }
+        val lineup = runBlocking { app.playlistStore.lineup(session.id) }
+        val deviceList = fetchMergedDevices(app, saved, deviceId, lineup)
         writeJson(
             socket,
             200,
             mapOf(
                 "ok" to true,
                 "email" to saved,
-                "devices" to merged.values.toList()
+                "devices" to deviceList
             )
         )
+    }
+
+    private fun deleteDevice(app: OlympusIptvApp, socket: Socket, body: JsonObject) {
+        val email = text(body, "email").trim().lowercase()
+        val targetDeviceId = text(body, "targetDeviceId").trim()
+        val session = session(app)
+        val saved = session?.email?.trim()?.lowercase().orEmpty()
+        if (session == null || saved.isBlank() || email != saved || targetDeviceId.isBlank()) {
+            writeJson(socket, 400, mapOf("error" to "Invalid email or targetDeviceId"))
+            return
+        }
+        val localDeviceId = runBlocking { app.playlistStore.deviceId() }
+        if (targetDeviceId == localDeviceId) {
+            writeJson(socket, 400, mapOf("error" to "Cannot delete the currently active TV from itself"))
+            return
+        }
+        val cloudBase = com.olympus.iptv.BuildConfig.PORTAL_CLOUD_URL.trim().trimEnd('/')
+        if (!cloudBase.startsWith("http")) {
+            writeJson(socket, 400, mapOf("error" to "Cloud sync URL is not configured"))
+            return
+        }
+        val ok = runCatching {
+            val token = com.olympus.iptv.playlist.LineupClient(app).ensureDeviceToken(saved, localDeviceId)
+            val quickHttp = com.olympus.iptv.playlist.HttpClients.shared.newBuilder()
+                .connectTimeout(4000, java.util.concurrent.TimeUnit.MILLISECONDS)
+                .readTimeout(6000, java.util.concurrent.TimeUnit.MILLISECONDS)
+                .build()
+            val reqBody = gson.toJson(mapOf("email" to saved, "deviceId" to localDeviceId, "targetDeviceId" to targetDeviceId))
+                .toRequestBody("application/json; charset=utf-8".toMediaType())
+            val apiKey = com.olympus.iptv.BuildConfig.PORTAL_API_KEY.trim()
+            val reqBuilder = Request.Builder()
+                .url("$cloudBase/api/devices/delete")
+                .header("X-Device-Id", localDeviceId)
+                .post(reqBody)
+            if (!token.isNullOrBlank()) reqBuilder.header("X-Device-Token", token)
+            if (apiKey.isNotEmpty()) reqBuilder.header("X-Olympus-Api-Key", apiKey)
+            quickHttp.newCall(reqBuilder.build()).execute().use { it.isSuccessful }
+        }.getOrDefault(false)
+        if (!ok) {
+            writeJson(socket, 502, mapOf("error" to "Could not delete device from cloud server"))
+            return
+        }
+        writeJson(socket, 200, mapOf("ok" to true, "deleted" to targetDeviceId))
     }
 
     private fun login(app: OlympusIptvApp, socket: Socket, body: JsonObject) {
@@ -852,7 +911,37 @@ object DashboardHost {
         }
         val playlistId = gate.playlist.id
         clearGuideCache()
+        val email = gate.playlist.email?.trim()?.lowercase().orEmpty()
         val page = runBlocking { app.playlistStore.savedPage(playlistId) }
+        val localDeviceId = runBlocking { app.playlistStore.deviceId() }
+        val deviceList = fetchMergedDevices(app, email, localDeviceId, page.favorites.lineup)
+        if (gate.isRemote) {
+            val client = com.olympus.iptv.playlist.LineupClient(app)
+            val remoteLineup = runCatching { client.remoteLineup(email, gate.deviceId) }.getOrNull() ?: LineupConfig()
+            val remoteFavs = runCatching { client.pullFavorites(email, gate.deviceId) }.getOrNull()
+            val favState = com.olympus.iptv.data.FavoritePage(
+                ids = remoteFavs?.first.orEmpty(),
+                revision = remoteFavs?.second ?: 0L,
+                lineup = remoteLineup
+            )
+            writeJson(
+                socket,
+                200,
+                mapOf(
+                    "ok" to true,
+                    "email" to email,
+                    "deviceId" to gate.deviceId,
+                    "remote" to true,
+                    "devices" to deviceList,
+                    "catalog" to catalog(app, playlistId),
+                    "lineup" to filled(remoteLineup),
+                    "refreshedAt" to page.refreshedAt,
+                    "favorites" to publicFavorites(app, playlistId, favState),
+                    "recordings" to page.recordings
+                )
+            )
+            return
+        }
         val stamp = app.catalogDb.libraryStamp(playlistId)
         val etag = "$stamp-${page.favorites.lineup.revision ?: 0L}-${page.favorites.revision}-${page.refreshedAt}"
         if (notModified(etag)) {
@@ -864,9 +953,9 @@ object DashboardHost {
             200,
             mapOf(
                 "ok" to true,
-                "email" to gate.playlist.email?.trim()?.lowercase().orEmpty(),
+                "email" to email,
                 "deviceId" to gate.deviceId,
-                "devices" to listOf(mapOf("id" to gate.deviceId)),
+                "devices" to deviceList,
                 "catalog" to catalog(app, playlistId),
                 "lineup" to filled(page.favorites.lineup),
                 "refreshedAt" to page.refreshedAt,
@@ -930,6 +1019,35 @@ object DashboardHost {
             return
         }
         val playlistId = gate.playlist.id
+        if (gate.isRemote) {
+            val email = gate.playlist.email?.trim().orEmpty()
+            val client = com.olympus.iptv.playlist.LineupClient(app)
+            val remote = runCatching { client.pullFavorites(email, gate.deviceId) }.getOrNull()
+            val currentIds = remote?.first.orEmpty().toMutableList()
+            val baseRev = remote?.second ?: 0L
+            val add = text(body, "add")
+            val remove = text(body, "remove")
+            var ids = currentIds.toMutableList()
+            if (add.isNotBlank()) {
+                if (!ids.contains(add)) ids.add(add)
+            } else if (remove.isNotBlank()) {
+                ids.remove(remove)
+            } else if (body.has("order") && body.get("order").isJsonArray) {
+                val posted = ArrayList<String>()
+                for (item in body.getAsJsonArray("order")) {
+                    val id = item.asString.trim()
+                    if (id.isNotBlank() && id !in posted && id in ids) posted.add(id)
+                }
+                ids = (posted + ids.filter { it !in posted }).toMutableList()
+            } else if (body.has("ids") && body.get("ids").isJsonArray) {
+                ids = body.getAsJsonArray("ids").map { it.asString.trim() }.filter { it.isNotBlank() }.toMutableList()
+            }
+            val rev = maxOf(System.currentTimeMillis(), baseRev + 1L)
+            runCatching { client.pushFavorites(email, gate.deviceId, ids, rev, baseRev) }
+            val favState = com.olympus.iptv.data.FavoritePage(ids = ids, revision = rev, lineup = LineupConfig())
+            writeJson(socket, 200, mapOf("ok" to true, "favorites" to publicFavorites(app, playlistId, favState)))
+            return
+        }
         val current = runBlocking { app.playlistStore.favorites(playlistId) }.toMutableList()
         val dropped = removed.getOrPut(playlistId) { mutableListOf() }
         val add = text(body, "add")
@@ -1261,13 +1379,22 @@ object DashboardHost {
             writeJson(socket, 401, mapOf("error" to "Device not registered"))
             return
         }
-        val current = filled(runBlocking { app.playlistStore.lineup(gate.playlist.id) })
+        val incoming = body.get("lineup")?.let { gson.fromJson(it, LineupConfig::class.java) } ?: LineupConfig()
         val base = body.get("baseRevision")?.asLong ?: 0L
+        if (gate.isRemote) {
+            val email = gate.playlist.email?.trim().orEmpty()
+            val next = filled(incoming).copy(revision = maxOf(incoming.revision ?: 0L, System.currentTimeMillis(), base + 1L))
+            val pushed = runCatching {
+                com.olympus.iptv.playlist.LineupClient(app).push(email, gate.deviceId, next, base)
+            }.getOrDefault(next)
+            writeJson(socket, 200, mapOf("ok" to true, "lineup" to filled(pushed)))
+            return
+        }
+        val current = filled(runBlocking { app.playlistStore.lineup(gate.playlist.id) })
         if (base > 0L && (current.revision ?: 0L) > base) {
             writeJson(socket, 200, mapOf("ok" to true, "lineup" to current, "kept" to true))
             return
         }
-        val incoming = body.get("lineup")?.let { gson.fromJson(it, LineupConfig::class.java) } ?: LineupConfig()
         val baseRev = current.revision ?: 0L
         val next = filled(incoming).let { config ->
             val bumped = maxOf(config.revision ?: 0L, System.currentTimeMillis(), baseRev + 1L)
@@ -2203,7 +2330,7 @@ object DashboardHost {
         return true
     }
 
-    private data class Gate(val playlist: SavedPlaylist, val deviceId: String)
+    private data class Gate(val playlist: SavedPlaylist, val deviceId: String, val isRemote: Boolean = false)
 
     private fun gate(app: OlympusIptvApp, email: String?, deviceId: String?): Gate? {
         val session = session(app) ?: return null
@@ -2212,8 +2339,7 @@ object DashboardHost {
         val postedDevice = deviceId?.trim().orEmpty()
         if (saved.isBlank() || postedEmail != saved || postedDevice.isBlank()) return null
         val id = cachedDeviceId ?: runBlocking { app.playlistStore.deviceId() }.also { cachedDeviceId = it }
-        if (postedDevice != id) return null
-        return Gate(session, id)
+        return Gate(session, postedDevice, isRemote = postedDevice != id)
     }
 
     private fun session(app: OlympusIptvApp): SavedPlaylist? = runBlocking { app.playlistStore.session.first() }

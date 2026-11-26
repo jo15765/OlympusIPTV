@@ -432,6 +432,15 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
                 includeInternational
             )
         }
+        if (bucket == LIVE && categoryId == AdultGroup.GROUP_ID) {
+            return@read readAdultPage(
+                readableDatabase,
+                playlistId,
+                limit,
+                after,
+                hiddenChannels
+            )
+        }
         val db = readableDatabase
         val now = System.currentTimeMillis()
         val preWindow = now + NameStrip.PRE_EVENT_WINDOW_MS
@@ -517,6 +526,9 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
             if (bucket == LIVE && categoryId == TwentyFourSeven.GROUP_ID) {
                 return@read read247Channels(readableDatabase, playlistId, emptySet(), emptySet(), true)
             }
+            if (bucket == LIVE && categoryId == AdultGroup.GROUP_ID) {
+                return@read readAdultChannels(readableDatabase, playlistId, emptySet())
+            }
             if (bucket == LIVE) {
                 val now = System.currentTimeMillis()
                 val preWindow = now + NameStrip.PRE_EVENT_WINDOW_MS
@@ -543,6 +555,51 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
                 "number, name COLLATE NOCASE"
             ).use { collectList(it) }
         }
+
+    private fun readAdultPage(
+        db: SQLiteDatabase,
+        playlistId: String,
+        limit: Int,
+        after: PageCursor?,
+        hiddenChannels: Set<String>
+    ): VisiblePage {
+        val all = readAdultChannels(db, playlistId, hiddenChannels)
+        val start = if (after == null) {
+            0
+        } else {
+            val idx = all.indexOfFirst { it.id == after.id }
+            if (idx >= 0) idx + 1 else all.size
+        }
+        val slice = if (start >= all.size) emptyList() else all.subList(start, (start + limit).coerceAtMost(all.size))
+        val last = slice.lastOrNull()
+        val hasMore = start + slice.size < all.size
+        val next = if (hasMore && last != null) PageCursor(null, last.name, last.id) else null
+        return VisiblePage(slice, next, hasMore)
+    }
+
+    private fun readAdultChannels(
+        db: SQLiteDatabase,
+        playlistId: String,
+        hiddenChannels: Set<String>
+    ): List<com.olympus.iptv.data.Channel> {
+        val out = ArrayList<com.olympus.iptv.data.Channel>()
+        db.query(
+            "channels",
+            LIST_COLUMNS,
+            "playlist_id=? AND bucket=? AND ${AdultGroup.SQL_MATCH}",
+            arrayOf(playlistId, LIVE),
+            null,
+            null,
+            "name COLLATE NOCASE, id ASC"
+        ).use { cur ->
+            while (cur.moveToNext()) {
+                val ch = listRow(cur)
+                if (ch.id in hiddenChannels) continue
+                out.add(ch.copy(categoryId = AdultGroup.GROUP_ID, groupTitle = AdultGroup.GROUP_NAME))
+            }
+        }
+        return out
+    }
 
     private fun read247Page(
         db: SQLiteDatabase,
@@ -1405,6 +1462,9 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
                     has247 = true
                     continue
                 }
+                if (bucket == LIVE && AdultGroup.isAdultGroup(label)) {
+                    continue
+                }
                 categories.add(Category(id = id, name = label, kind = kind))
             }
         }
@@ -1429,6 +1489,9 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
                     has247 = true
                     continue
                 }
+                if (bucket == LIVE && AdultGroup.isAdultGroup(title)) {
+                    continue
+                }
                 categories.add(Category(id = id, name = title, kind = kind))
                 addedAny = true
             }
@@ -1443,8 +1506,16 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
                     categories.add(Category(id = TwentyFourSeven.GROUP_ID, name = TwentyFourSeven.GROUP_NAME, kind = ContentKind.LIVE))
                     addedAny = true
                 }
+                val hasAdult = db.rawQuery(
+                    "SELECT 1 FROM channels WHERE playlist_id=? AND bucket=? AND ${AdultGroup.SQL_MATCH} LIMIT 1",
+                    arrayOf(playlistId, LIVE)
+                ).use { c -> c.moveToFirst() }
+                if (hasAdult && seenIds.add(AdultGroup.GROUP_ID)) {
+                    categories.add(Category(id = AdultGroup.GROUP_ID, name = AdultGroup.GROUP_NAME, kind = ContentKind.LIVE))
+                    addedAny = true
+                }
             }
-            if (addedAny) categories.sortBy { it.name.lowercase() }
+            if (addedAny) categories.sortWith(compareBy({ it.id == AdultGroup.GROUP_ID }, { it.name.lowercase() }))
         }
         return categories
     }
@@ -2283,6 +2354,7 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         val map = HashMap<String, Int>()
         var totalActive = 0
         var count247 = 0
+        var countAdult = 0
         val preWindow = now + NameStrip.PRE_EVENT_WINDOW_MS
         val postGraceCutoff = now - NameStrip.POST_EVENT_GRACE_MS
         val hiddenSet = hiddenChannels.filterTo(HashSet()) { it.isNotBlank() }
@@ -2338,10 +2410,14 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
                         count247 += 1
                     }
                 }
+                if (AdultGroup.isAdultGroup(groupTitle)) {
+                    countAdult += 1
+                }
             }
         }
         map[PlaylistLoader.ALL_ID] = totalActive
         if (count247 > 0) map[TwentyFourSeven.GROUP_ID] = count247
+        if (countAdult > 0) map[AdultGroup.GROUP_ID] = countAdult
         map
     }
 
@@ -2555,6 +2631,9 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
                 has247Group = true
                 continue
             }
+            if (bucket == LIVE && AdultGroup.isAdultGroup(name)) {
+                continue
+            }
             val parsed = CountryIndex.idFor(name).orEmpty()
             val countryId = when {
                 parsed.isNotEmpty() -> parsed
@@ -2575,6 +2654,9 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
                 has247Group = true
                 continue
             }
+            if (bucket == LIVE && AdultGroup.isAdultGroup(resolvedName)) {
+                continue
+            }
             val parsed = CountryIndex.idFor(resolvedName).orEmpty()
             val countryId = when {
                 parsed.isNotEmpty() -> parsed
@@ -2589,6 +2671,13 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
         ).use { c -> if (c.moveToFirst()) c.getInt(0) else 0 }
         if (count247 > 0 || has247Group) {
             rows.add(DashboardGroup(TwentyFourSeven.GROUP_ID, TwentyFourSeven.GROUP_NAME, "LIVE", count247, ""))
+        }
+        val countAdult = db.rawQuery(
+            "SELECT COUNT(*) FROM channels WHERE playlist_id=? AND bucket=? AND ${AdultGroup.SQL_MATCH}",
+            arrayOf(playlistId, LIVE)
+        ).use { c -> if (c.moveToFirst()) c.getInt(0) else 0 }
+        if (countAdult > 0) {
+            rows.add(DashboardGroup(AdultGroup.GROUP_ID, AdultGroup.GROUP_NAME, "LIVE", countAdult, ""))
         }
         rows
     }
@@ -2658,6 +2747,13 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
                 args
             ).use { c -> if (c.moveToFirst()) c.getInt(0) else 0 }
         }
+        if (groupId == AdultGroup.GROUP_ID) {
+            val (where, args) = bucketNeedleWhere(playlistId, LIVE, needle)
+            return@read readableDatabase.rawQuery(
+                "SELECT COUNT(*) FROM channels WHERE $where AND ${AdultGroup.SQL_MATCH}",
+                args
+            ).use { c -> if (c.moveToFirst()) c.getInt(0) else 0 }
+        }
         val catCount = countByCategoryIndexed(playlistId, groupId, needle)
         if (catCount > 0) return@read catCount
         val titleCount = countByGroupTitleIndexed(playlistId, groupId, groupName, needle)
@@ -2690,6 +2786,13 @@ class CatalogDb(context: Context) : SQLiteOpenHelper(context.applicationContext,
                     )
                 )
             return@read if (all.size <= capped) all else all.subList(0, capped)
+        }
+
+        if (groupId == AdultGroup.GROUP_ID) {
+            val (where, args) = bucketNeedleWhere(playlistId, LIVE, needle)
+            val all = querySlim("$where AND ${AdultGroup.SQL_MATCH}", args, true, capped)
+                .map { it.copy(groupId = AdultGroup.GROUP_ID) }
+            return@read all
         }
 
         val byCategory = queryByCategoryIndexed(playlistId, groupId, needle, byName, capped)

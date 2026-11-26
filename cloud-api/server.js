@@ -32,7 +32,7 @@ function sendCompressedJson(req, res, entry) {
     res.setHeader("Vary", "Accept-Encoding");
     return res.send(entry.gzip);
   }
-  return res.send(entry.raw);
+  return res.send(zlib.gunzipSync(entry.gzip));
 }
 const express = require("express");
 const compression = require("compression");
@@ -48,10 +48,10 @@ const { registerDispatchRoutes } = require("./dispatch");
 const log = security.logger.child({ service: "olympus-api" });
 
 const catalogCache = new LRUCache({
-  max: 24,
+  max: 48,
   ttl: 90 * 1000,
   maxSize: 96 * 1024 * 1024,
-  sizeCalculation: (val) => (val.br?.length || 0) + (val.gzip?.length || 0) + (val.raw?.length || 0) + 256
+  sizeCalculation: (val) => (val.br?.length || 0) + (val.gzip?.length || 0) + 256
 });
 const catalogInFlight = new Map();
 
@@ -64,6 +64,7 @@ function invalidateCatalogCache(accountId, deviceCode) {
 
 const app = express();
 app.disable("x-powered-by");
+app.set("etag", false);
 app.use(
   pinoHttp({
     logger: log,
@@ -90,6 +91,7 @@ app.use(
   compression({
     filter(req, res) {
       if (String(req.headers.accept || "").includes("text/event-stream")) return false;
+      if (req.path === "/api/catalog/sync" || req.path.startsWith("/api/proxy/stream/")) return false;
       return compression.filter(req, res);
     }
   })
@@ -410,6 +412,44 @@ app.post("/api/devices/shared-mode", requireDeviceAuth, async (req, res) => {
     const { targetDeviceId, enabled } = req.body || {};
     await db.setSharedMode(req.auth.account.id, targetDeviceId || req.auth.deviceId, enabled);
     res.json({ ok: true, sharedMode: Boolean(enabled) });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post("/api/devices/delete", requireDeviceAuth, async (req, res) => {
+  try {
+    const target = String(req.body?.targetDeviceId || "").trim();
+    if (!target || target === "__shared__") {
+      return res.status(400).json({ error: "Valid targetDeviceId required" });
+    }
+    const accountId = req.auth.account.id;
+    const childTables = [
+      "lineup_configs",
+      "favorites",
+      "recordings",
+      "reminders",
+      "provider_logins",
+      "cloud_channels",
+      "cloud_categories",
+      "cloud_epg",
+      "watch_history"
+    ];
+    await Promise.all(
+      childTables.map((tbl) =>
+        db.pool.query(
+          `DELETE FROM ${tbl} WHERE account_id = $1 AND device_code = $2`,
+          [accountId, target]
+        ).catch(() => {})
+      )
+    );
+    await db.pool.query(
+      `DELETE FROM devices WHERE account_id = $1 AND device_code = $2`,
+      [accountId, target]
+    );
+    db.evictDeviceToken(accountId, target);
+    invalidateCatalogCache(accountId, target);
+    res.json({ ok: true, deleted: target });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -979,7 +1019,7 @@ app.get("/api/catalog/sync", requireDeviceAuth, async (req, res) => {
             brotliAsync(raw, { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 4 } })
           ]);
           const etag = `"${crypto.createHash("sha1").update(gzip).digest("hex")}"`;
-          const built = { raw, gzip, br, etag };
+          const built = { gzip, br, etag };
           catalogCache.set(cacheKey, built, { ttl: kind === "live" ? 60 * 1000 : 5 * 60 * 1000 });
           return built;
         })().finally(() => {

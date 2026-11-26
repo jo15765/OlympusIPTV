@@ -14,7 +14,12 @@ const logger = pino({
       "req.headers['x-olympus-api-key']",
       "req.headers.authorization",
       "password",
-      "*.password"
+      "*.password",
+      "xtreamPassword",
+      "*.xtreamPassword",
+      "deviceToken",
+      "*.deviceToken",
+      "*.token"
     ],
     censor: "[REDACTED]"
   }

@@ -17,11 +17,8 @@ object EpgTiming {
     fun clock(millis: Long): String = com.olympus.iptv.playlist.EpgUtils.formatClock(millis)
 
     fun dress(program: com.olympus.iptv.data.EpgProgram, now: Long): com.olympus.iptv.data.EpgProgram {
-        if (program.guideClock.isNotEmpty()) return program
+        if (program.guideTitle.isNotEmpty()) return program
         val cleanTitle = DummyEpg.stripChannelNumber(program.title).ifBlank { program.title }
-        val timing = tag(now, program.startMillis, program.endMillis)
-        val title = if (timing.isNullOrBlank()) cleanTitle else "$timing · $cleanTitle"
-        val clock = clock(program.startMillis) + " – " + clock(program.endMillis)
-        return program.copy(guideTitle = title, guideClock = clock)
+        return program.copy(guideTitle = cleanTitle, guideClock = "")
     }
 }

@@ -1655,7 +1655,9 @@ internal fun BrowseActivity.render(restoreFocus: Boolean = false, reloadChannels
                 }
                 val spotlight = Category(PlaylistLoader.FOR_YOU_ID, getString(R.string.for_you), kind)
                 val liveEvents = Category(PlaylistLoader.LIVE_EVENTS_ID, "Live Games Now", kind)
-                listOf(spotlight, liveEvents) + withRecent(listOf(favorites) + withAll)
+                val assembled = listOf(spotlight, liveEvents) + withRecent(listOf(favorites) + withAll)
+                val adultTail = assembled.filter { it.id == com.olympus.iptv.playlist.AdultGroup.GROUP_ID }
+                if (adultTail.isEmpty()) assembled else assembled.filterNot { it.id == com.olympus.iptv.playlist.AdultGroup.GROUP_ID } + adultTail
             }
             GuideSection.MOVIES -> withContinue(
                 listOf(favorites) + withoutEmptyGroups(visibleGroups(data.vodCategories, config))

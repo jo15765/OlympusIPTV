@@ -2079,41 +2079,51 @@
     .settings-section-title {
       font-size: 11px;
       font-weight: 700;
+      letter-spacing: 0.08em;
       text-transform: uppercase;
-      letter-spacing: .09em;
       color: var(--accent);
-      margin: 18px 0 10px;
+      margin: 10px 0 6px;
     }
-    .settings-section-title:first-of-type { margin-top: 4px; }
+    .settings-section-title:first-of-type { margin-top: 2px; }
+    #panelAdmin h2 { font-size: 24px; margin: 0; }
+    .admin-back { margin: 0 0 4px; font-size: 13px; }
+    .admin-lead { margin: 2px 0 0; font-size: 13px; }
     .admin-cards {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-      gap: 12px;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 10px;
+      margin-top: 6px;
     }
     .admin-card {
-      border-radius: 14px;
+      border-radius: 12px;
       border: 1px solid rgba(255,255,255,0.08);
       background: rgba(255,255,255,0.025);
-      padding: 16px;
-      text-align: left;
+      min-height: 132px;
+      padding: 12px 13px;
+      gap: 5px;
+      text-align: center;
       transition: border-color .16s ease, transform .16s ease, background .16s ease;
     }
+    .admin-card strong { font-size: 15px; }
+    .admin-card span { font-size: 12px; line-height: 1.3; }
+    .admin-card em { padding: 2px 8px; font-size: 11.5px; }
     .admin-card:hover {
       border-color: rgba(212, 168, 83, 0.45);
       background: rgba(212, 168, 83, 0.06);
       transform: translateY(-2px);
     }
     .admin-card .admin-icon {
-      width: 38px;
-      height: 38px;
-      border-radius: 10px;
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
       background: rgba(212, 168, 83, 0.12);
       border: 1px solid rgba(212, 168, 83, 0.25);
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      margin-bottom: 10px;
+      margin-bottom: 4px;
     }
+    .admin-card .admin-icon svg { width: 18px; height: 18px; }
     .group-tools, .channel-tools {
       display: flex;
       flex-wrap: wrap;
@@ -3150,12 +3160,9 @@
         <div class="smart-filter-bar">
           <div class="smart-chips" id="groupQuickChips" role="group" aria-label="Filter groups by type">
             <label style="margin:0 6px 0 0;display:inline-flex;align-items:center;gap:6px;font-size:12.5px"><input class="group-check" id="groupsSelectAll" type="checkbox" /> Select All</label>
-            <button class="smart-chip" type="button" data-gcat="all" aria-pressed="true">All</button>
-            <button class="smart-chip" type="button" data-gcat="live" aria-pressed="false">Live TV</button>
+            <button class="smart-chip" type="button" data-gcat="all" aria-pressed="true">All Live</button>
             <button class="smart-chip" type="button" data-gcat="sports" aria-pressed="false">Sports</button>
             <button class="smart-chip" type="button" data-gcat="247" aria-pressed="false">24/7</button>
-            <button class="smart-chip" type="button" data-gcat="movies" aria-pressed="false">Movies</button>
-            <button class="smart-chip" type="button" data-gcat="series" aria-pressed="false">Shows</button>
             <button class="smart-chip" type="button" data-gcat="adult" aria-pressed="false">18+</button>
           </div>
           <button class="smart-chip" id="groupsCompactToggle" type="button" aria-pressed="true" title="Toggle 2-column compact grid">⊞ 2-Col Grid</button>
@@ -4715,7 +4722,12 @@
         return orderedCache.list;
       }
       const rank = new Map(order.map((id, index) => [id, index]));
-      const list = [...groups].sort((a, b) => (rank.get(a.id) ?? 999999) - (rank.get(b.id) ?? 999999) || a.name.localeCompare(b.name));
+      const list = [...groups].sort((a, b) => {
+        const aAdult = a.id === "__adult__" ? 1 : 0;
+        const bAdult = b.id === "__adult__" ? 1 : 0;
+        if (aAdult !== bAdult) return aAdult - bAdult;
+        return (rank.get(a.id) ?? 999999) - (rank.get(b.id) ?? 999999) || a.name.localeCompare(b.name);
+      });
       orderedCache = { groups, order, size: groups.length, list };
       return list;
     }
@@ -4734,6 +4746,7 @@
       return String(group.kind || "LIVE").toUpperCase() === "LIVE" ? "__other__" : "";
     }
     function groupBlocked(group) {
+      if (group.id === "__247__" || group.id === "__adult__") return false;
       const live = String(group.kind || "LIVE").toUpperCase() === "LIVE";
       const countryId = group.countryId || "";
       if (lineup().includeInternational !== true) {
@@ -5270,23 +5283,22 @@
     let groupCategoryFilter = "all";
     let channelLetterFilter = "";
 
+    function allowedLiveGroups() {
+      return allowedGroups().filter((group) => String(group.kind || "LIVE").toUpperCase() === "LIVE");
+    }
     function matchesGroupCategory(group, cat) {
       if (!cat || cat === "all") return true;
-      const kind = String(group.kind || "LIVE").toUpperCase();
       const text = (groupName(group) + " " + (group.name || "")).toLowerCase();
-      if (cat === "movies") return kind === "VOD" || /\b(movie|movies|4k|cinema|vod|releases)\b/.test(text);
-      if (cat === "series") return kind === "SERIES" || /\b(series|shows|tv shows|episodes)\b/.test(text);
       if (cat === "247") return group.id === "__247__" || text.includes("24/7") || text.includes("24-7");
       if (cat === "sports") return /\b(sport|nfl|nba|mlb|nhl|ncaa|espn|ppv|ufc|boxing|soccer|dazn|f1|racing|golf|tennis|mls)\b/.test(text);
-      if (cat === "adult") return /(?:^|\s|\|)(18\+|xxx|adult|porn|erotic)/i.test(text);
-      if (cat === "live") return kind === "LIVE" && !/(?:^|\s|\|)(18\+|xxx|adult)/i.test(text);
+      if (cat === "adult") return group.id === "__adult__" || /(?:^|\s|\|)(18\+|xxx|adult|porn|erotic|nutflix)/i.test(text);
       return true;
     }
 
     function visibleGroups() {
       const groupQuery = document.querySelector("#groupSearch").value.trim().toLowerCase();
       const hidden = new Set(lineup().hiddenGroups || []);
-      return allowedGroups().filter((group) => {
+      return allowedLiveGroups().filter((group) => {
         const isHidden = hidden.has(group.id);
         const matchesFilter = groupFilter === "both" || (groupFilter === "hidden" ? isHidden : !isHidden);
         const label = (groupName(group) + " " + (group.name || "")).toLowerCase();
@@ -5572,8 +5584,9 @@
     function renderChannelPanel() {
       const select = document.querySelector("#channelGroup");
       const hidden = new Set(lineup().hiddenGroups || []);
-      const groups = allowedGroups().filter((group) => !hidden.has(group.id));
-      const fallbackPool = groups.length ? groups : orderedGroups();
+      const liveGroups = allowedLiveGroups();
+      const groups = liveGroups.filter((group) => !hidden.has(group.id));
+      const fallbackPool = groups.length ? groups : orderedGroups().filter((group) => String(group.kind || "LIVE").toUpperCase() === "LIVE");
       if (!selectedGroupId || !fallbackPool.some((group) => String(group.id) === String(selectedGroupId))) {
         const nonEmpty = fallbackPool.find((g) => Number(g.count) > 0);
         selectedGroupId = (nonEmpty || fallbackPool[0])?.id || null;
@@ -5662,6 +5675,7 @@
         return;
       }
       if (token !== channelRender) return;
+      all = (all || []).filter((ch) => String(ch.kind || "LIVE").toUpperCase() === "LIVE");
       const hideDupes = document.querySelector("#hideBackupDupes")?.checked === true;
       const seenStems = hideDupes ? new Set() : null;
       const deduped = hideDupes ? all.filter((ch) => {
@@ -8671,6 +8685,37 @@
         action.className = current ? "device-badge" : "secondary device-switch";
         action.textContent = current ? "Currently Managing" : "Switch to Device";
         top.append(mark, idBlock, action);
+        if (!current) {
+          const del = document.createElement("span");
+          del.className = "secondary";
+          del.textContent = "🗑 Remove";
+          del.title = "Delete this device from your account";
+          del.style.cssText = "margin-left:6px;padding:5px 10px;border-radius:8px;font-size:12px;color:#fca5a5;border:1px solid rgba(248,113,113,0.35);background:rgba(248,113,113,0.08);cursor:pointer;";
+          del.addEventListener("click", async (ev) => {
+            ev.stopPropagation();
+            if (!window.confirm("Remove device " + device.id + " from your account?\n\nThis deletes its saved cloud profile.")) return;
+            del.textContent = "Removing…";
+            try {
+              const resp = await fetch("/api/devices/delete", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  email: accountEmail || (session && session.email) || sessionStorage.getItem("olympus-email") || "",
+                  deviceId: managing || (session && session.deviceId) || "",
+                  targetDeviceId: device.id
+                })
+              });
+              const resBody = await resp.json().catch(() => ({}));
+              if (!resp.ok) throw new Error(resBody.error || "Could not remove device");
+              showToast("Removed " + device.id);
+              await loadDevices(accountEmail || (session && session.email) || "");
+            } catch (err) {
+              del.textContent = "🗑 Remove";
+              showToast((err && err.message) || "Could not remove device");
+            }
+          });
+          top.append(del);
+        }
         const code = document.createElement("div");
         code.className = "device-code";
         code.textContent = device.id;
@@ -8723,17 +8768,23 @@
       if (box) box.checked = on;
     }
     async function loadDevices(email) {
+      const targetEmail = String(email || (session && session.email) || accountEmail || sessionStorage.getItem("olympus-email") || "").trim();
+      const currentDevId = String((session && session.deviceId) || sessionStorage.getItem("olympus-device") || "").trim();
+      if (!targetEmail) {
+        showSignIn();
+        return;
+      }
       const response = await fetch("/api/devices", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email })
+        body: JSON.stringify({ email: targetEmail, deviceId: currentDevId })
       });
       const body = await response.json();
-      if (!response.ok) throw new Error(body.error || "Could not sign in");
-      accountEmail = body.email;
-      sessionStorage.setItem("olympus-email", body.email);
+      if (!response.ok) throw new Error(body.error || "Could not load devices");
+      accountEmail = body.email || targetEmail;
+      sessionStorage.setItem("olympus-email", accountEmail);
       const devices = body.devices || [];
-      document.querySelector("#deviceListEmail").textContent = body.email + " — Choose a device. Each one keeps its own setup.";
+      document.querySelector("#deviceListEmail").textContent = accountEmail + " — Choose a device. Each one keeps its own setup.";
       renderDeviceCards(devices);
       loginForm.hidden = true;
       editor.hidden = true;
@@ -8854,8 +8905,12 @@
     const stripSuffixes = document.querySelector("#stripSuffixes");
     if (stripPrefixes) stripPrefixes.addEventListener("input", scheduleLineupSync);
     if (stripSuffixes) stripSuffixes.addEventListener("input", scheduleLineupSync);
-    document.querySelector("#backDevices").addEventListener("click", () => loadDevices(accountEmail));
-    document.querySelector("#adminHomeBack").addEventListener("click", () => loadDevices(accountEmail));
+    const openDevicePicker = () => {
+      const email = (session && session.email) || accountEmail || sessionStorage.getItem("olympus-email") || "";
+      loadDevices(email).catch((err) => showToast((err && err.message) || "Could not load devices"));
+    };
+    document.querySelector("#backDevices").addEventListener("click", openDevicePicker);
+    document.querySelector("#adminHomeBack").addEventListener("click", openDevicePicker);
     document.querySelector("#signOut").addEventListener("click", showSignIn);
     document.querySelector("#signOutDevices").addEventListener("click", showSignIn);
     document.querySelector("#addDevice").addEventListener("click", showAddDevice);
