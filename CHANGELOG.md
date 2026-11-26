@@ -8,7 +8,8 @@ All notable changes across **ClearCast Tuner (Olympus-IPTV)** and its optional *
 
 - **Monorepo Docker Backend (`cloud-api/`)**:
   - Consolidated the Node.js 22 API (`server.js`) and background Xtream ingestion worker (`worker.js`) into `cloud-api/` with full PostgreSQL schema (`schema.sql`) and an optional `--profile local-db` PostgreSQL 16 Docker service for one-command self-hosting.
-  - Added **Brotli (q4) + Gzip** pre-compressed `LRUCache` with `ETag` / `304 Not Modified`, singleflight request coalescing, `?since=<epochMs>` delta sync, and real-time `LISTEN olympus_sync` cache invalidation.
+  - Added **Brotli (q4) + Gzip** non-blocking parallel async compression (`Promise.all`) into `LRUCache` with `ETag` / `304 Not Modified`, singleflight request coalescing, `?since=<epochMs>` delta sync, real-time `LISTEN olympus_sync` cache invalidation, and proxy-tuned HTTP/PostgreSQL TCP keep-alive.
+  - Added in-memory `accountCache` & `tokenHashCache` (`LRUCache`) in `db.js` to eliminate 2 PostgreSQL round-trips per authenticated request, and increased `worker.js` `UNNEST` batch writes to **2,500 rows/batch**.
   - Added **PostgreSQL GIN full-text search** (`idx_cloud_channels_name_fts`) and partial live-event index (`idx_cloud_channels_live_active`), plus **PostgreSQL session advisory locks** (`pg_try_advisory_lock`) in `worker.js` to prevent duplicate container sync contention.
   - Hardened security: **AES-256-GCM** encryption at rest for provider credentials (`CREDENTIALS_KEY`) with automatic plaintext migration on startup, **SSRF URL guard**, **Zod** input validation, **Pino** log redaction, localhost-only port binding (`127.0.0.1:8443:3000`), non-root container (`USER node`), `cap_drop: [ALL]`, and WAN static dashboard disabled by default (`ENABLE_WEB_DASHBOARD=false`).
 - **Strict Live Event-Window & Dummy EPG Parity**:
