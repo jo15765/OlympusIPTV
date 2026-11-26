@@ -248,6 +248,10 @@ CREATE TABLE IF NOT EXISTS cloud_channels (
     PRIMARY KEY (account_id, device_code, kind, id)
 );
 
+ALTER TABLE cloud_channels ADD COLUMN IF NOT EXISTS source_id TEXT NOT NULL DEFAULT 'primary';
+ALTER TABLE cloud_channels ADD COLUMN IF NOT EXISTS tv_archive BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE cloud_channels ADD COLUMN IF NOT EXISTS tv_archive_duration INTEGER NOT NULL DEFAULT 0;
+
 CREATE INDEX IF NOT EXISTS idx_cloud_channels_kind ON cloud_channels(account_id, device_code, kind);
 CREATE INDEX IF NOT EXISTS idx_cloud_channels_live_active ON cloud_channels(account_id, device_code, is_event_slot, event_start_ms, event_end_ms) WHERE kind = 'live';
 CREATE INDEX IF NOT EXISTS idx_cloud_channels_name_fts ON cloud_channels USING gin (to_tsvector('simple', name));
