@@ -19,6 +19,7 @@ class NameStripEventSlotTest {
     fun sanitizedAndPrefixedEspnPlusFutureGamesAreHiddenUntilPreEventWindow() {
         val year = Calendar.getInstance(TimeZone.getTimeZone("America/New_York")).get(Calendar.YEAR)
         val afternoon = etMillis(year, Calendar.NOVEMBER, 25, 14, 0)
+        val tzOffsetEarly = etMillis(year, Calendar.NOVEMBER, 25, 17, 45)
         val preWindow = etMillis(year, Calendar.NOVEMBER, 25, 18, 50)
         val ended = etMillis(year, Calendar.NOVEMBER, 25, 22, 15)
 
@@ -32,6 +33,7 @@ class NameStripEventSlotTest {
             val status = NameStrip.inspect(raw)
             assertTrue("Expected event slot for $raw", status.isEventSlot)
             assertFalse("Expected $raw hidden at 2:00 PM ET", status.isVisibleAt(afternoon))
+            assertTrue("Expected $raw visible at 5:45 PM ET (within 90m TZ buffer)", status.isVisibleAt(tzOffsetEarly))
             assertTrue("Expected $raw visible at 6:50 PM ET", status.isVisibleAt(preWindow))
             assertFalse("Expected $raw hidden after ending", status.isVisibleAt(ended))
         }

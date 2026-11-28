@@ -18,7 +18,7 @@ object NameStrip {
         }
     }
 
-    const val PRE_EVENT_WINDOW_MS = 15L * 60L * 1000L
+    const val PRE_EVENT_WINDOW_MS = 90L * 60L * 1000L
     const val POST_EVENT_GRACE_MS = 30L * 60L * 1000L
     private const val DEFAULT_EVENT_DURATION_MS = 165L * 60L * 1000L
     private const val BASKETBALL_EVENT_DURATION_MS = 135L * 60L * 1000L

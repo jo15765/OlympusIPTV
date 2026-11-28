@@ -6,8 +6,8 @@ import androidx.media3.exoplayer.DefaultLoadControl
 object PlayerBuffers {
     const val MIN_MS = 15_000
     const val MAX_MS = 40_000
-    const val PLAYBACK_MS = 2_000
-    const val REBUFFER_MS = 3_500
+    const val PLAYBACK_MS = 1_200
+    const val REBUFFER_MS = 2_500
 
     fun live(lowRam: Boolean = false, highEndTv: Boolean = false, timeshiftMinutes: Int = 0): DefaultLoadControl {
         val min = if (lowRam) 8_000 else MIN_MS
@@ -16,7 +16,7 @@ object PlayerBuffers {
             highEndTv -> 45_000
             else -> MAX_MS
         }
-        val start = if (lowRam || highEndTv) 1_500 else PLAYBACK_MS
+        val start = if (lowRam) PLAYBACK_MS else 1_000
         val extraBackMs = if (lowRam) 0 else (timeshiftMinutes.coerceIn(0, 60) * 15_000).coerceAtMost(120_000)
         val back = when {
             lowRam -> 4_000

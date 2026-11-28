@@ -552,6 +552,69 @@ internal fun BrowseActivity.openBackupShortcut() {
         Toast.makeText(this, R.string.admin_backup_detail, Toast.LENGTH_LONG).show()
     }
 
+internal fun BrowseActivity.openCopyConfigToDevicesDialog() {
+        lifecycleScope.launch {
+            val store = (application as OlympusIptvApp).playlistStore
+            val saved = withContext(Dispatchers.IO) { store.session.first() }
+            val email = saved?.email?.trim().orEmpty()
+            if (saved == null || email.isEmpty()) {
+                Toast.makeText(this@openCopyConfigToDevicesDialog, R.string.copy_config_no_email, Toast.LENGTH_LONG).show()
+                return@launch
+            }
+            Toast.makeText(this@openCopyConfigToDevicesDialog, R.string.copy_config_loading, Toast.LENGTH_SHORT).show()
+            val client = com.olympus.iptv.playlist.LineupClient(screen().applicationContext)
+            val localDeviceId = withContext(Dispatchers.IO) { store.deviceId() }
+            val others = withContext(Dispatchers.IO) {
+                runCatching {
+                    client.fetchAccountDevices(email, localDeviceId)
+                        .filter { !it.id.equals(localDeviceId, ignoreCase = true) }
+                }.getOrDefault(emptyList())
+            }
+            if (isDestroyed || isFinishing) return@launch
+            if (others.isEmpty()) {
+                Toast.makeText(this@openCopyConfigToDevicesDialog, R.string.copy_config_no_other_devices, Toast.LENGTH_LONG).show()
+                return@launch
+            }
+            val labels = others.map { dev ->
+                val status = if (dev.online) "Online" else "Offline"
+                "${dev.name} ($status)"
+            }.toTypedArray()
+            val checked = BooleanArray(others.size) { false }
+            android.app.AlertDialog.Builder(this@openCopyConfigToDevicesDialog)
+                .setTitle(R.string.copy_config_title)
+                .setMultiChoiceItems(labels, checked) { _, which, isChecked ->
+                    checked[which] = isChecked
+                }
+                .setPositiveButton(R.string.copy_config_confirm) { _, _ ->
+                    val targetIds = others.indices.filter { checked[it] }.map { others[it].id }
+                    if (targetIds.isEmpty()) {
+                        Toast.makeText(this@openCopyConfigToDevicesDialog, R.string.copy_config_select_one, Toast.LENGTH_SHORT).show()
+                        return@setPositiveButton
+                    }
+                    lifecycleScope.launch {
+                        val copied = withContext(Dispatchers.IO) {
+                            runCatching {
+                                val localLineup = store.lineup(saved.id)
+                                client.cloneConfigToDevices(email, localDeviceId, targetIds, localLineup)
+                            }.getOrDefault(emptyList())
+                        }
+                        if (isDestroyed || isFinishing) return@launch
+                        if (copied.isNotEmpty()) {
+                            Toast.makeText(
+                                this@openCopyConfigToDevicesDialog,
+                                getString(R.string.copy_config_done, copied.size),
+                                Toast.LENGTH_LONG
+                            ).show()
+                        } else {
+                            Toast.makeText(this@openCopyConfigToDevicesDialog, R.string.copy_config_failed, Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+        }
+    }
+
 internal fun BrowseActivity.offerVpnConsent() {
         if (!AppTunnel.needsConsent || isDestroyed) return
         val consent = android.net.VpnService.prepare(this)

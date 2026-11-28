@@ -244,7 +244,7 @@ class LineupClient(
         val localRev = local.revision ?: 0L
         val remoteRev = remote?.revision ?: 0L
         if (remote != null && remoteRev > localRev) {
-            return remote
+            return AdultGroup.preserveLocalParentalOverrides(local, remote)
         }
         val payload = JsonObject().apply {
             addProperty("email", email)
@@ -255,6 +255,48 @@ class LineupClient(
             gson.fromJson(it, LineupConfig::class.java)
         }
         return pushed ?: local
+    }
+
+    data class AccountDevice(
+        val id: String,
+        val name: String,
+        val online: Boolean
+    )
+
+    fun fetchAccountDevices(email: String, deviceId: String): List<AccountDevice> {
+        val token = ensureDeviceToken(email, deviceId)
+        val url = "${baseUrl()}/api/devices?email=${enc(email)}"
+        val arr = getJson(url, token, deviceId)?.getAsJsonArray("devices") ?: return emptyList()
+        val out = ArrayList<AccountDevice>(arr.size())
+        for (el in arr) {
+            val obj = el.asJsonObject
+            val id = obj.get("id")?.takeUnless { it.isJsonNull }?.asString?.trim().orEmpty()
+            if (id.isEmpty()) continue
+            val name = obj.get("name")?.takeUnless { it.isJsonNull }?.asString?.trim().orEmpty().ifEmpty { id }
+            val online = obj.get("online")?.takeUnless { it.isJsonNull }?.asBoolean ?: false
+            out.add(AccountDevice(id = id, name = name, online = online))
+        }
+        return out
+    }
+
+    fun cloneConfigToDevices(
+        email: String,
+        sourceDeviceId: String,
+        targetDeviceIds: List<String>,
+        lineup: LineupConfig
+    ): List<String> {
+        val targets = targetDeviceIds.map { it.trim() }.filter { it.isNotEmpty() && !it.equals(sourceDeviceId, ignoreCase = true) }.distinct()
+        if (targets.isEmpty()) return emptyList()
+        val token = ensureDeviceToken(email, sourceDeviceId)
+        val payload = JsonObject().apply {
+            addProperty("email", email)
+            addProperty("sourceDeviceId", sourceDeviceId)
+            add("targetDeviceIds", gson.toJsonTree(targets))
+            add("lineup", gson.toJsonTree(lineup))
+        }
+        val resp = postJson("${baseUrl()}/api/devices/clone", payload, token, sourceDeviceId) ?: return emptyList()
+        val copied = resp.getAsJsonArray("copiedTo") ?: return emptyList()
+        return copied.mapNotNull { it.takeUnless { el -> el.isJsonNull }?.asString?.trim()?.takeIf { s -> s.isNotEmpty() } }
     }
 
     fun pushFavorites(

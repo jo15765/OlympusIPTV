@@ -398,10 +398,26 @@ app.post("/api/devices", requireDeviceAuth, async (req, res) => {
 
 app.post("/api/devices/clone", requireDeviceAuth, async (req, res) => {
   try {
-    const { sourceDeviceId, targetDeviceId } = req.body || {};
-    if (!sourceDeviceId || !targetDeviceId) throw new Error("sourceDeviceId and targetDeviceId required");
-    const lineup = await db.cloneDeviceProfile(req.auth.account.id, sourceDeviceId, targetDeviceId);
-    res.json({ ok: true, lineup });
+    const body = req.body || {};
+    const sourceDeviceId = String(body.sourceDeviceId || req.auth.deviceId || "").trim();
+    const targets = Array.isArray(body.targetDeviceIds)
+      ? body.targetDeviceIds
+      : body.targetDeviceId
+        ? [body.targetDeviceId]
+        : [];
+    if (!sourceDeviceId || !targets.length) {
+      throw new Error("sourceDeviceId and targetDeviceIds required");
+    }
+    const result = await db.cloneDeviceProfile(
+      req.auth.account.id,
+      sourceDeviceId,
+      targets,
+      body.lineup || null
+    );
+    for (const tid of result.copiedTo) {
+      invalidateCatalogCache(req.auth.account.id, tid);
+    }
+    res.json({ ok: true, copiedTo: result.copiedTo, revision: result.revision, lineup: result.lineup });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

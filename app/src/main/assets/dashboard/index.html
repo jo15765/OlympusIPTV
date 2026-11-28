@@ -4039,12 +4039,17 @@
               <div id="cloudHistoryList" style="margin-top:10px;display:flex;flex-direction:column;gap:6px"></div>
             </article>
             <article class="clean-card">
-              <h3>Multi-TV Profile Sync &amp; Clone</h3>
-              <p class="hint">Share one household lineup across all TVs, or copy another TV's setup onto this device.</p>
+              <h3>Multi-TV Profile Sync &amp; Copy Config</h3>
+              <p class="hint">Share one household lineup, pull another TV's setup, or push this device's config to selected devices. Adult &amp; PIN restrictions already enabled on target devices are always preserved.</p>
               <label class="intl-switch" style="margin-top:10px"><input id="sharedHouseholdToggle" type="checkbox" /><span class="switch" aria-hidden="true"></span> Share Household Lineup Across All TVs</label>
               <div style="display:flex;gap:8px;margin-top:12px">
                 <select id="cloneSourceSelect"></select>
-                <button class="secondary" id="cloneProfileBtn" type="button" style="flex-shrink:0">Clone Here</button>
+                <button class="secondary" id="cloneProfileBtn" type="button" style="flex-shrink:0">Pull Here</button>
+              </div>
+              <div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,.08)">
+                <div style="font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;opacity:.75;margin-bottom:8px">Copy This Device's Config To:</div>
+                <div id="cloneTargetsList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px"></div>
+                <button class="primary" id="pushCloneBtn" type="button" style="width:100%">Copy Config to Selected Devices</button>
               </div>
             </article>
           </div>
@@ -9924,7 +9929,9 @@
     async function populateCloneSources() {
       if (!session || !accountEmail) return;
       const sel = document.querySelector("#cloneSourceSelect");
-      if (!sel) return;
+      const targetsBox = document.querySelector("#cloneTargetsList");
+      const pushBtn = document.querySelector("#pushCloneBtn");
+      if (!sel && !targetsBox) return;
       const resp = await fetch("/api/devices", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -9932,20 +9939,46 @@
       });
       const body = await resp.json().catch(() => ({}));
       const list = (body.devices || []).filter((d) => d.id !== session.deviceId);
-      sel.innerHTML = "";
-      if (!list.length) {
-        const opt = document.createElement("option");
-        opt.value = "";
-        opt.textContent = "No other devices found";
-        sel.append(opt);
-        return;
+      if (sel) {
+        sel.innerHTML = "";
+        if (!list.length) {
+          const opt = document.createElement("option");
+          opt.value = "";
+          opt.textContent = "No other devices found";
+          sel.append(opt);
+        } else {
+          list.forEach((d) => {
+            const opt = document.createElement("option");
+            opt.value = d.id;
+            opt.textContent = (d.name || d.id) + " (" + (d.hiddenGroups || 0) + " hidden groups)";
+            sel.append(opt);
+          });
+        }
       }
-      list.forEach((d) => {
-        const opt = document.createElement("option");
-        opt.value = d.id;
-        opt.textContent = (d.name || d.id) + " (" + (d.hiddenGroups || 0) + " hidden groups)";
-        sel.append(opt);
-      });
+      if (targetsBox) {
+        targetsBox.innerHTML = "";
+        if (!list.length) {
+          const empty = document.createElement("div");
+          empty.className = "hint";
+          empty.textContent = "No other registered devices found under this account.";
+          targetsBox.append(empty);
+          if (pushBtn) pushBtn.disabled = true;
+        } else {
+          if (pushBtn) pushBtn.disabled = false;
+          list.forEach((d) => {
+            const lbl = document.createElement("label");
+            lbl.style.cssText = "display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:6px 8px;border-radius:8px;background:rgba(255,255,255,.04)";
+            const cb = document.createElement("input");
+            cb.type = "checkbox";
+            cb.value = d.id;
+            cb.className = "clone-target-cb";
+            const txt = document.createElement("span");
+            txt.textContent = (d.name || d.id) + (d.online ? " • Online" : " • Offline");
+            lbl.append(cb, txt);
+            targetsBox.append(lbl);
+          });
+        }
+      }
     }
 
     document.querySelector("#sharedHouseholdToggle")?.addEventListener("change", async (e) => {
@@ -9975,7 +10008,42 @@
         forgetTabPaint();
         paintStrip();
         openTab(tab || "countries");
-        showToast("✓ Cloned profile from " + sourceDeviceId);
+        showToast("✓ Pulled profile from " + sourceDeviceId + " (parental overrides preserved)");
+      } else {
+        showToast(body.error || "Could not pull profile");
+      }
+    });
+
+    document.querySelector("#pushCloneBtn")?.addEventListener("click", async () => {
+      if (!session) return;
+      const checked = Array.from(document.querySelectorAll(".clone-target-cb:checked")).map((el) => el.value);
+      if (!checked.length) {
+        showToast("Select at least one target device");
+        return;
+      }
+      const btn = document.querySelector("#pushCloneBtn");
+      if (btn) btn.disabled = true;
+      try {
+        const resp = await fetch("/api/devices/clone", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: session.email,
+            deviceId: session.deviceId,
+            sourceDeviceId: session.deviceId,
+            targetDeviceIds: checked,
+            lineup: session.lineup
+          })
+        });
+        const body = await resp.json().catch(() => ({}));
+        if (resp.ok) {
+          const count = (body.copiedTo || checked).length;
+          showToast("✓ Copied config to " + count + " device" + (count === 1 ? "" : "s") + " (parental overrides preserved)");
+        } else {
+          showToast(body.error || "Could not copy config");
+        }
+      } finally {
+        if (btn) btn.disabled = false;
       }
     });
 </script>

@@ -1,4 +1,5 @@
 require("dotenv").config();
+const crypto = require("crypto");
 const { Pool } = require("pg");
 const eventParser = require("./eventParser");
 const security = require("./security");
@@ -100,6 +101,15 @@ async function writeSyncLog(accountId, deviceCode, status, counts, duration, det
 }
 
 const BATCH_SIZE = 2500;
+const lastSyncHashes = new Map();
+
+function computeSyncDigest(liveCats, liveRows, vodCats, vodRows, seriesCats, seriesRows) {
+  const h = crypto.createHash("sha1");
+  h.update(`${liveCats.length}:${liveRows.length}:${vodCats.length}:${vodRows.length}:${seriesCats.length}:${seriesRows.length}`);
+  for (const r of liveRows) h.update(`|${r.id}:${r.name}:${r.categoryId}:${r.eventStartMs}:${r.tvArchive ? 1 : 0}`);
+  for (const c of liveCats) h.update(`#${c.category_id}:${c.category_name}`);
+  return h.digest("hex");
+}
 
 function dedupeByKey(items, keyFn) {
   const map = new Map();
@@ -428,6 +438,13 @@ async function syncAccountLogin(row) {
     });
   }
 
+  const syncKey = `${accountId}:${deviceCode}`;
+  const digest = computeSyncDigest(liveCats, liveRows, vodCats, vodRows, seriesCats, seriesRows);
+  if (lastSyncHashes.get(syncKey) === digest) {
+    log.info({ accountId, deviceCode }, "Provider catalog unchanged; skipping Postgres write cycle");
+    return;
+  }
+
   const client = await pool.connect();
   try {
 
@@ -512,6 +529,7 @@ async function syncAccountLogin(row) {
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
       [accountId, deviceCode, status, liveRows.length, vodRows.length, seriesRows.length, duration, detail || null]
     );
+    lastSyncHashes.set(syncKey, digest);
     if (status !== "SUCCESS") {
       await client.query(
         `INSERT INTO error_logs (account_id, device_code, platform, tag, message, detail, app_version, created_at)

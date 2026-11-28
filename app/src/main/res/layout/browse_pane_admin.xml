@@ -567,9 +567,27 @@
                     android:focusable="true"
                     android:gravity="center"
                     android:nextFocusLeft="@id/adminBackupLink"
+                    android:nextFocusRight="@id/btnCopyConfigDevices"
+                    android:nextFocusDown="@id/btnCopyConfigDevices"
                     android:nextFocusUp="@id/adminBackupLink"
                     android:paddingHorizontal="18dp"
                     android:text="@string/magic_cleanup"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp" />
+
+                <TextView
+                    android:id="@+id/btnCopyConfigDevices"
+                    android:layout_width="wrap_content"
+                    android:layout_height="44dp"
+                    android:layout_marginStart="12dp"
+                    android:background="@drawable/bg_nav"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:nextFocusLeft="@id/btnMagicCleanup"
+                    android:nextFocusUp="@id/adminQuietSchedule"
+                    android:paddingHorizontal="18dp"
+                    android:text="@string/copy_config_devices"
                     android:textColor="@color/text_primary"
                     android:textSize="14sp" />
             </LinearLayout>

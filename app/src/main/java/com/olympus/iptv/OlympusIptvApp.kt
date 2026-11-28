@@ -311,11 +311,12 @@ class OlympusIptvApp : Application() {
                 if (remote != null) {
                     val cloudChanged = prevLineupRev != null && lineupRev != prevLineupRev
                     if (cloudChanged || (remote.revision ?: 0L) > (local.revision ?: 0L)) {
-                        val applied = if (cloudChanged && (remote.revision ?: 0L) <= (local.revision ?: 0L)) {
+                        val baseApplied = if (cloudChanged && (remote.revision ?: 0L) <= (local.revision ?: 0L)) {
                             remote.copy(revision = maxOf(System.currentTimeMillis(), (local.revision ?: 0L) + 1L))
                         } else {
                             remote
                         }
+                        val applied = com.olympus.iptv.playlist.AdultGroup.preserveLocalParentalOverrides(local, baseApplied)
                         playlistStore.saveLineup(saved.id, applied)
                         val prefixes = applied.namePrefixes.orEmpty()
                         val suffixes = applied.nameSuffixes.orEmpty()

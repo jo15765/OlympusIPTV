@@ -253,15 +253,71 @@ async function restoreLineupHistory(accountId, deviceCode, historyId) {
   return upsertLineup(accountId, effective, restored);
 }
 
-async function cloneDeviceProfile(accountId, sourceDeviceCode, targetDeviceCode) {
-  const srcLineup = await getLineup(accountId, sourceDeviceCode);
-  const cloned = Object.assign({}, srcLineup, { revision: Date.now() });
-  const saved = await upsertLineup(accountId, targetDeviceCode, cloned);
-  const srcSnap = await getSnapshot(accountId, sourceDeviceCode);
-  if (srcSnap.groups.length || srcSnap.countries.length) {
-    await upsertSnapshot(accountId, targetDeviceCode, srcSnap);
+const ADULT_GROUP_RE = /(?:^|[\s|:\-\[\(])(?:18\+|21\+|xxx|porn|erotic|nutflix|for\s+adults?|adult\s+time)(?:$|[\s|:\-\]\)])|🔞/i;
+
+function isProtectedAdultGroupId(id, groupNameMap) {
+  const s = String(id || "").trim();
+  if (!s) return false;
+  if (s === "__adult__") return true;
+  if (ADULT_GROUP_RE.test(s) && !/adult\s+swim/i.test(s)) return true;
+  const label = groupNameMap && groupNameMap[s] ? String(groupNameMap[s]) : "";
+  return Boolean(label && ADULT_GROUP_RE.test(label) && !/adult\s+swim/i.test(label));
+}
+
+async function cloneDeviceProfile(accountId, sourceDeviceCode, targetDeviceCodes, inlineLineup = null) {
+  const targets = (Array.isArray(targetDeviceCodes) ? targetDeviceCodes : [targetDeviceCodes])
+    .map((id) => String(id || "").trim())
+    .filter((id) => id && id !== sourceDeviceCode && id !== "__shared__");
+  if (!targets.length) throw new Error("At least one target device is required");
+
+  if (inlineLineup && typeof inlineLineup === "object") {
+    const bumpedSrc = Object.assign({}, inlineLineup, { revision: Math.max(Number(inlineLineup.revision || 0), Date.now()) });
+    await upsertLineup(accountId, sourceDeviceCode, bumpedSrc);
   }
-  return saved;
+
+  const [srcLineup, srcSnap, catRes] = await Promise.all([
+    getLineup(accountId, sourceDeviceCode),
+    getSnapshot(accountId, sourceDeviceCode),
+    pool.query(
+      `SELECT id, name FROM cloud_categories WHERE account_id = $1 AND kind = 'live'`,
+      [accountId]
+    ).catch(() => ({ rows: [] }))
+  ]);
+  const catNames = {};
+  for (const r of catRes.rows) catNames[r.id] = r.name;
+
+  const rev = Date.now();
+  const copiedTo = [];
+  await Promise.all(
+    targets.map(async (targetCode) => {
+      const targetLineup = await getLineup(accountId, targetCode).catch(() => ({}));
+      const targetHidden = Array.isArray(targetLineup.hiddenGroups) ? targetLineup.hiddenGroups : [];
+      const protectedAdultHidden = targetHidden.filter((gid) => isProtectedAdultGroupId(gid, catNames));
+      const mergedHiddenGroups = Array.from(
+        new Set([...(Array.isArray(srcLineup.hiddenGroups) ? srcLineup.hiddenGroups : []), ...protectedAdultHidden])
+      );
+      const mergedGroupPins = Object.assign(
+        {},
+        srcLineup.groupPins && typeof srcLineup.groupPins === "object" ? srcLineup.groupPins : {},
+        targetLineup.groupPins && typeof targetLineup.groupPins === "object" ? targetLineup.groupPins : {}
+      );
+      const cloned = Object.assign({}, srcLineup, {
+        hiddenGroups: mergedHiddenGroups,
+        groupPins: mergedGroupPins,
+        revision: Math.max(rev, Number(targetLineup.revision || 0) + 1)
+      });
+      await upsertLineup(accountId, targetCode, cloned);
+      if (srcSnap.groups.length || srcSnap.countries.length) {
+        await upsertSnapshot(accountId, targetCode, srcSnap);
+      }
+      await pool.query(
+        `SELECT pg_notify('olympus_sync', json_build_object('table', 'lineup_configs', 'account_id', $1::text, 'device_code', $2::text)::text)`,
+        [accountId, targetCode]
+      ).catch(() => {});
+      copiedTo.push(targetCode);
+    })
+  );
+  return { copiedTo, revision: rev, lineup: srcLineup };
 }
 
 async function getFavorites(accountId) {

@@ -448,6 +448,7 @@ object DashboardHost {
             method == "POST" && path == "/api/register" -> register(app, socket, json(body))
             method == "POST" && path == "/api/devices" -> devices(app, socket, json(body))
             method == "POST" && path == "/api/devices/delete" -> deleteDevice(app, socket, json(body))
+            method == "POST" && path == "/api/devices/clone" -> cloneDevice(app, socket, json(body))
             method == "POST" && path == "/api/login" -> login(app, socket, json(body))
             method == "GET" && path == "/api/favorites" -> favorites(app, socket, query["email"], query["deviceId"])
             method == "POST" && path == "/api/favorites" -> saveFavorites(app, socket, json(body))
@@ -901,6 +902,77 @@ object DashboardHost {
             return
         }
         writeJson(socket, 200, mapOf("ok" to true, "deleted" to targetDeviceId))
+    }
+
+    private fun cloneDevice(app: OlympusIptvApp, socket: Socket, body: JsonObject) {
+        val email = text(body, "email").trim().lowercase()
+        val sourceDeviceId = text(body, "sourceDeviceId").trim()
+        val singleTarget = text(body, "targetDeviceId").trim()
+        val multiTargets = body.getAsJsonArray("targetDeviceIds")?.mapNotNull {
+            it.takeUnless { el -> el.isJsonNull }?.asString?.trim()?.takeIf { s -> s.isNotEmpty() }
+        }.orEmpty()
+        val targets = (if (multiTargets.isNotEmpty()) multiTargets else listOfNotNull(singleTarget.takeIf { it.isNotEmpty() })).distinct()
+        val session = session(app)
+        val saved = session?.email?.trim()?.lowercase().orEmpty()
+        if (session == null || email.isEmpty() || saved.isEmpty() || email != saved) {
+            writeJson(socket, 401, mapOf("error" to "Account mismatch"))
+            return
+        }
+        if (sourceDeviceId.isEmpty() || targets.isEmpty()) {
+            writeJson(socket, 400, mapOf("error" to "Select at least one target device"))
+            return
+        }
+        val cloudBase = com.olympus.iptv.BuildConfig.PORTAL_CLOUD_URL.trim().trimEnd('/')
+        if (!cloudBase.startsWith("http")) {
+            writeJson(socket, 400, mapOf("error" to "Cloud sync URL is not configured"))
+            return
+        }
+        val localDeviceId = runBlocking { app.playlistStore.deviceId() }
+        val respJson = runCatching {
+            val token = com.olympus.iptv.playlist.LineupClient(app).ensureDeviceToken(saved, localDeviceId)
+            val quickHttp = com.olympus.iptv.playlist.HttpClients.shared.newBuilder()
+                .connectTimeout(5000, java.util.concurrent.TimeUnit.MILLISECONDS)
+                .readTimeout(10000, java.util.concurrent.TimeUnit.MILLISECONDS)
+                .build()
+            val payload = JsonObject().apply {
+                addProperty("email", saved)
+                addProperty("sourceDeviceId", sourceDeviceId)
+                add("targetDeviceIds", gson.toJsonTree(targets))
+                if (body.has("lineup") && body.get("lineup").isJsonObject) {
+                    add("lineup", body.getAsJsonObject("lineup"))
+                }
+            }
+            val reqBody = gson.toJson(payload).toRequestBody("application/json; charset=utf-8".toMediaType())
+            val apiKey = com.olympus.iptv.BuildConfig.PORTAL_API_KEY.trim()
+            val reqBuilder = Request.Builder()
+                .url("$cloudBase/api/devices/clone")
+                .header("X-Device-Id", localDeviceId)
+                .post(reqBody)
+            if (!token.isNullOrBlank()) reqBuilder.header("X-Device-Token", token)
+            if (apiKey.isNotEmpty()) reqBuilder.header("X-Olympus-Api-Key", apiKey)
+            quickHttp.newCall(reqBuilder.build()).execute().use { resp ->
+                if (!resp.isSuccessful) null
+                else com.google.gson.JsonParser.parseString(resp.body?.string().orEmpty()).asJsonObject
+            }
+        }.getOrNull()
+        if (respJson == null) {
+            writeJson(socket, 502, mapOf("error" to "Could not copy config via cloud server"))
+            return
+        }
+        if (targets.any { it.equals(localDeviceId, ignoreCase = true) }) {
+            val incoming = respJson.getAsJsonObject("lineup")?.let {
+                runCatching { gson.fromJson(it, LineupConfig::class.java) }.getOrNull()
+            }
+            if (incoming != null) {
+                runBlocking {
+                    val local = app.playlistStore.lineup(session.id)
+                    val safe = com.olympus.iptv.playlist.AdultGroup.preserveLocalParentalOverrides(local, incoming)
+                    app.playlistStore.saveLineup(session.id, safe)
+                    respJson.add("lineup", gson.toJsonTree(safe))
+                }
+            }
+        }
+        writeJson(socket, 200, respJson)
     }
 
     private fun login(app: OlympusIptvApp, socket: Socket, body: JsonObject) {

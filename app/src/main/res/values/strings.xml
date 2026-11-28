@@ -469,6 +469,15 @@
     <string name="magic_cleanup">Magic Cleanup</string>
     <string name="magic_cleanup_running">Cleaning names and favorites…</string>
     <string name="magic_cleanup_done">Cleaned %1$d names. Added %2$d favorites.</string>
+    <string name="copy_config_devices">Copy Config to Devices</string>
+    <string name="copy_config_title">Copy Config to Other Devices</string>
+    <string name="copy_config_loading">Loading devices under your account…</string>
+    <string name="copy_config_no_email">Sign in with an email first to sync across devices.</string>
+    <string name="copy_config_no_other_devices">No other registered devices found under this account.</string>
+    <string name="copy_config_confirm">Copy to Selected</string>
+    <string name="copy_config_select_one">Select at least one target device.</string>
+    <string name="copy_config_done">Copied config to %1$d device(s). Target adult/PIN restrictions were preserved.</string>
+    <string name="copy_config_failed">Could not copy config to selected devices.</string>
     <string name="health_status">%1$s · %2$s / %3$s connections · expires %4$s · EPG %5$s</string>
     <string name="health_epg_only">EPG sync %1$s</string>
     <string name="health_never">not yet</string>

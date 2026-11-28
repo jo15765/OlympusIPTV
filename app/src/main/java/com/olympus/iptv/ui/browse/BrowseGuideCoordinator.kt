@@ -167,6 +167,7 @@ internal fun BrowseActivity.wireLazyPanes() {
             admin.cardAdminSetup.setOnClickListener { showAdminTools() }
             admin.adminToolsBack.setOnClickListener { showAdminPane(admin.cardAdminSetup) }
             admin.btnMagicCleanup.setOnClickListener { runMagicCleanup() }
+            admin.btnCopyConfigDevices.setOnClickListener { openCopyConfigToDevicesDialog() }
             paintProviderHealth()
             admin.adminQuietToggle.setOnClickListener { toggleAdminQuietHours() }
             admin.adminQuietSchedule.setOnClickListener { cycleAdminQuietSchedule() }

@@ -20,4 +20,31 @@ object AdultGroup {
         if (text.contains("adult swim", ignoreCase = true)) return false
         return adultRegex.containsMatchIn(text)
     }
+
+    fun isAdultGroupId(id: String?): Boolean {
+        if (id.isNullOrBlank()) return false
+        return id.equals(GROUP_ID, ignoreCase = true) || isAdultGroup(id)
+    }
+
+    fun preserveLocalParentalOverrides(
+        local: com.olympus.iptv.data.LineupConfig,
+        incoming: com.olympus.iptv.data.LineupConfig
+    ): com.olympus.iptv.data.LineupConfig {
+        val localAdultHidden = local.hiddenGroups.orEmpty().filter { isAdultGroupId(it) }
+        val localPins = local.groupPins.orEmpty().filter { (k, v) -> k.isNotBlank() && v.isNotBlank() }
+        if (localAdultHidden.isEmpty() && localPins.isEmpty()) return incoming
+
+        val mergedHidden = LinkedHashSet<String>(incoming.hiddenGroups.orEmpty())
+        mergedHidden.addAll(localAdultHidden)
+
+        val mergedPins = LinkedHashMap<String, String>(incoming.groupPins.orEmpty())
+        for ((groupKey, pin) in localPins) {
+            mergedPins[groupKey] = pin
+        }
+
+        return incoming.copy(
+            hiddenGroups = mergedHidden.toList(),
+            groupPins = if (mergedPins.isEmpty()) incoming.groupPins else mergedPins
+        )
+    }
 }
