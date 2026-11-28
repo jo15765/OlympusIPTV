@@ -1095,6 +1095,12 @@ internal fun BrowseActivity.watchBrowseWidth() {
     }
 
 internal fun BrowseActivity.watchFoldDisplay() {
+        com.olympus.iptv.ui.FormFactorBehavior.attachFoldDisplayWatcher(this) {
+            watchFoldDisplayInternal()
+        }
+    }
+
+private fun BrowseActivity.watchFoldDisplayInternal() {
         if (foldDisplayListener != null) return
         val bounds = if (android.os.Build.VERSION.SDK_INT >= 30) {
             windowManager.currentWindowMetrics.bounds
@@ -1133,6 +1139,20 @@ internal fun BrowseActivity.watchFoldDisplay() {
         }
         foldDisplayListener = listener
         manager.registerDisplayListener(listener, android.os.Handler(android.os.Looper.getMainLooper()))
+        if (touchPrimary && viewReady()) {
+            var lastShellWidth = binding.guideShell.width
+            binding.guideShell.addOnLayoutChangeListener { v, left, _, right, _, oldLeft, _, oldRight, _ ->
+                val newW = right - left
+                val oldW = oldRight - oldLeft
+                if (newW > 0 && (kotlin.math.abs(newW - oldW) >= 24 || kotlin.math.abs(newW - lastShellWidth) >= 24)) {
+                    lastShellWidth = newW
+                    v.post {
+                        if (!viewReady() || isDestroyed) return@post
+                        relayoutBrowseGrids(onlyIfChanged = false)
+                    }
+                }
+            }
+        }
     }
 
 internal fun BrowseActivity.adoptFoldWindow() {

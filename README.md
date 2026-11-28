@@ -44,15 +44,18 @@ flowchart LR
 
 ```text
 clearcast-tuner/
-├── app/                          # Android TV & Mobile Kotlin application
-│   └── src/main/
-│       ├── assets/dashboard/     # Embedded LAN web dashboard (gzipped at build time)
-│       ├── java/com/olympus/iptv/
-│       │   ├── data/             # NameStrip live event-window engine & models
-│       │   ├── playlist/         # CatalogDb (SQLite), DummyEpg, Xtream/M3U, Cloud sync
-│       │   ├── portal/           # Embedded LAN HTTP server (DashboardHost)
-│       │   └── ui/               # Browse guide, ExoPlayer, Search, DVR, Parental, VPN
-│       └── res/                  # TV & Mobile layouts (D-Pad & Touch)
+├── app/                          # Android TV & Mobile Kotlin application (tv + mobile product flavors)
+│   └── src/
+│       ├── main/                 # 100% shared engine, embedded LAN dashboard & resources
+│       │   ├── assets/dashboard/ # Embedded LAN web dashboard (gzipped at build time into both APKs)
+│       │   ├── java/com/olympus/iptv/
+│       │   │   ├── data/         # NameStrip live event-window engine & models
+│       │   │   ├── playlist/     # CatalogDb (SQLite), DummyEpg, TwentyFourSeven, AdultGroup, Xtream/M3U, Cloud sync
+│       │   │   ├── portal/       # Embedded LAN HTTP server (DashboardHost)
+│       │   │   └── ui/           # Browse guide, ExoPlayer, Search, DVR, Parental, VPN
+│       │   └── res/              # Shared TV & Mobile layouts/resources
+│       ├── tv/                   # Set-top box flavor (NVIDIA Shield, Fire TV, Google TV · zero foldable overhead)
+│       └── mobile/               # Phone / Foldable / Tablet flavor (SM-F976U unfold watcher & touch overrides)
 ├── cloud-api/                    # Optional self-hosted Docker backend
 │   ├── server.js                 # Express API (Brotli/Gzip, ETag, LRU, GIN search, SSE)
 │   ├── dispatch.js               # Multi-provider failover, M3U/XMLTV export, Catch-Up, HDHR, Stream Proxy, DVR rules, Telemetry
@@ -94,9 +97,11 @@ Sports and PPV IPTV providers often list hundreds of channels like `ESPN+ 16: NO
 - **Streamlined Layout:** Zero-scroll 4-column Favorites Auto Build, **Live-TV-only** Groups (2-column compact grid with `All Live`, `Sports`, `24/7`, `18+` chips) and Channels (single-line rows with an A–Z Quick Jump strip), and a compact Settings hub that fits cleanly without cutting off bottom cards.
 - On the cloud backend (`cloud-api/server.js`), static WAN dashboard hosting is **disabled by default** (`ENABLE_WEB_DASHBOARD=false`) so your VPS only exposes `/api/*` endpoints.
 
-### 4. Multi-Generation Fire TV Stick & Low-RAM Performance
-- **One APK across Fire TV & Android**: Supports **Fire OS 6 (API 25)**, **Fire OS 7 (API 28)**, **Fire OS 8 (API 30)**, Android TV, Google TV Streamer (4K), and Android phones/tablets (`minSdk = 24`, bundling both 32-bit `armeabi-v7a` and 64-bit `arm64-v8a`, GMS-free Cast fallback, and automatic low-RAM scaling).
-- **Zero-Churn Hot Paths**: Cached `NameStrip.statusCache` inspections, deduplicated SQLite live-window & EPG helpers (`CatalogDb`), and pre-compiled regex constants across `ChannelFailover`, `BrowseVodFilter`, `SearchTileAdapter`, and `FreshFragment`/`FreshActivity` keep scrolling and channel zapping snappy even on 1 GB–2 GB sticks.
+### 4. Dedicated `tv` & `mobile` Flavors, Fire TV & Foldable Performance
+- **Separate TV & Mobile APKs, Zero Code Duplication:** Gradle `formFactor` product flavors (`tv` and `mobile`) share 100% of `src/main/` (engine, SQLite, cloud sync, LAN dashboard) while isolating `src/tv/` and `src/mobile/` manifests and `FormFactorBehavior`. `DeviceForm.isTelevision()` / `isTouchPrimary()` resolve at compile time via `BuildConfig.IS_TV_BUILD` / `IS_MOBILE_BUILD`, letting R8 dead-code-strip unused form-factor paths and eliminating startup `PackageManager` IPC calls.
+- **Multi-Generation Fire TV Stick & Set-Top Box Support (`tv` flavor):** Supports **NVIDIA Shield**, **Fire OS 6/7/8**, Android TV, and Google TV Streamer (4K) (`minSdk = 24`, `armeabi-v7a` + `arm64-v8a`, GMS-free Cast fallback, zero foldable display-listener overhead, and automatic low-RAM scaling).
+- **Foldable & Large-Screen Resilience (`mobile` flavor):** Live `currentWindowMetrics` width checks (no stale 500ms cache) plus a persistent `OnLayoutChangeListener` on `guideShell` automatically re-span and re-bind group/folder grids after hinge unfold/fold, rotation, split-screen, or DeX transitions (e.g., Galaxy Z Fold `SM-F976U`).
+- **Zero-Churn Hot Paths:** Cached `NameStrip.statusCache` inspections, deduplicated SQLite live-window & EPG helpers (`CatalogDb`), and pre-compiled regex constants across `ChannelFailover`, `BrowseVodFilter`, `SearchTileAdapter`, and `FreshFragment`/`FreshActivity` keep scrolling and channel zapping snappy even on 1 GB–2 GB sticks.
 
 ### 5. Hardened 3-Tier Cloud Sync (`cloud-api/`)
 - **Fast Ingestion (`worker.js`):** Fetches all 6 Xtream endpoints in parallel with native Node 22 `fetch` + timeouts/retries, performs **2,500-row** PostgreSQL `UNNEST` bulk upserts across 3 staged commits over persistent TCP keep-alive pools, prunes stale VOD/Series/Categories, and uses **PostgreSQL session advisory locks** (`pg_try_advisory_lock`) so duplicate worker containers never collide.
@@ -128,13 +133,20 @@ Sports and PPV IPTV providers often list hundreds of channels like `ESPN+ 16: NO
    git clone https://github.com/<your-username>/ClearCast-Tuner.git
    cd ClearCast-Tuner/clearcast-tuner
    ```
-2. **Open in Android Studio** (JDK 17 / Android Studio JBR) or build from the command line:
+2. **Open in Android Studio** (JDK 17 / Android Studio JBR, pick `tvRelease` or `mobileRelease` in **Build Variants**) or build from the command line:
    ```powershell
-   # Windows PowerShell (verify tests + release Kotlin compile)
+   # Windows PowerShell (verify both flavors: unit tests + release Kotlin compile)
    $env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
-   .\gradlew.bat :app:gzipDashboardHtml :app:testDebugUnitTest :app:compileReleaseKotlin
+   .\gradlew.bat :app:gzipDashboardHtml :app:testTvDebugUnitTest :app:testMobileDebugUnitTest :app:compileTvReleaseKotlin :app:compileMobileReleaseKotlin
    ```
-3. **Build a Debug or Release APK** (via Android Studio **Build → Build APK(s)** or `./gradlew :app:assembleDebug`) and install on Android TV, Fire TV, Google TV, or Android phone/tablet.
+3. **Build Release APKs** (auto-copied to `Downloads` as `olympus-iptv-tv-<ver>.apk` and `olympus-iptv-mobile-<ver>.apk`):
+   ```powershell
+   # Build both TV and Mobile APKs
+   .\gradlew.bat :app:assembleRelease
+   # Or build just one flavor:
+   .\gradlew.bat :app:assembleTvRelease
+   .\gradlew.bat :app:assembleMobileRelease
+   ```
 4. **Add your playlist** directly on the TV/phone, or open the **LAN Dashboard URL** shown on screen from any browser on your home Wi-Fi.
 
 ---

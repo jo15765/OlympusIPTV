@@ -62,6 +62,22 @@ android {
         buildConfigField("String", "ONEDRIVE_CLIENT_ID", "\"$oneDriveClientId\"")
     }
 
+    flavorDimensions += "formFactor"
+    productFlavors {
+        create("tv") {
+            dimension = "formFactor"
+            buildConfigField("String", "FORM_FACTOR", "\"tv\"")
+            buildConfigField("boolean", "IS_TV_BUILD", "true")
+            buildConfigField("boolean", "IS_MOBILE_BUILD", "false")
+        }
+        create("mobile") {
+            dimension = "formFactor"
+            buildConfigField("String", "FORM_FACTOR", "\"mobile\"")
+            buildConfigField("boolean", "IS_TV_BUILD", "false")
+            buildConfigField("boolean", "IS_MOBILE_BUILD", "true")
+        }
+    }
+
     signingConfigs {
         if (signingValue("keystore").isNotBlank()) {
             create("release") {
@@ -200,29 +216,31 @@ val gzipDashboardHtml = tasks.register("gzipDashboardHtml") {
     }
 }
 
-tasks.matching { it.name == "assembleRelease" }.configureEach {
-    val releaseName = android.defaultConfig.versionName
-    val apkProvider = layout.buildDirectory.file("outputs/apk/release/app-release.apk")
-    val downloadsDir = File(System.getProperty("user.home"), "Downloads")
-    doLast {
-        val apk = apkProvider.get().asFile
-        if (!apk.exists() || releaseName.isNullOrBlank()) return@doLast
-        val dest = File(downloadsDir, "olympus-iptv-$releaseName.apk")
-        apk.copyTo(dest, overwrite = true)
-        println("Release APK: ${dest.absolutePath}")
+listOf("tv", "mobile").forEach { flavor ->
+    val cap = flavor.replaceFirstChar { it.uppercase() }
+    tasks.matching { it.name == "assemble${cap}Release" }.configureEach {
+        val releaseName = android.defaultConfig.versionName
+        val apkProvider = layout.buildDirectory.file("outputs/apk/$flavor/release/app-$flavor-release.apk")
+        val downloadsDir = File(System.getProperty("user.home"), "Downloads")
+        doLast {
+            val apk = apkProvider.get().asFile
+            if (!apk.exists() || releaseName.isNullOrBlank()) return@doLast
+            val dest = File(downloadsDir, "olympus-iptv-$flavor-$releaseName.apk")
+            apk.copyTo(dest, overwrite = true)
+            println("${cap} Release APK: ${dest.absolutePath}")
+        }
     }
-}
-
-tasks.matching { it.name == "assembleFastRelease" }.configureEach {
-    val releaseName = android.defaultConfig.versionName
-    val apkProvider = layout.buildDirectory.file("outputs/apk/fastRelease/app-fastRelease.apk")
-    val downloadsDir = File(System.getProperty("user.home"), "Downloads")
-    doLast {
-        val apk = apkProvider.get().asFile
-        if (!apk.exists() || releaseName.isNullOrBlank()) return@doLast
-        val dest = File(downloadsDir, "olympus-iptv-$releaseName-fast.apk")
-        apk.copyTo(dest, overwrite = true)
-        println("Fast Release APK: ${dest.absolutePath}")
+    tasks.matching { it.name == "assemble${cap}FastRelease" }.configureEach {
+        val releaseName = android.defaultConfig.versionName
+        val apkProvider = layout.buildDirectory.file("outputs/apk/$flavor/fastRelease/app-$flavor-fastRelease.apk")
+        val downloadsDir = File(System.getProperty("user.home"), "Downloads")
+        doLast {
+            val apk = apkProvider.get().asFile
+            if (!apk.exists() || releaseName.isNullOrBlank()) return@doLast
+            val dest = File(downloadsDir, "olympus-iptv-$flavor-$releaseName-fast.apk")
+            apk.copyTo(dest, overwrite = true)
+            println("${cap} Fast Release APK: ${dest.absolutePath}")
+        }
     }
 }
 

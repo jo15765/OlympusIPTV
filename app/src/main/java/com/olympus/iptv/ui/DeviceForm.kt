@@ -19,11 +19,10 @@ object DeviceForm {
     @Volatile private var cachedGoogleTvStreamer: Boolean? = null
     @Volatile private var cachedPowerSave = false
     @Volatile private var powerSaveCheckedAt = 0L
-    @Volatile private var cachedWidthKey = 0L
-    @Volatile private var cachedWidthAt = 0L
-    @Volatile private var cachedWidthDp = 0
 
     fun isTelevision(context: Context): Boolean {
+        if (com.olympus.iptv.BuildConfig.IS_TV_BUILD) return true
+        if (com.olympus.iptv.BuildConfig.IS_MOBILE_BUILD) return false
         cachedTelevision?.let { return it }
         val app = context.applicationContext
         val pm = app.packageManager
@@ -42,6 +41,8 @@ object DeviceForm {
     }
 
     fun isTouchPrimary(context: Context): Boolean {
+        if (com.olympus.iptv.BuildConfig.IS_TV_BUILD) return false
+        if (com.olympus.iptv.BuildConfig.IS_MOBILE_BUILD) return true
         cachedTouchPrimary?.let { return it }
         val touch = !isTelevision(context) &&
             context.applicationContext.packageManager.hasSystemFeature(PackageManager.FEATURE_TOUCHSCREEN)
@@ -54,14 +55,7 @@ object DeviceForm {
         val dm = res.displayMetrics
         val density = dm.density
         val cfgWidth = res.configuration.screenWidthDp
-        val key = (dm.widthPixels.toLong() shl 32) xor
-            (cfgWidth.toLong() shl 16) xor
-            java.lang.Float.floatToRawIntBits(density).toLong().and(0xFFFFL)
-        val now = android.os.SystemClock.elapsedRealtime()
-        if (cachedWidthKey == key && cachedWidthDp > 0 && now - cachedWidthAt < 500L) {
-            return cachedWidthDp
-        }
-        val result = if (context is Activity && Build.VERSION.SDK_INT >= 30 && density > 0f) {
+        return if (context is Activity && Build.VERSION.SDK_INT >= 30 && density > 0f) {
             val px = context.windowManager.currentWindowMetrics.bounds.width()
             if (px > 0) (px / density).toInt()
             else if (dm.widthPixels > 0) (dm.widthPixels / density).toInt()
@@ -71,10 +65,6 @@ object DeviceForm {
         } else {
             cfgWidth
         }
-        cachedWidthKey = key
-        cachedWidthAt = now
-        cachedWidthDp = result
-        return result
     }
 
     fun isCompact(context: Context): Boolean {

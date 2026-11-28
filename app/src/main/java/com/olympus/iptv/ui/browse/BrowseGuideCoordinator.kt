@@ -1826,6 +1826,9 @@ internal fun BrowseActivity.applyGuideColumns() {
             if (glm.spanCount != desired) {
                 glm.spanCount = desired
                 binding.categoryList.recycledViewPool.clear()
+                binding.categoryList.invalidateItemDecorations()
+                categoryAdapter.notifyDataSetChanged()
+                binding.categoryList.requestLayout()
             }
         }
         val content = binding.contentColumn.layoutParams as LinearLayout.LayoutParams
@@ -1840,9 +1843,9 @@ internal fun BrowseActivity.applyGuideColumns() {
                 groups.weight = 0f
                 binding.groupColumn.layoutParams = groups
             }
-        } else if (!phoneChrome) {
+        } else if (showGroups) {
             val groups = binding.groupColumn.layoutParams as LinearLayout.LayoutParams
-            if (groups.weight != 1f) {
+            if (groups.width != 0 || groups.weight != 1f) {
                 groups.width = 0
                 groups.weight = 1f
                 binding.groupColumn.layoutParams = groups
